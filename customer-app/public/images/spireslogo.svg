@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 60" width="280" height="60">
+  <defs>
+    <style>
+      .logo-text {
+        font-family: 'Cinzel', serif;
+        font-size: 28.8px;
+        font-weight: 400;
+        fill: #002147;
+        letter-spacing: 0.5px;
+      }
+    </style>
+
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#C5A572;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C5A572;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main logo text -->
+  <text x="140" y="30" class="logo-text" text-anchor="middle" dominant-baseline="middle">
+    SPIRES TAXIS
+  </text>
+  
+  <!-- Gold gradient accent line: positioned under the "S" in SPIRES -->
+  <rect x="52" y="42" width="136" height="2" fill="url(#goldGradient)"/>
+</svg>

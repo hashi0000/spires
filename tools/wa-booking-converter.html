@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp to Booking Converter</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #002147;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 400px;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #C5A572;
+            box-shadow: 0 0 0 3px rgba(197, 165, 114, 0.1);
+        }
+        .button {
+            background: #002147;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            background: #003366;
+            transform: translateY(-1px);
+        }
+        .button.secondary {
+            background: #C5A572;
+        }
+        .button.secondary:hover {
+            background: #b8965f;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        .output {
+            background: #f1f5f9;
+            border: 2px solid #cbd5e1;
+            min-height: 400px;
+        }
+        .stats {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #1e40af;
+        }
+        .booking-preview {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #fafafa;
+        }
+        .booking-header {
+            font-weight: 600;
+            color: #002147;
+            margin-bottom: 10px;
+        }
+        .booking-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .booking-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        .label {
+            font-weight: 500;
+            color: #64748b;
+        }
+        .value {
+            color: #1e293b;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        .format-info {
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        .format-info h4 {
+            color: #0369a1;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚖 WhatsApp Booking Converter</h1>
+        <p class="subtitle">Convert your WhatsApp booking messages into CSV format for your React booking system</p>
+        
+        <div class="format-info">
+            <h4>📋 CSV Output Format:</h4>
+            <code>Customer Name, Phone, Address, Pickup Location, Destination, Date, Time, Fare, Payment Method, Notes</code>
+        </div>
+        
+        <div class="grid">
+            <div>
+                <label for="whatsappInput">📱 Paste WhatsApp Messages</label>
+                <textarea 
+                    id="whatsappInput" 
+                    placeholder="Paste your WhatsApp messages here...
+
+Example:
+Assalam, a few jobs for Wednesday 23rd
+
+1) @ 4:25am
+Pick up: Old Bank Hotel
+Drop off: Heathrow T2
+Mr & Mrs Scheall
+(2ppl)
+Acc: Viking - £85
+
+2) @ 7:40am
+Pick up: Old Bank Hotel
+Drop off: Heathrow T3
+Mr & Mrs Maxfield
+(2ppl)
+Acc: Viking - £85"
+                ></textarea>
+                
+                <div style="margin-top: 15px;">
+                    <button class="button" onclick="parseBookings()">🔍 Parse Bookings</button>
+                    <button class="button secondary" onclick="loadExample()">📝 Load Example</button>
+                    <button class="button secondary" onclick="clearAll()">🗑️ Clear All</button>
+                </div>
+            </div>
+            
+            <div>
+                <label>📋 Parsed Bookings</label>
+                <div id="output" class="output">
+                    <div style="padding: 40px; text-align: center; color: #64748b;">
+                        <p>📱 Paste your WhatsApp messages and click "Parse Bookings"</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Each booking will be converted to CSV format for your React app</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px;" id="downloadSection" style="display: none;">
+                    <button class="button" onclick="copyAllText()">📋 Copy All Text</button>
+                    <button class="button secondary" onclick="downloadBookings()">💾 Download CSV</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let parsedBookings = [];
+
+        const exampleText = `Assalam, a few jobs for Wednesday 23rd
+
+1) @ 4:25am
+Pick up: Old Bank Hotel
+Drop off: Heathrow T2
+Mr & Mrs Scheall
+(2ppl)
+Acc: Viking - £85
+
+2) @ 7:40am
+Pick up: Old Bank Hotel
+Drop off: Heathrow T3
+Mr & Mrs Maxfield
+(2ppl)
+Acc: Viking - £85
+
+3) @ 6:50am
+Pick up: Old Bank Hotel
+Drop off: Heathrow T3
+Mr & Mrs Saunders
+Mr & Mrs Palmer
+(4ppl)
+Acc: Viking - £120`;
+
+        function loadExample() {
+            document.getElementById('whatsappInput').value = exampleText;
+        }
+
+        function clearAll() {
+            document.getElementById('whatsappInput').value = '';
+            document.getElementById('output').innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #64748b;">
+                    <p>📱 Paste your WhatsApp messages and click "Parse Bookings"</p>
+                    <p style="font-size: 14px; margin-top: 10px;">Each booking will be converted to CSV format for your React app</p>
+                </div>`;
+            parsedBookings = [];
+            document.getElementById('downloadSection').style.display = 'none';
+        }
+
+        function parseBookings() {
+            const input = document.getElementById('whatsappInput').value.trim();
+            if (!input) {
+                alert('Please paste your WhatsApp messages first');
+                return;
+            }
+
+            parsedBookings = [];
+            const bookings = extractBookingsFromText(input);
+            
+            if (bookings.length === 0) {
+                document.getElementById('output').innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #ef4444;">
+                        <p>❌ No bookings found</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Please check the format and try again</p>
+                    </div>`;
+                return;
+            }
+
+            parsedBookings = bookings;
+            displayBookings(bookings);
+            document.getElementById('downloadSection').style.display = 'block';
+        }
+
+        function extractBookingsFromText(text) {
+            const bookings = [];
+            
+            // Extract date from header - look for patterns like "Wednesday 23rd", "for 25th", etc.
+            const dateMatch = text.match(/(?:for\s+)?(?:\w+\s+)?(\d{1,2})(?:st|nd|rd|th)/i);
+            let bookingDate = new Date();
+            if (dateMatch) {
+                const dayNumber = parseInt(dateMatch[1]);
+                bookingDate.setDate(dayNumber);
+                // If the day is in the past this month, assume it's next month
+                if (bookingDate < new Date()) {
+                    bookingDate.setMonth(bookingDate.getMonth() + 1);
+                }
+            }
+
+            // Find all job patterns - more flexible matching
+            const jobPattern = /(\d+)\)\s*@?\s*(\d{1,2}):(\d{2})\s*(am|pm)/gi;
+            const matches = [];
+            let match;
+            while ((match = jobPattern.exec(text)) !== null) {
+                matches.push(match);
+            }
+
+            matches.forEach((match, index) => {
+                const jobNumber = match[1];
+                const hours = parseInt(match[2]);
+                const minutes = parseInt(match[3]);
+                const ampm = match[4].toLowerCase();
+
+                // Convert to 24 hour format
+                let hours24 = hours;
+                if (ampm === 'pm' && hours !== 12) hours24 += 12;
+                if (ampm === 'am' && hours === 12) hours24 = 0;
+
+                // Extract job text between this match and the next
+                const currentIndex = match.index;
+                const nextMatch = matches[index + 1];
+                const nextIndex = nextMatch ? nextMatch.index : text.length;
+                const jobText = text.substring(currentIndex, nextIndex);
+
+                const booking = parseJobText(jobText, bookingDate, hours24, minutes, jobNumber);
+                if (booking.pickupLocation && booking.destination) {
+                    bookings.push(booking);
+                }
+            });
+
+            return bookings;
+        }
+
+        function parseJobText(jobText, baseDate, hours, minutes, jobNumber) {
+            const lines = jobText.split('\n').map(line => line.trim()).filter(line => line);
+            
+            const booking = {
+                jobNumber,
+                customerName: '',
+                phone: '07000000000', // Default phone number
+                address: 'Oxford, UK', // Default address
+                pickupLocation: '',
+                destination: '',
+                date: '',
+                time: '',
+                fare: 0,
+                paymentMethod: 'account', // Default payment method
+                notes: ''
+            };
+
+            // Set date and time
+            const bookingDateTime = new Date(baseDate);
+            bookingDateTime.setHours(hours, minutes, 0, 0);
+            
+            // Format date as DD/MM/YYYY for CSV
+            const day = bookingDateTime.getDate().toString().padStart(2, '0');
+            const month = (bookingDateTime.getMonth() + 1).toString().padStart(2, '0');
+            const year = bookingDateTime.getFullYear();
+            booking.date = `${day}/${month}/${year}`;
+            
+            // Format time as HH:MM
+            booking.time = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+            let accountInfo = '';
+
+            lines.forEach(line => {
+                const cleanLine = line.trim();
+                
+                if (cleanLine.toLowerCase().includes('pick up:') || cleanLine.toLowerCase().includes('pickup:')) {
+                    booking.pickupLocation = cleanLine.replace(/pick\s*up:\s*/i, '');
+                } 
+                else if (cleanLine.toLowerCase().includes('drop off:') || cleanLine.toLowerCase().includes('dropoff:')) {
+                    booking.destination = cleanLine.replace(/drop\s*off:\s*/i, '');
+                }
+                else if (cleanLine.match(/^(Mr|Mrs|Ms|Dr|Miss)\s+/i) || cleanLine.includes('&')) {
+                    // Remove passenger count info if present
+                    booking.customerName = cleanLine.replace(/\(\d+ppl\)/i, '').trim();
+                }
+                else if (cleanLine.toLowerCase().includes('acc:')) {
+                    const accMatch = cleanLine.match(/acc:\s*([^-£]+)(?:-\s*)?£?(\d+(?:\.\d{2})?)/i);
+                    if (accMatch) {
+                        accountInfo = accMatch[1].trim();
+                        booking.fare = parseFloat(accMatch[2]);
+                        booking.paymentMethod = 'account';
+                    }
+                }
+                else if (cleanLine.match(/£\d+/)) {
+                    // Look for standalone price
+                    const priceMatch = cleanLine.match(/£(\d+(?:\.\d{2})?)/);
+                    if (priceMatch && !booking.fare) {
+                        booking.fare = parseFloat(priceMatch[1]);
+                    }
+                }
+            });
+
+            // Build notes from available information
+            let notes = `WhatsApp booking ${jobNumber}`;
+            if (accountInfo) {
+                notes += ` - ${accountInfo} account`;
+            }
+            booking.notes = notes;
+
+            return booking;
+        }
+
+        function displayBookings(bookings) {
+            const output = document.getElementById('output');
+            
+            let html = `
+                <div class="stats">
+                    📊 Found ${bookings.length} booking${bookings.length !== 1 ? 's' : ''} - Ready for CSV download and import into your React app
+                </div>
+            `;
+
+            bookings.forEach((booking, index) => {
+                html += `
+                    <div class="booking-preview">
+                        <div class="booking-header">
+                            🎫 Booking ${booking.jobNumber} - ${booking.customerName || 'Customer'}
+                        </div>
+                        <div class="booking-details">
+                            <div class="booking-row">
+                                <span class="label">👤 Customer:</span>
+                                <span class="value">${booking.customerName}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">📞 Phone:</span>
+                                <span class="value">${booking.phone}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">🏠 Address:</span>
+                                <span class="value">${booking.address}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">📍 From:</span>
+                                <span class="value">${booking.pickupLocation}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">🎯 To:</span>
+                                <span class="value">${booking.destination}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">📅 Date:</span>
+                                <span class="value">${booking.date}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">⏰ Time:</span>
+                                <span class="value">${booking.time}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">💷 Fare:</span>
+                                <span class="value">${booking.fare ? '£' + booking.fare : 'TBD'}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">💳 Payment:</span>
+                                <span class="value">${booking.paymentMethod}</span>
+                            </div>
+                            <div class="booking-row">
+                                <span class="label">📝 Notes:</span>
+                                <span class="value">${booking.notes}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            output.innerHTML = html;
+        }
+
+        function copyAllText() {
+            let text = `WhatsApp Bookings (${parsedBookings.length} total):\n\n`;
+            
+            parsedBookings.forEach((booking, index) => {
+                text += `Booking ${booking.jobNumber}:\n`;
+                text += `Customer: ${booking.customerName}\n`;
+                text += `Phone: ${booking.phone}\n`;
+                text += `Address: ${booking.address}\n`;
+                text += `From: ${booking.pickupLocation}\n`;
+                text += `To: ${booking.destination}\n`;
+                text += `Date: ${booking.date}\n`;
+                text += `Time: ${booking.time}\n`;
+                text += `Fare: £${booking.fare}\n`;
+                text += `Payment: ${booking.paymentMethod}\n`;
+                text += `Notes: ${booking.notes}\n`;
+                text += `\n`;
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Booking details copied to clipboard!');
+            });
+        }
+
+        function downloadBookings() {
+            // CSV format: Customer Name, Phone, Address, Pickup Location, Destination, Date, Time, Fare, Payment Method, Notes
+            const headers = 'Customer Name,Phone,Address,Pickup Location,Destination,Date,Time,Fare,Payment Method,Notes\n';
+            
+            const csvContent = parsedBookings.map(booking => {
+                // Escape quotes and wrap in quotes for CSV safety
+                const escape = (str) => `"${String(str).replace(/"/g, '""')}"`;
+                
+                return [
+                    escape(booking.customerName || 'WhatsApp Customer'),
+                    escape(booking.phone),
+                    escape(booking.address),
+                    escape(booking.pickupLocation),
+                    escape(booking.destination),
+                    escape(booking.date),
+                    escape(booking.time),
+                    escape(booking.fare || '0'),
+                    escape(booking.paymentMethod),
+                    escape(booking.notes)
+                ].join(',');
+            }).join('\n');
+
+            const csv = headers + csvContent;
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `whatsapp-bookings-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ Downloaded CSV with ${parsedBookings.length} bookings!\nReady to import into your React booking system.`);
+        }
+    </script>
+</body>
+</html>
