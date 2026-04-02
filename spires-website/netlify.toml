@@ -1,0 +1,40 @@
+[build]
+  # Build command that builds the React app and ignores warnings
+  command = "cd spires-admin-dashboard && npm install --legacy-peer-deps && CI=false npm run build"
+  
+  # Publish the entire website including the built React app
+  publish = "."
+
+[build.environment]
+  NODE_VERSION = "18.17.0"
+  NPM_FLAGS = "--legacy-peer-deps"
+  CI = "false"
+
+# Redirect rules for the admin dashboard
+[[redirects]]
+  from = "/admin/*"
+  to = "/spires-admin-dashboard/build/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/spires-admin-dashboard/build/index.html"
+  status = 200
+
+# Handle React Router routes in admin dashboard
+[[redirects]]
+  from = "/spires-admin-dashboard/*"
+  to = "/spires-admin-dashboard/build/index.html"
+  status = 200
+
+# Main website redirects (keep .html files working)
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+
+# Catch-all for any missing pages - redirect to home
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 404

@@ -1,0 +1,31 @@
+# robots.txt for Spires Taxis Oxford
+# https://www.spires-taxis.com
+
+User-agent: *
+Allow: /
+Disallow: /customer-app/
+Disallow: /spires-admin-fresh/
+Disallow: /functions/
+Disallow: /backend/
+Disallow: /customer/
+Disallow: /node_modules/
+Disallow: /*.html$
+Allow: /index.html
+Allow: /services.html
+Allow: /destinations.html
+Allow: /rates.html
+Allow: /about.html
+Allow: /reviews.html
+Allow: /contact.html
+Allow: /booking.html
+Allow: /student-offers.html
+Allow: /thank-you.html
+
+# Sitemap
+Sitemap: https://www.spires-taxis.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
+
+
+

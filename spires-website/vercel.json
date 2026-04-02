@@ -1,0 +1,5 @@
+{
+  "cleanUrls": true,
+  "ignoreCommand": "echo 'Static site - no build needed'",
+  "outputDirectory": "."
+}

@@ -1,0 +1,185 @@
+// bookingMapper.ts - Maps between customer app and admin app booking formats
+import { Booking } from '../types/types';
+
+/**
+ * Customer app booking format (from customer-app)
+ */
+export interface CustomerBooking {
+  id?: string;
+  uid?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  pickup?: string;
+  destination?: string;
+  dateTime?: string | Date | any; // Can be Firestore Timestamp, string, or Date
+  date?: string;
+  time?: string;
+  passengers?: number;
+  notes?: string;
+  status?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  customerStatus?: 'pending' | 'confirmed' | 'paid' | 'cancelled'; // Set by admin when confirming
+  createdAt?: any;
+  updatedAt?: any;
+  actualFare?: number;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  expenses?: any[];
+}
+
+/**
+ * Converts a customer booking to admin booking format
+ */
+export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Partial<Booking> => {
+  // Extract date/time from dateTime or separate date/time fields
+  let pickupTime = '';
+  let dateTime = '';
+
+  if (customerBooking.dateTime) {
+    // Handle Firestore Timestamp
+    if (customerBooking.dateTime.toDate) {
+      const dt = customerBooking.dateTime.toDate();
+      pickupTime = dt.toISOString();
+      dateTime = dt.toISOString();
+    } else if (typeof customerBooking.dateTime === 'string') {
+      pickupTime = customerBooking.dateTime;
+      dateTime = customerBooking.dateTime;
+    } else if (customerBooking.dateTime instanceof Date) {
+      pickupTime = customerBooking.dateTime.toISOString();
+      dateTime = customerBooking.dateTime.toISOString();
+    }
+  } else if (customerBooking.date && customerBooking.time) {
+    // Fallback to separate date/time
+    const combined = `${customerBooking.date}T${customerBooking.time}`;
+    pickupTime = new Date(combined).toISOString();
+    dateTime = new Date(combined).toISOString();
+  } else {
+    // Use createdAt as fallback
+    const fallbackDate = customerBooking.createdAt?.toDate 
+      ? customerBooking.createdAt.toDate() 
+      : new Date();
+    pickupTime = fallbackDate.toISOString();
+    dateTime = fallbackDate.toISOString();
+  }
+
+  // Keep pending as pending - admin will confirm it
+  // Map status: customer uses 'confirmed'/'paid', admin uses 'allocated'/'completed'
+  let status: Booking['status'] = 'pending';
+  if (customerBooking.status === 'pending') {
+    status = 'pending'; // Keep pending so admin can see and confirm
+  } else if (customerBooking.status === 'confirmed') {
+    status = 'allocated';
+  } else if (customerBooking.status === 'paid') {
+    status = 'completed';
+  } else if (customerBooking.status === 'cancelled') {
+    status = 'cancelled';
+  } else {
+    status = 'pending';
+  }
+
+  // Generate booking number if missing
+  const bookingNumber = customerBooking.id 
+    ? `CUST${customerBooking.id.slice(0, 6).toUpperCase()}`
+    : `CUST${Date.now().toString().slice(-6)}`;
+
+  // Map customer status to admin status, but preserve customer status
+  let customerStatus = customerBooking.status || 'pending';
+  let adminStatus: Booking['status'] = 'pending';
+  
+  // If admin has set customerStatus, use that for customer-facing status
+  if (customerBooking.customerStatus) {
+    customerStatus = customerBooking.customerStatus;
+  }
+  
+  // Map customer status to admin internal status
+  // Customer sees: pending → confirmed → paid
+  // Admin sees: pending → confirmed → allocated → completed
+  if (customerStatus === 'pending') {
+    adminStatus = 'pending';
+  } else if (customerStatus === 'confirmed') {
+    // Check if admin has set an internal status (allocated/completed)
+    const internalStatus = (customerBooking as any).adminStatus || (customerBooking as any).status;
+    if (internalStatus === 'allocated' || internalStatus === 'completed') {
+      adminStatus = internalStatus;
+    } else {
+      adminStatus = 'confirmed';
+    }
+  } else if (customerStatus === 'paid') {
+    adminStatus = 'completed';
+  } else if (customerStatus === 'cancelled') {
+    adminStatus = 'cancelled';
+  }
+
+  return {
+    id: customerBooking.id,
+    bookingNumber,
+    dateTime,
+    hirerName: customerBooking.name || 'Customer',
+    hirerAddress: '', // Customer app doesn't collect address
+    hirerPhone: customerBooking.phone || '',
+    bookingMethod: 'internet', // Customer bookings are always from internet
+    pickupTime,
+    pickupLocation: customerBooking.pickup || '',
+    destination: customerBooking.destination || '',
+    status: adminStatus,
+    notes: customerBooking.notes || '',
+    actualFare: customerBooking.actualFare,
+    paymentMethod: customerBooking.paymentMethod as any,
+    paymentStatus: customerBooking.paymentStatus as any,
+    expenses: customerBooking.expenses || [],
+    createdAt: customerBooking.createdAt?.toDate 
+      ? customerBooking.createdAt.toDate() 
+      : (customerBooking.createdAt || new Date()),
+    updatedAt: customerBooking.updatedAt?.toDate 
+      ? customerBooking.updatedAt.toDate() 
+      : (customerBooking.updatedAt || new Date()),
+    // Preserve customer info
+    uid: customerBooking.uid,
+    email: customerBooking.email,
+    passengers: customerBooking.passengers,
+    // Preserve customer status for customer app
+    customerStatus: customerStatus,
+  } as Partial<Booking>;
+};
+
+/**
+ * Checks if a booking is from customer app (has uid field)
+ */
+export const isCustomerBooking = (booking: any): boolean => {
+  return !!(booking.uid || (!booking.bookingNumber && booking.pickup && !booking.pickupLocation));
+};
+
+/**
+ * Normalizes a booking to admin format (handles both customer and admin formats)
+ */
+export const normalizeBooking = (booking: any): Booking => {
+  // If it's already in admin format (has bookingNumber, pickupLocation, hirerName)
+  // but might be a customer booking that was already mapped
+  if (booking.bookingNumber && booking.pickupLocation && booking.hirerName) {
+    // Check if it's a customer booking - if so, preserve customer status fields
+    if (isCustomerBooking(booking)) {
+      // Preserve customer status and admin status separately
+      const normalized = booking as Booking;
+      // Keep customerStatus if it exists
+      (normalized as any).customerStatus = booking.customerStatus || booking.status;
+      return normalized;
+    }
+    return booking as Booking;
+  }
+
+  // If it's a customer booking, map it
+  if (isCustomerBooking(booking)) {
+    return mapCustomerToAdminBooking(booking) as Booking;
+  }
+
+  // Fallback: try to construct admin format from available data
+  return {
+    ...booking,
+    bookingNumber: booking.bookingNumber || `UNK${Date.now().toString().slice(-6)}`,
+    pickupLocation: booking.pickupLocation || booking.pickup || '',
+    hirerName: booking.hirerName || booking.name || 'Unknown',
+    hirerPhone: booking.hirerPhone || booking.phone || '',
+    status: booking.status || 'pending',
+  } as Booking;
+};
+
