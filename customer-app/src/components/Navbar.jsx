@@ -34,7 +34,7 @@ const NAVBAR_CONFIG = {
     },
     adminPanel: {
       label: "Admin Panel",
-      path: "https://admin.spires-taxis.com",
+      path: "https://booking.spires-taxis.com/",
       external: true
     }
   }
