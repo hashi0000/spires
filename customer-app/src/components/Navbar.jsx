@@ -25,7 +25,8 @@ const NAVBAR_CONFIG = {
   buttons: {
     bookOnline: {
       label: "Book Online",
-      path: "/contact"
+      path: "https://booking.spires-taxis.com",
+      external: true
     },
     myAccount: {
       label: "My Account",
@@ -147,13 +148,25 @@ const Navbar = () => {
 
           {/* Action Buttons */}
           <div className="navbar-buttons">
-            <Link 
-              to={NAVBAR_CONFIG.buttons.bookOnline.path} 
-              className="btn-book-online"
-              onClick={closeMenu}
-            >
-              {NAVBAR_CONFIG.buttons.bookOnline.label}
-            </Link>
+            {NAVBAR_CONFIG.buttons.bookOnline.external ? (
+              <a
+                href={NAVBAR_CONFIG.buttons.bookOnline.path}
+                className="btn-book-online"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={closeMenu}
+              >
+                {NAVBAR_CONFIG.buttons.bookOnline.label}
+              </a>
+            ) : (
+              <Link
+                to={NAVBAR_CONFIG.buttons.bookOnline.path}
+                className="btn-book-online"
+                onClick={closeMenu}
+              >
+                {NAVBAR_CONFIG.buttons.bookOnline.label}
+              </Link>
+            )}
             <a 
               href={NAVBAR_CONFIG.buttons.myAccount.path} 
               className="btn-my-account"
@@ -217,13 +230,25 @@ const Navbar = () => {
             </a>
           </div>
           <div className="mobile-buttons-group">
-            <Link 
-              to={NAVBAR_CONFIG.buttons.bookOnline.path} 
-              className="mobile-book-btn"
-              onClick={closeMenu}
-            >
-              {NAVBAR_CONFIG.buttons.bookOnline.label}
-            </Link>
+            {NAVBAR_CONFIG.buttons.bookOnline.external ? (
+              <a
+                href={NAVBAR_CONFIG.buttons.bookOnline.path}
+                className="mobile-book-btn"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={closeMenu}
+              >
+                {NAVBAR_CONFIG.buttons.bookOnline.label}
+              </a>
+            ) : (
+              <Link
+                to={NAVBAR_CONFIG.buttons.bookOnline.path}
+                className="mobile-book-btn"
+                onClick={closeMenu}
+              >
+                {NAVBAR_CONFIG.buttons.bookOnline.label}
+              </Link>
+            )}
             <a 
               href={NAVBAR_CONFIG.buttons.myAccount.path} 
               className="mobile-account-btn"
