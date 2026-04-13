@@ -103,10 +103,22 @@
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://www.spires-taxis.com/pages/oxford-to-heathrow-taxi</loc>
-    <lastmod>2026-04-10</lastmod>
+    <loc>https://www.spires-taxis.com/oxford-to-heathrow-taxi</loc>
+    <lastmod>2026-04-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://www.spires-taxis.com/oxford-to-gatwick-taxi</loc>
+    <lastmod>2026-04-13</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.spires-taxis.com/oxford-to-luton-taxi</loc>
+    <lastmod>2026-04-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://www.spires-taxis.com/rates</loc>
