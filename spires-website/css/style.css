@@ -801,6 +801,55 @@ nav .btn-ghost:hover {
     background: var(--oxford-cream);
 }
 
+/* Homepage: three balanced route cards */
+.popular-routes-section .popular-routes-grid {
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+    align-items: stretch;
+}
+
+.popular-routes-section .popular-route-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.popular-routes-section .popular-route-card:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+}
+
+.popular-routes-section .popular-route-card .service-price {
+    margin-top: auto;
+    padding-top: 0.75rem;
+}
+
+.popular-routes-note {
+    text-align: center;
+    margin-top: 2rem;
+    font-size: 0.95rem;
+    color: var(--text-gray);
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.popular-routes-note a {
+    color: var(--oxford-blue);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+    .popular-routes-section .popular-routes-grid {
+        max-width: 100%;
+    }
+}
+
 .about-section {
     background: var(--white);
 }

@@ -109,6 +109,12 @@
     <priority>0.95</priority>
   </url>
   <url>
+    <loc>https://www.spires-taxis.com/heathrow-to-oxford-taxi</loc>
+    <lastmod>2026-04-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
     <loc>https://www.spires-taxis.com/oxford-to-gatwick-taxi</loc>
     <lastmod>2026-04-13</lastmod>
     <changefreq>monthly</changefreq>
