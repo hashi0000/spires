@@ -1,6 +1,12 @@
 // Dashboard.tsx - Put this in a separate file
-import React from 'react';
-import { Users, Car, FileText, Calendar, AlertTriangle, Bell } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Users, Car, FileText, Calendar, AlertTriangle, Bell, Clock } from 'lucide-react';
+import { Booking } from '../types/types';
+import {
+  formatPickupDisplay,
+  formatTimeUntil,
+  getUpcomingBookings
+} from '../utils/bookingSchedule';
 
 interface DashboardProps {
   activeDriversCount: number;
@@ -9,7 +15,13 @@ interface DashboardProps {
   todaysBookingsCount: number;
   isAtDriverLimit: boolean;
   pendingCustomerBookingsCount: number;
+  bookings: Booking[];
+  desktopRemindersEnabled: boolean;
+  onDesktopRemindersChange: (enabled: boolean) => void | Promise<void>;
 }
+
+const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const UPCOMING_LIST_MAX = 20;
 
 const Dashboard: React.FC<DashboardProps> = ({
   activeDriversCount,
@@ -17,8 +29,27 @@ const Dashboard: React.FC<DashboardProps> = ({
   totalBookings,
   todaysBookingsCount,
   isAtDriverLimit,
-  pendingCustomerBookingsCount
+  pendingCustomerBookingsCount,
+  bookings,
+  desktopRemindersEnabled,
+  onDesktopRemindersChange
 }) => {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const upcoming = useMemo(
+    () => getUpcomingBookings(bookings, now, { withinMs: UPCOMING_WINDOW_MS, maxItems: UPCOMING_LIST_MAX }),
+    [bookings, now]
+  );
+
+  const handleDesktopToggle = async (next: boolean) => {
+    await onDesktopRemindersChange(next);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
@@ -52,6 +83,65 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       )}
+
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <Clock className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Upcoming jobs</h3>
+            <p className="text-xs text-gray-500">
+              Active bookings in the next 7 days (pending, confirmed, or allocated)
+            </p>
+          </div>
+        </div>
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-gray-600 px-4 py-6">No upcoming jobs in the next week.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {upcoming.map(({ booking, pickupAt }) => {
+              const soon = pickupAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000;
+              return (
+                <li key={booking.id || booking.bookingNumber} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {booking.bookingNumber}
+                      <span className="text-gray-500 font-normal"> · {booking.hirerName}</span>
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {(booking.pickupLocation || '').trim() || '—'}
+                      {(booking.destination || '').trim() ? ` → ${(booking.destination || '').trim()}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right flex-shrink-0">
+                    <p className="text-sm text-gray-900">{formatPickupDisplay(pickupAt)}</p>
+                    <p className={`text-xs mt-0.5 ${soon ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
+                      {formatTimeUntil(pickupAt, now)}
+                      {soon ? ' · next 24h' : ''}
+                    </p>
+                    <p className="text-xs text-gray-400 capitalize mt-0.5">{booking.status}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              checked={desktopRemindersEnabled}
+              onChange={(e) => void handleDesktopToggle(e.target.checked)}
+            />
+            <span className="text-sm text-gray-700">
+              <span className="font-medium text-gray-900">Desktop reminders</span>
+              {' — '}
+              show a browser notification when a pickup is due in the next hour (while this tab is open). Requires
+              permission.
+            </span>
+          </label>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">

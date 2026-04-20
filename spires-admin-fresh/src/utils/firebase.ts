@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 
 // ✅ Firebase configuration (shared across admin & customer apps)
 const firebaseConfig = {
@@ -19,6 +20,8 @@ const app = initializeApp(firebaseConfig);
 // Export Firestore and Auth
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+/** Must match deployed Cloud Functions region (e.g. sendDriverReminderManual is us-central1). */
+export const functions = getFunctions(app, "us-central1");
 
 // Optional constants for collection names
 export const COLLECTIONS = {

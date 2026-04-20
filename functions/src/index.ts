@@ -2,6 +2,7 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { sendBookingReceipt } from "./sendBookingReceipt";
 import { sendWelcomeEmail } from "./sendWelcomeEmail";
+import { processBookingReminders } from "./sendBookingReminderEmails";
 import { createPaymentIntent, confirmPayment, stripeWebhook } from "./payment";
 
 admin.initializeApp();
@@ -35,5 +36,15 @@ export const onCustomerCreate = functions.firestore
     await sendWelcomeEmail(customerData);
   });
 
+/** ~24h and ~1h before pickup; uses same SMTP config as welcome email (functions.config().email / .smtp) */
+export const scheduledBookingReminderEmails = functions
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("every 15 minutes")
+  .timeZone("Europe/London")
+  .onRun(async () => {
+    await processBookingReminders(functions.logger);
+  });
+
 // Export payment functions
 export { createPaymentIntent, confirmPayment, stripeWebhook };
+export { sendDriverReminderManual } from "./sendDriverReminderManual";

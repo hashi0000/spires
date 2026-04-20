@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight } from 'lucide-react';
 import { Booking, Driver, Vehicle } from '../types/types';
 import { isCustomerBooking } from '../utils/bookingMapper';
+import { functions } from '../utils/firebase';
+
+const sendDriverReminderManualCallable = httpsCallable(functions, 'sendDriverReminderManual');
 
 interface BookingsProps {
   bookings: Booking[];
@@ -13,9 +17,22 @@ interface BookingsProps {
   onDeleteBooking: (id: string, bookingNumber: string) => void;
   onGeneratePDF: (booking: Booking) => void;
   onDuplicateBooking: (booking: Booking) => void;
+  onCreateReturnBooking: (booking: Booking) => void;
 }
 
-const Bookings: React.FC<BookingsProps> = ({ bookings, drivers, vehicles, onAddBooking, onEditBooking, onSaveBookingDirect, onDeleteBooking, onGeneratePDF, onDuplicateBooking }) => {
+const Bookings: React.FC<BookingsProps> = ({
+  bookings,
+  drivers,
+  vehicles,
+  onAddBooking,
+  onEditBooking,
+  onSaveBookingDirect,
+  onDeleteBooking,
+  onGeneratePDF,
+  onDuplicateBooking,
+  onCreateReturnBooking
+}) => {
+  const [sendingDriverReminderId, setSendingDriverReminderId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -300,6 +317,34 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     setDateFrom(''); setDateTo('');
   };
 
+  const handleSendDriverReminder = async (booking: Booking) => {
+    if (!booking.driverId) {
+      window.alert('No driver assigned');
+      return;
+    }
+    const driver = drivers.find(d => d.id === booking.driverId);
+    if (!driver?.email?.trim()) {
+      window.alert('Driver has no email');
+      return;
+    }
+    if (!booking.id) return;
+    setSendingDriverReminderId(booking.id);
+    try {
+      const result = await sendDriverReminderManualCallable({ bookingId: booking.id });
+      const data = result.data as { success?: boolean };
+      if (data?.success) {
+        window.alert('Reminder sent successfully');
+      }
+    } catch (e: unknown) {
+      const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message: string }).message === 'string'
+        ? (e as { message: string }).message
+        : 'Failed to send reminder';
+      window.alert(msg);
+    } finally {
+      setSendingDriverReminderId(null);
+    }
+  };
+
   return (
     <div>
       {bookings.filter(b => isCustomerBooking(b) && b.status === 'pending').length > 0 && (
@@ -482,6 +527,26 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         <strong>Driver:</strong> {driver?.name || 'Not assigned'} | <strong>Vehicle:</strong> {vehicle?.registration || 'Not assigned'}
                       </div>
                       <div className="booking-card-actions">
+                        <button
+                          type="button"
+                          onClick={() => handleSendDriverReminder(booking)}
+                          className="btn btn-secondary btn-sm"
+                          title="Send Driver Reminder"
+                          aria-label="Send Driver Reminder"
+                          disabled={sendingDriverReminderId === booking.id}
+                        >
+                          <Mail className="h-4 w-4" style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
+                          {sendingDriverReminderId === booking.id ? 'Sending…' : 'Send Driver Reminder'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onCreateReturnBooking(booking)}
+                          className="btn btn-secondary btn-sm"
+                          title="Create return trip (swap from/to, set date & time)"
+                          aria-label="Create return trip"
+                        >
+                          <ArrowLeftRight className="h-4 w-4" />
+                        </button>
                         <button onClick={() => onDuplicateBooking(booking)} className="btn btn-secondary btn-sm" title="Duplicate Booking">
                           <Copy className="h-4 w-4" />
                         </button>

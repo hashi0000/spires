@@ -33,11 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
 const sendWelcomeEmail_1 = require("./sendWelcomeEmail");
+const sendBookingReminderEmails_1 = require("./sendBookingReminderEmails");
 const payment_1 = require("./payment");
 Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: function () { return payment_1.createPaymentIntent; } });
 Object.defineProperty(exports, "confirmPayment", { enumerable: true, get: function () { return payment_1.confirmPayment; } });
@@ -68,3 +69,13 @@ exports.onCustomerCreate = functions.firestore
     const customerData = snapshot.data();
     await (0, sendWelcomeEmail_1.sendWelcomeEmail)(customerData);
 });
+/** ~24h and ~1h before pickup; uses same SMTP config as welcome email (functions.config().email / .smtp) */
+exports.scheduledBookingReminderEmails = functions
+    .runWith({ timeoutSeconds: 300, memory: "512MB" })
+    .pubsub.schedule("every 15 minutes")
+    .timeZone("Europe/London")
+    .onRun(async () => {
+    await (0, sendBookingReminderEmails_1.processBookingReminders)(functions.logger);
+});
+var sendDriverReminderManual_1 = require("./sendDriverReminderManual");
+Object.defineProperty(exports, "sendDriverReminderManual", { enumerable: true, get: function () { return sendDriverReminderManual_1.sendDriverReminderManual; } });

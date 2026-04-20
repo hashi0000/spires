@@ -1,11 +1,12 @@
 // components/BookingModal.tsx - FIXED CLEAN VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Minus, Calculator, CreditCard, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { db } from '../utils/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import type { CustomerProfile } from '../utils/customerSuggestions';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -16,6 +17,10 @@ interface BookingModalProps {
   availableVehicles: Vehicle[];
   /** Unique pickup/destination strings from existing bookings (datalist autocomplete) */
   locationSuggestions?: string[];
+  /** Past customers from bookings — name autocomplete + phone/address fill */
+  customerSuggestions?: CustomerProfile[];
+  /** Pre-fill a new booking (e.g. return trip); ignored when editing */
+  initialDraft?: Partial<ExtendedBooking> | null;
 }
 
 const BookingModal: React.FC<BookingModalProps> = ({
@@ -25,8 +30,30 @@ const BookingModal: React.FC<BookingModalProps> = ({
   editingBooking,
   activeDrivers,
   availableVehicles,
-  locationSuggestions = []
+  locationSuggestions = [],
+  customerSuggestions = [],
+  initialDraft = null
 }) => {
+  const customerByNormalizedName = useMemo(() => {
+    const m = new Map<string, CustomerProfile>();
+    for (const c of customerSuggestions) {
+      m.set(c.displayName.toLowerCase().trim(), c);
+    }
+    return m;
+  }, [customerSuggestions]);
+
+  const applyKnownCustomer = (rawName: string) => {
+    const key = rawName.trim().toLowerCase();
+    if (!key) return;
+    const match = customerByNormalizedName.get(key);
+    if (!match) return;
+    setFormData((prev) => ({
+      ...prev,
+      hirerName: match.displayName,
+      hirerPhone: match.phone || prev.hirerPhone,
+      hirerAddress: match.address || prev.hirerAddress
+    }));
+  };
   const [formData, setFormData] = useState<ExtendedBooking>({
     bookingNumber: '',
     dateTime: '',
@@ -81,7 +108,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
     } else {
       const now = new Date();
       now.setMinutes(now.getMinutes() + 30);
-      setFormData({
+      const toLocal = (v: string | undefined): string => {
+        if (!v) return '';
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16);
+      };
+
+      const empty: ExtendedBooking = {
         bookingNumber: '',
         dateTime: now.toISOString().slice(0, 16),
         hirerName: '',
@@ -100,9 +133,36 @@ const BookingModal: React.FC<BookingModalProps> = ({
         paymentMethod: 'cash',
         paymentStatus: 'pending',
         expenses: []
-      });
+      };
+
+      if (initialDraft) {
+        const d = initialDraft;
+        setFormData({
+          ...empty,
+          ...d,
+          dateTime: d.dateTime != null && String(d.dateTime).length > 0 ? toLocal(String(d.dateTime)) : empty.dateTime,
+          pickupTime: d.pickupTime != null && String(d.pickupTime).length > 0 ? toLocal(String(d.pickupTime)) : empty.pickupTime,
+          hirerName: d.hirerName ?? empty.hirerName,
+          hirerAddress: d.hirerAddress ?? empty.hirerAddress,
+          hirerPhone: d.hirerPhone ?? empty.hirerPhone,
+          pickupLocation: d.pickupLocation ?? empty.pickupLocation,
+          destination: d.destination ?? empty.destination,
+          bookingMethod: d.bookingMethod ?? empty.bookingMethod,
+          driverId: d.driverId ?? empty.driverId,
+          vehicleId: d.vehicleId ?? empty.vehicleId,
+          subContract: d.subContract ?? empty.subContract,
+          status: (d.status as ExtendedBooking['status']) || empty.status,
+          notes: d.notes ?? empty.notes,
+          actualFare: d.actualFare !== undefined && d.actualFare !== '' ? String(d.actualFare) : '',
+          paymentMethod: d.paymentMethod ?? empty.paymentMethod,
+          paymentStatus: (d.paymentStatus as ExtendedBooking['paymentStatus']) || empty.paymentStatus,
+          expenses: Array.isArray(d.expenses) ? d.expenses : []
+        });
+      } else {
+        setFormData(empty);
+      }
     }
-  }, [editingBooking, isOpen]);
+  }, [editingBooking, isOpen, initialDraft]);
 
   // ✅ Expense logic
   const addExpense = () => {
@@ -303,12 +363,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
         <div className="modal-header">
           <button className="modal-close" onClick={onClose}>×</button>
           <h3 className="modal-title">
-            {editingBooking ? 'Edit Booking' : 'Create New Booking'}
+            {editingBooking ? 'Edit Booking' : initialDraft ? 'Create return trip' : 'Create New Booking'}
           </h3>
           <p className="modal-subtitle">
             {editingBooking
               ? 'Update booking details and expenses'
-              : 'Create a new taxi booking with fare tracking'}
+              : initialDraft
+                ? 'Pickup and destination are swapped from the original. Change date & time for the return leg below.'
+                : 'Create a new taxi booking with fare tracking'}
           </p>
         </div>
 
@@ -332,6 +394,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
               />
             </div>
 
+            {customerSuggestions.length > 0 && (
+              <datalist id="booking-past-customers">
+                {customerSuggestions.map((c) => (
+                  <option key={c.displayName} value={c.displayName} />
+                ))}
+              </datalist>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
@@ -339,9 +409,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   type="text"
                   value={formData.hirerName}
                   onChange={(e) => setFormData({ ...formData, hirerName: e.target.value })}
+                  onBlur={(e) => applyKnownCustomer(e.target.value)}
+                  list={customerSuggestions.length > 0 ? 'booking-past-customers' : undefined}
+                  autoComplete="off"
+                  placeholder="Type or choose a past customer"
                   required
                   className="form-input"
                 />
+                {customerSuggestions.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">Matching a saved name fills phone and address from their last booking.</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
@@ -351,8 +428,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, hirerPhone: e.target.value })}
                   required
                   className="form-input"
+                  autoComplete="tel"
                 />
               </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer address</label>
+              <textarea
+                value={formData.hirerAddress || ''}
+                onChange={(e) => setFormData({ ...formData, hirerAddress: e.target.value })}
+                rows={2}
+                className="form-input"
+                placeholder="Optional — filled automatically for known customers when available"
+              />
             </div>
 
             <div className="mb-6">

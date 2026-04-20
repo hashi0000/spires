@@ -4,8 +4,13 @@ import { auth } from './utils/firebase';
 
 import { Driver, Vehicle, Booking } from './types/types';
 import { useDrivers, useVehicles, useBookings, useDriverLimitCheck } from './hooks/useFirebase';
+import { useBookingDesktopReminders } from './hooks/useBookingDesktopReminders';
 import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
 import { isCustomerBooking } from './utils/bookingMapper';
+import { countUpcomingWithinMs } from './utils/bookingSchedule';
+import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
+import { buildReturnTripDraft } from './utils/bookingReturn';
+import type { ExtendedBooking } from './types/types';
 
 import Login from './components/Login';
 import Header from './components/Header';
@@ -21,17 +26,29 @@ import VehicleModal from './components/VehicleModal';
 import BookingModal from './components/BookingModal';
 import './styles.css';
 
+const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
+const UPCOMING_SOON_MS = 48 * 60 * 60 * 1000;
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+  const [desktopRemindersEnabled, setDesktopRemindersEnabled] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem(DESKTOP_REMINDERS_KEY) === 'true'
+  );
+  const [headerNow, setHeaderNow] = useState(() => new Date());
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setHeaderNow(new Date()), 60 * 1000);
+    return () => clearInterval(id);
   }, []);
 
   const driversHook = useDrivers();
@@ -50,10 +67,22 @@ const App: React.FC = () => {
     return Array.from(seen).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [bookingsHook.bookings]);
 
+  const customerSuggestions = useMemo(
+    () => buildCustomerSuggestionsFromBookings(bookingsHook.bookings),
+    [bookingsHook.bookings]
+  );
+
+  const upcomingSoonCount = useMemo(
+    () => countUpcomingWithinMs(bookingsHook.bookings, headerNow, UPCOMING_SOON_MS),
+    [bookingsHook.bookings, headerNow]
+  );
+  useBookingDesktopReminders(desktopRemindersEnabled, bookingsHook.bookings);
+
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [bookingModalInitialDraft, setBookingModalInitialDraft] = useState<Partial<ExtendedBooking> | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -80,6 +109,26 @@ const App: React.FC = () => {
     booking => isCustomerBooking(booking) && booking.status === 'pending'
   );
   const pendingCustomerBookingsCount = pendingCustomerBookings.length;
+
+  const handleDesktopRemindersChange = async (enabled: boolean) => {
+    if (enabled && typeof Notification !== 'undefined') {
+      if (Notification.permission === 'denied') {
+        window.alert(
+          'Notifications are blocked for this site. Enable them in your browser settings if you want desktop reminders.'
+        );
+        return;
+      }
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          window.alert('Notifications were not enabled. You can try again from the dashboard at any time.');
+          return;
+        }
+      }
+    }
+    setDesktopRemindersEnabled(enabled);
+    localStorage.setItem(DESKTOP_REMINDERS_KEY, enabled ? 'true' : 'false');
+  };
 
   const handleAddDriver = async (driver: Omit<Driver, 'id' | 'createdAt'>) => {
     try {
@@ -176,6 +225,7 @@ const App: React.FC = () => {
   };
 
   const handleEditBooking = (booking: Booking) => {
+    setBookingModalInitialDraft(null);
     setEditingItem(booking);
     setShowBookingModal(true);
   };
@@ -215,6 +265,7 @@ const App: React.FC = () => {
   };
 
   const handleDuplicateBooking = (booking: Booking) => {
+    setBookingModalInitialDraft(null);
     const duplicatedBooking = {
       ...booking,
       id: undefined,
@@ -226,6 +277,12 @@ const App: React.FC = () => {
       paymentStatus: 'pending' as const
     };
     setEditingItem(duplicatedBooking);
+    setShowBookingModal(true);
+  };
+
+  const handleCreateReturnTrip = (booking: Booking) => {
+    setEditingItem(null);
+    setBookingModalInitialDraft(buildReturnTripDraft(booking));
     setShowBookingModal(true);
   };
 
@@ -262,6 +319,7 @@ const App: React.FC = () => {
 
   const openBookingModal = () => {
     setEditingItem(null);
+    setBookingModalInitialDraft(null);
     setShowBookingModal(true);
   };
 
@@ -278,6 +336,7 @@ const App: React.FC = () => {
   const closeBookingModal = () => {
     setShowBookingModal(false);
     setEditingItem(null);
+    setBookingModalInitialDraft(null);
   };
 
   if (driversHook.loading || vehiclesHook.loading || bookingsHook.loading) {
@@ -295,6 +354,9 @@ const App: React.FC = () => {
             todaysBookingsCount={todaysBookings.length}
             isAtDriverLimit={driverLimitCheck.isAtLimit}
             pendingCustomerBookingsCount={pendingCustomerBookingsCount}
+            bookings={bookingsHook.bookings}
+            desktopRemindersEnabled={desktopRemindersEnabled}
+            onDesktopRemindersChange={handleDesktopRemindersChange}
           />
         );
       case 'drivers':
@@ -330,6 +392,7 @@ const App: React.FC = () => {
             onDeleteBooking={handleDeleteBooking}
             onGeneratePDF={handleGeneratePDF}
             onDuplicateBooking={handleDuplicateBooking}
+            onCreateReturnBooking={handleCreateReturnTrip}
           />
         );
       case 'link-bookings':
@@ -345,6 +408,7 @@ const App: React.FC = () => {
         activeDriversCount={activeDrivers.length}
         availableVehiclesCount={availableVehicles.length}
         pendingCustomerBookingsCount={pendingCustomerBookingsCount}
+        upcomingSoonCount={upcomingSoonCount}
         onLogout={handleLogout}
       />
       <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -353,7 +417,19 @@ const App: React.FC = () => {
       </main>
       {showDriverModal && (<DriverModal isOpen={showDriverModal} onClose={closeDriverModal} onSubmit={editingItem ? handleUpdateDriver : handleAddDriver} editingDriver={editingItem} isAtLimit={driverLimitCheck.isAtLimit} />)}
       {showVehicleModal && (<VehicleModal isOpen={showVehicleModal} onClose={closeVehicleModal} onSubmit={editingItem ? handleUpdateVehicle : handleAddVehicle} editingVehicle={editingItem} />)}
-      {showBookingModal && (<BookingModal isOpen={showBookingModal} onClose={closeBookingModal} onSubmit={editingItem ? handleUpdateBooking : handleAddBooking} editingBooking={editingItem} activeDrivers={activeDrivers} availableVehicles={availableVehicles} locationSuggestions={bookingLocationSuggestions} />)}
+      {showBookingModal && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={closeBookingModal}
+          onSubmit={editingItem ? handleUpdateBooking : handleAddBooking}
+          editingBooking={editingItem}
+          activeDrivers={activeDrivers}
+          availableVehicles={availableVehicles}
+          locationSuggestions={bookingLocationSuggestions}
+          customerSuggestions={customerSuggestions}
+          initialDraft={bookingModalInitialDraft}
+        />
+      )}
     </div>
   );
 };
