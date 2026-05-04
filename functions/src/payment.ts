@@ -2,23 +2,19 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import Stripe from "stripe";
 
-// Initialize Stripe with secret key from Firebase config
-// Add error handling for missing config
-let stripe: Stripe;
-try {
-  const secretKey = functions.config().stripe?.secret_key;
-  if (!secretKey) {
-    console.error("STRIPE_SECRET_KEY not configured in functions.config()");
-    throw new Error("Stripe secret key not configured");
+/** Lazy init: never call `functions.config()` at module load (Firebase deploy analysis times out). */
+let stripeSingleton: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!stripeSingleton) {
+    const secretKey = functions.config().stripe?.secret_key;
+    if (!secretKey) {
+      throw new Error("Stripe secret key not configured");
+    }
+    stripeSingleton = new Stripe(secretKey, {
+      apiVersion: "2023-10-16",
+    });
   }
-  stripe = new Stripe(secretKey, {
-    apiVersion: "2023-10-16",
-  });
-} catch (error: any) {
-  console.error("Failed to initialize Stripe:", error);
-  // Create a dummy Stripe instance to prevent initialization errors
-  // The actual error will be caught in the function
-  stripe = {} as Stripe;
+  return stripeSingleton;
 }
 /**
  * Create a payment intent for a booking
@@ -115,13 +111,7 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
   }
 
   try {
-    // Ensure Stripe is properly initialized
-    if (!stripe || !stripe.paymentIntents) {
-      // Re-initialize if needed
-      stripe = new Stripe(secretKey, {
-        apiVersion: "2023-10-16",
-      });
-    }
+    const stripe = getStripe();
 
     console.log("Creating Stripe payment intent with amount:", amountInPence);
 
@@ -218,6 +208,7 @@ export const confirmPayment = functions.https.onCall(async (data, context) => {
   }
 
   try {
+    const stripe = getStripe();
     // Retrieve payment intent from Stripe to verify payment
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
@@ -288,7 +279,7 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+    event = getStripe().webhooks.constructEvent(rawBody, sig, secret);
   } catch (err: any) {
     console.error("Webhook signature verification failed:", err);
     res.status(400).send(`Webhook Error: ${err.message}`);

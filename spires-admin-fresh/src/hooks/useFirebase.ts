@@ -15,6 +15,8 @@ import { db } from '../utils/firebase'; // Direct import without COLLECTIONS
 import { Driver, Vehicle, Booking } from '../types/types';
 import { normalizeBooking } from '../utils/bookingMapper';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
+import { normalizeDriverFromFirestore } from '../utils/driverNormalize';
+import { newDriverFirestorePayload, applyDriverComplianceUpdate } from '../utils/driverFirestoreWrite';
 
 export const useDrivers = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -25,11 +27,9 @@ export const useDrivers = () => {
     
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const driversData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date()
-        })) as Driver[];
+        const driversData = snapshot.docs.map((d) =>
+          normalizeDriverFromFirestore(d.id, d.data() as Record<string, unknown>)
+        );
         setDrivers(driversData);
         setLoading(false);
       },
@@ -45,10 +45,7 @@ export const useDrivers = () => {
   const addDriver = async (driverData: Omit<Driver, 'id' | 'createdAt'>) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, 'drivers'), {
-        ...driverData,
-        createdAt: Timestamp.now()
-      });
+      await addDoc(collection(db, 'drivers'), newDriverFirestorePayload(driverData));
       // Let Firebase onSnapshot handle the state update automatically
     } catch (error) {
       console.error('Error adding driver:', error);
@@ -61,8 +58,7 @@ export const useDrivers = () => {
   const updateDriver = async (id: string, driverData: Partial<Driver>) => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'drivers', id), driverData);
-      setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...driverData } : d));
+      await applyDriverComplianceUpdate(id, driverData);
     } catch (error) {
       console.error('Error updating driver:', error);
       throw error;

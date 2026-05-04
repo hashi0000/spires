@@ -1,0 +1,53 @@
+rules_version = '2';
+// Firebase Storage — driver compliance uploads from spires-admin-fresh
+//
+// BEFORE PRODUCTION: Your customer app also uses Firebase Auth. Any signed-in user
+// could upload to drivers/{id}/... if they know a driver document ID. Prefer locking
+// this down to staff only, e.g. set custom claims (admin: true) in the Firebase Admin
+// SDK and replace the auth check with: request.auth.token.admin == true
+//
+// Console: Firebase → Build → Storage → Get started (enable default bucket)
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Short-lived uploads: admin app generates styled PDF in-browser, then Cloud Function emails & deletes.
+    match /admin-email-pdf/{userId}/{fileName} {
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource != null
+        && request.resource.size < 12 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    function driverDocNameOk() {
+      return fileName == 'driver-licence.pdf'
+        || fileName == 'private-hire-licence.pdf'
+        || fileName == 'mot.pdf';
+    }
+
+    function typeAndSizeOk() {
+      return request.resource.size < 5 * 1024 * 1024
+        && (
+          request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'image/jpeg'
+          || request.resource.contentType == 'image/png'
+        );
+    }
+
+    match /drivers/{driverId}/{fileName} {
+      // Upload / overwrite / delete (delete: request.resource is null; still path-restricted)
+      allow write: if request.auth != null
+        && driverDocNameOk()
+        && (request.resource == null || typeAndSizeOk());
+
+      // Direct SDK reads; "View" in the admin often uses download URLs (token) from getDownloadURL
+      allow read: if request.auth != null;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

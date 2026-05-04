@@ -6,7 +6,7 @@ export const ADMIN_EMAIL = "bookings@spires-taxis.com";
 
 let transporter: nodemailer.Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter {
+export function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
     const config = functions.config();
     transporter = nodemailer.createTransport({

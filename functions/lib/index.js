@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -79,3 +79,5 @@ exports.scheduledBookingReminderEmails = functions
 });
 var sendDriverReminderManual_1 = require("./sendDriverReminderManual");
 Object.defineProperty(exports, "sendDriverReminderManual", { enumerable: true, get: function () { return sendDriverReminderManual_1.sendDriverReminderManual; } });
+var sendBookingPdfToCustomer_1 = require("./sendBookingPdfToCustomer");
+Object.defineProperty(exports, "sendBookingPdfToCustomer", { enumerable: true, get: function () { return sendBookingPdfToCustomer_1.sendBookingPdfToCustomer; } });

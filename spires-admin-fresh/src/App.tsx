@@ -20,6 +20,7 @@ import Drivers from './components/Drivers';
 import Vehicles from './components/Vehicles';
 import Bookings from './components/Bookings';
 import LinkBookings from './components/LinkBookings';
+import Customers from './components/Customers';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -149,7 +150,7 @@ const App: React.FC = () => {
     setShowDriverModal(true);
   };
 
-  const handleUpdateDriver = async (driver: Partial<Driver>) => {
+  const handleUpdateDriver = async (driver: Omit<Driver, 'id' | 'createdAt'>) => {
     try {
       if (driver.active && !editingItem.active && driverLimitCheck.isAtLimit) {
         alert('Maximum 3 active drivers allowed by Oxford City Council.');
@@ -393,6 +394,17 @@ const App: React.FC = () => {
             onGeneratePDF={handleGeneratePDF}
             onDuplicateBooking={handleDuplicateBooking}
             onCreateReturnBooking={handleCreateReturnTrip}
+          />
+        );
+      case 'customers':
+        return (
+          <Customers
+            bookings={bookingsHook.bookings}
+            onUpdateBooking={bookingsHook.updateBooking}
+            onOpenBookingEditor={(booking) => {
+              handleEditBooking(booking);
+              setActiveTab('bookings');
+            }}
           />
         );
       case 'link-bookings':

@@ -48,3 +48,4 @@ export const scheduledBookingReminderEmails = functions
 // Export payment functions
 export { createPaymentIntent, confirmPayment, stripeWebhook };
 export { sendDriverReminderManual } from "./sendDriverReminderManual";
+export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";

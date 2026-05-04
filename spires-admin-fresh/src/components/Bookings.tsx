@@ -1,11 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
-import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight } from 'lucide-react';
-import { Booking, Driver, Vehicle } from '../types/types';
+import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
+import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { isCustomerBooking } from '../utils/bookingMapper';
 import { functions } from '../utils/firebase';
+import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
+import { blobToRawBase64 } from '../utils/blobToBase64';
+import { getCallableErrorMessage } from '../utils/callableErrorMessage';
 
 const sendDriverReminderManualCallable = httpsCallable(functions, 'sendDriverReminderManual');
+const sendBookingPdfToCustomerCallable = httpsCallable(functions, 'sendBookingPdfToCustomer');
+
+const resolvePdfTypeForEmail = (
+  booking: Booking
+): 'booking_confirmation' | 'payment_receipt' | 'payment_request' => {
+  if (booking.paymentStatus === 'paid') return 'payment_receipt';
+  if (booking.status === 'completed') return 'payment_request';
+  return 'booking_confirmation';
+};
 
 interface BookingsProps {
   bookings: Booking[];
@@ -33,12 +45,15 @@ const Bookings: React.FC<BookingsProps> = ({
   onCreateReturnBooking
 }) => {
   const [sendingDriverReminderId, setSendingDriverReminderId] = useState<string | null>(null);
+  const [sendingCustomerPdfId, setSendingCustomerPdfId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  /** Organise work: app sign-in bookings vs phone/admin entries */
+  const [audienceFilter, setAudienceFilter] = useState<'all' | 'customer_app' | 'other'>('all');
 
   const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
@@ -65,8 +80,13 @@ const Bookings: React.FC<BookingsProps> = ({
     if (paymentFilter !== 'all') {
       filtered = filtered.filter(b => b.paymentStatus === paymentFilter);
     }
+    if (audienceFilter === 'customer_app') {
+      filtered = filtered.filter(b => isCustomerBooking(b));
+    } else if (audienceFilter === 'other') {
+      filtered = filtered.filter(b => !isCustomerBooking(b));
+    }
     return filtered;
-  }, [bookings, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter]);
+  }, [bookings, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter, audienceFilter]);
 
   const groupedBookings = useMemo(() => {
     // Sort bookings: pending customer bookings first, then by pickup time
@@ -307,7 +327,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     event.target.value = '';
   };
 
-  const clearFilters = () => { setDateFrom(''); setDateTo(''); setSelectedMonth(''); setStatusFilter('all'); setPaymentFilter('all'); };
+  const clearFilters = () => {
+    setDateFrom('');
+    setDateTo('');
+    setSelectedMonth('');
+    setStatusFilter('all');
+    setPaymentFilter('all');
+    setAudienceFilter('all');
+  };
   const setQuickMonth = (monthsAgo: number) => {
     const date = new Date();
     date.setMonth(date.getMonth() - monthsAgo);
@@ -315,6 +342,51 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     setSelectedMonth(`${year}-${month}`);
     setDateFrom(''); setDateTo('');
+  };
+
+  const MAX_EMAIL_PDF_BYTES = 4 * 1024 * 1024;
+
+  const handleSendCustomerPdf = async (booking: Booking) => {
+    if (!booking.id) return;
+    const ext = booking as ExtendedBooking;
+    const suggested =
+      [ext.hirerEmail, ext.email].map((e) => (typeof e === 'string' ? e.trim() : '')).find(Boolean) || '';
+    const toInput = window.prompt(
+      'Send the styled PDF (same layout as Print / Download) to this address:',
+      suggested
+    );
+    if (!toInput?.trim()) return;
+
+    const driver = drivers.find((d) => d.id === booking.driverId);
+    const vehicle = vehicles.find((v) => v.id === booking.vehicleId);
+    const pdfType = resolvePdfTypeForEmail(booking);
+
+    setSendingCustomerPdfId(booking.id);
+    try {
+      const blob = await generateBookingConfirmationPdfBlob(booking, driver, vehicle, pdfType);
+      if (blob.size > MAX_EMAIL_PDF_BYTES) {
+        window.alert(
+          `This PDF is too large to email from the browser (${Math.round(blob.size / 1024)} KB). Use Download instead.`
+        );
+        return;
+      }
+      const pdfBase64 = await blobToRawBase64(blob);
+      const result = await sendBookingPdfToCustomerCallable({
+        pdfBase64,
+        toEmail: toInput.trim(),
+        pdfType,
+        bookingNumber: booking.bookingNumber,
+        hirerName: booking.hirerName,
+      });
+      const data = result.data as { success?: boolean; to?: string };
+      if (data?.success) {
+        window.alert(`PDF emailed to ${data.to || toInput.trim()}`);
+      }
+    } catch (e: unknown) {
+      window.alert(getCallableErrorMessage(e));
+    } finally {
+      setSendingCustomerPdfId(null);
+    }
   };
 
   const handleSendDriverReminder = async (booking: Booking) => {
@@ -404,6 +476,18 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Date To</label><input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setSelectedMonth(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Status</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="allocated">Allocated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label><select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Payments</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="partial">Partial</option></select></div>
+            <div className="col-span-full md:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Booking source</label>
+              <select
+                value={audienceFilter}
+                onChange={(e) => setAudienceFilter(e.target.value as 'all' | 'customer_app' | 'other')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="all">All sources</option>
+                <option value="customer_app">App / signed-in customers</option>
+                <option value="other">Phone, walk-in, admin</option>
+              </select>
+            </div>
           </div>
         </div>
         )}
@@ -467,6 +551,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                   const totalExpenses = booking.expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
                   const isPendingCustomer = isCustomerBooking(booking) && booking.status === 'pending';
+                  const ext = booking as ExtendedBooking;
+                  const customerEmail = [ext.hirerEmail, ext.email].map((e) => (typeof e === 'string' ? e.trim() : '')).find(Boolean) || '';
                   return (
                     <div 
                       key={booking.id} 
@@ -507,6 +593,11 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
                             <strong>Phone:</strong> {booking.hirerPhone}
                           </p>
+                          {customerEmail ? (
+                            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
+                              <strong>Email:</strong> {customerEmail}
+                            </p>
+                          ) : null}
                           <p style={{ margin: 0, fontSize: '0.875rem' }}>
                             <strong>Method:</strong> {booking.bookingMethod.replace('_', ' ')}
                           </p>
@@ -552,6 +643,16 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </button>
                         <button onClick={() => onGeneratePDF(booking)} className="btn btn-success btn-sm" title="Download PDF">
                           <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSendCustomerPdf(booking)}
+                          className="btn btn-success btn-sm"
+                          title="Email the same styled PDF as Print/Download (generated in your browser)"
+                          disabled={sendingCustomerPdfId === booking.id}
+                        >
+                          <Send className="h-4 w-4" style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
+                          {sendingCustomerPdfId === booking.id ? 'Sending…' : 'Email PDF'}
                         </button>
                         <button onClick={() => onEditBooking(booking)} className="btn btn-primary btn-sm" title="Edit Booking">
                           <Edit3 className="h-4 w-4" />

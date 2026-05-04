@@ -1,4 +1,12 @@
 {
+  "hosting": {
+    "public": "spires-admin-fresh/build",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "functions": {
     "source": "functions",
     "ignore": [
@@ -31,6 +39,9 @@
     },
     "auth": {
       "port": 9099
+    },
+    "storage": {
+      "port": 9199
     }
   }
 }

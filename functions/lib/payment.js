@@ -40,24 +40,19 @@ exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = v
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
-// Initialize Stripe with secret key from Firebase config
-// Add error handling for missing config
-let stripe;
-try {
-    const secretKey = functions.config().stripe?.secret_key;
-    if (!secretKey) {
-        console.error("STRIPE_SECRET_KEY not configured in functions.config()");
-        throw new Error("Stripe secret key not configured");
+/** Lazy init: never call `functions.config()` at module load (Firebase deploy analysis times out). */
+let stripeSingleton = null;
+function getStripe() {
+    if (!stripeSingleton) {
+        const secretKey = functions.config().stripe?.secret_key;
+        if (!secretKey) {
+            throw new Error("Stripe secret key not configured");
+        }
+        stripeSingleton = new stripe_1.default(secretKey, {
+            apiVersion: "2023-10-16",
+        });
     }
-    stripe = new stripe_1.default(secretKey, {
-        apiVersion: "2023-10-16",
-    });
-}
-catch (error) {
-    console.error("Failed to initialize Stripe:", error);
-    // Create a dummy Stripe instance to prevent initialization errors
-    // The actual error will be caught in the function
-    stripe = {};
+    return stripeSingleton;
 }
 /**
  * Create a payment intent for a booking
@@ -114,13 +109,7 @@ exports.createPaymentIntent = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("invalid-argument", "Amount must be at least £0.50");
     }
     try {
-        // Ensure Stripe is properly initialized
-        if (!stripe || !stripe.paymentIntents) {
-            // Re-initialize if needed
-            stripe = new stripe_1.default(secretKey, {
-                apiVersion: "2023-10-16",
-            });
-        }
+        const stripe = getStripe();
         console.log("Creating Stripe payment intent with amount:", amountInPence);
         // Create payment intent
         const paymentIntent = await stripe.paymentIntents.create({
@@ -192,6 +181,7 @@ exports.confirmPayment = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "You don't have permission to update this booking");
     }
     try {
+        const stripe = getStripe();
         // Retrieve payment intent from Stripe to verify payment
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
         if (paymentIntent.status !== "succeeded") {
@@ -245,7 +235,7 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
             res.status(500).send("Internal server error: rawBody not available");
             return;
         }
-        event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+        event = getStripe().webhooks.constructEvent(rawBody, sig, secret);
     }
     catch (err) {
         console.error("Webhook signature verification failed:", err);

@@ -1,11 +1,12 @@
 // constants.ts - Put this in a separate file
-import { Calendar, Car, FileText, Users, Link2 } from 'lucide-react';
+import { Calendar, Car, FileText, Users, Link2, UserCircle } from 'lucide-react';
 
 export const navigation = [
   { id: 'dashboard', name: 'Dashboard', icon: Calendar },
   { id: 'drivers', name: 'Drivers', icon: Users },
   { id: 'vehicles', name: 'Vehicles', icon: Car },
   { id: 'bookings', name: 'Bookings', icon: FileText },
+  { id: 'customers', name: 'Customers', icon: UserCircle },
   { id: 'link-bookings', name: 'Link Bookings', icon: Link2 },
 ];
 

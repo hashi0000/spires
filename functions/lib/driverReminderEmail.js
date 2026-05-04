@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ADMIN_EMAIL = void 0;
+exports.getTransporter = getTransporter;
 exports.mailFrom = mailFrom;
 exports.formatPhoneUK = formatPhoneUK;
 exports.buildWhatsAppLink = buildWhatsAppLink;

@@ -36,17 +36,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendWelcomeEmail = sendWelcomeEmail;
 const functions = __importStar(require("firebase-functions/v1"));
 const nodemailer = __importStar(require("nodemailer"));
-const config = functions.config();
-const transporter = nodemailer.createTransport({
-    host: config.smtp?.host || "smtp.ionos.co.uk",
-    port: Number(config.smtp?.port || 587),
-    secure: false,
-    auth: {
-        user: config.email.user || "bookings@spires-taxis.com",
-        pass: config.email.pass,
-    },
-    tls: { rejectUnauthorized: false },
-});
+/** Lazy init: avoid `functions.config()` at module load (breaks Firebase deploy code analysis / times out). */
+let welcomeTransporter = null;
+function getWelcomeTransporter() {
+    if (!welcomeTransporter) {
+        const config = functions.config();
+        welcomeTransporter = nodemailer.createTransport({
+            host: config.smtp?.host || "smtp.ionos.co.uk",
+            port: Number(config.smtp?.port || 587),
+            secure: false,
+            auth: {
+                user: config.email?.user || "bookings@spires-taxis.com",
+                pass: config.email?.pass,
+            },
+            tls: { rejectUnauthorized: false },
+        });
+    }
+    return welcomeTransporter;
+}
 async function sendWelcomeEmail(customerData) {
     try {
         const { email, firstName, lastName } = customerData;
@@ -112,7 +119,7 @@ async function sendWelcomeEmail(customerData) {
         </p>
       </div>
     `;
-        await transporter.sendMail({
+        await getWelcomeTransporter().sendMail({
             from: `"Spires Taxis" <bookings@spires-taxis.com>`,
             to: email,
             subject: "Welcome to Spires Taxis - Your Account is Ready!",
@@ -164,7 +171,7 @@ async function sendWelcomeEmail(customerData) {
         </p>
       </div>
     `;
-        await transporter.sendMail({
+        await getWelcomeTransporter().sendMail({
             from: `"Spires Taxis" <bookings@spires-taxis.com>`,
             to: email,
             subject: "Your Spires Taxis Login Details",

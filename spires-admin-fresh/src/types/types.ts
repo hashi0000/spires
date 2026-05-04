@@ -1,4 +1,23 @@
 // types.ts - Put this in a separate file
+
+/** Stored under `documents` on the driver; extra keys reserved for insurance, MOT, etc. */
+export interface DriverDocuments {
+  driverLicenceUrl?: string;
+  privateHireLicenceUrl?: string;
+  motDocumentUrl?: string;
+  [key: string]: string | undefined;
+}
+
+export interface DriverLicensing {
+  badgeNumber?: string;
+  badgeExpiry?: string;
+}
+
+export interface DriverCompliance {
+  dbsExpiry?: string;
+  safeguardingExpiry?: string;
+}
+
 export interface Driver {
   id?: string;
   name: string;
@@ -10,6 +29,12 @@ export interface Driver {
   address?: string;
   notes?: string;
   createdAt?: Date;
+  updatedAt?: Date;
+  licensing?: DriverLicensing;
+  compliance?: DriverCompliance;
+  documents?: DriverDocuments;
+  /** When absent in Firestore, treat as false in UI. */
+  isSchoolApproved?: boolean;
 }
 
 export interface Vehicle {
@@ -65,6 +90,8 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare'> {
   // Customer booking fields (from customer app)
   uid?: string;
   email?: string;
+  /** When set (e.g. admin-entered), used for emailing PDFs alongside `email`. */
+  hirerEmail?: string;
   passengers?: number;
   customerStatus?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
 }
