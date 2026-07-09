@@ -8,20 +8,20 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="dropdown-menu destinations-menu">
                 <div class="dropdown-section">
                     <h4>Airport Transfers</h4>
-                    <a href="./pages/heathrow-airport.html">Heathrow Airport</a>
-                    <a href="./destinations/airport-transfers.html">All Airport Transfers</a>
+                    <a href="/pages/heathrow-airport">Heathrow Airport</a>
+                    <a href="/destinations/airport-transfers">All Airport Transfers</a>
                 </div>
                 <div class="dropdown-section">
                     <h4>Popular Attractions</h4>
-                    <a href="./destinations/attractions/bicester-village.html">Bicester Village</a>
-                    <a href="./destinations/blenheim-palace.html">Blenheim Palace</a>
-                    <a href="./destinations/attractions/stratford-upon-avon.html">Stratford-upon-Avon</a>
-                    <a href="./destinations/warner-bros-studios.html">Warner Bros Studios</a>
+                    <a href="/destinations/attractions/bicester-village">Bicester Village</a>
+                    <a href="/destinations/blenheim-palace">Blenheim Palace</a>
+                    <a href="/destinations/attractions/stratford-upon-avon">Stratford-upon-Avon</a>
+                    <a href="/destinations/warner-bros-studios">Warner Bros Studios</a>
                 </div>
                 <div class="dropdown-section">
                     <h4>University & Tours</h4>
-                    <a href="./destinations/oxford-colleges.html">Oxford Colleges</a>
-                    <a href="./destinations/cotswold-tours.html">Cotswold Tours</a>
+                    <a href="/destinations/oxford-colleges">Oxford Colleges</a>
+                    <a href="/destinations/cotswold-tours">Cotswold Tours</a>
                 </div>
             </div>
         `;
@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return `
             <div class="dropdown-menu">
                 <div class="dropdown-section">
-                    <a href="./services.html">All Services</a>
-                    <a href="./student-offers.html">Student Offers</a>
-                    <a href="./services.html#corporate">Corporate Travel</a>
-                    <a href="./services.html#airport">Airport Transfers</a>
+                    <a href="/services">All Services</a>
+                    <a href="/student-taxis">Student Offers</a>
+                    <a href="/services#corporate">Corporate Travel</a>
+                    <a href="/services#airport">Airport Transfers</a>
                 </div>
             </div>
         `;
@@ -45,21 +45,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function createNavigation() {
         return `
             <nav>
-                <a href="./index.html" class="logo">Spires Taxis</a>
+                <a href="/" class="logo">Spires Taxis</a>
                 
                 <ul class="nav-links">
-                    <li><a href="./index.html" class="nav-home">Home</a></li>
-                    <li><a href="./about.html" class="nav-about">About Us</a></li>
+                    <li><a href="/" class="nav-home">Home</a></li>
+                    <li><a href="/about" class="nav-about">About Us</a></li>
                     <li class="dropdown">
-                        <a href="./services.html" class="dropdown-toggle nav-services">Services ▼</a>
+                        <a href="/services" class="dropdown-toggle nav-services">Services ▼</a>
                         ${createServicesDropdown()}
                     </li>
                     <li class="dropdown">
-                        <a href="./destinations.html" class="dropdown-toggle nav-destinations">Destinations ▼</a>
+                        <a href="/destinations" class="dropdown-toggle nav-destinations">Destinations ▼</a>
                         ${createDestinationsDropdown()}
                     </li>
-                    <li><a href="./rates.html" class="nav-rates">Rates</a></li>
-                    <li><a href="./contact.html" class="nav-contact">Contact</a></li>
+                    <li><a href="/rates" class="nav-rates">Rates</a></li>
+                    <li><a href="/contact" class="nav-contact">Contact</a></li>
                 </ul>
                 
                 <div class="nav-cta">

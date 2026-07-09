@@ -1,6 +1,10 @@
 User-agent: *
 Allow: /
 
+Disallow: /pages/
+Disallow: /login
+Disallow: /email
+Disallow: /thank-you
 Disallow: /node_modules/
 
 Sitemap: https://www.spires-taxis.com/sitemap.xml

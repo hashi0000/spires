@@ -1,1 +1,97 @@
-{"cleanUrls": true, "outputDirectory": "."}
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "spires-taxis.com" }],
+      "destination": "https://www.spires-taxis.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/pages/oxford-to-heathrow-taxi",
+      "destination": "/oxford-to-heathrow-taxi",
+      "permanent": true
+    },
+    {
+      "source": "/station-transfers",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/student-offers",
+      "destination": "/student-taxis",
+      "permanent": true
+    },
+    {
+      "source": "/pages/heathrow-airport",
+      "destination": "/oxford-to-heathrow-taxi",
+      "permanent": true
+    },
+    {
+      "source": "/destinations/airport-transfers",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/destinations/attractions/bicester-village",
+      "destination": "/bicester-taxis",
+      "permanent": true
+    },
+    {
+      "source": "/destinations/:path*",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/pages/:path*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/booking",
+      "destination": "https://booking.spires-taxis.com",
+      "permanent": true
+    },
+    {
+      "source": "/login",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/services",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/destinations",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/airport-taxis-oxford",
+      "destination": "/airport-transfers",
+      "permanent": true
+    },
+    {
+      "source": "/abingdon-taxi",
+      "destination": "/abingdon-taxis",
+      "permanent": true
+    },
+    {
+      "source": "/heathrow-airport-taxis",
+      "destination": "/oxford-to-heathrow-taxi",
+      "permanent": true
+    },
+    {
+      "source": "/gatwick-airport-taxis",
+      "destination": "/oxford-to-gatwick-taxi",
+      "permanent": true
+    },
+    {
+      "source": "/birmingham-airport-taxis",
+      "destination": "/airport-transfers",
+      "permanent": true
+    }
+  ]
+}
