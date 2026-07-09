@@ -4,6 +4,7 @@ import { Plus, Minus, Calculator, CreditCard, Receipt, Clock } from 'lucide-reac
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
+import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import { db } from '../utils/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { CustomerProfile } from '../utils/customerSuggestions';
@@ -98,30 +99,30 @@ const BookingModal: React.FC<BookingModalProps> = ({
         pickupLocation: editingBooking.pickupLocation || (editingBooking as any).pickup || '',
         destination: editingBooking.destination || '',
         bookingMethod: editingBooking.bookingMethod || 'internet',
-        pickupTime: editingBooking.pickupTime || (editingBooking as any).dateTime || editingBooking.dateTime || '',
+        pickupTime: toDatetimeLocalValue(
+          editingBooking.pickupTime || (editingBooking as any).dateTime || editingBooking.dateTime || ''
+        ),
         actualFare: editingBooking.actualFare?.toString() || '',
         dateTime: editingBooking.dateTime
-          ? new Date(editingBooking.dateTime).toISOString().slice(0, 16)
-          : (editingBooking.pickupTime ? new Date(editingBooking.pickupTime).toISOString().slice(0, 16) : '')
+          ? toDatetimeLocalValue(editingBooking.dateTime)
+          : editingBooking.pickupTime
+            ? toDatetimeLocalValue(editingBooking.pickupTime)
+            : '',
       };
       setFormData(mappedBooking);
     } else {
       const now = new Date();
       now.setMinutes(now.getMinutes() + 30);
-      const toLocal = (v: string | undefined): string => {
-        if (!v) return '';
-        const d = new Date(v);
-        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16);
-      };
+      const defaultLocal = toDatetimeLocalValue(now);
 
       const empty: ExtendedBooking = {
         bookingNumber: '',
-        dateTime: now.toISOString().slice(0, 16),
+        dateTime: defaultLocal,
         hirerName: '',
         hirerAddress: '',
         hirerPhone: '',
         bookingMethod: 'telephone',
-        pickupTime: now.toISOString().slice(0, 16),
+        pickupTime: defaultLocal,
         pickupLocation: '',
         destination: '',
         driverId: '',
@@ -140,8 +141,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
         setFormData({
           ...empty,
           ...d,
-          dateTime: d.dateTime != null && String(d.dateTime).length > 0 ? toLocal(String(d.dateTime)) : empty.dateTime,
-          pickupTime: d.pickupTime != null && String(d.pickupTime).length > 0 ? toLocal(String(d.pickupTime)) : empty.pickupTime,
+          dateTime: d.dateTime != null && String(d.dateTime).length > 0 ? toDatetimeLocalValue(String(d.dateTime)) : empty.dateTime,
+          pickupTime: d.pickupTime != null && String(d.pickupTime).length > 0 ? toDatetimeLocalValue(String(d.pickupTime)) : empty.pickupTime,
           hirerName: d.hirerName ?? empty.hirerName,
           hirerAddress: d.hirerAddress ?? empty.hirerAddress,
           hirerPhone: d.hirerPhone ?? empty.hirerPhone,
@@ -204,21 +205,26 @@ const BookingModal: React.FC<BookingModalProps> = ({
         : generateSpiresBookingNumber();
     const bookingId = editingBooking?.id || newBookingNumber;
 
-    // Prepare booking data - clean up undefined values
+    const pickupIso = fromDatetimeLocalValue(
+      String(formData.pickupTime || formData.dateTime || '')
+    );
+    const dateTimeIso = fromDatetimeLocalValue(String(formData.dateTime || ''));
+
     const bookingData: any = {
       ...formData,
       actualFare:
         typeof formData.actualFare === 'string'
           ? (formData.actualFare.trim() ? parseFloat(formData.actualFare) : undefined)
           : formData.actualFare,
-      dateTime: formData.dateTime
-        ? new Date(formData.dateTime).toISOString()
-        : new Date().toISOString(),
-      allocatedTime: editingBooking && formData.allocatedTime
-        ? formData.allocatedTime
-        : new Date().toISOString(),
+      dateTime: dateTimeIso,
+      pickupTime: pickupIso,
+      allocatedTime:
+        editingBooking && formData.allocatedTime
+          ? formData.allocatedTime
+          : formData.status === 'allocated' || formData.driverId
+            ? new Date().toISOString()
+            : undefined,
       bookingNumber: newBookingNumber,
-      id: bookingId,
     };
 
     // Only add createdAt for new bookings
@@ -300,6 +306,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         // Remove id from updateData as it's not a Firestore field
         delete cleanedUpdateData.id;
+
+        // Drop empty optional assignment fields
+        if (!cleanedUpdateData.driverId) delete cleanedUpdateData.driverId;
+        if (!cleanedUpdateData.vehicleId) delete cleanedUpdateData.vehicleId;
+        if (cleanedUpdateData.allocatedTime === undefined) delete cleanedUpdateData.allocatedTime;
         
         // Ensure required fields are preserved from original booking
         if (!cleanedUpdateData.pickupLocation && editingBooking.pickupLocation) {
@@ -326,32 +337,35 @@ const BookingModal: React.FC<BookingModalProps> = ({
         await updateDoc(doc(db, 'bookings', bookingId), cleanedUpdateData);
         console.log('✅ Booking updated successfully:', bookingId);
       } else {
-        await setDoc(doc(db, 'bookings', bookingId), bookingData);
+        const createPayload: Record<string, unknown> = {};
+        Object.entries(bookingData).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && key !== 'id') {
+            createPayload[key] = value;
+          }
+        });
+        if (!createPayload.driverId) delete createPayload.driverId;
+        if (!createPayload.vehicleId) delete createPayload.vehicleId;
+        if (createPayload.allocatedTime === undefined) delete createPayload.allocatedTime;
+
+        await setDoc(doc(db, 'bookings', bookingId), createPayload);
         console.log('✅ Booking created:', bookingId);
       }
 
-      onSubmit && onSubmit(bookingData);
+      onSubmit && onSubmit({ ...bookingData, id: bookingId });
       onClose();
     } catch (err: any) {
       console.error('❌ Error saving booking:', err);
-      // Only show error if it's a real error (not a successful update)
-      // Sometimes Firestore updates succeed but throw warnings
-      if (err?.code && err.code !== 'permission-denied') {
-        const errorMessage = err?.message || err?.code || 'Unknown error';
-        console.error('Full error details:', {
-          message: err?.message,
-          code: err?.code,
-          stack: err?.stack,
-          bookingId,
-          isCustomerBooking: !!(editingBooking?.uid || (formData as any)?.uid)
-        });
-        alert(`Error saving booking: ${errorMessage}\n\nPlease check the browser console (F12) for more details.`);
-      } else {
-        // If update succeeded, just close the modal
-        console.log('✅ Booking update completed (warning ignored)');
-        onSubmit && onSubmit(bookingData);
-        onClose();
-      }
+      const errorMessage = err?.message || err?.code || 'Unknown error';
+      console.error('Full error details:', {
+        message: err?.message,
+        code: err?.code,
+        stack: err?.stack,
+        bookingId,
+        isCustomerBooking: !!(editingBooking?.uid || (formData as any)?.uid),
+      });
+      alert(
+        `Error saving booking: ${errorMessage}\n\nIf this says permission-denied, deploy the updated Firestore rules (firestore.rules) from the project root.`
+      );
     }
   };
 
@@ -465,8 +479,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </div>
               <input
                 type="datetime-local"
-                value={formData.pickupTime ? new Date(formData.pickupTime).toISOString().slice(0, 16) : ''}
-                onChange={(e) => setFormData({ ...formData, pickupTime: new Date(e.target.value).toISOString() })}
+                value={toDatetimeLocalValue(formData.pickupTime || formData.dateTime)}
+                onChange={(e) => setFormData({ ...formData, pickupTime: e.target.value })}
                 required
                 className="form-input"
               />

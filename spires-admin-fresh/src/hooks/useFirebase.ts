@@ -9,37 +9,70 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  Timestamp
+  Timestamp,
 } from 'firebase/firestore';
-import { db } from '../utils/firebase'; // Direct import without COLLECTIONS
+import { onAuthStateChanged } from 'firebase/auth';
+import { db, auth } from '../utils/firebase';
 import { Driver, Vehicle, Booking } from '../types/types';
 import { normalizeBooking } from '../utils/bookingMapper';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { normalizeDriverFromFirestore } from '../utils/driverNormalize';
 import { newDriverFirestorePayload, applyDriverComplianceUpdate } from '../utils/driverFirestoreWrite';
 
+/** Firestore listeners must start after sign-in; they do not recover from permission-denied on their own. */
+function subscribeWhenAuthenticated(
+  subscribe: () => () => void,
+  onSignedOut: () => void
+): () => void {
+  let unsubSnapshot: (() => void) | undefined;
+
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    if (unsubSnapshot) {
+      unsubSnapshot();
+      unsubSnapshot = undefined;
+    }
+    if (!user) {
+      onSignedOut();
+      return;
+    }
+    unsubSnapshot = subscribe();
+  });
+
+  return () => {
+    unsubAuth();
+    if (unsubSnapshot) unsubSnapshot();
+  };
+}
+
 export const useDrivers = () => {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'drivers'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const driversData = snapshot.docs.map((d) =>
-          normalizeDriverFromFirestore(d.id, d.data() as Record<string, unknown>)
+    return subscribeWhenAuthenticated(
+      () => {
+        setLoading(true);
+        const q = query(collection(db, 'drivers'), orderBy('createdAt', 'desc'));
+        return onSnapshot(
+          q,
+          (snapshot) => {
+            const driversData = snapshot.docs.map((d) =>
+              normalizeDriverFromFirestore(d.id, d.data() as Record<string, unknown>)
+            );
+            setDrivers(driversData);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error fetching drivers:', error);
+            setLoading(false);
+          }
         );
-        setDrivers(driversData);
-        setLoading(false);
       },
-      (error) => {
-        console.error('Error fetching drivers:', error);
+      () => {
+        setDrivers([]);
         setLoading(false);
       }
     );
-
-    return () => unsubscribe();
   }, []);
 
   const addDriver = async (driverData: Omit<Driver, 'id' | 'createdAt'>) => {
@@ -97,25 +130,32 @@ export const useVehicles = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'vehicles'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q,
-      (snapshot) => {
-        const vehiclesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date()
-        })) as Vehicle[];
-        setVehicles(vehiclesData);
-        setLoading(false);
+    return subscribeWhenAuthenticated(
+      () => {
+        setLoading(true);
+        const q = query(collection(db, 'vehicles'), orderBy('createdAt', 'desc'));
+        return onSnapshot(
+          q,
+          (snapshot) => {
+            const vehiclesData = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+              createdAt: docSnap.data().createdAt?.toDate() || new Date(),
+            })) as Vehicle[];
+            setVehicles(vehiclesData);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error fetching vehicles:', error);
+            setLoading(false);
+          }
+        );
       },
-      (error) => {
-        console.error('Error fetching vehicles:', error);
+      () => {
+        setVehicles([]);
         setLoading(false);
       }
     );
-
-    return () => unsubscribe();
   }, []);
 
   const addVehicle = async (vehicleData: Omit<Vehicle, 'id' | 'createdAt'>) => {
@@ -177,29 +217,35 @@ export const useBookings = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q,
-      (snapshot) => {
-        const bookingsData = snapshot.docs.map(doc => {
-          const data = {
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date()
-          };
-          // Normalize customer bookings to admin format
-          return normalizeBooking(data);
-        }) as Booking[];
-        setBookings(bookingsData);
-        setLoading(false);
+    return subscribeWhenAuthenticated(
+      () => {
+        setLoading(true);
+        const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'));
+        return onSnapshot(
+          q,
+          (snapshot) => {
+            const bookingsData = snapshot.docs.map((docSnap) => {
+              const data = {
+                id: docSnap.id,
+                ...docSnap.data(),
+                createdAt: docSnap.data().createdAt?.toDate() || new Date(),
+              };
+              return normalizeBooking(data);
+            }) as Booking[];
+            setBookings(bookingsData);
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Error fetching bookings:', error);
+            setLoading(false);
+          }
+        );
       },
-      (error) => {
-        console.error('Error fetching bookings:', error);
+      () => {
+        setBookings([]);
         setLoading(false);
       }
     );
-
-    return () => unsubscribe();
   }, []);
 
   const generateBookingNumber = (): string => generateSpiresBookingNumber();

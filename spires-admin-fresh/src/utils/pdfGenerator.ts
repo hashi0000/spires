@@ -80,14 +80,24 @@ export function buildBookingConfirmationHtml(
     <head>
         <meta charset="UTF-8">
         <title>${documentTitle} - ${booking.bookingNumber}</title>
+    </head>
+
+    <body style="margin:0;padding:0;">
+        <!-- Styles + fonts live in body so html2pdf's clone (body only, moved to parent doc) still has CSS. -->
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
 
         <style>
             /* Zero page margins: mobile “Save as PDF” often can’t remove margins; html2pdf + @page stay edge-to-edge A4 */
             @page { size: A4 portrait; margin: 0; }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            /*
+             * html2pdf clones only <body> into the parent document, so fonts/CSS live in body.
+             * Prefix every rule with .booking-pdf-root (no @scope) so Safari / older engines still apply styles
+             * and nothing leaks onto the admin UI during capture.
+             */
+            .booking-pdf-root,
+            .booking-pdf-root * { margin: 0; padding: 0; box-sizing: border-box; }
 
-            body {
+            .booking-pdf-root {
                 font-family: 'Inter', sans-serif;
                 color: #333;
                 font-size: 10px;
@@ -95,42 +105,73 @@ export function buildBookingConfirmationHtml(
                 background: white;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+                min-height: 100vh;
+                width: 100%;
             }
 
-            .page-container { display: flex; flex-direction: column; min-height: 100vh; }
+            /* Flex column + main flex-grow pins footer to the bottom when content is short */
+            .booking-pdf-root .page-container {
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+                width: 100%;
+            }
 
-            .header {
+            /*
+             * Print: use A4 height instead of 100vh so Chrome “Save as PDF” does not insert a blank first page,
+             * while keeping flex so the footer sits at the bottom of the sheet when there is spare space.
+             */
+            @media print {
+                .booking-pdf-root .page-container {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    min-height: 297mm !important;
+                    height: auto !important;
+                }
+                .booking-pdf-root .main-content {
+                    flex: 1 1 auto !important;
+                }
+                .booking-pdf-root .footer {
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }
+            }
+
+            .booking-pdf-root .header {
                 background: #002147;
                 color: white;
                 padding: 18px 20px 15px;
                 position: relative;
                 overflow: hidden;
+                width: 100%;
+                margin: 0;
+                border-radius: 0;
             }
 
-            .header-content { display: flex; justify-content: center; }
-            .logo-section { text-align: center; }
+            .booking-pdf-root .header-content { display: flex; justify-content: center; }
+            .booking-pdf-root .logo-section { text-align: center; }
 
-            .logo-svg { width: 320px; height: 60px; margin-bottom: 8px; }
-            .logo-text {
+            .booking-pdf-root .logo-svg { width: 320px; height: 60px; margin-bottom: 8px; }
+            .booking-pdf-root .logo-text {
                 font-family: 'Cinzel', serif;
                 font-size: 35px;
                 fill: #C5A572;
             }
 
-            .tagline {
+            .booking-pdf-root .tagline {
                 font-family: 'Playfair Display', serif;
                 font-size: 0.95rem;
                 opacity: 0.9;
                 font-style: italic;
             }
 
-            .booking-ref {
+            .booking-pdf-root .booking-ref {
                 position: absolute;
                 top: 18px;
                 right: 20px;
             }
 
-            .booking-ref h2 {
+            .booking-pdf-root .booking-ref h2 {
                 font-family: 'Playfair Display', serif;
                 font-size: 1.1rem;
                 padding: 6px 14px;
@@ -139,9 +180,9 @@ export function buildBookingConfirmationHtml(
                 background: rgba(197, 165, 114, 0.2);
             }
 
-            .main-content { padding: 0 20px 14px; flex: 1; }
+            .booking-pdf-root .main-content { padding: 0 20px 14px; flex: 1; }
 
-            .document-banner {
+            .booking-pdf-root .document-banner {
                 background: #f7f4ec;
                 border-bottom: 3px solid #0f172a;
                 padding: 14px 10px 12px;
@@ -149,7 +190,7 @@ export function buildBookingConfirmationHtml(
                 margin: 0 -20px 12px;
             }
 
-            .document-banner span {
+            .booking-pdf-root .document-banner span {
                 font-family: 'Inter', sans-serif;
                 font-weight: 800;
                 font-size: 1rem;
@@ -157,21 +198,21 @@ export function buildBookingConfirmationHtml(
                 color: #0f172a;
             }
 
-            .content-grid {
+            .booking-pdf-root .content-grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 10px;
                 margin-bottom: 10px;
             }
 
-            .info-box {
+            .booking-pdf-root .info-box {
                 background: white;
                 border: 1.5px solid #e5e7eb;
                 border-radius: 6px;
                 padding: 11px;
             }
 
-            .section-header {
+            .booking-pdf-root .section-header {
                 font-family: 'Playfair Display', serif;
                 font-size: 0.9rem;
                 font-weight: 700;
@@ -181,30 +222,30 @@ export function buildBookingConfirmationHtml(
                 border-bottom: 1.5px solid #C5A572;
             }
 
-            .detail-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-            .detail-label { font-size: 0.8rem; color: #666; }
-            .detail-value { font-size: 0.9rem; color: #002147; text-align: right; }
+            .booking-pdf-root .detail-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+            .booking-pdf-root .detail-label { font-size: 0.8rem; color: #666; }
+            .booking-pdf-root .detail-value { font-size: 0.9rem; color: #002147; text-align: right; }
 
-            .full-width { grid-column: span 2; }
+            .booking-pdf-root .full-width { grid-column: span 2; }
 
-            .journey-section {
+            .booking-pdf-root .journey-section {
                 background: #f7f4e9;
                 border-radius: 6px;
                 padding: 12px;
                 border-left: 3px solid #C5A572;
             }
 
-            .journey-flow {
+            .booking-pdf-root .journey-flow {
                 display: flex;
                 align-items: center;
                 gap: 12px;
                 margin: 8px 0;
             }
 
-            .journey-point { flex: 1; text-align: center; }
-            .journey-arrow { font-size: 1.2rem; color: #C5A572; }
+            .booking-pdf-root .journey-point { flex: 1; text-align: center; }
+            .booking-pdf-root .journey-arrow { font-size: 1.2rem; color: #C5A572; }
 
-            .payment-summary {
+            .booking-pdf-root .payment-summary {
                 background: #002147;
                 color: white;
                 border-radius: 6px;
@@ -212,34 +253,35 @@ export function buildBookingConfirmationHtml(
                 text-align: center;
             }
 
-            .payment-summary.payment-request {
+            .booking-pdf-root .payment-summary.payment-request {
                 background: #92400e;
                 border: 2px solid #C5A572;
             }
 
-            .payment-amount { font-size: 1.6rem; font-weight: 700; color: #C5A572; }
-            .payment-method { font-size: 0.9rem; opacity: 0.9; }
+            .booking-pdf-root .payment-amount { font-size: 1.6rem; font-weight: 700; color: #C5A572; }
+            .booking-pdf-root .payment-method { font-size: 0.9rem; opacity: 0.9; }
 
-            .footer {
+            .booking-pdf-root .footer {
                 background: #002147;
                 color: white;
-                padding: 10px 16px;
+                padding: 12px 20px;
                 text-align: center;
-                border-radius: 6px;
-                margin: 8px 20px 10px;
+                border-radius: 0;
+                margin: 0;
+                margin-top: auto;
+                width: 100%;
             }
 
-            .footer-brand {
+            .booking-pdf-root .footer-brand {
                 font-family: 'Cinzel', serif;
                 color: #C5A572;
                 margin-bottom: 6px;
             }
 
-            a { color: #C5A572; text-decoration: none; }
+            .booking-pdf-root a { color: #C5A572; text-decoration: none; }
         </style>
-    </head>
 
-    <body>
+        <div class="booking-pdf-root">
         <div class="page-container">
 
             <div class="header">
@@ -408,6 +450,7 @@ export function buildBookingConfirmationHtml(
             </div>
 
         </div>
+        </div>
     </body>
     </html>
   `;
@@ -433,9 +476,28 @@ export const generateBookingConfirmationPDF = (
     printWindow.document.write(pdfContent);
     printWindow.document.close();
 
-    printWindow.addEventListener("load", () => {
+    const schedulePrint = () => {
+      printWindow.focus();
       printWindow.print();
-    });
+    };
+
+    const runWhenReady = async () => {
+      const d = printWindow.document;
+      if (d.readyState !== "complete") {
+        await new Promise<void>((r) => {
+          printWindow.addEventListener("load", () => r(), { once: true });
+        });
+      }
+      if (d.fonts?.ready) {
+        await d.fonts.ready.catch(() => undefined);
+      }
+      await new Promise<void>((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => r()));
+      });
+      setTimeout(schedulePrint, 120);
+    };
+
+    void runWhenReady();
   } else {
     const blob = new Blob([pdfContent], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -452,19 +514,36 @@ export const generateBookingConfirmationPDF = (
  * only while we capture for email — print / on-screen preview stay unchanged (no class on body).
  */
 const PDF_EMAIL_CAPTURE_CSS = `
-  body.pdf-email-capture {
+  .booking-pdf-root.pdf-email-capture {
     font-size: 11px !important;
     line-height: 1.45 !important;
     -webkit-font-smoothing: antialiased;
+    width: 100% !important;
   }
-  body.pdf-email-capture .page-container { min-height: auto !important; }
-  body.pdf-email-capture .content-grid {
+  /*
+   * html2pdf capture used to force min-height: auto on the page column, which collapses the flex column
+   * so margin-top:auto on the footer cannot push it down. Match one A4 portrait sheet (~1123px @ 96dpi,
+   * same as the hidden iframe min-height) so the footer sits at the bottom of the first page.
+   */
+  .booking-pdf-root.pdf-email-capture .page-container {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 1123px !important;
+    width: 100% !important;
+  }
+  .booking-pdf-root.pdf-email-capture .main-content {
+    flex: 1 1 auto !important;
+  }
+  .booking-pdf-root.pdf-email-capture .footer {
+    margin-top: auto !important;
+  }
+  .booking-pdf-root.pdf-email-capture .content-grid {
     display: block !important;
     width: 100% !important;
     margin-bottom: 10px !important;
   }
-  body.pdf-email-capture .content-grid > .info-box,
-  body.pdf-email-capture .info-box.full-width {
+  .booking-pdf-root.pdf-email-capture .content-grid > .info-box,
+  .booking-pdf-root.pdf-email-capture .info-box.full-width {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -472,42 +551,42 @@ const PDF_EMAIL_CAPTURE_CSS = `
     float: none !important;
     grid-column: auto !important;
   }
-  body.pdf-email-capture .info-box {
+  .booking-pdf-root.pdf-email-capture .info-box {
     box-shadow: none !important;
     border: 1.5px solid #e5e7eb !important;
   }
-  body.pdf-email-capture .detail-row {
+  .booking-pdf-root.pdf-email-capture .detail-row {
     display: flex !important;
     justify-content: space-between !important;
     gap: 8px !important;
     align-items: baseline !important;
   }
-  body.pdf-email-capture .journey-flow {
+  .booking-pdf-root.pdf-email-capture .journey-flow {
     display: table !important;
     width: 100% !important;
     table-layout: fixed !important;
     border-collapse: separate !important;
     border-spacing: 6px 0 !important;
   }
-  body.pdf-email-capture .journey-point {
+  .booking-pdf-root.pdf-email-capture .journey-point {
     display: table-cell !important;
     width: 42% !important;
     vertical-align: middle !important;
     text-align: center !important;
   }
-  body.pdf-email-capture .journey-arrow {
+  .booking-pdf-root.pdf-email-capture .journey-arrow {
     display: table-cell !important;
     width: 16% !important;
     vertical-align: middle !important;
     text-align: center !important;
     font-size: 1.25rem !important;
   }
-  body.pdf-email-capture .header { padding: 16px 14px !important; }
-  body.pdf-email-capture .logo-svg { width: 280px !important; height: 52px !important; }
-  body.pdf-email-capture .logo-text { font-size: 30px !important; }
-  body.pdf-email-capture .payment-summary,
-  body.pdf-email-capture .header,
-  body.pdf-email-capture .footer {
+  .booking-pdf-root.pdf-email-capture .header { padding: 16px 14px !important; }
+  .booking-pdf-root.pdf-email-capture .logo-svg { width: 280px !important; height: 52px !important; }
+  .booking-pdf-root.pdf-email-capture .logo-text { font-size: 30px !important; }
+  .booking-pdf-root.pdf-email-capture .payment-summary,
+  .booking-pdf-root.pdf-email-capture .header,
+  .booking-pdf-root.pdf-email-capture .footer {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -576,11 +655,11 @@ export async function generateBookingConfirmationPdfBlob(
 
     const run = async () => {
       try {
-        doc.body.classList.add("pdf-email-capture");
+        doc.querySelector(".booking-pdf-root")?.classList.add("pdf-email-capture");
         const fix = doc.createElement("style");
         fix.setAttribute("data-pdf-email-capture", "true");
         fix.textContent = PDF_EMAIL_CAPTURE_CSS;
-        doc.head.appendChild(fix);
+        doc.body.appendChild(fix);
 
         await new Promise<void>((r) => setTimeout(() => r(), 900));
         if (doc.fonts?.ready) {

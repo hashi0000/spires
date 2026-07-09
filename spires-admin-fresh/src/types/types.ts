@@ -16,6 +16,8 @@ export interface DriverLicensing {
 export interface DriverCompliance {
   dbsExpiry?: string;
   safeguardingExpiry?: string;
+  /** Subscribed to the DBS Update Service (annual subscription — status checked online). */
+  dbsUpdateService?: boolean;
 }
 
 export interface Driver {
@@ -37,6 +39,13 @@ export interface Driver {
   isSchoolApproved?: boolean;
 }
 
+export interface VehicleCompliance {
+  motExpiry?: string;
+  insuranceExpiry?: string;
+  phLicenceExpiry?: string;
+  taxExpiry?: string;
+}
+
 export interface Vehicle {
   id?: string;
   registration: string;
@@ -46,7 +55,10 @@ export interface Vehicle {
   color: string;
   available: boolean;
   notes?: string;
+  seats?: number;
+  compliance?: VehicleCompliance;
   createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface TripExpense {

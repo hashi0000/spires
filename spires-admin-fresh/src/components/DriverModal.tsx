@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Driver } from '../types/types';
-import { getExpiryStatus, expiryStatusLabel, expiryStatusClass } from '../utils/driverExpiry';
+import { getExpiryStatus, getDbsExpiryStatus, expiryStatusLabel, expiryStatusClass, dbsExpiryStatusLabel } from '../utils/driverExpiry';
 import {
   uploadDriverComplianceDocument,
   validateDriverUploadFile,
@@ -26,7 +26,7 @@ const emptyForm = (): Partial<Driver> => ({
   address: '',
   notes: '',
   licensing: { badgeNumber: '', badgeExpiry: '' },
-  compliance: { dbsExpiry: '', safeguardingExpiry: '' },
+  compliance: { dbsExpiry: '', safeguardingExpiry: '', dbsUpdateService: false },
   isSchoolApproved: false,
   documents: {},
 });
@@ -36,6 +36,21 @@ function ExpiryStatusBadge({ value }: { value?: string }) {
   return (
     <span className={`text-xs px-2 py-0.5 rounded font-medium ${expiryStatusClass(status)}`}>
       {expiryStatusLabel(status)}
+    </span>
+  );
+}
+
+function DbsExpiryStatusBadge({
+  dbsExpiry,
+  dbsUpdateService,
+}: {
+  dbsExpiry?: string;
+  dbsUpdateService?: boolean;
+}) {
+  const status = getDbsExpiryStatus(dbsExpiry, dbsUpdateService);
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded font-medium ${expiryStatusClass(status)}`}>
+      {dbsExpiryStatusLabel(status, dbsUpdateService)}
     </span>
   );
 }
@@ -57,6 +72,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
         compliance: {
           dbsExpiry: editingDriver.compliance?.dbsExpiry ?? '',
           safeguardingExpiry: editingDriver.compliance?.safeguardingExpiry ?? '',
+          dbsUpdateService: editingDriver.compliance?.dbsUpdateService === true,
         },
         documents: { ...editingDriver.documents },
         isSchoolApproved: editingDriver.isSchoolApproved === true,
@@ -98,6 +114,8 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
     }
   };
 
+  const onDbsUpdateService = formData.compliance?.dbsUpdateService === true;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -121,8 +139,9 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
         badgeExpiry: formData.licensing?.badgeExpiry ?? '',
       },
       compliance: {
-        dbsExpiry: formData.compliance?.dbsExpiry ?? '',
+        dbsExpiry: onDbsUpdateService ? '' : (formData.compliance?.dbsExpiry ?? ''),
         safeguardingExpiry: formData.compliance?.safeguardingExpiry ?? '',
+        dbsUpdateService: onDbsUpdateService,
       },
     };
 
@@ -291,19 +310,47 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
                       <input
                         type="date"
                         value={formData.compliance?.dbsExpiry ?? ''}
+                        disabled={onDbsUpdateService}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
                             compliance: {
                               dbsExpiry: e.target.value,
                               safeguardingExpiry: formData.compliance?.safeguardingExpiry ?? '',
+                              dbsUpdateService: formData.compliance?.dbsUpdateService === true,
                             },
                           })
                         }
-                        className="flex-1 min-w-[140px] p-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 min-w-[140px] p-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                       />
-                      <ExpiryStatusBadge value={formData.compliance?.dbsExpiry} />
+                      <DbsExpiryStatusBadge
+                        dbsExpiry={formData.compliance?.dbsExpiry}
+                        dbsUpdateService={onDbsUpdateService}
+                      />
                     </div>
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={onDbsUpdateService}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            compliance: {
+                              dbsExpiry: e.target.checked ? '' : (formData.compliance?.dbsExpiry ?? ''),
+                              safeguardingExpiry: formData.compliance?.safeguardingExpiry ?? '',
+                              dbsUpdateService: e.target.checked,
+                            },
+                          })
+                        }
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">On DBS Update Service</span>
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1 ml-6">
+                      {onDbsUpdateService
+                        ? 'No expiry date needed — status is checked via the Update Service.'
+                        : 'Tick if the driver pays for the annual DBS Update Service subscription.'}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Safeguarding expiry</label>
@@ -317,6 +364,7 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
                             compliance: {
                               dbsExpiry: formData.compliance?.dbsExpiry ?? '',
                               safeguardingExpiry: e.target.value,
+                              dbsUpdateService: formData.compliance?.dbsUpdateService === true,
                             },
                           })
                         }

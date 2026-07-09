@@ -61,6 +61,9 @@ export function buildDriverComplianceUpdate(partial: Partial<Driver>): Record<st
         typeof comp.safeguardingExpiry === 'string' ? comp.safeguardingExpiry : undefined
       );
     }
+    if (comp.dbsUpdateService !== undefined) {
+      u['compliance.dbsUpdateService'] = comp.dbsUpdateService === true;
+    }
   }
 
   return u;
@@ -86,10 +89,12 @@ export function newDriverFirestorePayload(driver: Omit<Driver, 'id' | 'createdAt
   const complianceClean: Record<string, unknown> | undefined = (() => {
     const dbs = optionalDateStringToTimestamp(driver.compliance?.dbsExpiry);
     const sg = optionalDateStringToTimestamp(driver.compliance?.safeguardingExpiry);
-    if (!dbs && !sg) return undefined;
+    const onUpdateService = driver.compliance?.dbsUpdateService === true;
+    if (!dbs && !sg && !onUpdateService) return undefined;
     return {
       ...(dbs ? { dbsExpiry: dbs } : {}),
       ...(sg ? { safeguardingExpiry: sg } : {}),
+      ...(onUpdateService ? { dbsUpdateService: true } : {}),
     };
   })();
 

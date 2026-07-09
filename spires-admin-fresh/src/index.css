@@ -10,10 +10,9 @@ body {
   color: #0b1c3d;
 }
 
-/* Ensure admin header stays blue - don't override */
+/* Admin header colours come from styles.css */
 header.admin-header {
-  background-color: #0b1c3d !important;
-  color: #fff !important;
+  color: #fff;
 }
 
 .min-h-screen {

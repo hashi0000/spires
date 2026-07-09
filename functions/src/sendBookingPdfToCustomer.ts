@@ -99,6 +99,7 @@ async function sendMailWithPdf(params: {
       {
         filename: `${filenamePrefix}_${bookingNumber}.pdf`,
         content: pdfBuffer,
+        contentType: "application/pdf",
       },
     ],
   });

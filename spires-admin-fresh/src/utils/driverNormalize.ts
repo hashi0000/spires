@@ -65,6 +65,7 @@ export function normalizeDriverFromFirestore(id: string, raw: Record<string, unk
         ? {
             dbsExpiry: timestampLikeToDateString(compliance.dbsExpiry),
             safeguardingExpiry: timestampLikeToDateString(compliance.safeguardingExpiry),
+            dbsUpdateService: compliance.dbsUpdateService === true,
           }
         : undefined,
     documents: normalizeDocuments(raw?.documents),

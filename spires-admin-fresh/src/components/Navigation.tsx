@@ -9,18 +9,21 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab }) => {
   return (
-    <nav className="admin-nav">
+    <nav className="admin-nav" aria-label="Main navigation">
       <div className="admin-nav-content">
         {navigation.map((item) => {
           const Icon = item.icon;
+          const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => setActiveTab(item.id)}
-              className={`admin-nav-button ${activeTab === item.id ? 'active' : ''}`}
+              className={`admin-nav-button${isActive ? ' active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
             >
-              <Icon className="h-5 w-5" style={{ marginRight: '0.5rem' }} />
-              {item.name}
+              <Icon className="admin-nav-button__icon" />
+              <span>{item.name}</span>
             </button>
           );
         })}

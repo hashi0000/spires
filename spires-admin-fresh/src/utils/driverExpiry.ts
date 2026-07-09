@@ -39,6 +39,21 @@ export function getExpiryStatus(value: unknown, now: Date = new Date()): ExpiryS
   return 'valid';
 }
 
+/** DBS expiry is optional when the driver is on the DBS Update Service. */
+export function getDbsExpiryStatus(
+  dbsExpiry: unknown,
+  dbsUpdateService?: boolean,
+  now: Date = new Date()
+): ExpiryStatus {
+  if (dbsUpdateService === true) return 'valid';
+  return getExpiryStatus(dbsExpiry, now);
+}
+
+export function dbsExpiryStatusLabel(status: ExpiryStatus, dbsUpdateService?: boolean): string {
+  if (dbsUpdateService === true) return 'Update Service';
+  return expiryStatusLabel(status);
+}
+
 export function expiryStatusLabel(status: ExpiryStatus): string {
   switch (status) {
     case 'expired':

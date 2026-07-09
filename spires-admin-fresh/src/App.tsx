@@ -231,9 +231,9 @@ const App: React.FC = () => {
     setShowBookingModal(true);
   };
 
-  const handleUpdateBooking = async (booking: any) => {
+  const handleUpdateBooking = async (_booking: any) => {
     try {
-      await bookingsHook.updateBooking(editingItem.id!, booking);
+      // BookingModal already persisted edits via updateDoc(bookings/{id})
       setShowBookingModal(false);
       setEditingItem(null);
     } catch (error) {
@@ -416,14 +416,16 @@ const App: React.FC = () => {
 
   return (
     <div className="admin-wrapper">
-      <Header
-        activeDriversCount={activeDrivers.length}
-        availableVehiclesCount={availableVehicles.length}
-        pendingCustomerBookingsCount={pendingCustomerBookingsCount}
-        upcomingSoonCount={upcomingSoonCount}
-        onLogout={handleLogout}
-      />
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+      <div className="admin-topbar">
+        <Header
+          activeDriversCount={activeDrivers.length}
+          availableVehiclesCount={availableVehicles.length}
+          pendingCustomerBookingsCount={pendingCustomerBookingsCount}
+          upcomingSoonCount={upcomingSoonCount}
+          onLogout={handleLogout}
+        />
+        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+      </div>
       <main className="admin-main">
         {renderContent()}
       </main>

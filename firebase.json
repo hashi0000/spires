@@ -7,6 +7,9 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "functions": {
     "source": "functions",
     "ignore": [
@@ -35,7 +38,7 @@
     "singleProjectMode": true,
     "apphosting": {
       "port": 5002,
-      "rootDirectory": "C:\\Users\\hashi\\Desktop\\spires-site-clean\\spires-site-clean"
+      "rootDirectory": "C:\\Users\\Hashim-Ali Shah\\Desktop\\spires-site-clean"
     },
     "auth": {
       "port": 9099
