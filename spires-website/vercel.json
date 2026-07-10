@@ -59,6 +59,16 @@
       "permanent": true
     },
     {
+      "source": "/admin",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/",
+      "permanent": true
+    },
+    {
       "source": "/services",
       "destination": "/airport-transfers",
       "permanent": true
