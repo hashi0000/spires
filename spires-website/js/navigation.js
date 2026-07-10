@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="https://wa.me/447776897772?text=Hello,%20I'd%20like%20to%20book%20a%20taxi%20please" class="whatsapp-btn">
                         <img src="./images/whatsapp-icon.svg" alt="WhatsApp" class="whatsapp-icon">
                     </a>
-                    <a href="https://booking.spires-taxis.com" class="book-btn" target="_blank" rel="noopener noreferrer">BOOK ONLINE</a>
+                    <a href="https://customer.spires-taxis.com" class="book-btn" target="_blank" rel="noopener noreferrer">BOOK ONLINE</a>
                 </div>
                 
                 <div class="mobile-menu-toggle">

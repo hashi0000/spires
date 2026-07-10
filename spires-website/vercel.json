@@ -50,7 +50,7 @@
     },
     {
       "source": "/booking",
-      "destination": "https://booking.spires-taxis.com",
+      "destination": "https://customer.spires-taxis.com",
       "permanent": true
     },
     {
