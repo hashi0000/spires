@@ -83,6 +83,8 @@ body {
 }
 
 img, svg { display: block; max-width: 100%; height: auto; }
+img { decoding: async; }
+.site-footer__logo { loading: lazy; }
 
 a { color: var(--blue-mid); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 a:hover { color: var(--blue); }
