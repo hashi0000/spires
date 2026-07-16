@@ -526,6 +526,61 @@ a.btn-primary, .btn.btn-primary {
 .prose h2:first-child { margin-top: 0; }
 .prose p { margin-bottom: 1rem; }
 
+.callout {
+  background: var(--blue-soft);
+  border-left: 3px solid var(--gold);
+  padding: 1.25rem 1.35rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 1.5rem 0;
+}
+
+.callout p { margin-bottom: 0.65rem; color: var(--text); }
+.callout p:last-child { margin-bottom: 0; }
+.callout strong { color: var(--blue); }
+
+.media-figure {
+  margin: 1.5rem 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--white);
+}
+
+.media-figure img {
+  width: 100%;
+  height: auto;
+}
+
+.media-figure figcaption {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  margin: 1rem 0 0;
+}
+
+.plain-table th,
+.plain-table td {
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.plain-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 /* —— Steps —— */
 .steps {
   display: grid;
