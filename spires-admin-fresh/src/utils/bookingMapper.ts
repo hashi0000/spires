@@ -25,6 +25,15 @@ export interface CustomerBooking {
   paymentStatus?: string;
   paymentMethod?: string;
   expenses?: any[];
+  returnTrip?: boolean;
+  returnDateTime?: string;
+  flightNumber?: string;
+  terminal?: string;
+  vehicleType?: string;
+  depositRequired?: boolean;
+  depositAmount?: number;
+  depositStatus?: string;
+  luggage?: number;
 }
 
 /**
