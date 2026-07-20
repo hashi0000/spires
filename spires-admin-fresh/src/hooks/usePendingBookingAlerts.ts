@@ -82,11 +82,13 @@ export function usePendingBookingAlerts(
     }
 
     // Drop ids that are no longer pending
-    knownIds.current = new Set(
-      [...knownIds.current].filter((id) => pendingIds.has(id) || sessionStorage.getItem(sessionKey(id)))
-    );
-    for (const id of pendingIds) {
-      knownIds.current.add(id);
-    }
+    const nextKnown = new Set<string>();
+    knownIds.current.forEach((id) => {
+      if (pendingIds.has(id) || sessionStorage.getItem(sessionKey(id))) {
+        nextKnown.add(id);
+      }
+    });
+    pendingIds.forEach((id) => nextKnown.add(id));
+    knownIds.current = nextKnown;
   }, [enabled, bookings]);
 }
