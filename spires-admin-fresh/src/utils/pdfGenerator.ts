@@ -63,7 +63,10 @@ export function buildBookingConfirmationHtml(
   }
 
   const bankDetailsBlock = showBankDetails
-    ? bankTransferDetailsHtml({ paymentStatus: booking.paymentStatus })
+    ? bankTransferDetailsHtml({
+        paymentStatus: booking.paymentStatus,
+        bookingNumber: booking.bookingNumber,
+      })
     : "";
 
   const depositAmountNum =
@@ -73,19 +76,19 @@ export function buildBookingConfirmationHtml(
   const depositBlock =
     booking.depositRequired && booking.depositStatus !== "paid"
       ? `
-        <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#fff8eb;font-size:0.9rem;line-height:1.5;">
-          <div style="font-weight:600;color:#002147;margin-bottom:6px;">Deposit required</div>
-          <div>${
+        <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#fff8eb;font-size:0.9rem;line-height:1.5;color:#002147;text-align:left;">
+          <div style="font-weight:700;color:#002147;margin-bottom:6px;">Deposit required</div>
+          <div style="color:#002147;">${
             Number.isFinite(depositAmountNum)
               ? `Please pay a deposit of <strong>£${depositAmountNum.toFixed(2)}</strong> to confirm this booking.`
               : "A deposit is required to confirm this booking."
           }</div>
-          <div style="margin-top:4px;font-size:0.85rem;color:#555;">Use your booking number as the payment reference.</div>
+          <div style="margin-top:4px;font-size:0.85rem;color:#333;">Use your booking number as the payment reference.</div>
         </div>
       `
       : booking.depositRequired && booking.depositStatus === "paid"
         ? `
-        <div style="margin-top:12px;padding:10px;font-size:0.9rem;">
+        <div style="margin-top:12px;padding:10px;font-size:0.9rem;color:#002147;text-align:left;">
           Deposit: <strong>Paid</strong>${
             Number.isFinite(depositAmountNum) ? ` (£${depositAmountNum.toFixed(2)})` : ""
           }
@@ -471,9 +474,9 @@ export function buildBookingConfirmationHtml(
                                 Please arrange payment for this booking using the method above.
                             </div>
                             ` : ""}
-                            ${bankDetailsBlock}
-                            ${depositBlock}
                         </div>
+                        ${bankDetailsBlock}
+                        ${depositBlock}
                     </div>
 
                 </div>

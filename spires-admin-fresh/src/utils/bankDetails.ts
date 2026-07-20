@@ -17,16 +17,24 @@ export function formatPaymentMethodLabel(method?: string | null): string {
 }
 
 /** HTML block for PDFs / emails when customer will pay by bank transfer */
-export function bankTransferDetailsHtml(opts?: { unpaidOnly?: boolean; paymentStatus?: string }): string {
+export function bankTransferDetailsHtml(opts?: {
+  unpaidOnly?: boolean;
+  paymentStatus?: string;
+  bookingNumber?: string;
+}): string {
   if (opts?.unpaidOnly && opts.paymentStatus === "paid") return "";
+  if (opts?.paymentStatus === "paid") return "";
   const { accountName, sortCode, accountNumber } = SPIRES_BANK_DETAILS;
+  const ref = (opts?.bookingNumber || "").trim();
   return `
-    <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#faf8f4;font-size:0.9rem;line-height:1.5;">
-      <div style="font-weight:600;color:#002147;margin-bottom:6px;">Pay by bank transfer</div>
-      <div><strong>Account name:</strong> ${accountName}</div>
-      <div><strong>Sort code:</strong> ${sortCode}</div>
-      <div><strong>Account number:</strong> ${accountNumber}</div>
-      <div style="margin-top:6px;font-size:0.85rem;color:#555;">Please use your booking number as the payment reference.</div>
+    <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#faf8f4;font-size:0.9rem;line-height:1.55;color:#002147;text-align:left;">
+      <div style="font-weight:700;color:#002147;margin-bottom:8px;">Bank transfer details</div>
+      <div style="color:#002147;"><strong>Account name:</strong> ${accountName}</div>
+      <div style="color:#002147;"><strong>Sort code:</strong> ${sortCode}</div>
+      <div style="color:#002147;"><strong>Account number:</strong> ${accountNumber}</div>
+      <div style="margin-top:8px;font-size:0.85rem;color:#333;">
+        Please use ${ref ? `<strong>${ref}</strong> as` : "your booking number as"} the payment reference.
+      </div>
     </div>
   `;
 }
