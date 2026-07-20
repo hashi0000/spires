@@ -88,6 +88,10 @@ export interface Booking {
   actualFare?: number;
   paymentMethod?: 'cash' | 'card' | 'bank transfer' | 'account';
   paymentStatus?: 'pending' | 'paid' | 'partial' | 'refunded';
+  vehicleType?: 'standard' | '8_seater' | string;
+  depositRequired?: boolean;
+  depositAmount?: number;
+  depositStatus?: 'not_required' | 'pending' | 'paid' | string;
   expenses?: TripExpense[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -106,6 +110,14 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare'> {
   hirerEmail?: string;
   passengers?: number;
   customerStatus?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  returnTrip?: boolean;
+  returnDateTime?: string;
+  flightNumber?: string;
+  terminal?: string;
+  vehicleType?: 'standard' | '8_seater' | string;
+  depositRequired?: boolean;
+  depositAmount?: number | string;
+  depositStatus?: 'not_required' | 'pending' | 'paid' | string;
 }
 
 // Customer interface (from customers collection)

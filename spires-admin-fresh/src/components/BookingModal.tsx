@@ -3,6 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Minus, Calculator, CreditCard, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
+import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails';
+import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import { db } from '../utils/firebase';
@@ -73,7 +75,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
     actualFare: '',
     paymentMethod: 'cash',
     paymentStatus: 'pending',
-    expenses: []
+    expenses: [],
+    vehicleType: '',
+    depositRequired: false,
+    depositAmount: '',
+    depositStatus: 'not_required',
   });
 
   const [newExpense, setNewExpense] = useState<{
@@ -108,6 +114,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
           : editingBooking.pickupTime
             ? toDatetimeLocalValue(editingBooking.pickupTime)
             : '',
+        vehicleType: editingBooking.vehicleType || (editingBooking as any).vehicleType || '',
+        depositRequired: editingBooking.depositRequired === true,
+        depositAmount:
+          editingBooking.depositAmount !== undefined && editingBooking.depositAmount !== null
+            ? String(editingBooking.depositAmount)
+            : '',
+        depositStatus: editingBooking.depositStatus || (editingBooking.depositRequired ? 'pending' : 'not_required'),
       };
       setFormData(mappedBooking);
     } else {
@@ -133,7 +146,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
         actualFare: '',
         paymentMethod: 'cash',
         paymentStatus: 'pending',
-        expenses: []
+        expenses: [],
+        vehicleType: '',
+        depositRequired: false,
+        depositAmount: '',
+        depositStatus: 'not_required',
       };
 
       if (initialDraft) {
@@ -157,7 +174,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
           actualFare: d.actualFare !== undefined && d.actualFare !== '' ? String(d.actualFare) : '',
           paymentMethod: d.paymentMethod ?? empty.paymentMethod,
           paymentStatus: (d.paymentStatus as ExtendedBooking['paymentStatus']) || empty.paymentStatus,
-          expenses: Array.isArray(d.expenses) ? d.expenses : []
+          expenses: Array.isArray(d.expenses) ? d.expenses : [],
+          vehicleType: (d as any).vehicleType ?? empty.vehicleType,
+          depositRequired: (d as any).depositRequired === true,
+          depositAmount: (d as any).depositAmount !== undefined && (d as any).depositAmount !== '' ? String((d as any).depositAmount) : '',
+          depositStatus: (d as any).depositStatus || empty.depositStatus,
         });
       } else {
         setFormData(empty);
@@ -216,6 +237,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
         typeof formData.actualFare === 'string'
           ? (formData.actualFare.trim() ? parseFloat(formData.actualFare) : undefined)
           : formData.actualFare,
+      depositRequired: formData.depositRequired === true,
+      depositAmount:
+        formData.depositRequired === true && formData.depositAmount !== undefined && formData.depositAmount !== ''
+          ? (typeof formData.depositAmount === 'string'
+              ? parseFloat(formData.depositAmount)
+              : formData.depositAmount)
+          : undefined,
+      depositStatus:
+        formData.depositRequired === true
+          ? (formData.depositStatus === 'paid' ? 'paid' : 'pending')
+          : 'not_required',
       dateTime: dateTimeIso,
       pickupTime: pickupIso,
       allocatedTime:
@@ -620,6 +652,80 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   </select>
                 </div>
               </div>
+              {isBankTransferMethod(formData.paymentMethod) && formData.paymentStatus !== 'paid' && (
+                <div className="mb-4 p-3 rounded-md border border-amber-300 bg-amber-50 text-sm text-gray-800 leading-relaxed">
+                  <div className="font-semibold text-gray-900 mb-1">Bank transfer details (shown on customer PDF)</div>
+                  <div>{SPIRES_BANK_DETAILS.accountName}</div>
+                  <div>Sort code: {SPIRES_BANK_DETAILS.sortCode}</div>
+                  <div>Account: {SPIRES_BANK_DETAILS.accountNumber}</div>
+                  <div className="mt-1 text-gray-600">Customer should use the booking number as the payment reference.</div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle type</label>
+                  <select
+                    value={formData.vehicleType || ''}
+                    onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Not specified</option>
+                    {VEHICLE_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Deposit required?</label>
+                  <select
+                    value={formData.depositRequired ? 'yes' : 'no'}
+                    onChange={(e) => {
+                      const required = e.target.value === 'yes';
+                      setFormData({
+                        ...formData,
+                        depositRequired: required,
+                        depositStatus: required
+                          ? (formData.depositStatus === 'paid' ? 'paid' : 'pending')
+                          : 'not_required',
+                        depositAmount: required ? formData.depositAmount : '',
+                      });
+                    }}
+                    className="form-input"
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                {formData.depositRequired && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Deposit status</label>
+                    <select
+                      value={formData.depositStatus === 'paid' ? 'paid' : 'pending'}
+                      onChange={(e) => setFormData({ ...formData, depositStatus: e.target.value })}
+                      className="form-input"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              {formData.depositRequired && (
+                <div className="mb-4 max-w-xs">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Deposit amount (£)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.depositAmount || ''}
+                    onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
+                    className="form-input"
+                    placeholder="e.g. 50"
+                  />
+                </div>
+              )}
+
               {actualFareNum > 0 && (
                 <div className="bg-white p-3 rounded border">
                   <div className="flex justify-between text-sm">

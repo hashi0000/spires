@@ -137,6 +137,14 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     uid: customerBooking.uid,
     email: customerBooking.email,
     passengers: customerBooking.passengers,
+    returnTrip: customerBooking.returnTrip,
+    returnDateTime: customerBooking.returnDateTime,
+    flightNumber: customerBooking.flightNumber,
+    terminal: customerBooking.terminal,
+    vehicleType: customerBooking.vehicleType,
+    depositRequired: customerBooking.depositRequired === true,
+    depositAmount: customerBooking.depositAmount,
+    depositStatus: customerBooking.depositStatus,
     // Preserve customer status for customer app
     customerStatus: customerStatus,
   } as Partial<Booking>;

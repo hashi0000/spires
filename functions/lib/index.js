@@ -44,28 +44,58 @@ Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: f
 Object.defineProperty(exports, "confirmPayment", { enumerable: true, get: function () { return payment_1.confirmPayment; } });
 Object.defineProperty(exports, "stripeWebhook", { enumerable: true, get: function () { return payment_1.stripeWebhook; } });
 admin.initializeApp();
+function isConfirmedStatus(data) {
+    if (!data)
+        return false;
+    return (data.status === "confirmed" ||
+        data.customerStatus === "confirmed" ||
+        data.adminStatus === "confirmed");
+}
+function isPendingRequest(data) {
+    const status = data.status || "pending";
+    return status === "pending" || data.customerStatus === "pending";
+}
 exports.onBookingWrite = functions.firestore
     .document("bookings/{bookingId}")
     .onWrite(async (change, context) => {
     const after = change.after.exists ? change.after.data() : null;
     const before = change.before.exists ? change.before.data() : null;
+    const bookingId = context.params.bookingId;
     if (!after)
         return;
-    // New confirmed booking
-    if (!before && after.status === "confirmed") {
-        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "confirmation");
+    // New pending customer booking request → email the office
+    if (!before && isPendingRequest(after)) {
+        await (0, sendBookingReceipt_1.notifyAdminNewBookingRequest)(after, bookingId);
+        return;
+    }
+    // Created already confirmed (admin-created) → send confirmation PDF
+    if (!before && isConfirmedStatus(after)) {
+        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "confirmation", bookingId);
+        await change.after.ref.update({
+            confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
+    }
+    // Pending → confirmed (or customerStatus flipped) → auto-send confirmation PDF once
+    if (before &&
+        !isConfirmedStatus(before) &&
+        isConfirmedStatus(after) &&
+        !after.confirmationEmailSentAt) {
+        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "confirmation", bookingId);
+        await change.after.ref.update({
+            confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
         return;
     }
     // Payment status changed to paid
     if (before && before.paymentStatus !== "paid" && after.paymentStatus === "paid") {
-        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "payment");
-        return;
+        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "payment", bookingId);
     }
 });
 // Send welcome email when a new customer signs up
 exports.onCustomerCreate = functions.firestore
     .document("customers/{customerId}")
-    .onCreate(async (snapshot, context) => {
+    .onCreate(async (snapshot) => {
     const customerData = snapshot.data();
     await (0, sendWelcomeEmail_1.sendWelcomeEmail)(customerData);
 });

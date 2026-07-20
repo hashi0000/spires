@@ -1,5 +1,7 @@
 // utils/pdfGenerator.ts - Booking PDF Generator
 import { Booking, Driver, Vehicle } from "../types/types";
+import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
+import { formatVehicleTypeLabel } from "./vehicleTypes";
 
 export type AdminPDFType = "booking_confirmation" | "payment_request" | "payment_receipt";
 
@@ -21,7 +23,7 @@ export function buildBookingConfirmationHtml(
   type: AdminPDFType = "booking_confirmation"
 ): string {
   const formatPaymentMethod = (method?: string) => {
-    if (!method) return "CASH";
+    if (!method) return "TO BE CONFIRMED";
     return method.replace(/_/g, " ").toUpperCase();
   };
 
@@ -38,6 +40,8 @@ export function buildBookingConfirmationHtml(
   const isPartial = booking.paymentStatus === "partial";
   const isPaymentReceipt = type === "payment_receipt";
   const isPaymentRequest = type === "payment_request";
+  const showBankDetails =
+    isBankTransferMethod(booking.paymentMethod) && !isPaid;
 
   const paymentAmount = hasFare
     ? `£${booking.actualFare!.toFixed(2)}`
@@ -58,11 +62,42 @@ export function buildBookingConfirmationHtml(
     paymentText = `To be paid by ${formatPaymentMethod(booking.paymentMethod)}`;
   }
 
+  const bankDetailsBlock = showBankDetails
+    ? bankTransferDetailsHtml({ paymentStatus: booking.paymentStatus })
+    : "";
+
+  const depositAmountNum =
+    typeof booking.depositAmount === "number"
+      ? booking.depositAmount
+      : Number(booking.depositAmount);
+  const depositBlock =
+    booking.depositRequired && booking.depositStatus !== "paid"
+      ? `
+        <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#fff8eb;font-size:0.9rem;line-height:1.5;">
+          <div style="font-weight:600;color:#002147;margin-bottom:6px;">Deposit required</div>
+          <div>${
+            Number.isFinite(depositAmountNum)
+              ? `Please pay a deposit of <strong>£${depositAmountNum.toFixed(2)}</strong> to confirm this booking.`
+              : "A deposit is required to confirm this booking."
+          }</div>
+          <div style="margin-top:4px;font-size:0.85rem;color:#555;">Use your booking number as the payment reference.</div>
+        </div>
+      `
+      : booking.depositRequired && booking.depositStatus === "paid"
+        ? `
+        <div style="margin-top:12px;padding:10px;font-size:0.9rem;">
+          Deposit: <strong>Paid</strong>${
+            Number.isFinite(depositAmountNum) ? ` (£${depositAmountNum.toFixed(2)})` : ""
+          }
+        </div>
+      `
+        : "";
+
   // ---------------------------
   // CLEAN CUSTOMER WHATSAPP LINK (Option C)
   // ---------------------------
 
-  const formattedWhatsAppLink = `https://wa.me/${booking.hirerPhone.replace(
+  const formattedWhatsAppLink = `https://wa.me/${(booking.hirerPhone || "").replace(
     /[^0-9]/g,
     ""
   )}`;
@@ -379,6 +414,17 @@ export function buildBookingConfirmationHtml(
                         </div>
                     </div>
 
+                    <div class="detail-row" style="margin-top:10px;">
+                        <span class="detail-label">Vehicle requested</span>
+                        <span class="detail-value">${formatVehicleTypeLabel((booking as any).vehicleType)}</span>
+                    </div>
+                    ${(booking as any).passengers ? `
+                    <div class="detail-row">
+                        <span class="detail-label">Passengers</span>
+                        <span class="detail-value">${(booking as any).passengers}</span>
+                    </div>
+                    ` : ""}
+
                 </div>
 
                 <div class="content-grid">
@@ -422,9 +468,11 @@ export function buildBookingConfirmationHtml(
                             <div class="payment-method">${paymentText}</div>
                             ${type === "payment_request" && hasFare ? `
                             <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.95;">
-                                Please arrange payment for this booking. Contact us to pay by cash, card, or other methods.
+                                Please arrange payment for this booking using the method above.
                             </div>
                             ` : ""}
+                            ${bankDetailsBlock}
+                            ${depositBlock}
                         </div>
                     </div>
 

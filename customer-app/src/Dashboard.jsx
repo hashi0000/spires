@@ -5,8 +5,13 @@ import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from "fire
 import { useNavigate } from "react-router-dom";
 import BookingForm from "./components/BookingForm";
 import Profile from "./components/Profile";
-import Payment from "./components/Payment";
 import { generateBookingPDF } from "./pdfGenerator";
+import {
+  SPIRES_BANK_DETAILS,
+  formatPaymentMethodLabel,
+  isBankTransferMethod,
+} from "./bankDetails";
+import { formatVehicleTypeLabel } from "./vehicleTypes";
 import "./styles.css";
 
 export default function Dashboard() {
@@ -14,8 +19,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState(null);
   const [userName, setUserName] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [drivers, setDrivers] = useState({}); // Store drivers by ID
@@ -372,7 +375,25 @@ export default function Dashboard() {
                       <span className="info-value">{booking.passengers}</span>
                     </div>
                   )}
-                  
+
+                  {booking.vehicleType && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Vehicle:</span>
+                      <span className="info-value">{formatVehicleTypeLabel(booking.vehicleType)}</span>
+                    </div>
+                  )}
+
+                  {booking.depositRequired && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Deposit:</span>
+                      <span className="info-value" style={{ fontWeight: 600, color: booking.depositStatus === "paid" ? "#065f46" : "#92400e" }}>
+                        {booking.depositStatus === "paid"
+                          ? `Paid${booking.depositAmount ? ` (£${Number(booking.depositAmount).toFixed(2)})` : ""}`
+                          : `Required${booking.depositAmount ? ` — £${Number(booking.depositAmount).toFixed(2)}` : ""}`}
+                      </span>
+                    </div>
+                  )}
+
                   {booking.createdAt && (
                     <div className="booking-info-row">
                       <span className="info-label">Booked:</span>
@@ -380,13 +401,81 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                  {booking.returnTrip && booking.returnDateTime && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Return:</span>
+                      <span className="info-value">{formatDateTime(booking.returnDateTime)}</span>
+                    </div>
+                  )}
+
+                  {(booking.flightNumber || booking.terminal) && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Flight:</span>
+                      <span className="info-value">
+                        {[booking.flightNumber, booking.terminal ? `Terminal ${booking.terminal}` : ""]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Show price when booking is confirmed or paid */}
-                  {booking.actualFare && (booking.status === "confirmed" || booking.status === "paid") && (
+                  {booking.actualFare && (booking.status === "confirmed" || booking.status === "paid" || booking.paymentStatus === "paid") && (
                     <div className="booking-info-row">
                       <span className="info-label">Fare:</span>
                       <span className="info-value" style={{ color: "#065f46", fontWeight: "600" }}>
                         £{typeof booking.actualFare === "number" ? booking.actualFare.toFixed(2) : parseFloat(booking.actualFare).toFixed(2)}
                       </span>
+                    </div>
+                  )}
+
+                  {booking.paymentMethod && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Pay by:</span>
+                      <span className="info-value">{formatPaymentMethodLabel(booking.paymentMethod)}</span>
+                    </div>
+                  )}
+
+                  {booking.paymentStatus === "paid" && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Payment:</span>
+                      <span className="info-value" style={{ color: "#065f46", fontWeight: "600" }}>Paid</span>
+                    </div>
+                  )}
+
+                  {((isBankTransferMethod(booking.paymentMethod) &&
+                    booking.paymentStatus !== "paid" &&
+                    (booking.status === "confirmed" || booking.actualFare)) ||
+                    (booking.depositRequired &&
+                      booking.depositStatus !== "paid" &&
+                      booking.status === "confirmed")) && (
+                    <div
+                      style={{
+                        marginTop: "0.75rem",
+                        padding: "0.75rem",
+                        borderRadius: "8px",
+                        border: "1px solid #C5A572",
+                        background: "#faf8f4",
+                        fontSize: "0.85rem",
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
+                        {booking.depositRequired && booking.depositStatus !== "paid"
+                          ? "Bank details for deposit / payment"
+                          : "Bank transfer"}
+                      </div>
+                      <div>{SPIRES_BANK_DETAILS.accountName}</div>
+                      <div>Sort code: {SPIRES_BANK_DETAILS.sortCode}</div>
+                      <div>Account: {SPIRES_BANK_DETAILS.accountNumber}</div>
+                      <div style={{ marginTop: "0.25rem", color: "#555" }}>
+                        Use booking ref{" "}
+                        <strong>
+                          {booking.bookingNumber ||
+                            (booking.id ? `CUST${booking.id.slice(0, 6).toUpperCase()}` : "TBC")}
+                        </strong>{" "}
+                        as the payment reference.
+                      </div>
                     </div>
                   )}
 
@@ -417,26 +506,11 @@ export default function Dashboard() {
                 </div>
 
                 <div className="booking-card-actions">
-                  {/* Show Pay Now button if booking is confirmed but not paid */}
-                  {booking.status === "confirmed" && 
-                   booking.actualFare && 
-                   booking.paymentStatus !== "paid" && (
-                    <button
-                      onClick={() => {
-                        setSelectedBooking(booking);
-                        setShowPayment(true);
-                      }}
-                      className="btn-primary"
-                      style={{ marginRight: "0.5rem" }}
-                    >
-                      Pay Now
-                    </button>
-                  )}
                   <button
                     onClick={() => handleDownloadPDF(booking)}
                     className="btn-download"
                   >
-                    Download Receipt
+                    Download Confirmation
                   </button>
                 </div>
               </div>
@@ -455,21 +529,6 @@ export default function Dashboard() {
       {showProfile && (
         <Profile
           onClose={() => setShowProfile(false)}
-        />
-      )}
-
-      {showPayment && selectedBooking && (
-        <Payment
-          booking={selectedBooking}
-          onSuccess={() => {
-            setShowPayment(false);
-            setSelectedBooking(null);
-            // The booking will automatically update via Firestore listener
-          }}
-          onClose={() => {
-            setShowPayment(false);
-            setSelectedBooking(null);
-          }}
         />
       )}
     </div>

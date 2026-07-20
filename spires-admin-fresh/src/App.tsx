@@ -5,6 +5,7 @@ import { auth } from './utils/firebase';
 import { Driver, Vehicle, Booking } from './types/types';
 import { useDrivers, useVehicles, useBookings, useDriverLimitCheck } from './hooks/useFirebase';
 import { useBookingDesktopReminders } from './hooks/useBookingDesktopReminders';
+import { usePendingBookingAlerts } from './hooks/usePendingBookingAlerts';
 import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
 import { isCustomerBooking } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
@@ -78,6 +79,7 @@ const App: React.FC = () => {
     [bookingsHook.bookings, headerNow]
   );
   useBookingDesktopReminders(desktopRemindersEnabled, bookingsHook.bookings);
+  usePendingBookingAlerts(true, bookingsHook.bookings);
 
   const [showDriverModal, setShowDriverModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);

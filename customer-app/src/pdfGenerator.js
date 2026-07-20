@@ -1,6 +1,9 @@
 // Customer PDF Generator - Professional HTML-based PDF with clickable links
 // Matches admin app style with WhatsApp integration
 
+import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
+import { formatVehicleTypeLabel } from "./vehicleTypes";
+
 const getDocumentTitle = (type = "booking_confirmation") => {
   switch (type) {
     case "payment_request":
@@ -573,9 +576,23 @@ export const generateBookingPDF = (
                             <span class="detail-value">${booking.passengers || 1}</span>
                         </div>
                         <div class="detail-row">
+                            <span class="detail-label">Vehicle</span>
+                            <span class="detail-value">${formatVehicleTypeLabel(booking.vehicleType)}</span>
+                        </div>
+                        <div class="detail-row">
                             <span class="detail-label">Luggage</span>
                             <span class="detail-value">${booking.luggage || 0} pieces</span>
                         </div>
+                        ${booking.depositRequired ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Deposit</span>
+                            <span class="detail-value">${
+                              booking.depositStatus === "paid"
+                                ? `Paid${booking.depositAmount ? ` (£${Number(booking.depositAmount).toFixed(2)})` : ""}`
+                                : `Required${booking.depositAmount ? ` — £${Number(booking.depositAmount).toFixed(2)}` : ""}`
+                            }</span>
+                        </div>
+                        ` : ''}
                         ${booking.specialRequirements ? `
                         <div class="detail-row" style="margin-top: 8px; flex-direction: column; align-items: flex-start;">
                             <span class="detail-label" style="margin-bottom: 4px;">Special Requirements</span>
@@ -610,9 +627,26 @@ export const generateBookingPDF = (
                         const isCompleted = booking.status === 'completed';
                         const isPaid = booking.paymentStatus === 'paid';
                         const hasFare = booking.actualFare;
-                        const paymentMethod = (booking.paymentMethod || "CASH").replace(/_/g, " ").toUpperCase();
+                        const paymentMethod = (booking.paymentMethod || "TO BE CONFIRMED").replace(/_/g, " ").toUpperCase();
                         const isPaymentRequest = type === 'payment_request';
                         const isPaymentReceipt = type === 'payment_receipt';
+                        const bankBlock = isBankTransferMethod(booking.paymentMethod) && !isPaid
+                          ? bankTransferDetailsHtml(booking.paymentStatus)
+                          : '';
+                        const depositAmt = Number(booking.depositAmount);
+                        const depositBlock = booking.depositRequired && booking.depositStatus !== 'paid'
+                          ? `
+                            <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#fff8eb;font-size:0.9rem;line-height:1.5;color:#fff;">
+                              <div style="font-weight:600;margin-bottom:6px;">Deposit required</div>
+                              <div>${Number.isFinite(depositAmt)
+                                ? `Please pay a deposit of £${depositAmt.toFixed(2)} to confirm this booking.`
+                                : "A deposit is required to confirm this booking."}</div>
+                              <div style="margin-top:4px;font-size:0.85rem;opacity:0.9;">Use your booking number as the payment reference.</div>
+                            </div>
+                          `
+                          : (booking.depositRequired && booking.depositStatus === 'paid'
+                            ? `<div style="margin-top:10px;font-size:0.9rem;">Deposit: Paid${Number.isFinite(depositAmt) ? ` (£${depositAmt.toFixed(2)})` : ""}</div>`
+                            : '');
                         
                         // Payment Request - always show prominently
                         if (isPaymentRequest && hasFare) {
@@ -623,8 +657,10 @@ export const generateBookingPDF = (
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">Payment Required - ${paymentMethod}</div>
                                     <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.95;">
-                                        Please arrange payment for this booking. Contact us to pay by cash, card, or other methods.
+                                        Please arrange payment for this booking using the method above.
                                     </div>
+                                    ${bankBlock}
+                                    ${depositBlock}
                                 </div>
                             </div>
                             `;
@@ -651,6 +687,8 @@ export const generateBookingPDF = (
                                 <div class="payment-summary" style="background: #92400e;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">Payment Pending - ${paymentMethod}</div>
+                                    ${bankBlock}
+                                    ${depositBlock}
                                 </div>
                             </div>
                             `;
@@ -664,6 +702,8 @@ export const generateBookingPDF = (
                                 <div class="payment-summary" style="background: #1d3c74;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">To be paid by ${paymentMethod}</div>
+                                    ${bankBlock}
+                                    ${depositBlock}
                                 </div>
                             </div>
                             `;
@@ -687,6 +727,8 @@ export const generateBookingPDF = (
                                 <span class="detail-label">Status</span>
                                 <span class="detail-value">${(booking.paymentStatus || 'pending').toUpperCase()}</span>
                             </div>
+                            ${bankBlock}
+                            ${depositBlock}
                         </div>
                         `;
                     })()}

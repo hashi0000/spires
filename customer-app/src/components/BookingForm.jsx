@@ -2,7 +2,18 @@ import React, { useState, useEffect } from "react";
 import { auth, db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
+import { SPIRES_BANK_DETAILS, isBankTransferMethod } from "../bankDetails";
+import {
+  VEHICLE_TYPES,
+  maxPassengersForVehicle,
+} from "../vehicleTypes";
 import "../styles.css";
+
+const PAYMENT_OPTIONS = [
+  { value: "cash", label: "Cash (pay driver)" },
+  { value: "card", label: "Card (pay driver)" },
+  { value: "bank transfer", label: "Bank transfer" },
+];
 
 export default function BookingForm({ onClose, onBookingCreated }) {
   const [formData, setFormData] = useState({
@@ -16,6 +27,10 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     returnTrip: false,
     returnDateTime: "",
     notes: "",
+    paymentMethod: "",
+    flightNumber: "",
+    terminal: "",
+    vehicleType: "",
   });
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedPickupAddress, setSelectedPickupAddress] = useState("");
@@ -106,6 +121,36 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       return;
     }
 
+    if (!formData.paymentMethod) {
+      setError("Please choose how you would like to pay.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!formData.vehicleType) {
+      setError("Please choose a standard car or 8-seater.");
+      setSubmitting(false);
+      return;
+    }
+
+    const passengers = parseInt(formData.passengers, 10) || 1;
+    const maxPax = maxPassengersForVehicle(formData.vehicleType);
+    if (passengers > maxPax) {
+      setError(
+        formData.vehicleType === "8_seater"
+          ? "An 8-seater can take up to 8 passengers."
+          : "A standard car can take up to 4 passengers. Please choose the 8-seater for larger groups."
+      );
+      setSubmitting(false);
+      return;
+    }
+
+    if (formData.returnTrip && !formData.returnDateTime) {
+      setError("Please enter a return date and time.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       await addDoc(collection(db, "bookings"), {
         uid: user.uid,
@@ -115,12 +160,19 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         pickup: formData.pickup,
         destination: formData.destination,
         dateTime: formData.dateTime,
-        passengers: parseInt(formData.passengers) || 1,
+        passengers,
         luggage: parseInt(formData.luggage) || 0,
         specialRequirements: formData.specialRequirements || "",
         returnTrip: formData.returnTrip || false,
         returnDateTime: formData.returnTrip && formData.returnDateTime ? formData.returnDateTime : "",
         notes: formData.notes || "",
+        paymentMethod: formData.paymentMethod,
+        paymentStatus: "pending",
+        vehicleType: formData.vehicleType,
+        depositRequired: false,
+        depositStatus: "not_required",
+        flightNumber: formData.flightNumber || "",
+        terminal: formData.terminal || "",
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -271,7 +323,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 value={formData.passengers}
                 onChange={handleChange}
                 min="1"
-                max="8"
+                max={maxPassengersForVehicle(formData.vehicleType || "8_seater")}
                 required
               />
             </div>
@@ -289,6 +341,48 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 max="10"
               />
             </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
+              Vehicle type *
+            </label>
+            <select
+              name="vehicleType"
+              value={formData.vehicleType}
+              onChange={(e) => {
+                const vehicleType = e.target.value;
+                const maxPax = maxPassengersForVehicle(vehicleType);
+                const pax = parseInt(formData.passengers, 10) || 1;
+                setFormData({
+                  ...formData,
+                  vehicleType,
+                  passengers: String(Math.min(pax, maxPax)),
+                });
+              }}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontSize: '1rem',
+                color: '#0b1c3d',
+                background: '#fff',
+              }}
+            >
+              <option value="">Select vehicle</option>
+              {VEHICLE_TYPES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
+                Groups over 4 need the 8-seater.
+              </p>
+            )}
           </div>
           
           <div>
@@ -310,8 +404,86 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 value={formData.returnDateTime}
                 onChange={handleChange}
                 min={formData.dateTime || getMinDateTime()}
+                required={formData.returnTrip}
                 style={{ marginTop: '0.5rem' }}
               />
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
+                Flight number (optional)
+              </label>
+              <input
+                type="text"
+                name="flightNumber"
+                placeholder="e.g. BA123"
+                value={formData.flightNumber}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
+                Terminal (optional)
+              </label>
+              <input
+                type="text"
+                name="terminal"
+                placeholder="e.g. T5"
+                value={formData.terminal}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
+              How would you like to pay? *
+            </label>
+            <select
+              name="paymentMethod"
+              value={formData.paymentMethod}
+              onChange={handleChange}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #d1d5db',
+                fontSize: '1rem',
+                color: '#0b1c3d',
+                background: '#fff',
+              }}
+            >
+              <option value="">Select payment method</option>
+              {PAYMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {isBankTransferMethod(formData.paymentMethod) && (
+              <div
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #C5A572',
+                  background: '#faf8f4',
+                  fontSize: '0.875rem',
+                  lineHeight: 1.5,
+                  color: '#0b1c3d',
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Bank transfer details</div>
+                <div><strong>Account name:</strong> {SPIRES_BANK_DETAILS.accountName}</div>
+                <div><strong>Sort code:</strong> {SPIRES_BANK_DETAILS.sortCode}</div>
+                <div><strong>Account number:</strong> {SPIRES_BANK_DETAILS.accountNumber}</div>
+                <div style={{ marginTop: '0.35rem', color: '#555' }}>
+                  After we confirm your fare, please use your booking number as the payment reference.
+                </div>
+              </div>
             )}
           </div>
 

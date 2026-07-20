@@ -34,26 +34,11 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendBookingReceipt = sendBookingReceipt;
+exports.notifyAdminNewBookingRequest = notifyAdminNewBookingRequest;
 const functions = __importStar(require("firebase-functions"));
-const nodemailer = __importStar(require("nodemailer"));
 const pdfGenerator_1 = require("./pdfGenerator");
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp-1and1.live.any.po.server.lan",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    tls: { rejectUnauthorized: false },
-});
-const docTitleMap = {
-    confirmation: "Booking Confirmation",
-    booking_confirmation: "Booking Confirmation",
-    payment: "Payment Receipt",
-    payment_receipt: "Payment Receipt",
-    payment_request: "Payment Request",
-};
+const driverReminderEmail_1 = require("./driverReminderEmail");
+const bankDetails_1 = require("./bankDetails");
 const getSubjectLine = (type, bookingNumber) => {
     switch (type) {
         case "payment":
@@ -65,15 +50,23 @@ const getSubjectLine = (type, bookingNumber) => {
             return "Your Spires Taxis Booking Confirmation";
     }
 };
-const getIntroCopy = (type) => {
+const getIntroCopy = (type, booking) => {
+    const bankNote = (0, bankDetails_1.isBankTransferMethod)(booking.paymentMethod) &&
+        booking.paymentStatus !== "paid"
+        ? `<p style="margin-top:12px;padding:12px;border:1px solid #C5A572;background:#faf8f4;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, bankDetails_1.bankTransferDetailsPlainText)())}</p>`
+        : "";
+    const depAmt = Number(booking.depositAmount);
+    const depositNote = booking.depositRequired && booking.depositStatus !== "paid"
+        ? `<p style="margin-top:12px;padding:12px;border:1px solid #C5A572;background:#fff8eb;border-radius:8px;">A deposit${Number.isFinite(depAmt) ? ` of <strong>£${depAmt.toFixed(2)}</strong>` : ""} is required. Please use your booking number as the payment reference.</p>`
+        : "";
     switch (type) {
         case "payment":
         case "payment_receipt":
             return `<p>We've received your payment. Your receipt is attached below.</p>`;
         case "payment_request":
-            return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>`;
+            return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
         default:
-            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>`;
+            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}`;
     }
 };
 const getFilenamePrefix = (type) => {
@@ -87,38 +80,98 @@ const getFilenamePrefix = (type) => {
             return "Booking_Confirmation";
     }
 };
-async function sendBookingReceipt(booking, type = "booking_confirmation") {
+async function sendBookingReceipt(booking, type = "booking_confirmation", bookingId) {
     try {
-        const pdfBuffer = await (0, pdfGenerator_1.generateBookingPDF)(booking, type);
-        const subject = getSubjectLine(type, booking.bookingNumber);
-        const introCopy = getIntroCopy(type);
+        const normalized = (0, bankDetails_1.normalizeBookingForEmail)(booking, bookingId);
+        const to = normalized.hirerEmail || normalized.email;
+        if (!to) {
+            functions.logger.warn(`No customer email for booking ${normalized.bookingNumber}; skipping receipt`);
+            return;
+        }
+        const pdfBuffer = await (0, pdfGenerator_1.generateBookingPDF)(normalized, type);
+        const subject = getSubjectLine(type, normalized.bookingNumber);
+        const introCopy = getIntroCopy(type, normalized);
         const filenamePrefix = getFilenamePrefix(type);
         const html = `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
-        <p>Dear ${booking.hirerName || "Customer"},</p>
+        <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(normalized.hirerName || "Customer")},</p>
         ${introCopy}
         <p>
-          📱 <a href="tel:07776897772">07776 897772</a><br>
-          📧 <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
-          🌐 <a href="https://www.spires-taxis.com">www.spires-taxis.com</a><br>
-          ⭐ <a href="https://uk.trustpilot.com/evaluate/spires-taxis.com">Leave a review on Trustpilot</a>
+          <a href="tel:07776897772">07776 897772</a><br>
+          <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
+          <a href="https://www.spires-taxis.com">www.spires-taxis.com</a><br>
+          <a href="https://uk.trustpilot.com/evaluate/spires-taxis.com">Leave a review on Trustpilot</a>
         </p>
       </div>`;
-        await transporter.sendMail({
-            from: `"Bookings Team – Spires Taxis" <bookings@spires-taxis.com>`,
-            to: booking.hirerEmail || "bookings@spires-taxis.com",
+        await (0, driverReminderEmail_1.getTransporter)().sendMail({
+            from: (0, driverReminderEmail_1.mailFrom)(),
+            to,
+            bcc: driverReminderEmail_1.ADMIN_EMAIL,
             subject,
             html,
             attachments: [
                 {
-                    filename: `${filenamePrefix}_${booking.bookingNumber || "Spires"}.pdf`,
+                    filename: `${filenamePrefix}_${normalized.bookingNumber || "Spires"}.pdf`,
                     content: pdfBuffer,
                 },
             ],
         });
-        functions.logger.info(`✅ Email sent for booking ${booking.bookingNumber}`);
+        functions.logger.info(`Email sent (${type}) for booking ${normalized.bookingNumber} to ${to}`);
     }
     catch (err) {
-        functions.logger.error("❌ Failed to send booking email", err);
+        functions.logger.error("Failed to send booking email", err);
+    }
+}
+/** Notify office when a new pending customer booking arrives */
+async function notifyAdminNewBookingRequest(booking, bookingId) {
+    try {
+        const n = (0, bankDetails_1.normalizeBookingForEmail)(booking, bookingId);
+        const subject = `New booking request · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
+        const pay = n.paymentMethod
+            ? n.paymentMethod.replace(/_/g, " ")
+            : "Not specified";
+        const html = `
+      <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">
+        <h2 style="color:#002147;margin:0 0 12px;">New customer booking request</h2>
+        <p>A new booking was submitted via the customer portal and needs a fare / confirmation.</p>
+        <table style="border-collapse:collapse;width:100%;max-width:560px;">
+          <tr><td style="padding:4px 8px;font-weight:600;">Customer</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.hirerName)}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Phone</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.hirerPhone || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Email</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.hirerEmail || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Pickup</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.pickupLocation || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Destination</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.destination || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">When</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(String(n.pickupTime || "—"))}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Passengers</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(String(booking.passengers ?? "—"))}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Vehicle</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.vehicleType === "8_seater" || n.vehicleType === "8-seater"
+            ? "8-seater"
+            : n.vehicleType === "standard"
+                ? "Standard car"
+                : n.vehicleType || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(pay)}</td></tr>
+          ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.flightNumber)}${n.terminal ? ` · Terminal ${(0, driverReminderEmail_1.escapeHtml)(n.terminal)}` : ""}</td></tr>` : ""}
+          ${n.notes ? `<tr><td style="padding:4px 8px;font-weight:600;">Notes</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.notes)}</td></tr>` : ""}
+        </table>
+        <p style="margin-top:16px;">Open the admin Bookings page to set the fare and confirm.</p>
+      </div>`;
+        await (0, driverReminderEmail_1.getTransporter)().sendMail({
+            from: (0, driverReminderEmail_1.mailFrom)(),
+            to: driverReminderEmail_1.ADMIN_EMAIL,
+            subject,
+            html,
+            text: [
+                "New customer booking request",
+                `Customer: ${n.hirerName}`,
+                `Phone: ${n.hirerPhone}`,
+                `Email: ${n.hirerEmail}`,
+                `Pickup: ${n.pickupLocation}`,
+                `Destination: ${n.destination}`,
+                `When: ${n.pickupTime}`,
+                `Pay by: ${pay}`,
+            ].join("\n"),
+        });
+        functions.logger.info(`Admin notified of new booking ${bookingId}`);
+    }
+    catch (err) {
+        functions.logger.error("Failed to notify admin of new booking", err);
     }
 }

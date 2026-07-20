@@ -136,8 +136,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <span className="text-sm text-gray-700">
               <span className="font-medium text-gray-900">Desktop reminders</span>
               {' — '}
-              show a browser notification when a pickup is due in the next hour (while this tab is open). Requires
-              permission.
+              browser notifications for pickups in the next hour (and new booking alerts when permission is granted).
+              A chime also plays for new customer requests while this tab is open.
             </span>
           </label>
         </div>
