@@ -8,5 +8,8 @@ Disallow: /booking
 Disallow: /email
 Disallow: /thank-you
 Disallow: /node_modules/
+Disallow: /services
+Disallow: /destinations
+Disallow: /index.html
 
 Sitemap: https://www.spires-taxis.com/sitemap.xml
