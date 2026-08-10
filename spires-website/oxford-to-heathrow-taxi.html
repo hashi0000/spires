@@ -10,106 +10,185 @@
   <meta property="og:site_name" content="Spires Taxis">
   <meta property="og:locale" content="en_GB">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Oxford to Heathrow Taxi from £87 | Spires Taxis">
-  <title>Oxford to Heathrow Taxi from £87 | Spires Taxis</title>
-  <meta name="description" content="Fixed-price Oxford to Heathrow return booking from £87 (up to 4 passengers). All terminals. WhatsApp or call 07776 897772.">
+  <title>Oxford to Heathrow Taxi | Fixed Price Airport Transfer</title>
+  <meta name="description" content="Private transfer from Oxford to Heathrow with clear fixed pricing. All terminals. Four-seater and eight-seater options. Book in advance with Spires Taxis — 07776 897772.">
   <link rel="canonical" href="https://www.spires-taxis.com/oxford-to-heathrow-taxi">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
   <meta property="og:image" content="https://www.spires-taxis.com/images/spireslogo.svg">
-  <meta property="og:title" content="Oxford to Heathrow Taxi from £87 | Spires Taxis">
-  <meta property="og:description" content="Oxford to Heathrow return booking from £87 — fixed fare agreed before travel.">
+  <meta property="og:title" content="Oxford to Heathrow Taxi | Fixed Price Airport Transfer">
+  <meta property="og:description" content="Private transfer from Oxford to Heathrow with clear fixed pricing. All terminals. Four-seater and eight-seater. Advance booking with Spires Taxis.">
   <meta property="og:url" content="https://www.spires-taxis.com/oxford-to-heathrow-taxi">
+  <meta name="twitter:title" content="Oxford to Heathrow Taxi | Fixed Price Airport Transfer">
+  <meta name="twitter:description" content="Private transfer from Oxford to Heathrow with clear fixed pricing. All terminals. Four-seater and eight-seater. Advance booking with Spires Taxis.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/airport-prices.js" defer></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": [
+    "@graph": [
       {
-        "@type": "Question",
-        "name": "How much is a taxi from Oxford to Heathrow?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Spires Taxis offers a return booking price from £87 for Oxford to Heathrow (up to 4 passengers). One-way-only fares are quoted separately."
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.spires-taxis.com/" },
+          { "@type": "ListItem", "position": 2, "name": "Airport transfers", "item": "https://www.spires-taxis.com/airport-transfers" },
+          { "@type": "ListItem", "position": 3, "name": "Oxford to Heathrow taxi", "item": "https://www.spires-taxis.com/oxford-to-heathrow-taxi" }
+        ]
+      },
+      {
+        "@type": "Service",
+        "@id": "https://www.spires-taxis.com/oxford-to-heathrow-taxi#service",
+        "name": "Oxford to Heathrow taxi",
+        "serviceType": "Airport transfer",
+        "url": "https://www.spires-taxis.com/oxford-to-heathrow-taxi",
+        "description": "Advance-booked private hire from Oxford and Oxfordshire to Heathrow Terminals 2, 3, 4 and 5 with a fixed fare confirmed before travel.",
+        "provider": { "@id": "https://www.spires-taxis.com/#taxiservice" },
+        "areaServed": [
+          { "@type": "City", "name": "Oxford" },
+          { "@type": "AdministrativeArea", "name": "Oxfordshire" }
+        ],
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "Heathrow return-booking rate — up to 4 passengers",
+            "price": "87",
+            "priceCurrency": "GBP",
+            "description": "Per vehicle, per leg, when you book a return airport journey. Not a one-way-only fare. Not per passenger."
+          },
+          {
+            "@type": "Offer",
+            "name": "Heathrow return-booking rate — Mercedes Vito up to 8 passengers",
+            "price": "110",
+            "priceCurrency": "GBP",
+            "description": "Per vehicle, per leg, when you book a return airport journey. Not a one-way-only fare. Not per passenger."
+          }
+        ]
+      },
+      {
+        "@type": "TaxiService",
+        "@id": "https://www.spires-taxis.com/#taxiservice",
+        "name": "Spires Taxis",
+        "url": "https://www.spires-taxis.com",
+        "telephone": "+447776897772",
+        "email": "bookings@spires-taxis.com",
+        "priceRange": "££",
+        "parentOrganization": { "@id": "https://www.spires-taxis.com/#organization" },
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Oxford",
+          "addressRegion": "Oxfordshire",
+          "addressCountry": "GB"
         }
       },
       {
-        "@type": "Question",
-        "name": "How long does Oxford to Heathrow take?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Allow 60 to 90 minutes depending on traffic and which terminal. We recommend booking pickup time with buffer before your flight check-in."
-        }
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How much is a taxi from Oxford to Heathrow?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Our published return-booking rate is £87 per vehicle per leg for up to 4 passengers, and £110 per vehicle per leg for the Mercedes Vito (up to 8). That rate applies when you book a return airport journey. One-way-only fares are quoted separately."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is the displayed price per passenger or per vehicle?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Per vehicle for the whole party, up to the passenger limit of the car you book. It is not charged per passenger."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How long does Oxford to Heathrow take?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Central Oxford to Heathrow is about 45 to 50 miles and normally takes around 60 to 90 minutes depending on traffic, pickup location and terminal. Journey time is not guaranteed."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which Heathrow terminals do you cover?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Terminals 2, 3, 4 and 5. Tell us your terminal or flight number when you book."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What time should I leave Oxford?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "We suggest a pickup time based on your flight and terminal. As a guide, allow driving time plus enough buffer before check-in closes — more for long-haul or busy periods."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I book a return collection from Heathrow?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Book the outbound and the Heathrow collection together. Return bookings booked online as a pair may qualify for £5 off — see offer terms."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do you monitor incoming flights?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes on Heathrow collections. Give us your flight number and we adjust for delays or early arrivals, with waiting time after landing within our standard allowance."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is airport parking included?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Normal airport pickup costs are included in the quoted airport fare under our current pricing policy."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can eight passengers travel together?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes — book the Mercedes Vito for up to 8 passengers. The return-booking rate for Heathrow is £110 per leg."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How much luggage can each vehicle carry?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "The standard car suits up to four passengers with normal holiday luggage. The Vito is better for larger groups or several large cases. Tell us passenger and bag counts when you book."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can students receive a discount?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Student discounts are available to eligible Oxford University and Oxford Brookes students with valid ID. Mention it when you book and present ID on the day."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I pay?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Card, cash and bank transfer are supported where arranged for your booking. Account invoicing can be set up for regular travellers."
+            }
+          }
+        ]
       }
     ]
   }
   </script>
-
-  <script type="application/ld+json">
-  {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": "https://www.spires-taxis.com/"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Airport transfers",
-          "item": "https://www.spires-taxis.com/airport-transfers"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Oxford to Heathrow",
-          "item": "https://www.spires-taxis.com/oxford-to-heathrow-taxi"
-        }
-      ]
-    },
-    {
-      "@type": "Service",
-      "name": "Oxford to Heathrow taxi",
-      "provider": {
-        "@type": "TaxiService",
-        "name": "Spires Taxis",
-        "telephone": "+447776897772",
-        "url": "https://www.spires-taxis.com"
-      },
-      "areaServed": {
-        "@type": "AdministrativeArea",
-        "name": "Oxfordshire"
-      },
-      "offers": {
-        "@type": "Offer",
-        "price": "87",
-        "priceCurrency": "GBP",
-        "description": "Return booking per leg where shown; up to 4 passengers unless stated otherwise."
-      }
-    },
-    {
-      "@type": "TaxiService",
-      "name": "Spires Taxis",
-      "url": "https://www.spires-taxis.com",
-      "telephone": "+447776897772",
-      "parentOrganization": {
-        "@id": "https://www.spires-taxis.com/#organization"
-      }
-    }
-  ]
-}
-  </script>
 </head>
-<body data-page="airport">
+<body data-page="heathrow">
 
 <div class="notice no-print">
   £5 off return airport bookings when you book both legs online. <a href="/offer-terms">Offer terms</a> · until 31 Dec 2026
@@ -161,106 +240,296 @@
   </ul>
   <div class="site-menu__cta">
     <a href="tel:+447776897772" class="btn btn--outline btn--block">Call us</a>
-    <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="btn btn--whatsapp btn--block" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+    <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20quote%20for%20an%20Oxford%20to%20Heathrow%20transfer." class="btn btn--whatsapp btn--block" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
     <a href="https://customer.spires-taxis.com" class="btn btn--primary btn--block" target="_blank" rel="noopener noreferrer">Book online</a>
   </div>
 </aside>
 <!-- /SITE-HEADER -->
 
 <main id="main-content">
+  <!-- 1. Introduction -->
   <section class="hero hero--compact">
     <div class="container hero__inner fade-in">
-      <p class="hero__label">Oxford → Heathrow</p>
-      <h1>Oxford to Heathrow — from £87 return booking</h1>
-      <p class="hero__lead">Pre-booked private hire from Oxford and across Oxfordshire to any Heathrow terminal. Price is for the <strong>return leg</strong> when you book a return airport journey (up to 4 passengers). We confirm the fare before you travel.</p>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <a href="/airport-transfers">Airport transfers</a>
+        <span aria-hidden="true">/</span>
+        <span>Oxford to Heathrow</span>
+      </nav>
+      <p class="hero__label">Airport transfer · Oxfordshire</p>
+      <h1>Oxford to Heathrow Taxi</h1>
+      <p class="hero__lead">Spires Taxis provides advance-booked private transfers from Oxford and surrounding areas to Heathrow Terminals 2, 3, 4 and 5. You get a fixed fare confirmed before you travel — no meter running in traffic and no surge pricing.</p>
       <div class="btn-group">
-        <a href="https://wa.me/447776897772?text=Hi%2C%20I%20need%20Oxford%20to%20Heathrow%20on%20%5Bdate%5D%20at%20%5Btime%5D.%20Pickup%3A%20%5Baddress%5D.%20Terminal%3A%20%5BT2%2FT3%2FT4%2FT5%5D" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for this route</a>
-        <a href="tel:+447776897772" class="btn btn--outline">Call now</a>
+        <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20quote%20for%20an%20Oxford%20to%20Heathrow%20transfer." class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
+        <a href="tel:+447776897772" class="btn btn--outline">Call 07776 897772</a>
+        <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
       </div>
-      <p style="margin-top:1rem;font-size:0.95rem;"><a href="/heathrow-to-oxford-taxi">Flying into Heathrow?</a> See our return route.</p>
     </div>
   </section>
 
   <div class="container">
     <div class="trust-strip fade-in">
-      <span>From £87 return</span>
-      <span>All terminals</span>
-      <span>Fixed fare</span>
-      <span>Licensed operator</span>
+      <span>Fixed fare before travel</span>
+      <span>All Heathrow terminals</span>
+      <span>4-seater &amp; 8-seater</span>
+      <span>Licensed Oxford private hire</span>
     </div>
   </div>
 
-  <section class="section">
-    <div class="container split">
-      <div class="prose fade-in">
-        <h2>The journey</h2>
-        <p>From central Oxford to Heathrow is roughly 50 miles via the M40. In normal traffic, allow <strong>60–90 minutes</strong>. We pick up from home addresses, hotels, colleges, stations and business parks — tell us exactly where when you book.</p>
-        <p>We drop at the terminal your airline uses (T2, T3, T4 or T5). If you’re not sure which, send your flight number and we’ll confirm.</p>
-        <div class="callout">
-          <p><strong>£87 is a return-booking rate per leg</strong> for up to 4 passengers. One-way-only journeys are quoted separately. Full explanation on the <a href="/rates">rates page</a>.</p>
-        </div>
-        <p>Need a Mercedes Vito (up to 8)? See <a href="/our-vehicles">our vehicles</a> and <a href="/rates">airport prices</a>.</p>
+  <!-- 2. Clear price and vehicle options -->
+  <section class="section" id="prices">
+    <div class="container">
+      <div class="section__header fade-in">
+        <p class="section__eyebrow">Prices</p>
+        <h2>Clear price and vehicle options</h2>
+        <p>Published figures are <strong>return-booking prices per leg</strong>: the amount for each direction when you book a return airport journey. Prices are <strong>per vehicle</strong>, not per passenger. One-way-only Heathrow trips are quoted separately.</p>
       </div>
-      <div class="fade-in">
-        <h2>What the return booking includes</h2>
-        <ul class="included-list">
-          <li>Private hire car and driver from your Oxfordshire pickup</li>
-          <li>Drop-off at your Heathrow terminal</li>
-          <li>Fuel and standard airport approach charges</li>
-          <li>A fare agreed in advance — not surge pricing</li>
-        </ul>
-        <p style="margin-top:1rem;font-size:0.95rem;">Full list of extras (waiting, additional stops, larger vehicles) is on our <a href="/rates">rates page</a>.</p>
+
+      <div class="callout fade-in" id="pricing-model-note">
+        <p><strong>How to read these prices</strong></p>
+        <p>If you book Oxford → Heathrow and Heathrow → Oxford together as a return, each leg uses the return-booking rate below. Example for the standard car: £87 outbound + £87 return = <strong>£174</strong> for both legs (before any online return offer). A one-way-only booking is a different quote.</p>
+      </div>
+
+      <div class="price-options fade-in" id="heathrow-price-options" aria-live="polite">
+        <article class="price-option">
+          <h3>Four-seater car</h3>
+          <p class="price-option__amount" data-price="upTo4">£87</p>
+          <p class="price-option__meta">Per vehicle · per leg · return booking</p>
+          <p>Up to 4 passengers. Suitable for most couples and small families with normal holiday luggage.</p>
+        </article>
+        <article class="price-option">
+          <h3>Mercedes Vito (up to 8)</h3>
+          <p class="price-option__amount" data-price="vitoUpTo8">£110</p>
+          <p class="price-option__meta">Per vehicle · per leg · return booking</p>
+          <p>Up to 8 passengers, or four adults with several large cases. Ask for the Vito when you enquire.</p>
+        </article>
+        <article class="price-option">
+          <h3>One-way journey</h3>
+          <p class="price-option__amount price-option__amount--muted">Quote</p>
+          <p class="price-option__meta">Per vehicle · one direction only</p>
+          <p>One-way-only fares are not published as a single fixed figure. WhatsApp or call with your date, address and terminal for a confirmed price.</p>
+        </article>
+        <article class="price-option">
+          <h3>Return booking (both legs)</h3>
+          <p class="price-option__amount" data-price="returnTotal4">£174</p>
+          <p class="price-option__meta">Standard car · both legs at return-booking rate</p>
+          <p>Two legs at £87 each for up to 4 passengers. Vito return total at the return-booking rate: <strong data-price="returnTotalVito">£220</strong>. Online return pairs may get £5 off — see <a href="/offer-terms">offer terms</a>.</p>
+        </article>
+      </div>
+
+      <p class="fade-in" style="margin-top:1.5rem;">Full airport list: <a href="/rates">airport transfer prices</a>. Vehicles: <a href="/our-vehicles">our vehicles</a>.</p>
+
+      <div class="btn-group fade-in" style="margin-top:1.75rem;">
+        <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20quote%20for%20an%20Oxford%20to%20Heathrow%20transfer." class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
+        <a href="tel:+447776897772" class="btn btn--outline">Call Spires Taxis</a>
+        <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
       </div>
     </div>
   </section>
 
-  <section class="section section--soft">
+  <!-- 3. Journey time and distance -->
+  <section class="section section--soft" id="journey">
+    <div class="container prose fade-in" style="max-width:42rem;">
+      <p class="section__eyebrow">The journey</p>
+      <h2>Journey time and distance</h2>
+      <p>From central Oxford to Heathrow is approximately <strong>45 to 50 miles</strong>, usually via the M40. In typical conditions the drive takes around <strong>60 to 90 minutes</strong>, depending on traffic, your pickup location and which terminal you need.</p>
+      <p>We do not guarantee a journey time. Motorway congestion, roadworks and terminal approach queues can add delay — especially at peak times. When you book, we suggest a pickup time that builds in sensible buffer for your flight.</p>
+    </div>
+  </section>
+
+  <!-- 4. Terminals -->
+  <section class="section" id="terminals">
     <div class="container">
       <div class="section__header fade-in">
-        <h2>How to book</h2>
+        <p class="section__eyebrow">Heathrow</p>
+        <h2>Heathrow terminals covered</h2>
+        <p>We drop off and collect at Terminals 2, 3, 4 and 5. If you are unsure which terminal your airline uses, send your flight number and we will confirm.</p>
+      </div>
+      <ul class="terminal-list fade-in">
+        <li>Terminal 2</li>
+        <li>Terminal 3</li>
+        <li>Terminal 4</li>
+        <li>Terminal 5</li>
+      </ul>
+      <p class="fade-in" style="margin-top:1.25rem;">Arrivals from Heathrow into Oxford: <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford taxi</a>. Meeting points: <a href="/how-airport-pickup-works">how airport pickup works</a>.</p>
+    </div>
+  </section>
+
+  <!-- 5. What is included -->
+  <section class="section section--soft" id="included">
+    <div class="container">
+      <div class="section__header fade-in">
+        <p class="section__eyebrow">Included</p>
+        <h2>What is included</h2>
+      </div>
+      <ul class="included-list fade-in">
+        <li>Fixed fare confirmed before travel</li>
+        <li>Licensed private hire driver and vehicle</li>
+        <li>Drop-off at the correct Heathrow terminal</li>
+        <li>Flight monitoring for Heathrow collections</li>
+        <li>Standard airport charges where included under our current pricing policy</li>
+        <li>Help with luggage</li>
+        <li>No surge pricing</li>
+        <li>Card, bank transfer and cash payment options where arranged for your booking</li>
+      </ul>
+      <p class="fade-in" style="margin-top:1.25rem;font-size:0.95rem;">Extras such as additional stops, waiting beyond the included allowance, or child seats are listed on our <a href="/rates">rates page</a>. Full conditions: <a href="/terms-and-conditions">terms and conditions</a>.</p>
+    </div>
+  </section>
+
+  <!-- 6. Pickup areas -->
+  <section class="section" id="pickup-areas">
+    <div class="container prose fade-in" style="max-width:42rem;">
+      <p class="section__eyebrow">Coverage</p>
+      <h2>Oxford and Oxfordshire pickup areas</h2>
+      <p>We regularly collect from Oxford city centre, Headington, Cowley, Summertown, Kidlington, Abingdon, Bicester, Witney, Oxford colleges, Oxford hotels and Oxford railway station.</p>
+      <p>Locations outside central Oxford may receive a different confirmed price — give us the full address or postcode when you enquire so we can quote accurately.</p>
+    </div>
+  </section>
+
+  <!-- 7. Vehicles -->
+  <section class="section section--soft" id="vehicles">
+    <div class="container">
+      <div class="section__header fade-in">
+        <p class="section__eyebrow">Vehicles</p>
+        <h2>Vehicle and luggage guidance</h2>
+        <p>We match the car to passengers and bags. When you book, tell us the number of passengers, large suitcases, cabin bags and any extra items (pushchairs, sports kit, instruments).</p>
+      </div>
+      <div class="grid grid-2 fade-in">
+        <article class="card">
+          <h3>Up to 4 passengers</h3>
+          <p>Our standard airport cars — often a Toyota RAV4 — suit up to four passengers with normal holiday luggage (typically a couple of large cases plus smaller bags, depending on bag size).</p>
+          <p class="card__meta">Return-booking rate from Oxford to Heathrow: £87 per leg</p>
+        </article>
+        <article class="card">
+          <h3>Mercedes Vito — up to 8</h3>
+          <p>Choose the silver Mercedes Vito for larger groups, or when four adults each have large cases and you need more boot space.</p>
+          <p class="card__meta">Return-booking rate from Oxford to Heathrow: £110 per leg</p>
+        </article>
+      </div>
+      <div class="callout fade-in" style="margin-top:1.5rem;">
+        <p><strong>Vehicle photos</strong> are being added to the site. Until then, capacity guidance is on <a href="/our-vehicles">our vehicles</a> page — ask on WhatsApp if you are unsure which size you need.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. How booking works -->
+  <section class="section" id="how-to-book">
+    <div class="container">
+      <div class="section__header fade-in">
+        <p class="section__eyebrow">Booking</p>
+        <h2>How booking works</h2>
       </div>
       <ol class="steps fade-in">
-        <li><strong>Send your details</strong> Date, pickup time, full pickup address, terminal or flight number, number of passengers and bags.</li>
-        <li><strong>We confirm the fare</strong> £87 return booking on this route — or we quote a larger vehicle / one-way if that’s what you need.</li>
-        <li><strong>Driver on the day</strong> Your driver contacts you before pickup. Pay by card or cash unless you have an account.</li>
+        <li><strong>Send your details</strong> Date, preferred pickup time, full pickup address, terminal or flight number, passengers and bags.</li>
+        <li><strong>Get a confirmed fare</strong> We confirm the fixed price for your vehicle and whether it is return booking or one-way.</li>
+        <li><strong>Travel on the day</strong> Your driver contacts you before pickup. Pay by card, cash or bank transfer as agreed for your booking.</li>
       </ol>
     </div>
   </section>
 
-  <section class="section">
+  <!-- 9. Why choose Spires -->
+  <section class="section section--soft" id="why-spires">
+    <div class="container prose fade-in" style="max-width:42rem;">
+      <p class="section__eyebrow">Why book with us</p>
+      <h2>Why choose Spires Taxis</h2>
+      <p>Spires Taxis is a licensed Oxford City Council private hire operator. Journeys are pre-booked. We specialise in airport work from Oxfordshire — fixed fares, flight monitoring on collections, and clear communication before you travel.</p>
+      <p>You are not booking a national app that may send a car from miles away. You get a local firm that knows Oxford’s roads, college areas and the usual Heathrow routes at different times of day.</p>
+    </div>
+  </section>
+
+  <!-- 10. Reviews -->
+  <section class="section" id="reviews">
     <div class="container">
       <div class="section__header fade-in">
-        <h2>Questions about this route</h2>
+        <p class="section__eyebrow">Reviews</p>
+        <h2>Genuine customer reviews</h2>
+        <p>We do not publish invented testimonials on this page. Read independent reviews on Trustpilot, including airport transfer feedback from real customers.</p>
+      </div>
+      <div class="fade-in" style="max-width:40rem;">
+        <div class="trustpilot-widget" data-locale="en-GB" data-template-id="5419b6a8b0d04a076446a9ad" data-businessunit-id="68d691f1bc1ed3e03b670e8a" data-style-height="52px" data-style-width="100%" data-theme="light">
+          <a href="https://uk.trustpilot.com/review/spires-taxis.com" target="_blank" rel="noopener noreferrer">Spires Taxis on Trustpilot</a>
+        </div>
+        <p style="margin-top:1.25rem;"><a href="/reviews">More about our reviews</a> · <a href="https://uk.trustpilot.com/review/spires-taxis.com" target="_blank" rel="noopener noreferrer">Open Trustpilot</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. FAQs -->
+  <section class="section section--soft" id="faq">
+    <div class="container">
+      <div class="section__header fade-in">
+        <p class="section__eyebrow">FAQ</p>
+        <h2>Frequently asked questions</h2>
       </div>
       <div class="faq fade-in">
         <details>
-          <summary>Is £87 the return or one-way price?</summary>
-          <p>£87 is our return-booking rate on Oxford–Heathrow for up to 4 passengers. One-way-only journeys are priced separately — ask when you book.</p>
+          <summary>How much is a taxi from Oxford to Heathrow?</summary>
+          <p>Our published return-booking rate is <strong>£87 per vehicle per leg</strong> for up to 4 passengers, and <strong>£110 per vehicle per leg</strong> for the Mercedes Vito (up to 8). That rate applies when you book a return airport journey. One-way-only fares are quoted separately.</p>
         </details>
         <details>
-          <summary>What time should I leave for my flight?</summary>
-          <p>We’ll suggest a pickup time based on your terminal and flight. As a rule, build in at least 2 hours before short-haul check-in closes, more for long-haul or busy periods.</p>
+          <summary>Is the displayed price per passenger or per vehicle?</summary>
+          <p>Per vehicle for the whole party, up to the passenger limit of the car you book. It is not charged per passenger.</p>
         </details>
         <details>
-          <summary>Do you cover villages outside Oxford?</summary>
-          <p>Yes — Abingdon, Witney, Bicester, Kidlington and surrounding areas. Mention your postcode when asking for a quote.</p>
+          <summary>How long does Oxford to Heathrow take?</summary>
+          <p>About 45–50 miles from central Oxford; normally around 60–90 minutes depending on traffic, pickup point and terminal. Journey time is not guaranteed.</p>
         </details>
         <details>
-          <summary>Can I book the return from Heathrow at the same time?</summary>
-          <p>Yes. Return bookings booked together through the website qualify for £5 off the pair — see <a href="/offer-terms">offer terms</a>.</p>
+          <summary>Which Heathrow terminals do you cover?</summary>
+          <p>Terminals 2, 3, 4 and 5. Tell us your terminal or flight number when you book.</p>
+        </details>
+        <details>
+          <summary>What time should I leave Oxford?</summary>
+          <p>We suggest a pickup time based on your flight and terminal. Allow driving time plus buffer before check-in — more for long-haul or busy periods.</p>
+        </details>
+        <details>
+          <summary>Can I book a return collection from Heathrow?</summary>
+          <p>Yes. Book outbound and return together. Online return pairs may qualify for £5 off — see <a href="/offer-terms">offer terms</a>. Details for arrivals: <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a>.</p>
+        </details>
+        <details>
+          <summary>Do you monitor incoming flights?</summary>
+          <p>Yes on Heathrow collections. Provide your flight number; we adjust for delays or early arrivals, with waiting after landing within our standard allowance. See <a href="/how-airport-pickup-works">how airport pickup works</a>.</p>
+        </details>
+        <details>
+          <summary>Is airport parking included?</summary>
+          <p>Normal airport pickup costs are included in the quoted airport fare under our current pricing policy. See the <a href="/rates">rates page</a>.</p>
+        </details>
+        <details>
+          <summary>Can eight passengers travel together?</summary>
+          <p>Yes — book the Mercedes Vito. Heathrow return-booking rate for the Vito is £110 per leg.</p>
+        </details>
+        <details>
+          <summary>How much luggage can each vehicle carry?</summary>
+          <p>Standard car: up to four passengers with normal holiday bags. Vito: better for larger groups or several large cases. Tell us passenger and bag counts when you book — see <a href="/our-vehicles">our vehicles</a>.</p>
+        </details>
+        <details>
+          <summary>Can students receive a discount?</summary>
+          <p>Eligible Oxford University and Oxford Brookes students can receive a student discount with valid ID. Mention it when booking. More on <a href="/student-taxis">student taxis</a>.</p>
+        </details>
+        <details>
+          <summary>How can I pay?</summary>
+          <p>Card, cash and bank transfer where arranged for your booking. Account invoicing is available for regular travellers. See <a href="/terms-and-conditions">terms</a> and <a href="/contact">contact</a>.</p>
         </details>
       </div>
     </div>
   </section>
 
-  <section class="section section--blue">
-    <div class="container" style="text-align:center;max-width:32rem;margin-inline:auto;">
-      <h2 class="fade-in">Book Oxford to Heathrow</h2>
-      <p class="fade-in">WhatsApp is the quickest way to get a confirmed price for your date and address.</p>
+  <!-- 12. Final booking -->
+  <section class="section section--blue" id="book">
+    <div class="container" style="text-align:center;max-width:34rem;margin-inline:auto;">
+      <h2 class="fade-in">Book your Oxford to Heathrow taxi</h2>
+      <p class="fade-in">WhatsApp is usually the fastest way to get a confirmed price for your date and address. Or call, email or book online.</p>
       <div class="btn-group fade-in" style="justify-content:center;">
-        <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
-        <a href="/contact" class="btn btn--outline" style="border-color:rgba(255,255,255,.4);color:#fff;">Contact form</a>
+        <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20quote%20for%20an%20Oxford%20to%20Heathrow%20transfer." class="btn btn--primary" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
+        <a href="tel:+447776897772" class="btn btn--outline" style="border-color:rgba(255,255,255,.4);color:#fff;">Call 07776 897772</a>
+        <a href="https://customer.spires-taxis.com" class="btn btn--outline" style="border-color:rgba(255,255,255,.4);color:#fff;" target="_blank" rel="noopener noreferrer">Book online</a>
       </div>
+      <p class="fade-in" style="margin-top:1.25rem;font-size:0.95rem;">
+        <a href="mailto:bookings@spires-taxis.com" style="color:rgba(255,255,255,.9);">bookings@spires-taxis.com</a>
+        · <a href="/contact" style="color:rgba(255,255,255,.9);">Contact form</a>
+        · <a href="/reviews" style="color:rgba(255,255,255,.9);">Reviews</a>
+      </p>
     </div>
   </section>
 </main>
@@ -280,9 +549,9 @@
     <div>
       <h2 class="site-footer__heading">Airport &amp; routes</h2>
       <ul class="site-footer__links">
-        <li><a href="/airport-transfers">Airport transfers</a></li>
+        <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
         <li><a href="/how-airport-pickup-works">How airport pickup works</a></li>
-        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow</a></li>
+        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow taxi</a></li>
         <li><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a></li>
         <li><a href="/oxford-to-gatwick-taxi">Oxford to Gatwick</a></li>
         <li><a href="/oxford-to-luton-taxi">Oxford to Luton</a></li>
@@ -291,7 +560,7 @@
     <div>
       <h2 class="site-footer__heading">Useful links</h2>
       <ul class="site-footer__links">
-        <li><a href="/rates">Rates &amp; what's included</a></li>
+        <li><a href="/rates">Airport transfer prices</a></li>
         <li><a href="/our-vehicles">Our vehicles</a></li>
         <li><a href="/reviews">Customer reviews</a></li>
         <li><a href="/about">About us</a></li>
@@ -308,10 +577,31 @@
     </div>
   </div>
 </footer>
-<a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="whatsapp-float no-print" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+<a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20quote%20for%20an%20Oxford%20to%20Heathrow%20transfer." class="whatsapp-float no-print" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp for an Oxford to Heathrow quote">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
 <script src="/js/main.js" defer></script>
+<script src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var data = window.SPIRES_AIRPORT_PRICES;
+  if (!data || !data.routes || !data.routes.heathrow) return;
+  var h = data.routes.heathrow;
+  var money = window.SPIRES_formatMoney;
+  document.querySelectorAll('[data-price="upTo4"]').forEach(function (el) {
+    el.textContent = money(h.upTo4);
+  });
+  document.querySelectorAll('[data-price="vitoUpTo8"]').forEach(function (el) {
+    el.textContent = money(h.vitoUpTo8);
+  });
+  document.querySelectorAll('[data-price="returnTotal4"]').forEach(function (el) {
+    el.textContent = money(h.upTo4 * 2);
+  });
+  document.querySelectorAll('[data-price="returnTotalVito"]').forEach(function (el) {
+    el.textContent = money(h.vitoUpTo8 * 2);
+  });
+});
+</script>
 <!-- /SITE-FOOTER -->
 
 </body>
