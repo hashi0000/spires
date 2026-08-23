@@ -15,7 +15,11 @@
   <meta name="description" content="Fixed taxi prices from Oxford with clear inclusions. See airport fares, local rates, extras, day hire prices and student discount details.">
   <link rel="canonical" href="https://www.spires-taxis.com/rates">
   <meta name="robots" content="index, follow">
-  <meta property="og:image" content="https://www.spires-taxis.com/images/spireslogo.svg">
+  <meta property="og:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta name="twitter:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
   <meta property="og:title" content="Taxi Prices Oxford | Fixed Rates | Spires Taxis">
   <meta property="og:description" content="Airport and local fixed fares from Oxford, plus extras, day hire and payment details.">
   <meta property="og:type" content="website">
@@ -27,42 +31,67 @@
 
   <script type="application/ld+json">
   {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "WebPage",
-      "name": "Taxi prices from Oxford",
-      "url": "https://www.spires-taxis.com/rates",
-      "isPartOf": {
-        "@id": "https://www.spires-taxis.com/#website"
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://www.spires-taxis.com/rates#webpage",
+        "name": "Taxi prices from Oxford",
+        "url": "https://www.spires-taxis.com/rates",
+        "isPartOf": { "@id": "https://www.spires-taxis.com/#website" },
+        "about": { "@id": "https://www.spires-taxis.com/#taxiservice" }
+      },
+      {
+        "@type": "TaxiService",
+        "@id": "https://www.spires-taxis.com/#taxiservice",
+        "name": "Spires Taxis",
+        "url": "https://www.spires-taxis.com",
+        "telephone": "+447776897772",
+        "email": "bookings@spires-taxis.com",
+        "parentOrganization": { "@id": "https://www.spires-taxis.com/#organization" }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.spires-taxis.com/" },
+          { "@type": "ListItem", "position": 2, "name": "Rates", "item": "https://www.spires-taxis.com/rates" }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What does fixed price mean?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "We agree your fare before the journey starts. You are not charged by a running meter."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is airport parking included?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, normal airport pickup costs are included in the quoted airport fare."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I pay?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Card and cash. Bank transfer can be arranged in advance for some account bookings."
+            }
+          }
+        ]
       }
-    },
-    {
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Home",
-          "item": "https://www.spires-taxis.com/"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Rates",
-          "item": "https://www.spires-taxis.com/rates"
-        }
-      ]
-    }
-  ]
-}
+    ]
+  }
   </script>
 </head>
 <body data-page="rates">
 
-<div class="notice no-print">
-  £5 off return airport bookings when you book both legs online. <a href="/offer-terms">Offer terms</a> · until 31 Dec 2026
-</div>
 
 <!-- SITE-HEADER -->
 <a href="#main-content" class="skip-link">Skip to content</a>
@@ -119,6 +148,11 @@
 <main id="main-content">
   <section class="hero hero--compact">
     <div class="container hero__inner fade-in">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">/</span>
+        <span>Rates</span>
+      </nav>
       <p class="hero__label">Fixed fares</p>
       <h1>Taxi prices from Oxford</h1>
       <p class="hero__lead">Clear fixed fares for pre-booked journeys from Oxford. Read the short note below before you compare airport prices — “return booking” and “one-way” are not the same thing.</p>
@@ -284,6 +318,22 @@
     </div>
   </section>
 
+  <section class="section">
+    <div class="container">
+      <div class="section__header fade-in">
+        <h2>Related information</h2>
+        <p>Prices are one part of booking. These pages cover pickup, vehicles and typical journeys.</p>
+      </div>
+      <ul class="included-list fade-in">
+        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow transfers</a></li>
+        <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
+        <li><a href="/how-airport-pickup-works">How we handle airport pickup</a></li>
+        <li><a href="/our-vehicles">Standard cars and the Mercedes Vito</a></li>
+        <li><a href="/student-taxis">Student taxis and discount</a></li>
+      </ul>
+    </div>
+  </section>
+
   <section class="section section--blue">
     <div class="container" style="text-align:center;max-width:36rem;margin-inline:auto;">
       <h2 class="fade-in">Get a confirmed price</h2>
@@ -311,9 +361,9 @@
     <div>
       <h2 class="site-footer__heading">Airport &amp; routes</h2>
       <ul class="site-footer__links">
-        <li><a href="/airport-transfers">Airport transfers</a></li>
+        <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
         <li><a href="/how-airport-pickup-works">How airport pickup works</a></li>
-        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow</a></li>
+        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow taxi</a></li>
         <li><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a></li>
         <li><a href="/oxford-to-gatwick-taxi">Oxford to Gatwick</a></li>
         <li><a href="/oxford-to-luton-taxi">Oxford to Luton</a></li>
@@ -322,7 +372,8 @@
     <div>
       <h2 class="site-footer__heading">Useful links</h2>
       <ul class="site-footer__links">
-        <li><a href="/rates">Rates &amp; what's included</a></li>
+        <li><a href="/rates">Airport transfer prices</a></li>
+        <li><a href="/student-taxis">Student taxis</a></li>
         <li><a href="/our-vehicles">Our vehicles</a></li>
         <li><a href="/reviews">Customer reviews</a></li>
         <li><a href="/about">About us</a></li>
@@ -342,8 +393,9 @@
 <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="whatsapp-float no-print" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
-<script src="/js/airport-prices.js" defer></script>
 <script src="/js/main.js" defer></script>
+<!-- /SITE-FOOTER -->
+<script src="/js/airport-prices.js" defer></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   var data = window.SPIRES_AIRPORT_PRICES;
@@ -369,7 +421,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }).join("");
 });
 </script>
-<!-- /SITE-FOOTER -->
 
 </body>
 </html>

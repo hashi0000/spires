@@ -62,7 +62,7 @@ for (const file of fs.readdirSync(root).filter((f) => f.endsWith('.html'))) {
   const dataPage = pageMap[file] || file.replace('.html', '').replace(/-/g, '_');
   html = html.replace(/<body([^>]*)>/i, `<body$1 data-page="${dataPage}">`);
 
-  html = html.replace(/<body[^>]*>/i, (m) => `${m}\n\n<div class="notice no-print">\n  £5 off return airport bookings when you book both legs online. <a href="/offer-terms">Offer terms</a> · until 31 Dec 2026\n</div>\n\n${headerBlock}\n`);
+  html = html.replace(/<body[^>]*>/i, (m) => `${m}\n\n${headerBlock}\n`);
 
   html = html.replace(/<\/body>/i, `\n${footerBlock}\n\n</body>`);
 

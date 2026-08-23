@@ -31,11 +31,6 @@ const NAVBAR_CONFIG = {
     myAccount: {
       label: "My Account",
       path: "https://customer.spires-taxis.com"
-    },
-    adminPanel: {
-      label: "Admin Panel",
-      path: "https://booking.spires-taxis.com/",
-      external: true
     }
   }
 };
@@ -174,15 +169,6 @@ const Navbar = () => {
             >
               {NAVBAR_CONFIG.buttons.myAccount.label}
             </a>
-            <a
-              href={NAVBAR_CONFIG.buttons.adminPanel.path}
-              className="btn-admin-panel"
-              target={NAVBAR_CONFIG.buttons.adminPanel.external ? "_blank" : undefined}
-              rel={NAVBAR_CONFIG.buttons.adminPanel.external ? "noopener noreferrer" : undefined}
-              onClick={closeMenu}
-            >
-              {NAVBAR_CONFIG.buttons.adminPanel.label}
-            </a>
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -255,15 +241,6 @@ const Navbar = () => {
               onClick={closeMenu}
             >
               {NAVBAR_CONFIG.buttons.myAccount.label}
-            </a>
-            <a
-              href={NAVBAR_CONFIG.buttons.adminPanel.path}
-              className="mobile-admin-btn"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={closeMenu}
-            >
-              {NAVBAR_CONFIG.buttons.adminPanel.label}
             </a>
           </div>
         </div>

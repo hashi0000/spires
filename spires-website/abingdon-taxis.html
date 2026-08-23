@@ -16,7 +16,11 @@
   <link rel="canonical" href="https://www.spires-taxis.com/abingdon-taxis">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="https://www.spires-taxis.com/images/spireslogo.svg">
+  <meta property="og:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta name="twitter:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
   <meta property="og:title" content="Abingdon Taxis | Oxford to Abingdon from £20 | Spires Taxis">
   <meta property="og:description" content="Fixed-price taxis between Oxford and Abingdon from £20. Pre-booked private hire across south Oxfordshire.">
   <meta property="og:url" content="https://www.spires-taxis.com/abingdon-taxis">
@@ -73,12 +77,7 @@
     {
       "@type": "Service",
       "name": "Abingdon taxi",
-      "provider": {
-        "@type": "TaxiService",
-        "name": "Spires Taxis",
-        "telephone": "+447776897772",
-        "url": "https://www.spires-taxis.com"
-      },
+      "provider": { "@id": "https://www.spires-taxis.com/#taxiservice" },
       "areaServed": {
         "@type": "AdministrativeArea",
         "name": "Oxfordshire"
@@ -87,11 +86,12 @@
         "@type": "Offer",
         "price": "20",
         "priceCurrency": "GBP",
-        "description": "Return booking per leg where shown; up to 4 passengers unless stated otherwise."
+        "description": "Guide fare as shown on the page, confirmed when you book."
       }
     },
     {
       "@type": "TaxiService",
+      "@id": "https://www.spires-taxis.com/#taxiservice",
       "name": "Spires Taxis",
       "url": "https://www.spires-taxis.com",
       "telephone": "+447776897772",
@@ -105,9 +105,7 @@
 </head>
 <body data-page="about">
 
-<div class="notice no-print">
-  £5 off return airport bookings when you book both legs online. <a href="/offer-terms">Offer terms</a> · until 31 Dec 2026
-</div>
+
 
 <!-- SITE-HEADER -->
 <a href="#main-content" class="skip-link">Skip to content</a>
@@ -299,9 +297,9 @@
     <div>
       <h2 class="site-footer__heading">Airport &amp; routes</h2>
       <ul class="site-footer__links">
-        <li><a href="/airport-transfers">Airport transfers</a></li>
+        <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
         <li><a href="/how-airport-pickup-works">How airport pickup works</a></li>
-        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow</a></li>
+        <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow taxi</a></li>
         <li><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a></li>
         <li><a href="/oxford-to-gatwick-taxi">Oxford to Gatwick</a></li>
         <li><a href="/oxford-to-luton-taxi">Oxford to Luton</a></li>
@@ -310,7 +308,8 @@
     <div>
       <h2 class="site-footer__heading">Useful links</h2>
       <ul class="site-footer__links">
-        <li><a href="/rates">Rates &amp; what's included</a></li>
+        <li><a href="/rates">Airport transfer prices</a></li>
+        <li><a href="/student-taxis">Student taxis</a></li>
         <li><a href="/our-vehicles">Our vehicles</a></li>
         <li><a href="/reviews">Customer reviews</a></li>
         <li><a href="/about">About us</a></li>

@@ -1,5 +1,8 @@
 User-agent: *
 Allow: /
+Allow: /css/
+Allow: /js/
+Allow: /images/
 
 Disallow: /pages/
 Disallow: /login
@@ -8,6 +11,10 @@ Disallow: /booking
 Disallow: /email
 Disallow: /thank-you
 Disallow: /node_modules/
+Disallow: /scripts/
+Disallow: /includes/
+Disallow: /src/
+Disallow: /tools/
 Disallow: /services
 Disallow: /destinations
 Disallow: /index.html
