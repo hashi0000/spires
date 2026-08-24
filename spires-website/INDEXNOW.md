@@ -4,7 +4,7 @@ IndexNow tells Bing (and other participating engines) that specific canonical UR
 
 ## What is already in the repo
 
-- Public key file: `/76942d39c903b508.txt` (must stay crawlable at `https://www.spires-taxis.com/76942d39c903b508.txt`)
+- Public key file: `/3f569e285f8a4c30a76a5971841458d5.txt` (must stay crawlable at `https://www.spires-taxis.com/3f569e285f8a4c30a76a5971841458d5.txt`)
 - Submit script: `scripts/submit-indexnow.mjs`
 
 The key file is public by design (search engines fetch it to verify you control the site). It is not an API secret. Do not put Stripe, Firebase or other private credentials in this file.
@@ -12,14 +12,14 @@ The key file is public by design (search engines fetch it to verify you control 
 ## Environment variable (optional)
 
 ```
-INDEXNOW_KEY=76942d39c903b508
+INDEXNOW_KEY=3f569e285f8a4c30a76a5971841458d5
 ```
 
 Set this in your shell or CI if you prefer not to read the key from the committed `.txt` file. The live verification file must still match.
 
 ## After a production deploy
 
-1. Confirm the live key file: `https://www.spires-taxis.com/76942d39c903b508.txt`
+1. Confirm the live key file: `https://www.spires-taxis.com/3f569e285f8a4c30a76a5971841458d5.txt`
 2. From `spires-website/`:
 
 ```bash
