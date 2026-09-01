@@ -839,6 +839,64 @@ a.btn-primary, .btn.btn-primary {
 
 .trust-strip span { font-weight: 600; color: var(--blue); }
 
+/* —— Route at a glance (commercial landing pages) —— */
+.route-glance {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 1.5rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.route-glance__title {
+  font-size: 1.25rem;
+  margin: 0 0 1.25rem;
+}
+
+.route-glance__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+.route-glance__grid div {
+  margin: 0;
+}
+
+.route-glance__grid dt {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 0 0 0.25rem;
+}
+
+.route-glance__grid dd {
+  margin: 0;
+  color: var(--blue);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.route-glance__note {
+  margin: 1.25rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.route-glance__note strong { color: var(--blue); }
+
+/* Vehicle cards: optional photo slot — only render an <img> when a real file exists */
+.vehicle-card__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 1rem;
+}
+
 /* —— Places we've been —— */
 .places-been {
   display: grid;
@@ -1090,6 +1148,7 @@ a.btn-primary, .btn.btn-primary {
   /* Above-the-fold content is always visible */
   .hero .fade-in,
   .trust-strip.fade-in,
+  .route-glance.fade-in,
   .notice .fade-in {
     opacity: 1;
     transform: none;
