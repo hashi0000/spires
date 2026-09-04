@@ -15,6 +15,7 @@ Disallow: /scripts/
 Disallow: /includes/
 Disallow: /src/
 Disallow: /tools/
+Disallow: /nav-snippet
 Disallow: /services
 Disallow: /destinations
 Disallow: /index.html

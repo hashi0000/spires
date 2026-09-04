@@ -12,7 +12,7 @@ window.SPIRES_AIRPORT_PRICES = {
   oneWayPolicy:
     "One-way-only airport journeys are quoted separately. Message us with date, pickup address, terminal and passengers for a confirmed fare.",
   includes:
-    "Flight monitoring on collections, meet & greet where arranged, normal airport approach charges, and waiting time within our standard allowance after landing.",
+    "Flight monitoring on collections, meet & greet where arranged, normal airport approach charges, and 45 minutes waiting after landing.",
   routes: {
     heathrow: {
       id: "heathrow",

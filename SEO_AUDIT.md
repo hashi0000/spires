@@ -1,415 +1,533 @@
 # Spires Taxis SEO audit
 
-**Site audited:** https://www.spires-taxis.com  
+**Site:** https://www.spires-taxis.com  
 **Codebase:** `spires-website/` (static HTML on Vercel; `cleanUrls: true`, no trailing slash)  
-**Primary commercial query:** Oxford to Heathrow taxi  
-**Date:** 1 September 2026
+**Booking app:** https://customer.spires-taxis.com (separate; not this Vercel site)  
+**Date:** 4 September 2026  
+**Live HTTP sampled:** 4 September 2026
 
-This audit describes the **current** implementation. It does not assume more content is the answer. Several technical SEO items (canonicals, unique titles, sitemap generation, IndexNow, 404, cache headers) are already in place and should be left alone unless a finding says otherwise.
+This audit uses **real Google Search Console figures** supplied for this review plus live headers and the current HTML. It does not assume more content is the answer. Google already associates Spires with Oxford → Heathrow. The problem is **ranking position** (typically 20–70+), not missing keywords and not 0% CTR at those positions.
 
----
-
-## Architecture (do not treat as a JS SPA)
-
-The public marketing site is **server-rendered static HTML**. Crawlers do not need JavaScript to see fares, copy, or links. `js/airport-prices.js` can rewrite displayed Heathrow figures to the same published numbers already in HTML. Booking lives on **https://customer.spires-taxis.com** (separate app). Firebase/admin are not part of this Vercel site.
-
-There is **no blog**. There is **no programmatic generator** of postcode, OX1/OX2, Headington, or Cowley landing pages.
+A previous audit (1 September 2026) already added the Heathrow **Route at a glance** block, removed “photos coming soon”, and linked `/reviews` to Heathrow. Those remain. This document is the current state, not a request to redo that work.
 
 ---
 
-## Phase 1 — Public route map
+## Architecture (do not treat as a React SPA)
 
-### INDEX (in `sitemap.xml`, `index,follow`)
+The marketing site is **static HTML**. Crawlers see fares, copy, and links without JavaScript. `js/airport-prices.js` can rewrite displayed Heathrow figures to the same published numbers already in HTML. Firebase/admin are out of scope for this Vercel site.
+
+There is **no blog**. There is **no programmatic generator** of OX1/OX2, Headington, Cowley, or postcode landing pages. Do not create them.
+
+---
+
+## 1. Google Search Console evidence
+
+### Queries (as supplied)
+
+| Query | Clicks | Impressions | Approx. avg position |
+| --- | ---: | ---: | ---: |
+| spire taxis | 4 | 89 | — |
+| taxi companies in oxford | 2 | 5 | — |
+| airport transfers oxford to heathrow | 1 | 4 | 17.75 |
+| oxford to heathrow taxi | 0 | 138 | 43.26 |
+| taxi oxford to heathrow | 0 | 94 | 25.89 |
+| airport taxis oxford | 0 | 34 | — |
+| oxford taxi to heathrow | 0 | 33 | 25.55 |
+| airport taxi oxford to heathrow | 0 | 29 | 36.69 |
+| taxi oxford prices | 0 | 26 | — |
+| taxi in oxford england | 0 | 25 | — |
+| oxford to heathrow taxi price | 0 | ~25 | 41.76 |
+| oxford to heathrow airport taxi | 0 | ~25 | 77.92 |
+| taxis oxford to heathrow | 0 | ~24 | 21.00 |
+
+**Conclusion:** Relevance is established. Several Heathrow queries already sit around positions **21–43**. CTR near zero at those positions is expected. Do not “fix CTR” by stuffing titles.
+
+### Pages (as supplied)
+
+| Page | Impressions | Clicks | Approx. avg position |
+| --- | ---: | ---: | ---: |
+| `/oxford-to-heathrow-taxi` | ~175 | 0 | **68.09** |
+| `/rates` | ~364 | 0 | **25.43** |
+| `/about` | ~197 | 1 | **11.55** |
+| `/services` | ~153 | 1 | **8.12** |
+| `/our-vehicles` | ~22 | 1 | **5.59** |
+
+**Conclusion:** The domain *can* rank around positions 5–12. The Heathrow URL is the weak page, not the whole site. `/services` in GSC is **not** the current live document (see §4).
+
+### Devices (as supplied)
+
+| Device | Clicks | Impressions | CTR | Avg position |
+| --- | ---: | ---: | ---: | ---: |
+| Mobile | 76 | 746 | 10.19% | 11.4 |
+| Desktop | 43 | 1,898 | 2.27% | 34.66 |
+
+Different query mixes (brand/local vs competitive airport) explain much of this. HTML content is not swapped by device (see §10).
+
+### Hostnames (historical GSC)
+
+www homepage ~75 clicks / 1,745 imp / pos 23.2; apex homepage ~37 clicks / 155 imp / pos 7.53. Live consolidation is already correct (see §5).
+
+---
+
+## 2. Heathrow ranking diagnosis
+
+**Affected:** `/oxford-to-heathrow-taxi`
+
+**Current implementation:** Unique title `Oxford to Heathrow Taxi | Fixed Price Airport Transfer`. Single H1. Canonical www HTTPS. Indexable. In sitemap. Route at a glance under the trust strip (distance, 60–90 minutes, T2–T5, RAV4 £174/£87, Vito £220/£110, per vehicle, one-way = quote). Price cards, terminals, FAQs, BreadcrumbList + Service + TaxiService + FAQPage. Footer + mobile nav + homepage card + rates table all link here.
+
+**Evidence:** Page average position **68** vs several Heathrow *queries* at **21–43**. That gap means Google often ranks a **different Spires URL** for those queries. The dedicated page is not the consistent winner.
+
+**Problem (ranked, not guessed):**
+
+1. **Mixed ranking / cannibalisation of *signals*, not duplicate 200 pages.** Homepage, `/rates`, `/airport-transfers`, and `/heathrow-to-oxford-taxi` all talk about Heathrow and £87. Google has not fully assigned the query family to the dedicated URL.
+2. **Desktop main nav omits Heathrow** (`includes/header.html`). Mobile drawer includes it. Sitewide crawl path from every desktop page is weaker than for Rates/About.
+3. **External authority** from Oxford colleges, student housing, and local organisations cannot be manufactured in this repo. Competitors with those links will keep positions 1–10 until Spires earns equivalent mentions. The page must still be the obvious on-site answer.
+4. **Age and competition.** Positions 20–70 on “Oxford to Heathrow taxi” is a national-comparison SERP. Technical cleanliness will not by itself produce page one.
+
+**What is *not* the problem:** Missing the phrase “Oxford to Heathrow taxi” (title and H1 already use it). Thin on-page answers (the glance and FAQs already answer the nine customer questions). 0% CTR at position 68. Need for another landing page.
+
+**Why it matters:** This is the primary commercial URL. Until Google consistently selects it, extra paragraphs will not move the query.
+
+**Recommended solution:** Keep this URL. Add a desktop nav item (approval). Use GSC to list competing Spires URLs per query. Do not rewrite the page into an article. Do not change the title without a documented SERP test. Earn links to this URL (best target for partners).
+
+**Expected SEO benefit:** Better chance that query-level positions 21–43 consolidate onto this URL rather than remaining split. Unlikely to jump to page one from code alone.
+
+**Risk:** Low if we do not change the URL or pricing. Medium if we change title/H1.
+
+**Safe now?** Glance/pricing already shipped. Desktop nav — **not** without layout approval.
+
+---
+
+## 3. Keyword-to-URL cannibalisation
+
+See `KEYWORD_TO_URL_MAP.md`.
+
+**Genuine cannibalisation?** **Yes, as mixed ranking — not as two indexable copies of the same page.** Live site has one canonical Heathrow money URL. Supporting pages correctly exist. Google’s query-to-page assignment is still messy, which is why the dedicated page’s average position is worse than several query averages.
+
+Do **not** delete `/rates`, `/airport-transfers`, or `/heathrow-to-oxford-taxi`.
+
+---
+
+## 4. Legacy `.html` URLs and `/services`
+
+Live headers, 4 September 2026 (no follow):
+
+| Request | Status | Location |
+| --- | --- | --- |
+| `/rates` | 200 | — |
+| `/rates.html` | **308** | `/rates` |
+| `/services` | **301** | `/airport-transfers` |
+| `/services.html` | **308** | `/services` (then 301 to `/airport-transfers`) |
+| `/oxford-to-heathrow-taxi.html` | **308** | `/oxford-to-heathrow-taxi` |
+
+**Current implementation:** Vercel `cleanUrls` 308s `.html` → clean path. `vercel.json` 301s `/services` → `/airport-transfers`. Stub HTML is `noindex` + meta refresh + canonical to the live URL.
+
+**Problem:** `/services.html` is a **two-hop chain** (308 then 301). `/rates.html` is a **single hop** to the live page. There are **no duplicate 200 documents**.
+
+**GSC `/services` ~position 8:** Treat as **historical (or redirect attribution)** for the old services URL, not proof that a live `/services` page still ranks. The current equivalent is `/airport-transfers`. Do not rewrite a stub. Do not recreate `/services` as indexable.
+
+**Why it matters:** Chains slow consolidation slightly. Duplicate 200s would be CRITICAL; they do not exist.
+
+**Recommended solution:** Optional (approval): add an explicit `301 /services.html → /airport-transfers` in `vercel.json` so Vercel redirects run before `cleanUrls` and skip the hop. Leave `/rates.html` as the 308 from `cleanUrls`.
+
+**Expected benefit:** Marginal crawl hygiene.
+
+**Risk:** Low–medium (touches a historically indexed path).
+
+**Safe now?** Documented only — **not implemented** (indexed-URL redirect).
+
+**Verdict:** `/rates.html` and `/services.html` are **not a current duplicate-content problem**. They are historical GSC rows plus correct redirects. `/services.html` chain is a small remaining hygiene item.
+
+---
+
+## 5. WWW vs non-WWW
+
+Live headers:
+
+| Request | Status | Location |
+| --- | --- | --- |
+| `https://www.spires-taxis.com/` | 200 | — |
+| `https://spires-taxis.com/` | **301** | `https://www.spires-taxis.com/` |
+| `http://www.spires-taxis.com/` | **308** | `https://www.spires-taxis.com/` |
+| `http://spires-taxis.com/` | **308** | `https://spires-taxis.com/` (then 301 to www) |
+
+Canonicals, sitemap, robots sitemap line, Open Graph URLs use **https://www.spires-taxis.com**.
+
+**Intended hostname:** `https://www.spires-taxis.com`
+
+**Problem:** HTTP apex is a two-hop chain (platform HTTPS upgrade on the same host, then apex→www). Normal for Vercel. Historical GSC for both hostnames is expected.
+
+**Verdict: NO ACTION REQUIRED** for hostname policy. Do not change canonicals.
+
+**HTTP apex chain:** LOW / leave unless Vercel ever supports collapsing it.
+
+---
+
+## 6. Technical SEO
+
+### Phase 1 — Public route inventory
+
+#### INDEX (sitemap, `index,follow`)
 
 | URL | File | Intent |
 | --- | --- | --- |
-| `/` | `index.html` | Brand / local private hire home |
-| `/oxford-to-heathrow-taxi` | `oxford-to-heathrow-taxi.html` | **Primary money page:** Oxford → Heathrow |
+| `/` | `index.html` | Brand / local private hire |
+| `/oxford-to-heathrow-taxi` | `oxford-to-heathrow-taxi.html` | **Primary:** Oxford → Heathrow |
 | `/heathrow-to-oxford-taxi` | `heathrow-to-oxford-taxi.html` | Arrivals: Heathrow → Oxford |
-| `/airport-transfers` | `airport-transfers.html` | Hub: all airports from Oxford |
+| `/airport-transfers` | `airport-transfers.html` | All airports from Oxford |
 | `/oxford-to-gatwick-taxi` | `oxford-to-gatwick-taxi.html` | Oxford → Gatwick |
 | `/oxford-to-luton-taxi` | `oxford-to-luton-taxi.html` | Oxford → Luton |
-| `/how-airport-pickup-works` | `how-airport-pickup-works.html` | Arrivals process (meet, flight tracking) |
-| `/rates` | `rates.html` | Price list (all airports + local + extras) |
-| `/our-vehicles` | `our-vehicles.html` | RAV4 / Vito capacity |
-| `/oxford-taxis` | `oxford-taxis.html` | Local Oxford journeys |
-| `/abingdon-taxis` | `abingdon-taxis.html` | Abingdon local + airport connect |
-| `/bicester-taxis` | `bicester-taxis.html` | Bicester / Village |
+| `/how-airport-pickup-works` | `how-airport-pickup-works.html` | Arrivals process |
+| `/rates` | `rates.html` | Full price list |
+| `/our-vehicles` | `our-vehicles.html` | RAV4 / Vito |
+| `/oxford-taxis` | `oxford-taxis.html` | Local Oxford |
+| `/abingdon-taxis` | `abingdon-taxis.html` | Abingdon |
+| `/bicester-taxis` | `bicester-taxis.html` | Bicester |
 | `/banbury-to-oxford-taxi` | `banbury-to-oxford-taxi.html` | Banbury ↔ Oxford |
-| `/student-taxis` | `student-taxis.html` | Students / term / luggage |
-| `/corporate-taxis` | `corporate-taxis.html` | Accounts / business |
+| `/student-taxis` | `student-taxis.html` | Students |
+| `/corporate-taxis` | `corporate-taxis.html` | Business / accounts |
 | `/reviews` | `reviews.html` | Trustpilot + Google/Facebook links |
-| `/about` | `about.html` | Operator, licensing, how they work |
-| `/contact` | `contact.html` | Call / WhatsApp / email / form |
+| `/about` | `about.html` | Operator / licensing |
+| `/contact` | `contact.html` | Call / WhatsApp / form |
 | `/terms-and-conditions` | `terms-and-conditions.html` | Legal |
-| `/offer-terms` | `offer-terms.html` | £5-off portal offer terms |
+| `/offer-terms` | `offer-terms.html` | Portal offer terms (**still indexed**) |
 
-### NOINDEX / not in sitemap (correct)
+#### NOINDEX / not in sitemap (correct unless noted)
 
 | URL | Status | Notes |
 | --- | --- | --- |
-| `/404` custom | `noindex` | Vercel 404 page |
+| Custom 404 | `noindex` | |
 | `/booking` | `noindex` + 301 to customer app | |
-| `/email` | `noindex,nofollow` + robots Disallow | B2B page, not for search |
-| `/thank-you` | `noindex,nofollow` | |
-| `/services`, `/destinations`, `/airport-taxis-oxford`, `/abingdon-taxi`, `/heathrow-airport-taxis`, `/gatwick-airport-taxis`, `/birmingham-airport-taxis` | `noindex` + meta refresh + canonical to live URL + Vercel 301 | Redirect stubs |
+| `/email` | `noindex,nofollow` + robots Disallow | |
+| `/thank-you` | `noindex,nofollow` | Still loads legacy `navigation.js` — not a ranking page |
+| `/services`, `/destinations`, `/airport-taxis-oxford`, `/abingdon-taxi`, `/heathrow-airport-taxis`, `/gatwick-airport-taxis`, `/birmingham-airport-taxis` | `noindex` stubs + Vercel 301 | |
 
-### Dynamically generated routes
+#### Was 200 without noindex (fixed in this pass)
 
-**None** on the marketing site. No city/postcode template loop.
+| URL | Finding | Action |
+| --- | --- | --- |
+| `/nav-snippet` | Live **200** HTML fragment, no robots meta, not in sitemap | **Implemented:** robots `Disallow: /nav-snippet`; Vercel **301 → /** |
 
-### Chrome, metadata, crawl files
+Titles are unique across indexable HTML. Each indexable page has one H1, a canonical on www, and `robots` index,follow (except stubs/utility).
 
-- **Canonicals:** present and unique on indexable pages; HTTPS www.
-- **Open Graph / Twitter:** PNG OG image `android-chrome-512x512.png` (512×512). Most pages lack `twitter:description` (see LOW). Twitter tags do not affect Google ranking.
-- **JSON-LD:** TaxiService `@id` `https://www.spires-taxis.com/#taxiservice`. Organization defined fully on the homepage. FAQPage used where visible `<details>` exist on several pages.
-- **Visible breadcrumbs:** present on the Heathrow page and most inner pages.
-- **Nav:** desktop = Home, Airport transfers, Rates, Reviews, About, Contact + phone + Book online. **Oxford to Heathrow is only in the mobile menu and footer**, not desktop nav.
-- **Footer:** includes Oxford to Heathrow, Heathrow to Oxford, Gatwick, Luton, pickup guide, rates, vehicles.
-- **Images:** logo SVG; one rates table PNG with width/height and lazy load. **No real vehicle photographs in the repo.**
-- **Lazy load:** footer logo and rates PNG. Hero logo is not lazy (correct).
-- **Redirects:** apex → www 301; several legacy paths in `vercel.json`.
-- **robots.txt:** allows `/`, CSS, JS, images; disallows booking/email/admin/scripts; declares sitemap.
-- **IndexNow:** public key file at site root (`3f569e285f8a4c30a76a5971841458d5.txt`); submit via `npm run indexnow`.
-- **Cache:** HTML/sitemap/robots `max-age=0, must-revalidate`.
+**Trailing slash:** `trailingSlash: false`. Consistent.
+
+**Programmatic SEO:** none. Do not add OX1–OX4 or neighbourhood templates.
 
 ---
 
-## Findings
+## Findings by severity
 
-Severity: **CRITICAL** / **HIGH** / **MEDIUM** / **LOW** / **NO ACTION REQUIRED**.
+### CRITICAL
 
----
-
-### H1 — Heathrow money page answers the query, but the “glance” is scattered
-
-**Severity:** HIGH  
-**Affected:** `/oxford-to-heathrow-taxi`
-
-**Current implementation:** Strong commercial page. Unique title `Oxford to Heathrow Taxi | Fixed Price Airport Transfer`. Single H1. Return-booking prices are explicit: £87 / £110 per leg, £174 / £220 both legs, one-way as Quote. Distance (45–50 miles) and 60–90 minutes sit in a later section. Terminals sit further down. Vehicle names (Toyota RAV4, Mercedes Vito) sit in the vehicles section. The page does **not** invent a one-way fare.
-
-**Problem:** Someone searching “Oxford to Heathrow taxi” can get the answer, but not “within seconds” in one block. They must scan hero → trust strip → four price cards → then journey/terminals.
-
-**Why it matters:** This is the primary commercial landing page. Clarity at the top beats extra paragraphs.
-
-**Recommended solution:** Add a compact **Route at a glance** block immediately under the trust strip (route, distance, typical time, terminals, vehicles, return totals, one-way = get a quote, CTAs). Do not replace existing price cards or FAQs.
-
-**Risk:** Low–medium visual change on an indexed money page. Additive and reversible. Does not change URL, title, or pricing logic.
+None on the live marketing site. No duplicate 200 copies of `/rates` or `/services`. No accidental sitewide noindex. No fake AggregateRating. Booking/Firebase not broken by this site’s SEO layer.
 
 ---
 
-### H2 — Heathrow → Oxford title and H1 still lead with “from £87”
+### HIGH — Mixed ranking for Heathrow queries vs dedicated page
 
-**Severity:** HIGH  
+Covered in §2. **Safe now?** Diagnosis only.
+
+---
+
+### HIGH — Desktop navigation omits `/oxford-to-heathrow-taxi`
+
+**Affected:** `includes/header.html` and the inlined `SITE-HEADER` on each page (chrome is copied, not SSI).
+
+**Current:** Desktop `.site-nav`: Home, Airport transfers, Rates, Reviews, About, Contact. Heathrow is in the **mobile** drawer and **footer** only. CSS hides `.site-nav` below 900px; it does not remove Heathrow from the HTML on desktop — Heathrow was never in the desktop list.
+
+**Evidence:** Source of `includes/header.html` vs `site-menu__links`.
+
+**Problem:** Weakest sitewide internal link to the money page on the default desktop crawl path.
+
+**Why it matters:** Internal links are an importance signal. Desktop users cannot reach Heathrow from the primary nav.
+
+**Recommended solution (approval):** Add “Heathrow” → `/oxford-to-heathrow-taxi`. Do not use exact-match “Oxford to Heathrow taxi” in the nav. Test wrapping at 1024px and 1280px. If it wraps, swap Reviews to footer-only.
+
+**Expected benefit:** Stronger internal authority to the URL Google should rank.
+
+**Risk:** Medium (sitewide chrome).
+
+**Safe now?** **No** — layout change.
+
+---
+
+### HIGH — `/heathrow-to-oxford-taxi` title and H1 still “from £87”
+
 **Affected:** `/heathrow-to-oxford-taxi`
 
-**Current implementation:** Title and OG title: `Heathrow to Oxford Taxi from £87 | Spires Taxis`. H1: `Heathrow to Oxford — from £87 return booking`. Body copy does explain return-booking vs one-way.
+**Current:** Title `Heathrow to Oxford Taxi from £87 | Spires Taxis`. H1 `Heathrow to Oxford — from £87 return booking`. Body does explain return-booking vs one-way.
 
-**Problem:** SERP snippet can be read as a one-way £87 fare — the exact confusion the Oxford→Heathrow page already works hard to avoid.
+**Problem:** SERP can be read as a one-way £87 fare. Overlaps outbound Heathrow queries.
 
-**Why it matters:** Competes with the outbound page for overlapping queries (“Oxford Heathrow taxi”) while sending a muddier price signal.
+**Recommended solution (approval):** Align with outbound pattern: arrivals, flight tracking, return-booking — without “from £87” as the headline. Keep unique arrivals content.
 
-**Recommended solution (approval required):** Align title/H1/description with the outbound page pattern, e.g. emphasise arrivals, flight tracking and return-booking, without “from £87” as the headline claim. Keep unique arrivals content (meet & greet, terminals table, colleges/hotels). Do not duplicate the outbound page and reverse the words.
+**Risk:** Medium (indexed title).
 
-**Risk:** Medium. Title/H1 change on an indexed URL. Google may take time to recrawl. Do not ship without approval.
-
----
-
-### H3 — Desktop navigation omits the primary money page
-
-**Severity:** HIGH  
-**Affected:** `includes/header.html` (all pages using SITE-HEADER); desktop `.site-nav`
-
-**Current implementation:** Oxford to Heathrow is in the mobile drawer and footer only.
-
-**Problem:** The most important commercial URL is not in the main crawl path from every desktop page. Internal PageRank-style equity is weaker than it should be.
-
-**Why it matters:** Google uses internal links as relevance and importance signals. Users on desktop cannot reach Heathrow from the primary nav.
-
-**Recommended solution (approval required):** Add one desktop item, e.g. “Heathrow”, pointing to `/oxford-to-heathrow-taxi`, without stuffing “Oxford to Heathrow taxi” on every page. Keep the current six-item set if adding an item would wrap badly — in that case swap a lower-value item (Reviews can stay in footer/mobile).
-
-**Risk:** Medium. Sitewide layout. Test at 1024px and 1280px before shipping.
+**Safe now?** **No**.
 
 ---
 
-### H4 — No analytics or conversion events on the marketing site
+### HIGH — No analytics on the marketing site
 
-**Severity:** HIGH  
-**Affected:** All `spires-website` HTML; booking is off-site
+**Affected:** All `spires-website` HTML.
 
-**Current implementation:** No Google Analytics, GTM, or gtag in this codebase. Call/WhatsApp/book links are plain `tel:`, `wa.me`, and `customer.spires-taxis.com`. Search Console is not implemented in HTML (verification is typically DNS or a meta tag in GSC — not present here).
+**Current:** No GA4, GTM, or gtag. Call/WhatsApp/book are plain links. GSC is used externally (not a meta tag in HTML).
 
-**Problem:** You cannot measure Heathrow landing visits vs call clicks vs WhatsApp vs booking starts from this site.
+**Problem:** Cannot measure Heathrow visits vs tel vs WhatsApp vs booking starts.
 
-**Why it matters:** Ranking without measurement makes the next SEO round guesswork.
+**Recommended solution (approval):** GA4 or GTM with events for `tel:`, WhatsApp, and `customer.spires-taxis.com`. Needs a measurement ID and a cookie/privacy decision.
 
-**Recommended solution (approval required):** Add GA4 (or GTM) with events for `tel:` clicks, WhatsApp clicks, and outbound booking clicks. Use one measurement ID supplied by you. Do not put secrets in the repo; a public GA4 ID is normal.
+**Risk:** Medium (third-party script, INP, privacy).
 
-**Risk:** Medium. Third-party script affects INP/privacy. Needs a measurement ID and a cookie/privacy decision.
-
----
-
-### H5 — “Photos coming soon” on commercial pages
-
-**Severity:** MEDIUM (copy) — **implemented as low-risk removal in this pass**  
-**Affected:** `/oxford-to-heathrow-taxi`, `/our-vehicles`
-
-**Current implementation:** Heathrow page: “Vehicle photos are being added to the site.” Vehicles page: “Photos coming soon.”
-
-**Problem:** Explicitly forbidden customer-facing placeholder. It also signals an unfinished business.
-
-**Why it matters:** Trust and conversion. No SEO benefit.
-
-**Recommended solution:** Remove the callouts. Keep capacity copy. Add real photos later with width/height, WebP, lazy load below the fold, and natural alt text. Do not invent images.
-
-**Risk:** Low. Copy deletion only.
+**Safe now?** **No**.
 
 ---
 
-### H6 — Content cannibalisation among airport URLs
+### HIGH — Waiting-time copy still disagrees (fact, not SEO copy)
 
-**Severity:** MEDIUM  
-**Affected:** `/oxford-to-heathrow-taxi`, `/heathrow-to-oxford-taxi`, `/airport-transfers`, `/rates`, `/oxford-taxis`, `/`
+**Affected:** `/airport-transfers` still states **60 minutes** after landing in the meta description and body. Heathrow page, rates, and pickup guide say **“standard allowance”**. Terms still mention **5–10 minutes** at pickup locations.
 
-**Current implementation:** Distinct URLs with overlapping Heathrow price mentions (“from £87”) on home, rates, airport hub, local Oxford, Abingdon, Bicester, student, corporate.
+**Problem:** Conflicting claims harm trust and can confuse rich results. This audit will **not** pick a number.
 
-**Problem:** Google may split “Oxford to Heathrow taxi” / “Oxford airport taxi” / “Oxford airport transfers” across several URLs. The outbound Heathrow page is the right primary target; others should **support** it, not rank as alternatives.
+**Recommended solution (approval):** One published rule, then align meta, body, FAQs, and terms.
 
-**Why it matters:** Diluted ranking for the money query.
+**Risk:** Medium (customer-facing policy).
 
-**Recommended solution:** Do **not** merge or delete pages. Tighten supporting pages so they link to `/oxford-to-heathrow-taxi` for route detail and keep their own intent (hub, price list, local, arrivals). Review the Heathrow→Oxford title (H2). No new location pages.
-
-**Risk:** Medium if titles on supporting pages are rewritten. Leave URLs unchanged.
-
-**Intent map (keep all):**
-
-| Query family | Primary URL | Supporting |
-| --- | --- | --- |
-| Oxford to Heathrow taxi / Oxford Heathrow taxi / taxi Oxford to Heathrow | `/oxford-to-heathrow-taxi` | Home, rates, airport-transfers |
-| Heathrow to Oxford taxi | `/heathrow-to-oxford-taxi` | Pickup guide |
-| Oxford airport transfers / airport taxi Oxford | `/airport-transfers` | Rates, home |
-| Price-led “Heathrow from £87” | `/rates` + Heathrow page | Do not create a third price URL |
+**Safe now?** **No**.
 
 ---
 
-### H7 — `/offer-terms` is still indexable after the sitewide offer banner was removed
+### MEDIUM — `/offer-terms` remains indexable
 
-**Severity:** MEDIUM  
-**Affected:** `/offer-terms`, sitemap
+**Affected:** `/offer-terms` — 200, in sitemap, `index,follow`.
 
-**Current implementation:** Indexable, in sitemap, describes a £5-off airport return offer via the customer portal. Banner was removed sitewide.
+**Problem:** If the £5 portal offer is finished, this wastes crawl and can look stale.
 
-**Problem:** If the offer is withdrawn, this page is leftover commercial/legal content competing for crawl attention and possibly confusing users.
+**Recommended solution (approval):** Confirm whether the offer is live. If not: `noindex` and drop from sitemap. Do not 404 if customers still use the link.
 
-**Why it matters:** Thin or obsolete indexed pages waste crawl budget and can mismatch ads/snippets.
-
-**Recommended solution (approval required):** Confirm whether the portal offer is live. If yes: INDEX, keep. If no: `noindex` and remove from sitemap (do not 404 immediately if people still have the link).
-
-**Risk:** Medium. Indexing change.
+**Safe now?** **No**.
 
 ---
 
-### H8 — Waiting-time wording is inconsistent
+### MEDIUM — Google review link is a Maps search, not a GBP short URL
 
-**Severity:** MEDIUM  
-**Affected:** `/airport-transfers` (meta + body: **60 minutes** after landing); `/rates` (allowance + £25/hour extra); `/how-airport-pickup-works` and Heathrow pages (“standard allowance”); `terms-and-conditions` (5–10 minutes at pickup — different context)
+**Affected:** `/reviews`
 
-**Problem:** Airport transfers states a specific 60-minute arrivals wait. Other pages stay vague. Terms mention 5–10 minutes for general pickup.
+**Current:** `https://www.google.com/maps/search/?api=1&query=Spires+Taxis+Oxford`. Trustpilot and Facebook also linked. No star count hardcoded. No AggregateRating.
 
-**Why it matters:** Trust and possible rich-result mismatch. Not a ranking lever by itself.
+**Problem:** Weaker entity `sameAs` than a stable GBP/review URL.
 
-**Recommended solution (approval required):** Confirm the operational rule, then use the **same** phrase on airport pages. Do not invent a number if 60 minutes is wrong.
+**Recommended solution (approval):** Official Google Business Profile review URL when you have it. Homepage Organization `sameAs` currently lists Trustpilot and Facebook only.
 
-**Risk:** Medium. This is a business-policy statement.
-
----
-
-### H9 — Reviews: genuine, but Google is a search link, not a profile
-
-**Severity:** MEDIUM  
-**Affected:** `/reviews`, `/oxford-to-heathrow-taxi` Trustpilot widget
-
-**Current implementation:** No fake AggregateRating. Trustpilot widget + links. Google CTA is `google.com/maps/search/?api=1&query=Spires+Taxis+Oxford` (search), not a Business Profile write-review URL. Heathrow page embeds a Trustpilot widget **without** the Trustpilot bootstrap script used on `/reviews` (falls back to a text link — acceptable).
-
-**Problem:** Google reviews are harder to leave than they should be. Do not hardcode star ratings.
-
-**Why it matters:** Local pack trust. Conversion on the money page.
-
-**Recommended solution (approval required):** Supply the official Google review / GBP URL. Add it on `/reviews` and a single line on the Heathrow reviews section. Keep Trustpilot. No review gating.
-
-**Risk:** Low once the URL is known. Wrong URL is worse than a search link.
+**Safe now?** **No** (needs the real URL).
 
 ---
 
-### H10 — Legal / entity name “Spires Taxis Ltd” is unused
+### MEDIUM — `/services.html` redirect chain
 
-**Severity:** MEDIUM  
-**Affected:** Sitewide identity, JSON-LD Organization on `/`
-
-**Current implementation:** Public name is **Spires Taxis**. Footer: licensed Oxford City Council private hire. About: honest note that the operator licence number is not published yet. Phone `07776 897772` / `+447776897772` and `bookings@spires-taxis.com` are consistent. No street address in schema (locality Oxford only).
-
-**Problem:** Google’s local entity is stronger with legal name, licence number, and a consistent GBP NAP. Ltd never appears.
-
-**Why it matters:** Local SEO / Knowledge Panel, not keyword ranking.
-
-**Recommended solution (needs facts from you):** Optional `legalName` in Organization schema and a one-line About/footer “Spires Taxis Ltd” **only if that is the trading/legal name you want public**. Add operator licence number when confirmed. Do not invent an address.
-
-**Risk:** Medium. NAP mismatch with GBP if wrong.
+See §4. Optional Vercel 301 skip-hop. **Not implemented.**
 
 ---
 
-### H11 — No conversion measurement; CTAs themselves are sound
+### MEDIUM — Sitemap `lastmod` dates
 
-**Severity:** LOW (UX) / see H4 for tracking  
-**Affected:** `/oxford-to-heathrow-taxi` and global chrome
+**Current:** Many sitemap lastmods are `2026-08-23` even though Heathrow HTML was edited later. `scripts/generate-sitemap.mjs` uses file mtime at **build** time on Vercel, so production lastmod should refresh on deploy. The committed `sitemap.xml` in git can lag.
 
-**Current implementation:** Hero and mid-page: WhatsApp quote, Call, Book online. Sticky WhatsApp FAB sitewide. Mobile menu repeats Call / WhatsApp / Book. No popups.
+**Recommended:** Rely on Vercel `npm run build`; optionally regenerate locally before commit. Not a ranking lever.
 
-**Problem:** Three equally weighted buttons in the hero. WhatsApp is often the fastest quote path; Book online is the account path. Not broken.
-
-**Why it matters:** Conversion, not crawl.
-
-**Recommended solution:** Optional: on the Heathrow page only, make WhatsApp the primary and Book/Call secondary — **approval** (design). Do not add popups or a second sticky bar.
-
-**Risk:** Low–medium visual.
-
-**NO ACTION REQUIRED** on booking URLs, Firebase, or `customer.spires-taxis.com`.
+**Safe now?** Optional; not required for this audit.
 
 ---
 
-### H12 — Performance: fonts and third parties, not huge images
+### LOW — `/nav-snippet` was a public 200 fragment
 
-**Severity:** MEDIUM (performance)  
-**Affected:** All pages; `/reviews` Trustpilot; `/rates` PNG
-
-**Current implementation:** Two Google Fonts families (DM Sans + Source Serif 4) loaded from fonts.googleapis.com (render-blocking CSS). `main.js` is small and deferred. No GA. Rates image has dimensions. Fade-in CSS can start at `opacity: 0` until JS (prefers-reduced-motion respected). WhatsApp FAB is CSS/SVG.
-
-**Problem:** LCP on text-hero pages is likely the H1/font, not a giant photo. CLS risk is low without ads. Trustpilot on `/reviews` is the main third party.
-
-**Why it matters:** Core Web Vitals are a light ranking factor; usability matters more here.
-
-**Recommended solution:** Do not self-host fonts or strip the design in this pass. Optional later: `media="print" onload` pattern or fewer weights. Do not add Trustpilot JS to every page.
-
-**Risk:** Medium if fonts are changed (brand look).
-
----
-
-### H13 — JSON-LD is valid but incomplete as a local entity graph
-
-**Severity:** LOW  
-**Affected:** Inner pages referencing `#organization` without repeating the full Organization node; Offer schema on Heathrow uses price `87` with a correct description that it is return-booking per leg.
-
-**Problem:** Google can still connect `@id`s. Missing street address and legal name (H10). Offer price without `priceSpecification` nuance can still be misread as a one-way fare in some tools — visible HTML is clearer than schema.
-
-**Why it matters:** Rich results / entity, secondary to visible copy.
-
-**Recommended solution:** Do **not** rebuild schema architecture in this pass. After approval: add `legalName` / licence on homepage Organization only. Do not add AggregateRating.
-
-**Risk:** Medium if schema architecture is rewritten (user instruction: review first).
-
----
-
-### L1 — Missing `twitter:description` on most pages
-
-**Severity:** LOW  
-**Affected:** Almost all HTML except Heathrow, offer-terms, terms
-
-**Why it matters:** Social sharing only. Google uses title + meta description.
-
-**Recommended solution:** No action for Google SEO. Optional copy from `og:description` later.
-
-**Risk:** None.
-
----
-
-### L2 — Homepage popular-routes grid only shows Heathrow and Gatwick
-
-**Severity:** LOW  
-**Affected:** `/` `#popular-airport-routes`
-
-**Current implementation:** Two cards (Heathrow, Gatwick) in a three-column grid. Luton exists as a dedicated page and is linked from airport-transfers and footer.
-
-**Recommended solution:** Optional third card to Luton. Not required for the Heathrow query.
-
+**Was:** Live 200, no noindex.  
+**Implemented:** robots Disallow + 301 to `/`.  
 **Risk:** Low.
 
 ---
 
-### L3 — Heathrow Trustpilot widget without bootstrap script
+### LOW — Missing `twitter:description` on some pages; OG image 512×512
 
-**Severity:** LOW  
-**Affected:** `/oxford-to-heathrow-taxi` reviews section
-
-**Current implementation:** Widget markup + plain Trustpilot link. Script is only on `/reviews`.
-
-**Recommended solution:** Keep the text link (works without JS). Do not load Trustpilot sitewide. Optional: one line linking to `/reviews`.
-
-**Risk:** Low. Adding the script is a performance trade-off.
+Twitter tags do not affect Google ranking. Leave unless touching social cards anyway.
 
 ---
 
-### N1 — Technical SEO baseline
+### LOW — Visible breadcrumbs missing on some local pages
 
-**Severity:** NO ACTION REQUIRED  
-**Affected:** Indexable HTML
-
-Unique titles and descriptions on indexable pages, one H1 each, canonicals on www, robots allow CSS/JS, sitemap generated from indexable files with file `lastmod`, no invented changefreq/priority, 404 `noindex`, redirect stubs `noindex`, no client-side-only fares, no index.html duplicate in sitemap, no programmatic thin location pages.
-
-Do not “fix” these because a crawler tool wants more meta tags.
+JSON-LD BreadcrumbList exists on several local/route pages without a visible `<nav class="breadcrumbs">`. Not a ranking emergency. Optional consistency.
 
 ---
 
-### N2 — Do not create OX1 / Headington / Cowley Heathrow clones
+### LOW — `thank-you.html` legacy nav + `navigation.js`
 
-**Severity:** NO ACTION REQUIRED (do not build)
-
-No generator exists. Do not add one. Distinct value would require real pickup constraints (college access, station, hospital), not a find-and-replace town name.
+Page is noindex. `js/navigation.js` still contains old `/pages/` and `/destinations/` links **if** it injects (it only injects when a header has no `<nav>`). Thank-you already has a `<nav>`, so injection should not run. Cleanup later; do not treat as a ranking issue.
 
 ---
 
-## Sitemap quality classification
+### NO ACTION REQUIRED
 
-| URL | Class | Reasoning |
+| Item | Why |
+| --- | --- |
+| Unique titles / H1s / canonicals on indexable pages | Already unique and www HTTPS |
+| Apex → www 301 | Working |
+| `/rates.html` 308 | Working; historical GSC only |
+| `/services` 301 to hub | Working; do not restore |
+| robots.txt sitemap + Allow CSS/JS | Adequate |
+| No OX1–OX4 generator | Correct — do not add |
+| Heathrow one-way as Quote | Correct — do not invent a fare |
+| No fake reviews / AggregateRating | Correct |
+| `/about`, `/our-vehicles` | Relatively strong GSC positions — do not rewrite |
+| Mobile vs desktop HTML split | Nav CSS hide only; same main content |
+| Creating another Oxford→Heathrow URL | Would worsen cannibalisation |
+
+---
+
+## 7. Structured data
+
+**Current:** Homepage defines Organization + WebSite + TaxiService (`#taxiservice`, `#organization`). Route pages reference TaxiService by `@id` and add Service + FAQPage + BreadcrumbList where FAQs exist. Offers on Heathrow use £87 / £110 with explicit “per vehicle, per leg, return booking” descriptions.
+
+**Problem:** None critical. Do not add Review/AggregateRating. Do not invent a street address (schema uses Oxford / Oxfordshire / GB only).
+
+**Optional (approval):** Add GBP URL to `sameAs` when known; TaxiService `legalName` “Spires Taxis Ltd” if you confirm public use.
+
+**Safe now?** Leave schema architecture.
+
+---
+
+## 8. Internal linking
+
+**To `/oxford-to-heathrow-taxi`:** Footer (every chrome page), mobile menu, homepage card, rates table + footer, airport-transfers card, student/corporate/oxford/abingdon/bicester cards, vehicles, pickup guide, arrivals page, reviews useful-links, 404. **Not** in desktop main nav.
+
+**Anchors:** Mix of “Oxford to Heathrow”, “Oxford to Heathrow taxi”, “Heathrow”. Not stuffed on every paragraph.
+
+**Gap:** Desktop nav (HIGH, approval).
+
+**Do not:** Add dozens of exact-match footer clones.
+
+**Best external link target:** `/oxford-to-heathrow-taxi` for airport partners; `/` or `/about` for general Oxford mentions.
+
+---
+
+## 9. Rates page opportunity
+
+**Affected:** `/rates` — title `Taxi Prices Oxford | Fixed Rates | Spires Taxis`, H1 `Taxi prices from Oxford`. ~364 impressions, position ~25.
+
+**Current:** Airport table including Heathrow From £87 / £110 with return-booking explanation; link to `/oxford-to-heathrow-taxi`. Local and extras. FAQPage. One-way not invented.
+
+**Problem:** Strong impressions, 0 clicks — consistent with average position ~25, not a broken snippet. Some Heathrow *price* queries may land here instead of the route page (medium overlap, acceptable).
+
+**Recommended:** Do not rewrite for keywords. Optional later: clearer “per vehicle / return booking” line in the table caption (copy already nearby). Do not put a fake one-way column.
+
+**Protect this page.** It is the best-performing commercial URL in the GSC page set.
+
+---
+
+## 10. Mobile vs desktop
+
+**CSS:** `.site-nav` and header phone hide below 900px; Book online hides below 480px. **Main content, prices, and FAQs stay in the HTML.** WhatsApp float is sitewide.
+
+**No evidence** of desktop-only hidden SEO text or different JSON-LD.
+
+**Verdict:** Query mix is the more likely explanation for pos 11.4 mobile vs 34.66 desktop. **NO ACTION REQUIRED** as a technical desktop bug.
+
+---
+
+## 11. Core Web Vitals
+
+Not measured from CrUX in this pass (no GA4). Static HTML is light. Risks: Google Fonts (two families, `display=swap`), WhatsApp float, `airport-prices.js` on Heathrow/rates. No huge hero photographs (no fleet photos in repo).
+
+**Do not** chase a Lighthouse 100. Optional later: subset fonts. **Approval** before adding analytics (INP).
+
+---
+
+## 12. Conversion
+
+Heathrow already has WhatsApp, Call, Book online in the hero and again under prices. Sticky WhatsApp float sitewide. Primary action is visible. Do not add a fourth competing CTA.
+
+Desktop: phone in header + Book online. Mobile: hamburger + float WhatsApp.
+
+**Gap:** No event tracking (see analytics HIGH).
+
+---
+
+## 13. Analytics
+
+None in `spires-website`. GSC exists (you supplied data). Recommend GA4 events after you provide a measurement ID and privacy stance. Do not commit secrets.
+
+---
+
+## 14. Local entity signals
+
+Consistent: Spires Taxis, 07776 897772, bookings@spires-taxis.com, Oxford licensed private hire, www.spires-taxis.com.
+
+**Not on site (need from you):** legal display of **Spires Taxis Ltd**, operator licence number, registered office if you want it public, official GBP review URL.
+
+Do not invent those.
+
+---
+
+## 15. Content opportunities (do not auto-build)
+
+| Page | Status | Overlap risk |
 | --- | --- | --- |
-| `/` | INDEX | Home |
-| `/oxford-to-heathrow-taxi` | INDEX | Primary money page |
-| `/heathrow-to-oxford-taxi` | INDEX | Distinct arrivals intent |
-| `/airport-transfers` | INDEX | Airport hub |
-| `/oxford-to-gatwick-taxi` | INDEX | Distinct airport |
-| `/oxford-to-luton-taxi` | INDEX | Distinct airport |
-| `/how-airport-pickup-works` | INDEX | Process page supporting arrivals |
-| `/rates` | INDEX | Price list |
-| `/our-vehicles` | INDEX | Fleet / luggage |
-| `/oxford-taxis` | INDEX | Local (not Heathrow) |
-| `/abingdon-taxis` | INDEX | Town page with unique £20 fare |
-| `/bicester-taxis` | INDEX | Town / Village |
-| `/banbury-to-oxford-taxi` | INDEX | Distinct corridor |
-| `/student-taxis` | INDEX | Audience page |
-| `/corporate-taxis` | INDEX | Audience page |
-| `/reviews` | INDEX | Trust |
-| `/about` | INDEX | Entity |
-| `/contact` | INDEX | Conversion |
-| `/terms-and-conditions` | INDEX | Legal (normal for a hire operator) |
-| `/offer-terms` | **REVIEW** | Offer may be obsolete (H7) |
-| Redirect stubs, `/email`, `/thank-you`, `/booking`, `/404` | NOINDEX / REMOVE FROM SITEMAP | Already excluded |
-
-Do not auto-delete any INDEX page.
+| Oxford → Heathrow | EXISTS — protect and support | — |
+| Heathrow → Oxford | EXISTS — fix £87 title with approval | Medium with outbound |
+| Oxford → Gatwick | EXISTS | Low |
+| Oxford → Luton | EXISTS | Low |
+| Gatwick/Luton/Stansted/Birmingham inbound | MISSING | Only if distinct arrivals content |
+| Oxford Airport Transfers | EXISTS as `/airport-transfers` | — |
+| Student | EXISTS | Low |
+| Corporate | EXISTS | Low |
+| OX1/Headington/Cowley to Heathrow | MUST NOT CREATE | Doorway risk |
 
 ---
 
-## Conversion path (Oxford to Heathrow)
+## 16. Things that should NOT be changed
 
-A visitor can Call, WhatsApp, or Book. Email and `/contact` are available. The WhatsApp FAB is always present. Primary route is obvious enough; tracking is the gap (H4).
+- `/about` and `/our-vehicles` (relatively strong positions)
+- `/rates` pricing logic and published Heathrow return-booking figures
+- Heathrow title/H1 **unless** a planned SERP test (already well targeted)
+- One-way as quote
+- Canonical hostname
+- Working 301/308 map
+- Booking portal and Firebase
+- Invented reviews, awards, journey stats, one-way fares
+- Mass new location pages
+- Recreating `/services` as a fat article to “keep” GSC position 8
 
 ---
 
-## What should stay untouched
+## Sitemap classification (relevant URLs)
 
-- URL `/oxford-to-heathrow-taxi`
-- Published Heathrow return-booking figures (£87 / £110 / £174 / £220) unless you change prices
-- One-way as quote, not a invented fare
-- Booking domain and Firebase/customer app
-- FAQ answers that match visible `<details>`
-- No fake reviews, ratings, awards, or journey counts
-- No new programmatic location pages
-- Redirect map in `vercel.json` unless a specific 404 is proven
+| URL | Class |
+| --- | --- |
+| All INDEX rows in §6 | INDEX (canonical www, in sitemap) |
+| `/offer-terms` | REVIEW (confirm offer still live) |
+| Stubs, `/booking`, `/email`, `/thank-you`, `/nav-snippet` | NOINDEX / redirect — keep out of sitemap |
+| `.html` variants, apex host | Not in sitemap — correct |
+
+---
+
+## robots.txt
+
+Allows `/`, `/css/`, `/js/`, `/images/`. Disallows admin/booking/email/includes/scripts/services/destinations/index.html. **This pass added** `Disallow: /nav-snippet`. Sitemap declared. Does not block CSS/JS needed to render.
+
+---
+
+## Oxford to Heathrow — nine customer questions
+
+| Question | Answered quickly? |
+| --- | --- |
+| Can Spires take me? | Yes — hero + terminals |
+| How much? | Yes — glance + cards (£87/£110 per leg return booking; £174/£220 both legs) |
+| Per person or vehicle? | Yes — stated per vehicle |
+| What vehicle? | RAV4 / Vito |
+| Luggage? | Body + FAQ (not the first line of the glance) |
+| How long? | 60–90 minutes, not guaranteed |
+| Terminals? | T2–T5 |
+| Legitimate Oxford operator? | Trust strip + about/reviews links |
+| How to book? | WhatsApp / call / book online |
+
+Do not inflate word count. Optional later: one luggage line in the glance (approval if it crowds the grid).

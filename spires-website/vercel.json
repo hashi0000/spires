@@ -102,6 +102,11 @@
       "statusCode": 301
     },
     {
+      "source": "/services.html",
+      "destination": "/airport-transfers",
+      "statusCode": 301
+    },
+    {
       "source": "/services",
       "destination": "/airport-transfers",
       "statusCode": 301
@@ -138,6 +143,11 @@
     },
     {
       "source": "/index.html",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/nav-snippet",
       "destination": "/",
       "statusCode": 301
     }

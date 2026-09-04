@@ -19,6 +19,7 @@ const SKIP_FILES = new Set([
   'thank-you.html',
   'student-offers.html',
   '404.html',
+  'offer-terms.html',
 ]);
 
 function isRedirectStub(html) {
