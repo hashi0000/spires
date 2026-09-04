@@ -127,3 +127,18 @@ export function allocateInvoiceNumber(
   const invoiceNumber = `${prefix}-${ym}-${String(next).padStart(3, "0")}`;
   return { vault: { ...vault, seq }, invoiceNumber };
 }
+
+/** Rebuild sequence counters from remaining invoices so numbers can be reused after deletes. */
+export function rebuildInvoiceSeq(invoices: GeneratedSchoolInvoice[]): Record<string, number> {
+  const seq: Record<string, number> = {};
+  for (const inv of invoices) {
+    const prefix = inv.invoiceNumber.replace(/-\d{6}-\d+$/, "");
+    if (!prefix || prefix === inv.invoiceNumber) continue;
+    const key = `${prefix}-${inv.serviceMonth}`;
+    const match = inv.invoiceNumber.match(/-(\d+)$/);
+    const n = match ? Number(match[1]) : 0;
+    if (!Number.isFinite(n) || n <= 0) continue;
+    seq[key] = Math.max(seq[key] || 0, n);
+  }
+  return seq;
+}

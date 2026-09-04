@@ -20,11 +20,13 @@ import {
   SchoolInvoiceLine,
   SchoolSupplierDetails,
   DEFAULT_SUPPLIER_DETAILS,
+  GeneratedSchoolInvoice,
 } from "../utils/schoolInvoiceTypes";
 import {
   allocateInvoiceNumber,
   loadSchoolInvoiceVault,
   persistSchoolInvoiceVault,
+  rebuildInvoiceSeq,
   SchoolInvoiceVault,
 } from "../utils/schoolInvoiceStorage";
 import { downloadSchoolInvoicePdf } from "../utils/schoolInvoicePdf";
@@ -254,6 +256,71 @@ const SchoolInvoices: React.FC = () => {
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate the PDF.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeGeneratedInvoice = async (id: string, invoiceNumber: string) => {
+    if (!vault) return;
+    const ok = window.confirm(
+      `Delete ${invoiceNumber} from Firebase? Company details and saved routes are kept. This cannot be undone.`
+    );
+    if (!ok) return;
+    setError("");
+    setBusy(true);
+    try {
+      const invoices = history.filter((row) => row.id !== id);
+      await persist({ ...vault, supplier, routes, invoices, seq: rebuildInvoiceSeq(invoices) });
+      setStatus(`${invoiceNumber} removed. The next PDF can reuse that number if it was the latest.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete invoice.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const redownloadInvoice = async (row: GeneratedSchoolInvoice) => {
+    setError("");
+    setStatus("");
+    setBusy(true);
+    try {
+      const draft = !canSubmitOn(row.serviceMonth);
+      await downloadSchoolInvoicePdf({
+        invoiceNumber: row.invoiceNumber,
+        invoiceDate: row.invoiceDate,
+        kind: row.kind,
+        serviceMonth: row.serviceMonth,
+        lines: row.lines,
+        notes: row.notes,
+        draft,
+        supplier,
+      });
+      setStatus(
+        draft
+          ? `Draft PDF ${row.invoiceNumber} downloaded again. Do not email it until ${formatUkDate(earliestSubmitForServiceMonth(row.serviceMonth))}.`
+          : `PDF ${row.invoiceNumber} downloaded again.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not download the PDF.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearGeneratedInvoices = async () => {
+    if (!vault || history.length === 0) return;
+    const ok = window.confirm(
+      `Delete all ${history.length} recently generated school invoice${history.length === 1 ? "" : "s"} from Firebase? Company details and saved routes are kept. Invoice numbers will start again from 001.`
+    );
+    if (!ok) return;
+    setError("");
+    setBusy(true);
+    try {
+      await persist({ ...vault, supplier, routes, invoices: [], seq: {} });
+      setStatus("Recently generated invoices cleared. The next PDF will be numbered 001.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear invoices.");
     } finally {
       setBusy(false);
     }
@@ -543,12 +610,41 @@ const SchoolInvoices: React.FC = () => {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Recently generated</h3>
+            <button type="button" className="btn btn-danger btn-sm" onClick={clearGeneratedInvoices} disabled={busy}>
+              Clear all
+            </button>
           </div>
+          <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+            Use the download button to get the PDF again with the current headed paper. Deleting a record does not recall an email already sent to the Council.
+          </p>
           <ul className="text-sm space-y-2">
-            {history.slice(0, 8).map((row) => (
-              <li key={row.id}>
-                <strong>{row.invoiceNumber}</strong>
-                {row.draft ? " (draft)" : ""} · {labelForServiceMonth(row.serviceMonth)} · {formatGbp(invoiceTotals(row.lines).total)}
+            {history.map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-3" style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
+                <div>
+                  <strong>{row.invoiceNumber}</strong>
+                  {row.draft ? " (draft)" : ""} · {labelForServiceMonth(row.serviceMonth)} · {formatGbp(invoiceTotals(row.lines).total)}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm"
+                    onClick={() => redownloadInvoice(row)}
+                    disabled={busy}
+                    title="Download this invoice PDF again"
+                    aria-label={`Redownload invoice ${row.invoiceNumber}`}
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => removeGeneratedInvoice(row.id, row.invoiceNumber)}
+                    disabled={busy}
+                    aria-label={`Delete invoice ${row.invoiceNumber}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
