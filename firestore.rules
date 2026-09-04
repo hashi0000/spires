@@ -9,8 +9,9 @@ service cloud.firestore {
     // Admin dashboard accounts — add staff emails here
     function isAdmin() {
       return isAuthenticated()
-        && request.auth.token.email in [
-          'spirestaxis24@gmail.com'
+        && request.auth.token.email.lower() in [
+          'spirestaxis24@gmail.com',
+          'hashim@spires.com'
         ];
     }
 

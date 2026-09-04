@@ -6,7 +6,7 @@ const VAULT_COLLECTION = "schoolInvoiceVault";
 const VAULT_DOC = "workspace";
 const ALG = "aes-256-gcm";
 const KEY_SALT = "spires-school-invoice-v1";
-const ADMIN_EMAILS = ["spirestaxis24@gmail.com"];
+const ADMIN_EMAILS = ["spirestaxis24@gmail.com", "hashim@spires.com"];
 
 type VaultPayload = {
   version: 1;
