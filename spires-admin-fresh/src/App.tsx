@@ -22,6 +22,7 @@ import Vehicles from './components/Vehicles';
 import Bookings from './components/Bookings';
 import LinkBookings from './components/LinkBookings';
 import Customers from './components/Customers';
+import SchoolInvoices from './components/SchoolInvoices';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -409,6 +410,8 @@ const App: React.FC = () => {
             }}
           />
         );
+      case 'school-invoices':
+        return <SchoolInvoices />;
       case 'link-bookings':
         return <LinkBookings />;
       default:
