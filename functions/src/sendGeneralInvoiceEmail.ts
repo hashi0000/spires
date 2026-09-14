@@ -29,8 +29,12 @@ function formatUkDate(iso: string): string {
   });
 }
 
-function formatGbp(n: number): string {
-  return n.toLocaleString("en-GB", { style: "currency", currency: "GBP" });
+function formatGbpHtml(n: number): string {
+  const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `&pound;${amount}`;
 }
 
 function isEmail(value: string): boolean {
@@ -111,7 +115,7 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
   const html = `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${escapeHtml(customerName)},</p>
-        <p>Please find attached invoice <strong>${escapeHtml(invoiceNumber)}</strong> for <strong>${escapeHtml(formatGbp(total))}</strong>.</p>
+        <p>Please find attached invoice <strong>${escapeHtml(invoiceNumber)}</strong> for <strong>${formatGbpHtml(total)}</strong>.</p>
         <p>Payment terms: ${escapeHtml(paymentTermsLabel(paymentTerms))}${
           dueDate ? `. Due ${escapeHtml(formatUkDate(dueDate))}` : ""
         }${invoiceDate ? `. Invoice date: ${escapeHtml(formatUkDate(invoiceDate))}` : ""}.</p>

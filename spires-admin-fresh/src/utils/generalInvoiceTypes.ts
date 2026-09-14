@@ -29,6 +29,15 @@ export type GeneralInvoiceLine = {
   vatRatePercent: number;
 };
 
+export type SavedInvoiceClient = {
+  id: string;
+  name: string;
+  address: string;
+  email: string;
+  phone: string;
+  invoicePrefix: string;
+};
+
 export type GeneratedGeneralInvoice = {
   id: string;
   invoiceNumber: string;
@@ -36,6 +45,7 @@ export type GeneratedGeneralInvoice = {
   dueDate: string;
   paymentTerms: InvoicePaymentTerms;
   customer: GeneralInvoiceCustomer;
+  clientId?: string;
   bookingNumber: string;
   travelDate: string;
   pickup: string;
@@ -91,8 +101,44 @@ export function invoiceTotals(lines: GeneralInvoiceLine[]): {
   );
 }
 
+export function sanitiseInvoicePrefix(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return cleaned || "ST-INV";
+}
+
+export function suggestInvoicePrefix(name: string): string {
+  const words = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return "ST-INV";
+  const slug =
+    words.length === 1 ? words[0].slice(0, 8) : words.map((word) => word[0]).join("").slice(0, 8);
+  return sanitiseInvoicePrefix(`ST-${slug}`);
+}
+
+/** Always pounds sterling — never a dollar sign, even if the browser locale is US. */
 export function formatGbp(n: number): string {
-  return n.toLocaleString("en-GB", { style: "currency", currency: "GBP" });
+  const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `£${amount}`;
+}
+
+export function formatGbpHtml(n: number): string {
+  const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `&pound;${amount}`;
 }
 
 export function formatUkDate(iso: string): string {

@@ -6,10 +6,14 @@ import {
   DEFAULT_GENERAL_SUPPLIER,
   GeneratedGeneralInvoice,
   InvoiceSupplierDetails,
+  SavedInvoiceClient,
+  sanitiseInvoicePrefix,
+  suggestInvoicePrefix,
 } from "./generalInvoiceTypes";
 
 export type GeneralInvoiceVault = {
   supplier: InvoiceSupplierDetails;
+  clients: SavedInvoiceClient[];
   invoices: GeneratedGeneralInvoice[];
   seq: Record<string, number>;
 };
@@ -50,8 +54,33 @@ function supplierFromUnknown(raw: unknown): InvoiceSupplierDetails {
   return { ...DEFAULT_GENERAL_SUPPLIER };
 }
 
+function normaliseClients(raw: unknown): SavedInvoiceClient[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Partial<SavedInvoiceClient> & { routeNumber?: unknown };
+      if (typeof row.routeNumber === "string" && row.routeNumber.trim()) return null;
+      const name = typeof row.name === "string" ? row.name.trim() : "";
+      if (!name) return null;
+      return {
+        id: typeof row.id === "string" && row.id.trim() ? row.id : `client-${name}`,
+        name,
+        address: typeof row.address === "string" ? row.address : "",
+        email: typeof row.email === "string" ? row.email : "",
+        phone: typeof row.phone === "string" ? row.phone : "",
+        invoicePrefix: sanitiseInvoicePrefix(row.invoicePrefix || suggestInvoicePrefix(name)),
+      };
+    })
+    .filter((row): row is SavedInvoiceClient => Boolean(row));
+}
+
 function normaliseVault(raw: unknown): GeneralInvoiceVault {
-  const row = (raw || {}) as Partial<GeneralInvoiceVault> & { supplier?: unknown };
+  const row = (raw || {}) as Partial<GeneralInvoiceVault> & {
+    supplier?: unknown;
+    routes?: unknown;
+    clients?: unknown;
+  };
   const supplier =
     row.supplier && typeof row.supplier === "object"
       ? { ...DEFAULT_GENERAL_SUPPLIER, ...(row.supplier as Partial<InvoiceSupplierDetails>) }
@@ -59,6 +88,7 @@ function normaliseVault(raw: unknown): GeneralInvoiceVault {
   if (!supplier.invoicePrefix) supplier.invoicePrefix = "ST-INV";
   return {
     supplier,
+    clients: normaliseClients(row.clients ?? row.routes),
     invoices: Array.isArray(row.invoices) ? (row.invoices as GeneratedGeneralInvoice[]) : [],
     seq: row.seq && typeof row.seq === "object" ? row.seq : {},
   };
@@ -69,7 +99,7 @@ export async function loadGeneralInvoiceVault(): Promise<GeneralInvoiceVault> {
     const res = await getVault({ docId: VAULT_DOC });
     const data = res.data as { empty?: boolean; payload?: unknown };
     if (!data?.empty && looksLikeSchoolVault(data?.payload)) {
-      return { supplier: supplierFromUnknown(data?.payload), invoices: [], seq: {} };
+      return { supplier: supplierFromUnknown(data?.payload), clients: [], invoices: [], seq: {} };
     }
     const vault = normaliseVault(data?.payload);
     if (data?.empty) {
@@ -104,7 +134,7 @@ export async function persistGeneralInvoiceVault(vault: GeneralInvoiceVault): Pr
       payload: {
         version: 1,
         supplier: vault.supplier,
-        routes: [],
+        routes: vault.clients,
         invoices: vault.invoices.slice(0, 100),
         seq: vault.seq,
       },

@@ -7,11 +7,14 @@ import {
   GeneralInvoiceLine,
   InvoicePaymentTerms,
   InvoiceSupplierDetails,
+  SavedInvoiceClient,
   dueDateFor,
   formatGbp,
   formatUkDate,
   invoiceTotals,
   paymentTermsLabel,
+  sanitiseInvoicePrefix,
+  suggestInvoicePrefix,
 } from "../utils/generalInvoiceTypes";
 import {
   allocateGeneralInvoiceNumber,
@@ -34,6 +37,14 @@ function emptyLine(): GeneralInvoiceLine {
 
 function emptyCustomer(): GeneralInvoiceCustomer {
   return { name: "", address: "", email: "", phone: "" };
+}
+
+function emptyClientDraft() {
+  return { name: "", invoicePrefix: "", email: "", phone: "", address: "" };
+}
+
+function newClientId(): string {
+  return `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function pdfInputFromRecord(
@@ -59,6 +70,9 @@ function pdfInputFromRecord(
 const GeneralInvoices: React.FC = () => {
   const [vault, setVault] = useState<GeneralInvoiceVault | null>(null);
   const [supplier, setSupplier] = useState<InvoiceSupplierDetails>(DEFAULT_GENERAL_SUPPLIER);
+  const [clients, setClients] = useState<SavedInvoiceClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [clientDraft, setClientDraft] = useState(emptyClientDraft);
   const [history, setHistory] = useState<GeneratedGeneralInvoice[]>([]);
   const [customer, setCustomer] = useState<GeneralInvoiceCustomer>(emptyCustomer);
   const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -82,6 +96,7 @@ const GeneralInvoices: React.FC = () => {
         if (cancelled) return;
         setVault(loaded);
         setSupplier(loaded.supplier);
+        setClients(loaded.clients);
         setHistory(loaded.invoices);
       } catch (err) {
         if (!cancelled) {
@@ -97,24 +112,88 @@ const GeneralInvoices: React.FC = () => {
   }, []);
 
   const persist = async (next: GeneralInvoiceVault) => {
-    await persistGeneralInvoiceVault(next);
-    setVault(next);
-    setSupplier(next.supplier);
-    setHistory(next.invoices);
+    const withClients = { ...next, clients: next.clients ?? clients };
+    await persistGeneralInvoiceVault(withClients);
+    setVault(withClients);
+    setSupplier(withClients.supplier);
+    setClients(withClients.clients);
+    setHistory(withClients.invoices);
   };
 
   const totals = useMemo(() => invoiceTotals(lines), [lines]);
   const dueDate = dueDateFor(invoiceDate, paymentTerms);
+  const selectedClient = clients.find((row) => row.id === selectedClientId) || null;
+  const activePrefix = sanitiseInvoicePrefix(
+    selectedClient?.invoicePrefix || supplier.invoicePrefix || "ST-INV"
+  );
 
   const saveSupplier = async (e: FormEvent) => {
     e.preventDefault();
     if (!vault) return;
     setError("");
     try {
-      await persist({ ...vault, supplier });
+      await persist({ ...vault, supplier, clients });
       setStatus("Company details saved encrypted in Firebase.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save company details.");
+    }
+  };
+
+  const applyClient = (client: SavedInvoiceClient) => {
+    setSelectedClientId(client.id);
+    setCustomer({
+      name: client.name,
+      address: client.address,
+      email: client.email,
+      phone: client.phone,
+    });
+    setStatus(`Using ${client.name}. Invoice numbers will use prefix ${client.invoicePrefix}.`);
+  };
+
+  const saveClient = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!vault) return;
+    const name = clientDraft.name.trim();
+    if (!name) {
+      setError("Enter a client name to save.");
+      return;
+    }
+    const invoicePrefix = sanitiseInvoicePrefix(clientDraft.invoicePrefix || suggestInvoicePrefix(name));
+    const duplicate = clients.find((row) => sanitiseInvoicePrefix(row.invoicePrefix) === invoicePrefix);
+    if (duplicate) {
+      setError(`Prefix ${invoicePrefix} is already used by ${duplicate.name}.`);
+      return;
+    }
+    setError("");
+    const saved: SavedInvoiceClient = {
+      id: newClientId(),
+      name,
+      address: clientDraft.address.trim(),
+      email: clientDraft.email.trim(),
+      phone: clientDraft.phone.trim(),
+      invoicePrefix,
+    };
+    try {
+      await persist({ ...vault, supplier, clients: [...clients, saved] });
+      setClientDraft(emptyClientDraft());
+      applyClient(saved);
+      setStatus(`Saved ${saved.name}. Their invoices will be numbered ${saved.invoicePrefix}-YYYYMM-001.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save client.");
+    }
+  };
+
+  const removeClient = async (id: string, name: string) => {
+    if (!vault) return;
+    const ok = window.confirm(`Remove saved client ${name}? Existing invoices are kept.`);
+    if (!ok) return;
+    try {
+      const nextClients = clients.filter((row) => row.id !== id);
+      await persist({ ...vault, supplier, clients: nextClients });
+      if (selectedClientId === id) setSelectedClientId("");
+      setStatus(`${name} removed from saved clients.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove client.");
     }
   };
 
@@ -156,6 +235,7 @@ const GeneralInvoices: React.FC = () => {
         email: customer.email.trim(),
         phone: customer.phone.trim(),
       },
+      clientId: selectedClientId || undefined,
       bookingNumber: bookingNumber.trim(),
       travelDate,
       pickup: pickup.trim(),
@@ -182,7 +262,7 @@ const GeneralInvoices: React.FC = () => {
     try {
       const allocated = allocateGeneralInvoiceNumber(
         vault,
-        supplier.invoicePrefix.trim() || "ST-INV",
+        activePrefix,
         invoiceDate
       );
       const record = buildDraftRecord(allocated.invoiceNumber);
@@ -190,6 +270,7 @@ const GeneralInvoices: React.FC = () => {
       await persist({
         ...allocated.vault,
         supplier,
+        clients,
         invoices: [record, ...history],
       });
       setStatus(`PDF ${record.invoiceNumber} downloaded.`);
@@ -232,12 +313,12 @@ const GeneralInvoices: React.FC = () => {
     try {
       const allocated = allocateGeneralInvoiceNumber(
         vault,
-        supplier.invoicePrefix.trim() || "ST-INV",
+        activePrefix,
         invoiceDate
       );
       const record = buildDraftRecord(allocated.invoiceNumber);
       record.customer = { ...record.customer, email: to };
-      const nextVault = { ...allocated.vault, supplier, invoices: [record, ...history] };
+      const nextVault = { ...allocated.vault, supplier, clients, invoices: [record, ...history] };
       await persist(nextVault);
       const sent = await emailGeneralInvoicePdf(record, supplier, to);
       await markEmailed(nextVault.invoices, record.invoiceNumber, sent.to, nextVault);
@@ -285,7 +366,7 @@ const GeneralInvoices: React.FC = () => {
     setBusy(true);
     try {
       const invoices = history.filter((row) => row.id !== id);
-      await persist({ ...vault, supplier, invoices, seq: rebuildGeneralInvoiceSeq(invoices) });
+      await persist({ ...vault, supplier, clients, invoices, seq: rebuildGeneralInvoiceSeq(invoices) });
       setStatus(`${invoiceNumber} removed. The next PDF can reuse that number if it was the latest.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete invoice.");
@@ -317,7 +398,7 @@ const GeneralInvoices: React.FC = () => {
     setError("");
     setBusy(true);
     try {
-      await persist({ ...vault, supplier, invoices: [], seq: {} });
+      await persist({ ...vault, supplier, clients, invoices: [], seq: {} });
       setStatus("Recently generated invoices cleared. The next PDF will be numbered 001.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear invoices.");
@@ -378,7 +459,7 @@ const GeneralInvoices: React.FC = () => {
             <input className="form-input" value={supplier.vatNumber} onChange={(e) => setSupplier({ ...supplier, vatNumber: e.target.value })} placeholder="Leave blank if not VAT registered" />
           </label>
           <label className="form-group">
-            <span className="form-label">Invoice number prefix</span>
+            <span className="form-label">Default prefix for one-off customers</span>
             <input className="form-input" value={supplier.invoicePrefix} onChange={(e) => setSupplier({ ...supplier, invoicePrefix: e.target.value })} />
           </label>
           <label className="form-group">
@@ -398,9 +479,112 @@ const GeneralInvoices: React.FC = () => {
 
       <div className="card">
         <div className="card-header">
+          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Saved clients</h3>
+        </div>
+        <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+          Each saved client has their own invoice prefix, so their numbers stay in a separate sequence.
+        </p>
+        <form onSubmit={saveClient} className="school-invoice-grid" style={{ marginBottom: "1rem" }}>
+          <label className="form-group">
+            <span className="form-label">Client name</span>
+            <input
+              className="form-input"
+              value={clientDraft.name}
+              onChange={(e) => {
+                const name = e.target.value;
+                setClientDraft((current) => ({
+                  ...current,
+                  name,
+                  invoicePrefix:
+                    !current.invoicePrefix || current.invoicePrefix === suggestInvoicePrefix(current.name)
+                      ? suggestInvoicePrefix(name)
+                      : current.invoicePrefix,
+                }));
+              }}
+            />
+          </label>
+          <label className="form-group">
+            <span className="form-label">Invoice prefix</span>
+            <input
+              className="form-input"
+              value={clientDraft.invoicePrefix}
+              onChange={(e) => setClientDraft({ ...clientDraft, invoicePrefix: e.target.value.toUpperCase() })}
+              placeholder="ST-ACME"
+            />
+          </label>
+          <label className="form-group">
+            <span className="form-label">Email</span>
+            <input className="form-input" type="email" value={clientDraft.email} onChange={(e) => setClientDraft({ ...clientDraft, email: e.target.value })} />
+          </label>
+          <label className="form-group">
+            <span className="form-label">Phone</span>
+            <input className="form-input" value={clientDraft.phone} onChange={(e) => setClientDraft({ ...clientDraft, phone: e.target.value })} />
+          </label>
+          <label className="form-group" style={{ gridColumn: "1 / -1" }}>
+            <span className="form-label">Address</span>
+            <textarea className="form-textarea" rows={2} value={clientDraft.address} onChange={(e) => setClientDraft({ ...clientDraft, address: e.target.value })} />
+          </label>
+          <div>
+            <button type="submit" className="btn btn-primary btn-sm">
+              <Plus className="h-4 w-4 mr-1" /> Save client
+            </button>
+          </div>
+        </form>
+        {clients.length === 0 ? (
+          <p className="text-sm text-gray-500">No saved clients yet. Add a name and prefix, then use them on invoices.</p>
+        ) : (
+          <ul className="space-y-2">
+            {clients.map((client) => (
+              <li key={client.id} className="flex items-center justify-between gap-3" style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
+                <div>
+                  <strong>{client.name}</strong>
+                  <span className="text-sm text-gray-600"> · {client.invoicePrefix}</span>
+                  {client.email ? <div className="text-sm text-gray-500">{client.email}</div> : null}
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" className="btn btn-sm" onClick={() => applyClient(client)}>Use on invoice</button>
+                  <button type="button" className="btn btn-sm" onClick={() => removeClient(client.id, client.name)} aria-label={`Remove client ${client.name}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-header">
           <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Create invoice</h3>
         </div>
         <div className="school-invoice-grid">
+          <label className="form-group">
+            <span className="form-label">Saved client</span>
+            <select
+              className="form-select"
+              value={selectedClientId}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (!id) {
+                  setSelectedClientId("");
+                  return;
+                }
+                const found = clients.find((row) => row.id === id);
+                if (found) applyClient(found);
+              }}
+            >
+              <option value="">One-off customer ({sanitiseInvoicePrefix(supplier.invoicePrefix || "ST-INV")})</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name} ({client.invoicePrefix})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-group">
+            <span className="form-label">Invoice prefix in use</span>
+            <input className="form-input" value={activePrefix} readOnly />
+          </label>
           <label className="form-group">
             <span className="form-label">Invoice date</span>
             <input className="form-input" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />

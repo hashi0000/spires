@@ -56,8 +56,12 @@ function formatUkDate(iso) {
         timeZone: "Europe/London",
     });
 }
-function formatGbp(n) {
-    return n.toLocaleString("en-GB", { style: "currency", currency: "GBP" });
+function formatGbpHtml(n) {
+    const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+    return `&pound;${amount}`;
 }
 function isEmail(value) {
     return EMAIL_RE.test(value);
@@ -119,7 +123,7 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
     const html = `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(customerName)},</p>
-        <p>Please find attached invoice <strong>${(0, driverReminderEmail_1.escapeHtml)(invoiceNumber)}</strong> for <strong>${(0, driverReminderEmail_1.escapeHtml)(formatGbp(total))}</strong>.</p>
+        <p>Please find attached invoice <strong>${(0, driverReminderEmail_1.escapeHtml)(invoiceNumber)}</strong> for <strong>${formatGbpHtml(total)}</strong>.</p>
         <p>Payment terms: ${(0, driverReminderEmail_1.escapeHtml)(paymentTermsLabel(paymentTerms))}${dueDate ? `. Due ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(dueDate))}` : ""}${invoiceDate ? `. Invoice date: ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(invoiceDate))}` : ""}.</p>
         <p>Please pay by bank transfer using the invoice number as the payment reference. Bank details are on the attached invoice.</p>
         <p>

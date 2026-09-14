@@ -1,5 +1,5 @@
 import {
-  formatGbp,
+  formatGbpHtml,
   formatUkDate,
   invoiceTotals,
   lineNet,
@@ -146,16 +146,16 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
     .map((line) => {
       const vatLabel =
         line.vatRatePercent > 0
-          ? `${formatGbp(lineVat(line))} (${line.vatRatePercent.toFixed(0)}%)`
-          : formatGbp(0);
+          ? `${formatGbpHtml(lineVat(line))} (${line.vatRatePercent.toFixed(0)}%)`
+          : formatGbpHtml(0);
       return `
         <tr>
           <td>${esc(line.description || "Private hire journey")}</td>
           <td class="num">${line.quantity}</td>
-          <td class="num">${formatGbp(line.unitPrice)}</td>
-          <td class="num">${formatGbp(lineNet(line))}</td>
+          <td class="num">${formatGbpHtml(line.unitPrice)}</td>
+          <td class="num">${formatGbpHtml(lineNet(line))}</td>
           <td class="num">${vatLabel}</td>
-          <td class="num">${formatGbp(lineTotal(line))}</td>
+          <td class="num">${formatGbpHtml(lineTotal(line))}</td>
         </tr>`;
     })
     .join("");
@@ -453,10 +453,10 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
           <div class="info-box">
             <h2 class="section-header">Amount due</h2>
             <div class="payment-summary">
-              <div class="payment-amount">${formatGbp(totals.total)}</div>
+              <div class="payment-amount">${formatGbpHtml(totals.total)}</div>
               <div class="payment-method">Total payable</div>
               <div style="margin-top:8px;font-size:0.8rem;opacity:0.95;">
-                Net ${formatGbp(totals.net)} · VAT ${formatGbp(totals.vat)}
+                Net ${formatGbpHtml(totals.net)} · VAT ${formatGbpHtml(totals.vat)}
               </div>
             </div>
             ${
