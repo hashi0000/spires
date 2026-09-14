@@ -38,10 +38,18 @@ const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const crypto_1 = require("crypto");
 const VAULT_COLLECTION = "schoolInvoiceVault";
-const VAULT_DOC = "workspace";
+const ALLOWED_DOCS = new Set(["workspace", "general"]);
 const ALG = "aes-256-gcm";
 const KEY_SALT = "spires-school-invoice-v1";
 const ADMIN_EMAILS = ["spirestaxis24@gmail.com", "hashim@spires.com"];
+function requestedDocId(data) {
+    const raw = data && typeof data === "object" ? data.docId : undefined;
+    const id = raw == null || raw === "" ? "workspace" : String(raw);
+    if (!ALLOWED_DOCS.has(id)) {
+        throw new functions.https.HttpsError("invalid-argument", "Unknown invoice vault.");
+    }
+    return id;
+}
 function assertAdmin(context) {
     if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
@@ -92,9 +100,9 @@ function emptyPayload() {
 }
 exports.getSchoolInvoiceVault = functions
     .runWith({ secrets: ["SCHOOL_INVOICE_ENCRYPTION_KEY"] })
-    .https.onCall(async (_data, context) => {
+    .https.onCall(async (data, context) => {
     assertAdmin(context);
-    const snap = await admin.firestore().collection(VAULT_COLLECTION).doc(VAULT_DOC).get();
+    const snap = await admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data)).get();
     if (!snap.exists) {
         return { empty: true, payload: emptyPayload() };
     }
@@ -128,7 +136,7 @@ exports.saveSchoolInvoiceVault = functions
         seq: incoming.seq && typeof incoming.seq === "object" ? incoming.seq : {},
     };
     const sealed = encryptJson(payload);
-    await admin.firestore().collection(VAULT_COLLECTION).doc(VAULT_DOC).set({
+    await admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data)).set({
         alg: ALG,
         v: 1,
         iv: sealed.iv,

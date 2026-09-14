@@ -23,6 +23,7 @@ import Bookings from './components/Bookings';
 import LinkBookings from './components/LinkBookings';
 import Customers from './components/Customers';
 import SchoolInvoices from './components/SchoolInvoices';
+import GeneralInvoices from './components/GeneralInvoices';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -410,6 +411,8 @@ const App: React.FC = () => {
             }}
           />
         );
+      case 'invoices':
+        return <GeneralInvoices />;
       case 'school-invoices':
         return <SchoolInvoices />;
       case 'link-bookings':

@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -114,3 +114,5 @@ Object.defineProperty(exports, "sendBookingPdfToCustomer", { enumerable: true, g
 var schoolInvoiceVault_1 = require("./schoolInvoiceVault");
 Object.defineProperty(exports, "getSchoolInvoiceVault", { enumerable: true, get: function () { return schoolInvoiceVault_1.getSchoolInvoiceVault; } });
 Object.defineProperty(exports, "saveSchoolInvoiceVault", { enumerable: true, get: function () { return schoolInvoiceVault_1.saveSchoolInvoiceVault; } });
+var sendGeneralInvoiceEmail_1 = require("./sendGeneralInvoiceEmail");
+Object.defineProperty(exports, "sendGeneralInvoiceEmail", { enumerable: true, get: function () { return sendGeneralInvoiceEmail_1.sendGeneralInvoiceEmail; } });
