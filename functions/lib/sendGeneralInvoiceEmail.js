@@ -38,11 +38,67 @@ const functions = __importStar(require("firebase-functions/v1"));
 const driverReminderEmail_1 = require("./driverReminderEmail");
 const MAX_INLINE_PDF_BYTES = 4 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function paymentTermsLabel(terms) {
+function isoDateParts(iso) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || "").trim());
+    if (!match)
+        return null;
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    const d = Number(match[3]);
+    if (!y || m < 1 || m > 12 || d < 1 || d > 31)
+        return null;
+    return { y, m, d };
+}
+function calendarDaysBetween(fromIso, toIso) {
+    const from = isoDateParts(fromIso);
+    const to = isoDateParts(toIso);
+    if (!from || !to)
+        return null;
+    const fromUtc = Date.UTC(from.y, from.m - 1, from.d);
+    const toUtc = Date.UTC(to.y, to.m - 1, to.d);
+    return Math.round((toUtc - fromUtc) / 86400000);
+}
+function paymentTermsFromDates(invoiceDate, dueDate) {
+    const days = calendarDaysBetween(invoiceDate, dueDate);
+    if (days === 0)
+        return "due_on_receipt";
+    if (days === 7)
+        return "7_days";
+    if (days === 14)
+        return "14_days";
+    if (days === 28)
+        return "28_days";
+    if (days === 30)
+        return "30_days";
+    return "custom";
+}
+function paymentTermsLabel(terms, dueDate = "") {
+    if (terms === "due_on_receipt")
+        return "Due on receipt";
+    if (terms === "7_days")
+        return "Payment within 7 days";
     if (terms === "14_days")
-        return "14 days";
+        return "Payment within 14 days";
     if (terms === "28_days")
-        return "28 days";
+        return "Payment within 28 days";
+    if (terms === "30_days")
+        return "Payment within 30 days";
+    return dueDate ? `Payment due by ${formatUkDate(dueDate)}` : "Payment due by the due date";
+}
+function invoicePaymentTermsLabel(invoiceDate, dueDate, storedTerms = "") {
+    if (invoiceDate && dueDate) {
+        return paymentTermsLabel(paymentTermsFromDates(invoiceDate, dueDate), dueDate);
+    }
+    if (storedTerms === "7_days")
+        return "Payment within 7 days";
+    if (storedTerms === "14_days")
+        return "Payment within 14 days";
+    if (storedTerms === "28_days")
+        return "Payment within 28 days";
+    if (storedTerms === "30_days")
+        return "Payment within 30 days";
+    if (storedTerms === "custom" && dueDate)
+        return `Payment due by ${formatUkDate(dueDate)}`;
     return "Due on receipt";
 }
 function formatUkDate(iso) {
@@ -92,8 +148,8 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
         : "Customer";
     const invoiceDate = typeof data?.invoiceDate === "string" ? data.invoiceDate.trim() : "";
     const dueDate = typeof data?.dueDate === "string" ? data.dueDate.trim() : "";
-    const termsRaw = typeof data?.paymentTerms === "string" ? data.paymentTerms : "due_on_receipt";
-    const paymentTerms = termsRaw === "14_days" || termsRaw === "28_days" ? termsRaw : "due_on_receipt";
+    const termsRaw = typeof data?.paymentTerms === "string" ? data.paymentTerms : "";
+    const paymentTermsLabelText = invoicePaymentTermsLabel(invoiceDate, dueDate, termsRaw);
     const total = Number(data?.total);
     if (!Number.isFinite(total) || total <= 0) {
         throw new functions.https.HttpsError("invalid-argument", "Invoice total is required.");
@@ -124,7 +180,7 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(customerName)},</p>
         <p>Please find attached invoice <strong>${(0, driverReminderEmail_1.escapeHtml)(invoiceNumber)}</strong> for <strong>${formatGbpHtml(total)}</strong>.</p>
-        <p>Payment terms: ${(0, driverReminderEmail_1.escapeHtml)(paymentTermsLabel(paymentTerms))}${dueDate ? `. Due ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(dueDate))}` : ""}${invoiceDate ? `. Invoice date: ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(invoiceDate))}` : ""}.</p>
+        <p>Payment terms: ${(0, driverReminderEmail_1.escapeHtml)(paymentTermsLabelText)}${dueDate ? `. Due ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(dueDate))}` : ""}${invoiceDate ? `. Invoice date: ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(invoiceDate))}` : ""}.</p>
         <p>Please pay by bank transfer using the invoice number as the payment reference. Bank details are on the attached invoice.</p>
         <p>
           📱 <a href="tel:07776897772">07776 897772</a><br>

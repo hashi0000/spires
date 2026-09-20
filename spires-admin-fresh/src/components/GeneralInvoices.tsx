@@ -9,10 +9,12 @@ import {
   InvoiceSupplierDetails,
   SavedInvoiceClient,
   dueDateFor,
+  formPaymentTermsValue,
   formatGbp,
   formatUkDate,
+  invoicePaymentTermsLabel,
   invoiceTotals,
-  paymentTermsLabel,
+  paymentTermsFromDates,
   sanitiseInvoicePrefix,
   suggestInvoicePrefix,
   todayIsoDate,
@@ -128,9 +130,26 @@ const GeneralInvoices: React.FC = () => {
     selectedClient?.invoicePrefix || supplier.invoicePrefix || "ST-INV"
   );
 
-  useEffect(() => {
-    setDueDate(dueDateFor(invoiceDate, paymentTerms));
-  }, [invoiceDate, paymentTerms]);
+  const handleInvoiceDateChange = (nextInvoiceDate: string) => {
+    setInvoiceDate(nextInvoiceDate);
+    if (formPaymentTermsValue(paymentTerms) === "custom") {
+      setPaymentTerms(paymentTermsFromDates(nextInvoiceDate, dueDate));
+      return;
+    }
+    setDueDate(dueDateFor(nextInvoiceDate, paymentTerms));
+  };
+
+  const handlePaymentTermsChange = (nextTerms: InvoicePaymentTerms) => {
+    setPaymentTerms(nextTerms);
+    if (nextTerms !== "custom") {
+      setDueDate(dueDateFor(invoiceDate, nextTerms));
+    }
+  };
+
+  const handleDueDateChange = (nextDueDate: string) => {
+    setDueDate(nextDueDate);
+    setPaymentTerms(paymentTermsFromDates(invoiceDate, nextDueDate));
+  };
 
   const saveSupplier = async (e: FormEvent) => {
     e.preventDefault();
@@ -239,7 +258,7 @@ const GeneralInvoices: React.FC = () => {
       invoiceNumber,
       invoiceDate,
       dueDate,
-      paymentTerms,
+      paymentTerms: paymentTermsFromDates(invoiceDate, dueDate),
       customer: {
         name: customer.name.trim(),
         address: customer.address.trim(),
@@ -598,21 +617,27 @@ const GeneralInvoices: React.FC = () => {
           </label>
           <label className="form-group">
             <span className="form-label">Invoice date</span>
-            <input className="form-input" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            <input className="form-input" type="date" value={invoiceDate} onChange={(e) => handleInvoiceDateChange(e.target.value)} />
           </label>
           <label className="form-group">
             <span className="form-label">Payment terms</span>
-            <select className="form-select" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value as InvoicePaymentTerms)}>
+            <select
+              className="form-select"
+              value={formPaymentTermsValue(paymentTerms)}
+              onChange={(e) => handlePaymentTermsChange(e.target.value as InvoicePaymentTerms)}
+            >
               <option value="due_on_receipt">Due on receipt</option>
-              <option value="14_days">14 days</option>
-              <option value="28_days">28 days</option>
+              <option value="7_days">Payment within 7 days</option>
+              <option value="14_days">Payment within 14 days</option>
+              <option value="30_days">Payment within 30 days</option>
+              <option value="custom">Custom due date</option>
             </select>
           </label>
           <label className="form-group">
             <span className="form-label">Due date</span>
-            <input className="form-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <input className="form-input" type="date" value={dueDate} onChange={(e) => handleDueDateChange(e.target.value)} />
             <span className="text-xs text-gray-500" style={{ marginTop: "0.35rem" }}>
-              Fills from payment terms, then you can change it.
+              Payment terms follow the due date. Choosing a standard term fills the due date for you.
             </span>
           </label>
           <label className="form-group">
@@ -727,7 +752,7 @@ const GeneralInvoices: React.FC = () => {
                   {formatUkDate(row.invoiceDate)}
                   {row.dueDate ? ` · due ${formatUkDate(row.dueDate)}` : ""}
                   {" · "}
-                  {paymentTermsLabel(row.paymentTerms)}
+                  {invoicePaymentTermsLabel(row.invoiceDate, row.dueDate)}
                   {" · "}
                   {formatGbp(invoiceTotals(row.lines).total)}
                   {row.emailedTo ? (

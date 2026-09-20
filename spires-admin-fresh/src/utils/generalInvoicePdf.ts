@@ -2,10 +2,11 @@ import {
   formatGbpHtml,
   formatUkDate,
   invoiceTotals,
+  invoicePaymentTermsLabel,
   lineNet,
   lineTotal,
   lineVat,
-  paymentTermsLabel,
+  paymentDueNotice,
   GeneratedGeneralInvoice,
   InvoiceSupplierDetails,
 } from "./generalInvoiceTypes";
@@ -413,7 +414,8 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
             <h2 class="section-header">Bill to</h2>
             <div class="detail-value" style="text-align:left;line-height:1.5;">${billToLines}</div>
             <div class="detail-row" style="margin-top:8px;"><span class="detail-label">Invoice date</span><span class="detail-value">${esc(formatUkDate(input.invoiceDate))}</span></div>
-            <div class="detail-row"><span class="detail-label">Due</span><span class="detail-value">${esc(formatUkDate(input.dueDate))} (${esc(paymentTermsLabel(input.paymentTerms))})</span></div>
+            <div class="detail-row"><span class="detail-label">Payment terms</span><span class="detail-value">${esc(invoicePaymentTermsLabel(input.invoiceDate, input.dueDate))}</span></div>
+            <div class="detail-row"><span class="detail-label">Due date</span><span class="detail-value">${esc(formatUkDate(input.dueDate))}</span></div>
           </div>
         </div>
 
@@ -447,7 +449,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
             <div class="detail-row"><span class="detail-label">Account number</span><span class="detail-value">${esc(input.supplier.accountNumber)}</span></div>
             <div class="detail-row"><span class="detail-label">Payment reference</span><span class="detail-value">${esc(input.invoiceNumber)}</span></div>
             <div class="notice">
-              Please pay by bank transfer using the invoice number as the payment reference. Payment is ${esc(paymentTermsLabel(input.paymentTerms).toLowerCase())}.
+              Please pay by bank transfer using the invoice number as the payment reference. ${esc(paymentDueNotice(input.invoiceDate, input.dueDate))}
             </div>
           </div>
           <div class="info-box">

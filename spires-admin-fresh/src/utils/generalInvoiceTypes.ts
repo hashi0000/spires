@@ -1,6 +1,19 @@
 import { SPIRES_BANK_DETAILS } from "./bankDetails";
 
-export type InvoicePaymentTerms = "due_on_receipt" | "14_days" | "28_days";
+export type InvoicePaymentTerms =
+  | "due_on_receipt"
+  | "7_days"
+  | "14_days"
+  | "28_days"
+  | "30_days"
+  | "custom";
+
+export const FORM_PAYMENT_TERMS: InvoicePaymentTerms[] = [
+  "due_on_receipt",
+  "7_days",
+  "14_days",
+  "30_days",
+];
 
 export type InvoiceSupplierDetails = {
   providerName: string;
@@ -158,17 +171,71 @@ export function formatUkDate(iso: string): string {
   });
 }
 
-export function paymentTermsLabel(terms: InvoicePaymentTerms): string {
+function isoDateParts(iso: string): { y: number; m: number; d: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || "").trim());
+  if (!match) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return { y, m, d };
+}
+
+/** Calendar-day difference from YYYY-MM-DD parts, ignoring local time and DST. */
+export function calendarDaysBetween(fromIso: string, toIso: string): number | null {
+  const from = isoDateParts(fromIso);
+  const to = isoDateParts(toIso);
+  if (!from || !to) return null;
+  const fromUtc = Date.UTC(from.y, from.m - 1, from.d);
+  const toUtc = Date.UTC(to.y, to.m - 1, to.d);
+  return Math.round((toUtc - fromUtc) / 86400000);
+}
+
+export function paymentTermsFromDates(invoiceDate: string, dueDate: string): InvoicePaymentTerms {
+  const days = calendarDaysBetween(invoiceDate, dueDate);
+  if (days === 0) return "due_on_receipt";
+  if (days === 7) return "7_days";
+  if (days === 14) return "14_days";
+  if (days === 28) return "28_days";
+  if (days === 30) return "30_days";
+  return "custom";
+}
+
+export function formPaymentTermsValue(terms: InvoicePaymentTerms): InvoicePaymentTerms {
+  return FORM_PAYMENT_TERMS.includes(terms) ? terms : "custom";
+}
+
+export function paymentTermsLabel(terms: InvoicePaymentTerms, dueDate = ""): string {
   if (terms === "due_on_receipt") return "Due on receipt";
-  if (terms === "14_days") return "14 days";
-  return "28 days";
+  if (terms === "7_days") return "Payment within 7 days";
+  if (terms === "14_days") return "Payment within 14 days";
+  if (terms === "28_days") return "Payment within 28 days";
+  if (terms === "30_days") return "Payment within 30 days";
+  return dueDate ? `Payment due by ${formatUkDate(dueDate)}` : "Payment due by the due date";
+}
+
+/** Display wording from the selected dates so stored terms cannot contradict the due date. */
+export function invoicePaymentTermsLabel(invoiceDate: string, dueDate: string): string {
+  return paymentTermsLabel(paymentTermsFromDates(invoiceDate, dueDate), dueDate);
+}
+
+export function paymentDueNotice(invoiceDate: string, dueDate: string): string {
+  const terms = paymentTermsFromDates(invoiceDate, dueDate);
+  if (terms === "due_on_receipt") return "Payment is due on receipt.";
+  if (terms === "7_days") return "Payment is due within 7 days.";
+  if (terms === "14_days") return "Payment is due within 14 days.";
+  if (terms === "28_days") return "Payment is due within 28 days.";
+  if (terms === "30_days") return "Payment is due within 30 days.";
+  return dueDate ? `Payment is due by ${formatUkDate(dueDate)}.` : "Please pay by the due date.";
 }
 
 export function dueDateFor(invoiceDate: string, terms: InvoicePaymentTerms): string {
-  if (!invoiceDate || terms === "due_on_receipt") return invoiceDate;
-  const days = terms === "14_days" ? 14 : 28;
-  const [y, m, d] = invoiceDate.split("-").map(Number);
-  const dt = new Date(y, (m || 1) - 1, d || 1);
+  if (!invoiceDate || terms === "due_on_receipt" || terms === "custom") return invoiceDate;
+  const days = terms === "7_days" ? 7 : terms === "14_days" ? 14 : terms === "30_days" ? 30 : 28;
+  const parts = isoDateParts(invoiceDate);
+  const dt = parts
+    ? new Date(parts.y, parts.m - 1, parts.d)
+    : new Date(invoiceDate);
   dt.setDate(dt.getDate() + days);
   const yy = dt.getFullYear();
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
