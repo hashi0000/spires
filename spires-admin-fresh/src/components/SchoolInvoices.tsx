@@ -10,6 +10,7 @@ import {
   formatUkDate,
   getTimetableRow,
   labelForServiceMonth,
+  toIsoDate,
 } from "../utils/schoolInvoiceTimetable";
 import {
   formatGbp,
@@ -49,7 +50,7 @@ const SchoolInvoices: React.FC = () => {
   const [history, setHistory] = useState<SchoolInvoiceVault["invoices"]>([]);
   const [kind, setKind] = useState<SchoolInvoiceKind>("monthly_contract");
   const [serviceMonth, setServiceMonth] = useState(() => defaultServiceMonth());
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [invoiceDate, setInvoiceDate] = useState(() => toIsoDate(new Date()));
   const [lines, setLines] = useState<SchoolInvoiceLine[]>([emptyLine()]);
   const [notes, setNotes] = useState("");
   const [noChildNames, setNoChildNames] = useState(false);
@@ -200,6 +201,9 @@ const SchoolInvoices: React.FC = () => {
     if (totals.total <= 0) {
       return "Invoice total must be greater than zero.";
     }
+    if (!invoiceDate) {
+      return "Choose an invoice date.";
+    }
     return null;
   };
 
@@ -221,10 +225,9 @@ const SchoolInvoices: React.FC = () => {
     try {
       const allocated = allocateInvoiceNumber(vault, supplier.invoicePrefix.trim() || "ST-OCC", serviceMonth);
       const invoiceNumber = allocated.invoiceNumber;
-      const dated = submitOk && invoiceDate >= earliest ? invoiceDate : earliest;
       await downloadSchoolInvoicePdf({
         invoiceNumber,
-        invoiceDate: dated,
+        invoiceDate,
         kind,
         serviceMonth,
         lines: usable,
@@ -235,7 +238,7 @@ const SchoolInvoices: React.FC = () => {
       const record = {
         id: invoiceNumber,
         invoiceNumber,
-        invoiceDate: dated,
+        invoiceDate,
         kind,
         serviceMonth,
         lines: usable,
@@ -529,8 +532,16 @@ const SchoolInvoices: React.FC = () => {
           <label className="form-group">
             <span className="form-label">Invoice date</span>
             <input className="form-input" type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            <span className="text-xs text-gray-500" style={{ marginTop: "0.35rem" }}>
+              Printed on the PDF as you set it here.
+            </span>
           </label>
         </div>
+        {invoiceDate && invoiceDate < earliest ? (
+          <p className="text-sm text-amber-800" style={{ marginBottom: "1rem" }}>
+            This date is before the Council’s earliest submission date ({formatUkDate(earliest)}). The PDF will still use {formatUkDate(invoiceDate)}.
+          </p>
+        ) : null}
         {kind === "social_care_one_off" && (
           <p className="text-sm text-gray-600" style={{ marginBottom: "1rem" }}>
             One-off social care journeys can be invoiced after the journey. They are still processed from the timetable date for the month after transport was supplied. Use a journey or DCMS reference — not a child’s name.
@@ -622,7 +633,7 @@ const SchoolInvoices: React.FC = () => {
               <li key={row.id} className="flex items-center justify-between gap-3" style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
                 <div>
                   <strong>{row.invoiceNumber}</strong>
-                  {row.draft ? " (draft)" : ""} · {labelForServiceMonth(row.serviceMonth)} · {formatGbp(invoiceTotals(row.lines).total)}
+                  {row.draft ? " (draft)" : ""} · {labelForServiceMonth(row.serviceMonth)} · {formatUkDate(row.invoiceDate)} · {formatGbp(invoiceTotals(row.lines).total)}
                 </div>
                 <div className="flex gap-2">
                   <button

@@ -15,6 +15,7 @@ import {
   paymentTermsLabel,
   sanitiseInvoicePrefix,
   suggestInvoicePrefix,
+  todayIsoDate,
 } from "../utils/generalInvoiceTypes";
 import {
   allocateGeneralInvoiceNumber,
@@ -75,8 +76,9 @@ const GeneralInvoices: React.FC = () => {
   const [clientDraft, setClientDraft] = useState(emptyClientDraft);
   const [history, setHistory] = useState<GeneratedGeneralInvoice[]>([]);
   const [customer, setCustomer] = useState<GeneralInvoiceCustomer>(emptyCustomer);
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [invoiceDate, setInvoiceDate] = useState(() => todayIsoDate());
   const [paymentTerms, setPaymentTerms] = useState<InvoicePaymentTerms>("due_on_receipt");
+  const [dueDate, setDueDate] = useState(() => todayIsoDate());
   const [bookingNumber, setBookingNumber] = useState("");
   const [travelDate, setTravelDate] = useState("");
   const [pickup, setPickup] = useState("");
@@ -121,11 +123,14 @@ const GeneralInvoices: React.FC = () => {
   };
 
   const totals = useMemo(() => invoiceTotals(lines), [lines]);
-  const dueDate = dueDateFor(invoiceDate, paymentTerms);
   const selectedClient = clients.find((row) => row.id === selectedClientId) || null;
   const activePrefix = sanitiseInvoicePrefix(
     selectedClient?.invoicePrefix || supplier.invoicePrefix || "ST-INV"
   );
+
+  useEffect(() => {
+    setDueDate(dueDateFor(invoiceDate, paymentTerms));
+  }, [invoiceDate, paymentTerms]);
 
   const saveSupplier = async (e: FormEvent) => {
     e.preventDefault();
@@ -217,6 +222,12 @@ const GeneralInvoices: React.FC = () => {
     }
     if (totals.total <= 0) {
       return "Invoice total must be greater than zero.";
+    }
+    if (!invoiceDate) {
+      return "Choose an invoice date.";
+    }
+    if (!dueDate) {
+      return "Choose a due date.";
     }
     return null;
   };
@@ -599,7 +610,10 @@ const GeneralInvoices: React.FC = () => {
           </label>
           <label className="form-group">
             <span className="form-label">Due date</span>
-            <input className="form-input" value={dueDate ? formatUkDate(dueDate) : ""} readOnly />
+            <input className="form-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <span className="text-xs text-gray-500" style={{ marginTop: "0.35rem" }}>
+              Fills from payment terms, then you can change it.
+            </span>
           </label>
           <label className="form-group">
             <span className="form-label">Customer name</span>
@@ -711,6 +725,7 @@ const GeneralInvoices: React.FC = () => {
                   {row.customer.name}
                   {" · "}
                   {formatUkDate(row.invoiceDate)}
+                  {row.dueDate ? ` · due ${formatUkDate(row.dueDate)}` : ""}
                   {" · "}
                   {paymentTermsLabel(row.paymentTerms)}
                   {" · "}
