@@ -33,8 +33,8 @@ export type SchoolInvoicePdfInput = {
   supplier: SchoolSupplierDetails;
 };
 
-/** A4 at 96dpi — same iframe / canvas size as booking confirmation PDFs. */
-const A4_PX = { width: 794, height: 1123 };
+/** A4 at 96dpi. 1123px is ~0.04mm over 297mm and html2pdf then emits a blank second page. */
+const A4_PX = { width: 794, height: 1122 };
 
 function html2pdfOptions(filename: string, pageHeight = A4_PX.height): Record<string, unknown> {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
@@ -59,7 +59,7 @@ function html2pdfOptions(filename: string, pageHeight = A4_PX.height): Record<st
       windowHeight: pageHeight,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+    pagebreak: { mode: [] },
   };
 }
 
@@ -545,7 +545,8 @@ export async function downloadSchoolInvoicePdf(input: SchoolInvoicePdfInput): Pr
       });
     });
 
-    await html2pdf().set(html2pdfOptions(filename, A4_PX.height)).from(doc.body).save();
+    const source = (doc.querySelector(".booking-pdf-root") as HTMLElement) || doc.body;
+    await html2pdf().set(html2pdfOptions(filename, A4_PX.height)).from(source).save();
   } finally {
     if (iframe.parentNode) document.body.removeChild(iframe);
   }
