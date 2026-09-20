@@ -15,6 +15,13 @@ describe("invoice payment terms from due date", () => {
     expect(paymentDueNotice(INVOICE, "2026-09-20")).toBe("Payment is due on receipt.");
   });
 
+  test("3 calendar days is payment within 3 days", () => {
+    expect(dueDateFor(INVOICE, "3_days")).toBe("2026-09-23");
+    expect(paymentTermsFromDates(INVOICE, "2026-09-23")).toBe("3_days");
+    expect(invoicePaymentTermsLabel(INVOICE, "2026-09-23")).toBe("Payment within 3 days");
+    expect(invoicePaymentTermsLabel(INVOICE, "2026-09-23")).not.toContain("Due on receipt");
+  });
+
   test("7 calendar days is payment within 7 days", () => {
     expect(dueDateFor(INVOICE, "7_days")).toBe("2026-09-27");
     expect(paymentTermsFromDates(INVOICE, "2026-09-27")).toBe("7_days");

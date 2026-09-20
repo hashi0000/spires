@@ -33,6 +33,14 @@ describe("invoice PDF payment wording", () => {
     expect(html).toContain("Payment is due on receipt.");
   });
 
+  test("3-day due date does not show Due on receipt", () => {
+    const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-23"));
+    expect(html).toContain("Payment within 3 days");
+    expect(html).toContain("23 September 2026");
+    expect(html).not.toContain("Due on receipt");
+    expect(html).toContain("Payment is due within 3 days.");
+  });
+
   test("7-day due date does not show Due on receipt", () => {
     const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-27"));
     expect(html).toContain("Payment within 7 days");

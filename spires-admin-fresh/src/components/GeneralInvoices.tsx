@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { Download, Mail, Plus, Trash2 } from "lucide-react";
+import { Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import {
   DEFAULT_GENERAL_SUPPLIER,
   GeneratedGeneralInvoice,
@@ -91,6 +91,7 @@ const GeneralInvoices: React.FC = () => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +127,7 @@ const GeneralInvoices: React.FC = () => {
 
   const totals = useMemo(() => invoiceTotals(lines), [lines]);
   const selectedClient = clients.find((row) => row.id === selectedClientId) || null;
+  const editingInvoice = history.find((row) => row.id === editingId) || null;
   const activePrefix = sanitiseInvoicePrefix(
     selectedClient?.invoicePrefix || supplier.invoicePrefix || "ST-INV"
   );
@@ -171,7 +173,11 @@ const GeneralInvoices: React.FC = () => {
       email: client.email,
       phone: client.phone,
     });
-    setStatus(`Using ${client.name}. Invoice numbers will use prefix ${client.invoicePrefix}.`);
+    setStatus(
+      editingId
+        ? `Using ${client.name} details. Invoice number ${editingInvoice?.invoiceNumber || ""} stays the same.`
+        : `Using ${client.name}. Invoice numbers will use prefix ${client.invoicePrefix}.`
+    );
   };
 
   const saveClient = async (e: FormEvent) => {
@@ -251,10 +257,67 @@ const GeneralInvoices: React.FC = () => {
     return null;
   };
 
-  const buildDraftRecord = (invoiceNumber: string): GeneratedGeneralInvoice => {
+  const resetCreateForm = () => {
+    setEditingId(null);
+    setSelectedClientId("");
+    setCustomer(emptyCustomer());
+    setInvoiceDate(todayIsoDate());
+    setPaymentTerms("due_on_receipt");
+    setDueDate(todayIsoDate());
+    setBookingNumber("");
+    setTravelDate("");
+    setPickup("");
+    setDestination("");
+    setLines([emptyLine()]);
+    setNotes("");
+  };
+
+  const startEdit = (row: GeneratedGeneralInvoice) => {
+    setEditingId(row.id);
+    setSelectedClientId(
+      row.clientId && clients.some((client) => client.id === row.clientId) ? row.clientId : ""
+    );
+    setCustomer({
+      name: row.customer?.name || "",
+      address: row.customer?.address || "",
+      email: row.customer?.email || "",
+      phone: row.customer?.phone || "",
+    });
+    const nextInvoiceDate = row.invoiceDate || todayIsoDate();
+    const nextDueDate = row.dueDate || nextInvoiceDate;
+    setInvoiceDate(nextInvoiceDate);
+    setDueDate(nextDueDate);
+    setPaymentTerms(paymentTermsFromDates(nextInvoiceDate, nextDueDate));
+    setBookingNumber(row.bookingNumber || "");
+    setTravelDate(row.travelDate || "");
+    setPickup(row.pickup || "");
+    setDestination(row.destination || "");
+    setLines(
+      Array.isArray(row.lines) && row.lines.length
+        ? row.lines.map((line) => ({ ...line }))
+        : [emptyLine()]
+    );
+    setNotes(row.notes || "");
+    setError("");
+    setStatus(`Editing ${row.invoiceNumber}. The invoice number stays the same.`);
+    window.requestAnimationFrame(() => {
+      document.getElementById("general-invoice-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const cancelEdit = () => {
+    resetCreateForm();
+    setError("");
+    setStatus("Edit cancelled. New invoices will get the next number.");
+  };
+
+  const buildDraftRecord = (
+    invoiceNumber: string,
+    existing?: GeneratedGeneralInvoice
+  ): GeneratedGeneralInvoice => {
     const usable = lines.filter((l) => l.description.trim() && l.quantity > 0 && l.unitPrice > 0);
     return {
-      id: invoiceNumber,
+      id: existing?.id || invoiceNumber,
       invoiceNumber,
       invoiceDate,
       dueDate,
@@ -272,8 +335,45 @@ const GeneralInvoices: React.FC = () => {
       destination: destination.trim(),
       lines: usable,
       notes: notes.trim(),
-      createdAt: new Date().toISOString(),
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      emailedAt: existing?.emailedAt,
+      emailedTo: existing?.emailedTo,
     };
+  };
+
+  const persistInvoiceRecord = async (
+    record: GeneratedGeneralInvoice,
+    nextVault: GeneralInvoiceVault
+  ) => {
+    const invoices = editingId
+      ? history.map((row) => (row.id === record.id ? record : row))
+      : [record, ...history];
+    await persist({ ...nextVault, supplier, clients, invoices });
+    return invoices;
+  };
+
+  const handleSaveEdit = async () => {
+    setError("");
+    setStatus("");
+    const problem = validate();
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    if (!vault || !editingInvoice) {
+      setError("Choose an invoice to edit first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
+      await persistInvoiceRecord(record, vault);
+      setStatus(`Saved changes to ${record.invoiceNumber}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the invoice.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDownload = async () => {
@@ -290,20 +390,22 @@ const GeneralInvoices: React.FC = () => {
     }
     setBusy(true);
     try {
-      const allocated = allocateGeneralInvoiceNumber(
-        vault,
-        activePrefix,
-        invoiceDate
-      );
-      const record = buildDraftRecord(allocated.invoiceNumber);
+      let record: GeneratedGeneralInvoice;
+      let nextVault = vault;
+      if (editingInvoice) {
+        record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
+      } else {
+        const allocated = allocateGeneralInvoiceNumber(vault, activePrefix, invoiceDate);
+        record = buildDraftRecord(allocated.invoiceNumber);
+        nextVault = allocated.vault;
+      }
       await downloadGeneralInvoicePdf(pdfInputFromRecord(record, supplier));
-      await persist({
-        ...allocated.vault,
-        supplier,
-        clients,
-        invoices: [record, ...history],
-      });
-      setStatus(`PDF ${record.invoiceNumber} downloaded.`);
+      await persistInvoiceRecord(record, nextVault);
+      setStatus(
+        editingInvoice
+          ? `Updated PDF ${record.invoiceNumber} downloaded.`
+          : `PDF ${record.invoiceNumber} downloaded.`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate the PDF.");
     } finally {
@@ -341,17 +443,19 @@ const GeneralInvoices: React.FC = () => {
     if (!to) return;
     setBusy(true);
     try {
-      const allocated = allocateGeneralInvoiceNumber(
-        vault,
-        activePrefix,
-        invoiceDate
-      );
-      const record = buildDraftRecord(allocated.invoiceNumber);
+      let record: GeneratedGeneralInvoice;
+      let nextVault = vault;
+      if (editingInvoice) {
+        record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
+      } else {
+        const allocated = allocateGeneralInvoiceNumber(vault, activePrefix, invoiceDate);
+        record = buildDraftRecord(allocated.invoiceNumber);
+        nextVault = allocated.vault;
+      }
       record.customer = { ...record.customer, email: to };
-      const nextVault = { ...allocated.vault, supplier, clients, invoices: [record, ...history] };
-      await persist(nextVault);
+      const invoices = await persistInvoiceRecord(record, nextVault);
       const sent = await emailGeneralInvoicePdf(record, supplier, to);
-      await markEmailed(nextVault.invoices, record.invoiceNumber, sent.to, nextVault);
+      await markEmailed(invoices, record.invoiceNumber, sent.to, { ...nextVault, invoices });
       setStatus(
         sent.cc
           ? `Invoice ${record.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
@@ -397,6 +501,7 @@ const GeneralInvoices: React.FC = () => {
     try {
       const invoices = history.filter((row) => row.id !== id);
       await persist({ ...vault, supplier, clients, invoices, seq: rebuildGeneralInvoiceSeq(invoices) });
+      if (editingId === id) resetCreateForm();
       setStatus(`${invoiceNumber} removed. The next PDF can reuse that number if it was the latest.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete invoice.");
@@ -429,6 +534,7 @@ const GeneralInvoices: React.FC = () => {
     setBusy(true);
     try {
       await persist({ ...vault, supplier, clients, invoices: [], seq: {} });
+      resetCreateForm();
       setStatus("Recently generated invoices cleared. The next PDF will be numbered 001.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear invoices.");
@@ -583,10 +689,22 @@ const GeneralInvoices: React.FC = () => {
         )}
       </div>
 
-      <div className="card">
+      <div className="card" id="general-invoice-form">
         <div className="card-header">
-          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Create invoice</h3>
+          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>
+            {editingInvoice ? `Edit invoice ${editingInvoice.invoiceNumber}` : "Create invoice"}
+          </h3>
+          {editingInvoice ? (
+            <button type="button" className="btn btn-sm" onClick={cancelEdit} disabled={busy}>
+              Cancel edit
+            </button>
+          ) : null}
         </div>
+        {editingInvoice ? (
+          <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+            Changes keep invoice number {editingInvoice.invoiceNumber}. Save, download, or email to update the stored invoice.
+          </p>
+        ) : null}
         <div className="school-invoice-grid">
           <label className="form-group">
             <span className="form-label">Saved client</span>
@@ -612,8 +730,8 @@ const GeneralInvoices: React.FC = () => {
             </select>
           </label>
           <label className="form-group">
-            <span className="form-label">Invoice prefix in use</span>
-            <input className="form-input" value={activePrefix} readOnly />
+            <span className="form-label">{editingInvoice ? "Invoice number" : "Invoice prefix in use"}</span>
+            <input className="form-input" value={editingInvoice ? editingInvoice.invoiceNumber : activePrefix} readOnly />
           </label>
           <label className="form-group">
             <span className="form-label">Invoice date</span>
@@ -627,6 +745,7 @@ const GeneralInvoices: React.FC = () => {
               onChange={(e) => handlePaymentTermsChange(e.target.value as InvoicePaymentTerms)}
             >
               <option value="due_on_receipt">Due on receipt</option>
+              <option value="3_days">Payment within 3 days</option>
               <option value="7_days">Payment within 7 days</option>
               <option value="14_days">Payment within 14 days</option>
               <option value="30_days">Payment within 30 days</option>
@@ -716,13 +835,18 @@ const GeneralInvoices: React.FC = () => {
         {status && <p className="text-sm" style={{ color: "#166534", marginBottom: "0.75rem" }}>{status}</p>}
 
         <div className="flex flex-wrap gap-2">
+          {editingInvoice ? (
+            <button type="button" className="btn btn-primary" onClick={handleSaveEdit} disabled={busy}>
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          ) : null}
           <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={busy}>
             <Download className="h-4 w-4 mr-2" />
-            {busy ? "Preparing PDF…" : "Download PDF invoice"}
+            {busy ? "Preparing PDF…" : editingInvoice ? "Save and download PDF" : "Download PDF invoice"}
           </button>
           <button type="button" className="btn btn-success" onClick={handleEmail} disabled={busy}>
             <Mail className="h-4 w-4 mr-2" />
-            {busy ? "Sending…" : "Email PDF invoice"}
+            {busy ? "Sending…" : editingInvoice ? "Save and email PDF" : "Email PDF invoice"}
           </button>
         </div>
         <p className="text-xs text-gray-500" style={{ marginTop: "0.75rem" }}>
@@ -739,11 +863,11 @@ const GeneralInvoices: React.FC = () => {
             </button>
           </div>
           <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-            Download again with the current headed paper, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
+            Download again with the current headed paper, edit and re-save, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
           </p>
           <ul className="text-sm space-y-2">
             {history.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3" style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
+              <li key={row.id} className="flex items-center justify-between gap-3" style={{ border: editingId === row.id ? "2px solid #002147" : "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
                 <div>
                   <strong>{row.invoiceNumber}</strong>
                   {" · "}
@@ -760,6 +884,16 @@ const GeneralInvoices: React.FC = () => {
                   ) : null}
                 </div>
                 <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => startEdit(row)}
+                    disabled={busy}
+                    title="Edit this invoice"
+                    aria-label={`Edit invoice ${row.invoiceNumber}`}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     className="btn btn-success btn-sm"

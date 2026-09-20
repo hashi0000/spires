@@ -62,6 +62,8 @@ function paymentTermsFromDates(invoiceDate, dueDate) {
     const days = calendarDaysBetween(invoiceDate, dueDate);
     if (days === 0)
         return "due_on_receipt";
+    if (days === 3)
+        return "3_days";
     if (days === 7)
         return "7_days";
     if (days === 14)
@@ -75,6 +77,8 @@ function paymentTermsFromDates(invoiceDate, dueDate) {
 function paymentTermsLabel(terms, dueDate = "") {
     if (terms === "due_on_receipt")
         return "Due on receipt";
+    if (terms === "3_days")
+        return "Payment within 3 days";
     if (terms === "7_days")
         return "Payment within 7 days";
     if (terms === "14_days")
@@ -89,6 +93,8 @@ function invoicePaymentTermsLabel(invoiceDate, dueDate, storedTerms = "") {
     if (invoiceDate && dueDate) {
         return paymentTermsLabel(paymentTermsFromDates(invoiceDate, dueDate), dueDate);
     }
+    if (storedTerms === "3_days")
+        return "Payment within 3 days";
     if (storedTerms === "7_days")
         return "Payment within 7 days";
     if (storedTerms === "14_days")

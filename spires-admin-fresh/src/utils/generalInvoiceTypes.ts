@@ -2,6 +2,7 @@ import { SPIRES_BANK_DETAILS } from "./bankDetails";
 
 export type InvoicePaymentTerms =
   | "due_on_receipt"
+  | "3_days"
   | "7_days"
   | "14_days"
   | "28_days"
@@ -10,6 +11,7 @@ export type InvoicePaymentTerms =
 
 export const FORM_PAYMENT_TERMS: InvoicePaymentTerms[] = [
   "due_on_receipt",
+  "3_days",
   "7_days",
   "14_days",
   "30_days",
@@ -194,6 +196,7 @@ export function calendarDaysBetween(fromIso: string, toIso: string): number | nu
 export function paymentTermsFromDates(invoiceDate: string, dueDate: string): InvoicePaymentTerms {
   const days = calendarDaysBetween(invoiceDate, dueDate);
   if (days === 0) return "due_on_receipt";
+  if (days === 3) return "3_days";
   if (days === 7) return "7_days";
   if (days === 14) return "14_days";
   if (days === 28) return "28_days";
@@ -207,6 +210,7 @@ export function formPaymentTermsValue(terms: InvoicePaymentTerms): InvoicePaymen
 
 export function paymentTermsLabel(terms: InvoicePaymentTerms, dueDate = ""): string {
   if (terms === "due_on_receipt") return "Due on receipt";
+  if (terms === "3_days") return "Payment within 3 days";
   if (terms === "7_days") return "Payment within 7 days";
   if (terms === "14_days") return "Payment within 14 days";
   if (terms === "28_days") return "Payment within 28 days";
@@ -222,6 +226,7 @@ export function invoicePaymentTermsLabel(invoiceDate: string, dueDate: string): 
 export function paymentDueNotice(invoiceDate: string, dueDate: string): string {
   const terms = paymentTermsFromDates(invoiceDate, dueDate);
   if (terms === "due_on_receipt") return "Payment is due on receipt.";
+  if (terms === "3_days") return "Payment is due within 3 days.";
   if (terms === "7_days") return "Payment is due within 7 days.";
   if (terms === "14_days") return "Payment is due within 14 days.";
   if (terms === "28_days") return "Payment is due within 28 days.";
@@ -231,7 +236,8 @@ export function paymentDueNotice(invoiceDate: string, dueDate: string): string {
 
 export function dueDateFor(invoiceDate: string, terms: InvoicePaymentTerms): string {
   if (!invoiceDate || terms === "due_on_receipt" || terms === "custom") return invoiceDate;
-  const days = terms === "7_days" ? 7 : terms === "14_days" ? 14 : terms === "30_days" ? 30 : 28;
+  const days =
+    terms === "3_days" ? 3 : terms === "7_days" ? 7 : terms === "14_days" ? 14 : terms === "30_days" ? 30 : 28;
   const parts = isoDateParts(invoiceDate);
   const dt = parts
     ? new Date(parts.y, parts.m - 1, parts.d)

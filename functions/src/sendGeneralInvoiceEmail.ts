@@ -10,7 +10,7 @@ import {
 const MAX_INLINE_PDF_BYTES = 4 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type PaymentTerms = "due_on_receipt" | "7_days" | "14_days" | "28_days" | "30_days" | "custom";
+type PaymentTerms = "due_on_receipt" | "3_days" | "7_days" | "14_days" | "28_days" | "30_days" | "custom";
 
 function isoDateParts(iso: string): { y: number; m: number; d: number } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((iso || "").trim());
@@ -34,6 +34,7 @@ function calendarDaysBetween(fromIso: string, toIso: string): number | null {
 function paymentTermsFromDates(invoiceDate: string, dueDate: string): PaymentTerms {
   const days = calendarDaysBetween(invoiceDate, dueDate);
   if (days === 0) return "due_on_receipt";
+  if (days === 3) return "3_days";
   if (days === 7) return "7_days";
   if (days === 14) return "14_days";
   if (days === 28) return "28_days";
@@ -43,6 +44,7 @@ function paymentTermsFromDates(invoiceDate: string, dueDate: string): PaymentTer
 
 function paymentTermsLabel(terms: PaymentTerms, dueDate = ""): string {
   if (terms === "due_on_receipt") return "Due on receipt";
+  if (terms === "3_days") return "Payment within 3 days";
   if (terms === "7_days") return "Payment within 7 days";
   if (terms === "14_days") return "Payment within 14 days";
   if (terms === "28_days") return "Payment within 28 days";
@@ -54,6 +56,7 @@ function invoicePaymentTermsLabel(invoiceDate: string, dueDate: string, storedTe
   if (invoiceDate && dueDate) {
     return paymentTermsLabel(paymentTermsFromDates(invoiceDate, dueDate), dueDate);
   }
+  if (storedTerms === "3_days") return "Payment within 3 days";
   if (storedTerms === "7_days") return "Payment within 7 days";
   if (storedTerms === "14_days") return "Payment within 14 days";
   if (storedTerms === "28_days") return "Payment within 28 days";
