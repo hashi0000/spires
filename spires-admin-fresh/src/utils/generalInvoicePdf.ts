@@ -41,7 +41,7 @@ export type GeneralInvoicePdfInput = {
 /** A4 at 96dpi — same iframe / canvas size as booking confirmation PDFs. */
 const A4_PX = { width: 794, height: 1123 };
 
-function html2pdfOptions(filename: string): Record<string, unknown> {
+function html2pdfOptions(filename: string, pageHeight = A4_PX.height): Record<string, unknown> {
   const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
   const scale = Math.min(4, Math.max(2.75, dpr * 2.2));
   return {
@@ -58,7 +58,10 @@ function html2pdfOptions(filename: string): Record<string, unknown> {
       scrollY: 0,
       backgroundColor: "#ffffff",
       imageTimeout: 20000,
+      width: A4_PX.width,
+      height: pageHeight,
       windowWidth: A4_PX.width,
+      windowHeight: pageHeight,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
     pagebreak: { mode: ["avoid-all", "css", "legacy"] },
@@ -70,6 +73,9 @@ const CAPTURE_CSS = `
     margin: 0 !important;
     padding: 0 !important;
     width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
+    overflow: hidden !important;
   }
   .booking-pdf-root.pdf-email-capture {
     font-size: 11px !important;
@@ -77,12 +83,15 @@ const CAPTURE_CSS = `
     -webkit-font-smoothing: antialiased;
     width: ${A4_PX.width}px !important;
     max-width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .page-container {
     display: flex !important;
     flex-direction: column !important;
     width: ${A4_PX.width}px !important;
     min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .main-content {
     flex: 1 1 auto !important;
@@ -209,7 +218,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
   <meta charset="UTF-8">
   <title>Invoice ${esc(input.invoiceNumber)}</title>
 </head>
-<body style="margin:0;padding:0;">
+<body style="margin:0;padding:0;width:${A4_PX.width}px;height:${A4_PX.height}px;overflow:hidden;">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
   <style>
     @page { size: A4 portrait; margin: 0; }
@@ -223,24 +232,33 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
       background: white;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-      min-height: 100vh;
-      width: 100%;
+      width: ${A4_PX.width}px;
+      min-height: ${A4_PX.height}px;
+      height: ${A4_PX.height}px;
     }
     .booking-pdf-root .page-container {
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      width: 100%;
+      width: ${A4_PX.width}px;
+      min-height: ${A4_PX.height}px;
+      height: ${A4_PX.height}px;
     }
     @media print {
+      .booking-pdf-root,
       .booking-pdf-root .page-container {
         display: flex !important;
         flex-direction: column !important;
+        width: 210mm !important;
         min-height: 297mm !important;
-        height: auto !important;
+        height: 297mm !important;
       }
       .booking-pdf-root .main-content { flex: 1 1 auto !important; }
-      .booking-pdf-root .footer { break-inside: avoid; page-break-inside: avoid; }
+      .booking-pdf-root .footer {
+        margin-top: auto !important;
+        flex: 0 0 auto !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
     }
     .booking-pdf-root .header {
       background: #002147;
@@ -279,7 +297,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
       border-radius: 5px;
       background: rgba(197, 165, 114, 0.2);
     }
-    .booking-pdf-root .main-content { padding: 0 20px 14px; flex: 1; }
+    .booking-pdf-root .main-content { padding: 0 20px 14px; flex: 1 1 auto; }
     .booking-pdf-root .document-banner {
       background: #f7f4ec;
       border-bottom: 3px solid #0f172a;
@@ -364,6 +382,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
       border-radius: 0;
       margin: 0;
       margin-top: auto;
+      flex: 0 0 auto;
       width: 100%;
     }
     .booking-pdf-root .footer-brand {
@@ -489,7 +508,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
 
 async function withInvoicePdfDocument<T>(
   html: string,
-  run: (doc: Document) => Promise<T>
+  run: (doc: Document, pageHeight: number) => Promise<T>
 ): Promise<T> {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
@@ -511,6 +530,7 @@ async function withInvoicePdfDocument<T>(
     fix.setAttribute("data-pdf-email-capture", "true");
     fix.textContent = CAPTURE_CSS;
     doc.body.appendChild(fix);
+    const pageHeight = lockInvoiceCaptureToA4(doc);
 
     await new Promise<void>((r) => setTimeout(r, 900));
     if (doc.fonts?.ready) {
@@ -522,19 +542,52 @@ async function withInvoicePdfDocument<T>(
         window.requestAnimationFrame(() => r());
       });
     });
+    lockInvoiceCaptureToA4(doc, pageHeight);
 
-    return await run(doc);
+    return await run(doc, pageHeight);
   } finally {
     if (iframe.parentNode) document.body.removeChild(iframe);
   }
+}
+
+function lockInvoiceCaptureToA4(doc: Document, forcedHeight?: number): number {
+  const root = doc.querySelector(".booking-pdf-root") as HTMLElement | null;
+  const page = doc.querySelector(".page-container") as HTMLElement | null;
+  const nodes = [doc.documentElement, doc.body, root, page].filter(
+    (el): el is HTMLElement => Boolean(el)
+  );
+  const height = forcedHeight || A4_PX.height;
+  for (const el of nodes) {
+    el.style.width = `${A4_PX.width}px`;
+    el.style.minHeight = `${height}px`;
+    el.style.height = `${height}px`;
+    el.style.maxHeight = `${height}px`;
+    el.style.overflow = "hidden";
+    el.style.margin = "0";
+    el.style.padding = el === page || el === root ? el.style.padding : "0";
+  }
+  if (page) {
+    page.style.display = "flex";
+    page.style.flexDirection = "column";
+  }
+  const footer = doc.querySelector(".footer") as HTMLElement | null;
+  if (footer) {
+    footer.style.marginTop = "auto";
+    footer.style.flex = "0 0 auto";
+  }
+  const main = doc.querySelector(".main-content") as HTMLElement | null;
+  if (main) {
+    main.style.flex = "1 1 auto";
+  }
+  return height;
 }
 
 export async function downloadGeneralInvoicePdf(input: GeneralInvoicePdfInput): Promise<void> {
   const html = buildGeneralInvoiceHtml(input);
   const html2pdf = (await import("html2pdf.js")).default;
   const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
-  await withInvoicePdfDocument(html, async (doc) => {
-    await html2pdf().set(html2pdfOptions(filename)).from(doc.body).save();
+  await withInvoicePdfDocument(html, async (doc, pageHeight) => {
+    await html2pdf().set(html2pdfOptions(filename, pageHeight)).from(doc.body).save();
   });
 }
 
@@ -542,8 +595,8 @@ export async function generateGeneralInvoicePdfBlob(input: GeneralInvoicePdfInpu
   const html = buildGeneralInvoiceHtml(input);
   const html2pdf = (await import("html2pdf.js")).default;
   const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
-  return withInvoicePdfDocument(html, async (doc) => {
-    const blob = (await html2pdf().set(html2pdfOptions(filename)).from(doc.body).outputPdf("blob")) as Blob;
+  return withInvoicePdfDocument(html, async (doc, pageHeight) => {
+    const blob = (await html2pdf().set(html2pdfOptions(filename, pageHeight)).from(doc.body).outputPdf("blob")) as Blob;
     return blob;
   });
 }
