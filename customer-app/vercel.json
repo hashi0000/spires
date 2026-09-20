@@ -1,1 +1,26 @@
-{"cleanUrls": true, "routes": [{"handle": "filesystem"}, {"src": "/(.*)", "dest": "/index.html"}]}
+{
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "booking.spires-taxis.com" }],
+      "destination": "https://customer.spires-taxis.com/:path*",
+      "statusCode": 301
+    }
+  ],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}

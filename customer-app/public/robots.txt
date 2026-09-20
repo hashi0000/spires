@@ -1,3 +1,7 @@
-# https://www.robotstxt.org/robotstxt.html
+# Booking portal — do not index login or account pages.
+# Public content lives on https://www.spires-taxis.com
 User-agent: *
-Disallow:
+Allow: /
+
+User-agent: bingbot
+Allow: /

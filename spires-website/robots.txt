@@ -12,4 +12,10 @@ Disallow: /includes/
 Disallow: /src/
 Disallow: /tools/
 
+User-agent: bingbot
+Allow: /
+
+User-agent: BingPreview
+Allow: /
+
 Sitemap: https://www.spires-taxis.com/sitemap.xml

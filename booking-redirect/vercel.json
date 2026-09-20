@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://customer.spires-taxis.com/$1",
+      "statusCode": 301
+    }
+  ]
+}

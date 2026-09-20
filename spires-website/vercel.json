@@ -32,6 +32,15 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/terms-and-conditions",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, follow"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -39,6 +48,12 @@
       "source": "/:path*",
       "has": [{ "type": "host", "value": "spires-taxis.com" }],
       "destination": "https://www.spires-taxis.com/:path*",
+      "statusCode": 301
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "booking.spires-taxis.com" }],
+      "destination": "https://customer.spires-taxis.com/:path*",
       "statusCode": 301
     },
     {
