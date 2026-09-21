@@ -604,6 +604,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </div>
                         <div>
                           <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
+                            <strong>Type:</strong> {booking.bookingType === 'return' || (booking.returnPickupLocation && booking.returnDestination) ? 'Return' : 'One way'}
+                          </p>
+                          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
                             <strong>From:</strong> {booking.pickupLocation}
                           </p>
                           <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
@@ -641,8 +644,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           type="button"
                           onClick={() => onCreateReturnBooking(booking)}
                           className="btn btn-secondary btn-sm"
-                          title="Create return trip (swap from/to, set date & time)"
-                          aria-label="Create return trip"
+                          title="Add return journey to this booking"
+                          aria-label="Add return journey to this booking"
                         >
                           <ArrowLeftRight className="h-4 w-4" />
                         </button>

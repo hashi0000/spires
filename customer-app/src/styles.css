@@ -512,7 +512,7 @@ input::placeholder {
   padding: 2.5rem;
   border-radius: 16px;
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   box-shadow: 0 10px 40px rgba(11, 28, 61, 0.2);
   position: relative;
   text-align: left;
@@ -573,6 +573,7 @@ input::placeholder {
   gap: 1rem;
 }
 
+.modal-form select,
 .modal-form input,
 .modal-form textarea {
   padding: 0.875rem 1rem;
@@ -585,6 +586,7 @@ input::placeholder {
   width: 100%;
 }
 
+.modal-form select:focus,
 .modal-form input:focus,
 .modal-form textarea:focus {
   border-color: #1d3c74;

@@ -401,18 +401,38 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {booking.returnTrip && booking.returnDateTime && (
+                  {booking.bookingType === "return" || booking.returnPickupLocation ? (
+                    <>
+                      <div className="booking-info-row">
+                        <span className="info-label">Type:</span>
+                        <span className="info-value">Return</span>
+                      </div>
+                      <div className="booking-info-row">
+                        <span className="info-label">Return:</span>
+                        <span className="info-value">
+                          {booking.returnPickupLocation || booking.destination} → {booking.returnDestination || booking.pickup}
+                          {booking.returnPickupTime || booking.returnDateTime
+                            ? ` · ${formatDateTime(booking.returnPickupTime || booking.returnDateTime)}`
+                            : ""}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
                     <div className="booking-info-row">
-                      <span className="info-label">Return:</span>
-                      <span className="info-value">{formatDateTime(booking.returnDateTime)}</span>
+                      <span className="info-label">Type:</span>
+                      <span className="info-value">One way</span>
                     </div>
                   )}
 
-                  {(booking.flightNumber || booking.terminal) && (
+                  {(booking.flightNumber || booking.terminal || booking.returnFlightNumber) && (
                     <div className="booking-info-row">
                       <span className="info-label">Flight:</span>
                       <span className="info-value">
-                        {[booking.flightNumber, booking.terminal ? `Terminal ${booking.terminal}` : ""]
+                        {[
+                          booking.flightNumber,
+                          booking.terminal ? `Terminal ${booking.terminal}` : "",
+                          booking.returnFlightNumber ? `Return ${booking.returnFlightNumber}` : "",
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

@@ -15,6 +15,21 @@ const PAYMENT_OPTIONS = [
   { value: "bank transfer", label: "Bank transfer" },
 ];
 
+function splitLocalDateTime(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return { date: "", time: "" };
+  if (raw.includes("T")) {
+    const [date, rest] = raw.split("T");
+    return { date: date || "", time: (rest || "").slice(0, 5) };
+  }
+  return { date: "", time: "" };
+}
+
+function combineLocalDateTime(date, time) {
+  if (!date) return "";
+  return `${date}T${time || "00:00"}`;
+}
+
 export default function BookingForm({ onClose, onBookingCreated }) {
   const [formData, setFormData] = useState({
     phone: "",
@@ -24,8 +39,15 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     passengers: "1",
     luggage: "0",
     specialRequirements: "",
+    bookingType: "one_way",
     returnTrip: false,
     returnDateTime: "",
+    returnPickupTime: "",
+    returnPickupLocation: "",
+    returnDestination: "",
+    airportCollection: false,
+    returnAirportCollection: false,
+    returnFlightNumber: "",
     notes: "",
     paymentMethod: "",
     flightNumber: "",
@@ -145,10 +167,13 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       return;
     }
 
-    if (formData.returnTrip && !formData.returnDateTime) {
-      setError("Please enter a return date and time.");
-      setSubmitting(false);
-      return;
+    const isReturn = formData.bookingType === "return";
+    if (isReturn) {
+      if (!formData.returnPickupTime || !String(formData.returnPickupLocation || "").trim() || !String(formData.returnDestination || "").trim()) {
+        setError("Return bookings need a return date, pickup time, pickup address and destination.");
+        setSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -163,15 +188,25 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         passengers,
         luggage: parseInt(formData.luggage) || 0,
         specialRequirements: formData.specialRequirements || "",
-        returnTrip: formData.returnTrip || false,
-        returnDateTime: formData.returnTrip && formData.returnDateTime ? formData.returnDateTime : "",
+        bookingType: isReturn ? "return" : "one_way",
+        returnTrip: isReturn,
+        returnDateTime: isReturn ? formData.returnPickupTime : "",
+        returnPickupTime: isReturn ? formData.returnPickupTime : "",
+        returnPickupLocation: isReturn ? String(formData.returnPickupLocation || "").trim() : "",
+        returnDestination: isReturn ? String(formData.returnDestination || "").trim() : "",
+        airportCollection: formData.airportCollection === true,
+        returnAirportCollection: isReturn && formData.returnAirportCollection === true,
+        returnFlightNumber:
+          isReturn && formData.returnAirportCollection === true
+            ? String(formData.returnFlightNumber || "").trim()
+            : "",
         notes: formData.notes || "",
         paymentMethod: formData.paymentMethod,
         paymentStatus: "pending",
         vehicleType: formData.vehicleType,
         depositRequired: false,
         depositStatus: "not_required",
-        flightNumber: formData.flightNumber || "",
+        flightNumber: formData.airportCollection ? formData.flightNumber || "" : "",
         terminal: formData.terminal || "",
         status: "pending",
         createdAt: serverTimestamp(),
@@ -185,11 +220,10 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
   };
 
-  // Get minimum datetime for input (current time)
-  const getMinDateTime = () => {
+  const getMinDate = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
+    return now.toISOString().slice(0, 10);
   };
 
   if (loading) {
@@ -201,6 +235,17 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       </div>
     );
   }
+
+  const outbound = splitLocalDateTime(formData.dateTime);
+  const ret = splitLocalDateTime(formData.returnPickupTime);
+  const isReturn = formData.bookingType === "return";
+  const labelStyle = { display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' };
+  const journeyBox = (color) => ({
+    padding: '1rem',
+    borderRadius: '10px',
+    border: `1px solid ${color === 'green' ? '#bbf7d0' : '#bfdbfe'}`,
+    background: color === 'green' ? '#f0fdf4' : '#eff6ff',
+  });
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -219,12 +264,65 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             onChange={handleChange}
             required
           />
-          {savedAddresses.length > 0 && (
-            <>
+          <div>
+            <label style={labelStyle}>Booking type *</label>
+            <select
+              name="bookingType"
+              value={isReturn ? "return" : "one_way"}
+              onChange={(e) => {
+                const nextType = e.target.value === "return" ? "return" : "one_way";
+                setFormData((prev) => ({
+                  ...prev,
+                  bookingType: nextType,
+                  returnTrip: nextType === "return",
+                  returnPickupLocation:
+                    nextType === "return"
+                      ? (prev.returnPickupLocation || prev.destination)
+                      : prev.returnPickupLocation,
+                  returnDestination:
+                    nextType === "return"
+                      ? (prev.returnDestination || prev.pickup)
+                      : prev.returnDestination,
+                }));
+              }}
+              required
+            >
+              <option value="one_way">One Way</option>
+              <option value="return">Return</option>
+            </select>
+            <p style={{ margin: '0.4rem 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+              Return stays on this same booking. It does not create a second booking.
+            </p>
+          </div>
+
+          <div style={journeyBox('green')}>
+            <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: '#14532d' }}>
+              {isReturn ? 'Outbound journey *' : 'Journey *'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
-                  Saved Addresses (Pickup)
-                </label>
+                <label style={labelStyle}>Date *</label>
+                <input
+                  type="date"
+                  value={outbound.date}
+                  min={getMinDate()}
+                  onChange={(e) => setFormData({ ...formData, dateTime: combineLocalDateTime(e.target.value, outbound.time || '00:00') })}
+                  required
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Pickup time *</label>
+                <input
+                  type="time"
+                  value={outbound.time}
+                  onChange={(e) => setFormData({ ...formData, dateTime: combineLocalDateTime(outbound.date, e.target.value) })}
+                  required
+                />
+              </div>
+            </div>
+            {savedAddresses.length > 0 && (
+              <div>
+                <label style={labelStyle}>Saved Addresses (Pickup)</label>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                   {savedAddresses.map((addr, idx) => {
                     const formattedAddress = formatAddress(addr);
@@ -252,22 +350,19 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                   })}
                 </div>
               </div>
-            </>
-          )}
-          <input
-            type="text"
-            name="pickup"
-            placeholder="Pickup Location"
-            value={formData.pickup}
-            onChange={handleChange}
-            required
-          />
-          {savedAddresses.length > 0 && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
-                Saved Addresses (Destination)
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            )}
+            <input
+              type="text"
+              name="pickup"
+              placeholder="Pickup Location"
+              value={formData.pickup}
+              onChange={handleChange}
+              required
+            />
+            {savedAddresses.length > 0 && (
+              <div>
+                <label style={labelStyle}>Saved Addresses (Destination)</label>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                   {savedAddresses.map((addr, idx) => {
                     const formattedAddress = formatAddress(addr);
                     const isSelected = selectedDestinationAddress === formattedAddress;
@@ -292,25 +387,116 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                       </button>
                     );
                   })}
+                </div>
               </div>
+            )}
+            <input
+              type="text"
+              name="destination"
+              placeholder="Destination"
+              value={formData.destination}
+              onChange={handleChange}
+              required
+            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={formData.airportCollection === true}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    airportCollection: e.target.checked,
+                    flightNumber: e.target.checked ? formData.flightNumber : '',
+                  })
+                }
+                style={{ width: '18px', height: '18px', cursor: 'pointer', marginBottom: 0 }}
+              />
+              Airport collection
+            </label>
+            {formData.airportCollection && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <input
+                  type="text"
+                  name="flightNumber"
+                  placeholder="Flight number, e.g. BA123"
+                  value={formData.flightNumber}
+                  onChange={handleChange}
+                />
+                <input
+                  type="text"
+                  name="terminal"
+                  placeholder="Terminal, e.g. T5"
+                  value={formData.terminal}
+                  onChange={handleChange}
+                />
+              </div>
+            )}
+          </div>
+
+          {isReturn && (
+            <div style={journeyBox('blue')}>
+              <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: '#1e3a8a' }}>Return journey *</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>Date *</label>
+                  <input
+                    type="date"
+                    value={ret.date}
+                    min={outbound.date || getMinDate()}
+                    onChange={(e) => setFormData({ ...formData, returnPickupTime: combineLocalDateTime(e.target.value, ret.time || '00:00') })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Pickup time *</label>
+                  <input
+                    type="time"
+                    value={ret.time}
+                    onChange={(e) => setFormData({ ...formData, returnPickupTime: combineLocalDateTime(ret.date, e.target.value) })}
+                    required
+                  />
+                </div>
+              </div>
+              <input
+                type="text"
+                placeholder="Return pickup address"
+                value={formData.returnPickupLocation || ''}
+                onChange={(e) => setFormData({ ...formData, returnPickupLocation: e.target.value })}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Return destination"
+                value={formData.returnDestination || ''}
+                onChange={(e) => setFormData({ ...formData, returnDestination: e.target.value })}
+                required
+              />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.returnAirportCollection === true}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      returnAirportCollection: e.target.checked,
+                      returnFlightNumber: e.target.checked ? formData.returnFlightNumber : '',
+                    })
+                  }
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', marginBottom: 0 }}
+                />
+                Airport collection
+              </label>
+              {formData.returnAirportCollection && (
+                <input
+                  type="text"
+                  placeholder="Return flight number, e.g. BA123"
+                  value={formData.returnFlightNumber || ''}
+                  onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })}
+                />
+              )}
             </div>
           )}
-          <input
-            type="text"
-            name="destination"
-            placeholder="Destination"
-            value={formData.destination}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="datetime-local"
-            name="dateTime"
-            value={formData.dateTime}
-            onChange={handleChange}
-            min={getMinDateTime()}
-            required
-          />
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
@@ -383,58 +569,6 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 Groups over 4 need the 8-seater.
               </p>
             )}
-          </div>
-          
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                name="returnTrip"
-                checked={formData.returnTrip}
-                onChange={(e) => setFormData({ ...formData, returnTrip: e.target.checked })}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              Return Trip Required
-            </label>
-            {formData.returnTrip && (
-              <input
-                type="datetime-local"
-                name="returnDateTime"
-                placeholder="Return Date & Time"
-                value={formData.returnDateTime}
-                onChange={handleChange}
-                min={formData.dateTime || getMinDateTime()}
-                required={formData.returnTrip}
-                style={{ marginTop: '0.5rem' }}
-              />
-            )}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
-                Flight number (optional)
-              </label>
-              <input
-                type="text"
-                name="flightNumber"
-                placeholder="e.g. BA123"
-                value={formData.flightNumber}
-                onChange={handleChange}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
-                Terminal (optional)
-              </label>
-              <input
-                type="text"
-                name="terminal"
-                placeholder="e.g. T5"
-                value={formData.terminal}
-                onChange={handleChange}
-              />
-            </div>
           </div>
 
           <div>

@@ -10,7 +10,6 @@ import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
 import { isCustomerBooking } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
-import { buildReturnTripDraft } from './utils/bookingReturn';
 import type { ExtendedBooking } from './types/types';
 
 import Login from './components/Login';
@@ -287,8 +286,20 @@ const App: React.FC = () => {
   };
 
   const handleCreateReturnTrip = (booking: Booking) => {
-    setEditingItem(null);
-    setBookingModalInitialDraft(buildReturnTripDraft(booking));
+    const dest = (booking.destination || '').trim();
+    const pickup = (booking.pickupLocation || '').trim();
+    const origPickup = new Date(booking.pickupTime || booking.dateTime || Date.now());
+    const returnPickup = new Date(origPickup);
+    returnPickup.setDate(returnPickup.getDate() + 1);
+    setBookingModalInitialDraft(null);
+    setEditingItem({
+      ...booking,
+      bookingType: 'return',
+      returnTrip: true,
+      returnPickupLocation: booking.returnPickupLocation || dest,
+      returnDestination: booking.returnDestination || pickup,
+      returnPickupTime: booking.returnPickupTime || returnPickup.toISOString(),
+    });
     setShowBookingModal(true);
   };
 
