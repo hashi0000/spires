@@ -7,6 +7,13 @@ import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails'
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
+import {
+  combineLocalDateTime,
+  parseMoney,
+  paymentScheduleValidationError,
+  resolveBookingType,
+  splitLocalDateTime,
+} from '../utils/bookingJourney';
 import { db } from '../utils/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { CustomerProfile } from '../utils/customerSuggestions';
@@ -57,6 +64,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
       hirerAddress: match.address || prev.hirerAddress
     }));
   };
+  const [formError, setFormError] = useState('');
   const [formData, setFormData] = useState<ExtendedBooking>({
     bookingNumber: '',
     dateTime: '',
@@ -80,6 +88,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
     depositRequired: false,
     depositAmount: '',
     depositStatus: 'not_required',
+    bookingType: 'one_way',
+    airportCollection: false,
+    flightNumber: '',
+    returnPickupTime: '',
+    returnPickupLocation: '',
+    returnDestination: '',
+    returnAirportCollection: false,
+    returnFlightNumber: '',
+    dueOnOutbound: '',
+    dueOnReturn: '',
   });
 
   const [newExpense, setNewExpense] = useState<{
@@ -121,7 +139,24 @@ const BookingModal: React.FC<BookingModalProps> = ({
             ? String(editingBooking.depositAmount)
             : '',
         depositStatus: editingBooking.depositStatus || (editingBooking.depositRequired ? 'pending' : 'not_required'),
+        bookingType: resolveBookingType(editingBooking),
+        airportCollection: editingBooking.airportCollection === true,
+        flightNumber: editingBooking.flightNumber || '',
+        returnPickupTime: toDatetimeLocalValue(editingBooking.returnPickupTime || ''),
+        returnPickupLocation: editingBooking.returnPickupLocation || '',
+        returnDestination: editingBooking.returnDestination || '',
+        returnAirportCollection: editingBooking.returnAirportCollection === true,
+        returnFlightNumber: editingBooking.returnFlightNumber || '',
+        dueOnOutbound:
+          editingBooking.dueOnOutbound !== undefined && editingBooking.dueOnOutbound !== null
+            ? String(editingBooking.dueOnOutbound)
+            : '',
+        dueOnReturn:
+          editingBooking.dueOnReturn !== undefined && editingBooking.dueOnReturn !== null
+            ? String(editingBooking.dueOnReturn)
+            : '',
       };
+      setFormError('');
       setFormData(mappedBooking);
     } else {
       const now = new Date();
@@ -151,6 +186,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
         depositRequired: false,
         depositAmount: '',
         depositStatus: 'not_required',
+        bookingType: 'one_way',
+        airportCollection: false,
+        flightNumber: '',
+        returnPickupTime: '',
+        returnPickupLocation: '',
+        returnDestination: '',
+        returnAirportCollection: false,
+        returnFlightNumber: '',
+        dueOnOutbound: '',
+        dueOnReturn: '',
       };
 
       if (initialDraft) {
@@ -179,9 +224,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
           depositRequired: (d as any).depositRequired === true,
           depositAmount: (d as any).depositAmount !== undefined && (d as any).depositAmount !== '' ? String((d as any).depositAmount) : '',
           depositStatus: (d as any).depositStatus || empty.depositStatus,
+          bookingType: resolveBookingType(d as any),
+          airportCollection: (d as any).airportCollection === true,
+          flightNumber: (d as any).flightNumber || '',
+          returnPickupTime: (d as any).returnPickupTime ? toDatetimeLocalValue(String((d as any).returnPickupTime)) : '',
+          returnPickupLocation: (d as any).returnPickupLocation || '',
+          returnDestination: (d as any).returnDestination || '',
+          returnAirportCollection: (d as any).returnAirportCollection === true,
+          returnFlightNumber: (d as any).returnFlightNumber || '',
+          dueOnOutbound: (d as any).dueOnOutbound !== undefined && (d as any).dueOnOutbound !== '' ? String((d as any).dueOnOutbound) : '',
+          dueOnReturn: (d as any).dueOnReturn !== undefined && (d as any).dueOnReturn !== '' ? String((d as any).dueOnReturn) : '',
         });
+        setFormError('');
       } else {
         setFormData(empty);
+        setFormError('');
       }
     }
   }, [editingBooking, isOpen, initialDraft]);
@@ -230,6 +287,29 @@ const BookingModal: React.FC<BookingModalProps> = ({
       String(formData.pickupTime || formData.dateTime || '')
     );
     const dateTimeIso = fromDatetimeLocalValue(String(formData.dateTime || ''));
+    const isReturn = formData.bookingType === 'return';
+    const dueOnOutbound = parseMoney(formData.dueOnOutbound);
+    const dueOnReturn = parseMoney(formData.dueOnReturn);
+    const depositAmountNum = parseMoney(formData.depositAmount);
+    const usingSchedule = dueOnOutbound != null || dueOnReturn != null;
+    const scheduleError =
+      isReturn && usingSchedule
+        ? paymentScheduleValidationError(
+            actualFareNum > 0 ? actualFareNum : null,
+            depositAmountNum ?? 0,
+            dueOnOutbound ?? 0,
+            dueOnReturn ?? 0
+          )
+        : null;
+    if (scheduleError) {
+      setFormError(scheduleError);
+      return;
+    }
+    if (isReturn && (!formData.returnPickupTime || !formData.returnPickupLocation?.trim() || !formData.returnDestination?.trim())) {
+      setFormError('Return bookings need a return date, pickup time, pickup address and destination.');
+      return;
+    }
+    setFormError('');
 
     const bookingData: any = {
       ...formData,
@@ -257,6 +337,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
             ? new Date().toISOString()
             : undefined,
       bookingNumber: newBookingNumber,
+      bookingType: isReturn ? 'return' : 'one_way',
+      returnTrip: isReturn,
+      airportCollection: formData.airportCollection === true,
+      flightNumber: formData.airportCollection === true ? String(formData.flightNumber || '').trim() : '',
+      returnPickupTime: isReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
+      returnPickupLocation: isReturn ? String(formData.returnPickupLocation || '').trim() : '',
+      returnDestination: isReturn ? String(formData.returnDestination || '').trim() : '',
+      returnAirportCollection: isReturn && formData.returnAirportCollection === true,
+      returnFlightNumber:
+        isReturn && formData.returnAirportCollection === true
+          ? String(formData.returnFlightNumber || '').trim()
+          : '',
+      returnDateTime: isReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
+      dueOnOutbound: isReturn && dueOnOutbound != null ? dueOnOutbound : '',
+      dueOnReturn: isReturn && dueOnReturn != null ? dueOnReturn : '',
     };
 
     // Only add createdAt for new bookings
@@ -504,18 +599,34 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </select>
             </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center mb-3">
-                <Clock className="w-5 h-5 text-green-600 mr-2" />
-                <h4 className="text-md font-semibold text-green-900">Pickup Date & Time *</h4>
-              </div>
-              <input
-                type="datetime-local"
-                value={toDatetimeLocalValue(formData.pickupTime || formData.dateTime)}
-                onChange={(e) => setFormData({ ...formData, pickupTime: e.target.value })}
-                required
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Booking type *</label>
+              <select
+                value={formData.bookingType === 'return' ? 'return' : 'one_way'}
+                onChange={(e) => {
+                  const nextType = e.target.value === 'return' ? 'return' : 'one_way';
+                  setFormData((prev) => ({
+                    ...prev,
+                    bookingType: nextType,
+                    returnTrip: nextType === 'return',
+                    returnPickupLocation:
+                      nextType === 'return'
+                        ? (prev.returnPickupLocation || prev.destination)
+                        : prev.returnPickupLocation,
+                    returnDestination:
+                      nextType === 'return'
+                        ? (prev.returnDestination || prev.pickupLocation)
+                        : prev.returnDestination,
+                  }));
+                }}
                 className="form-input"
-              />
+              >
+                <option value="one_way">One Way</option>
+                <option value="return">Return</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Return stays on this same booking confirmation. It does not create a second booking.
+              </p>
             </div>
 
             {locationSuggestions.length > 0 && (
@@ -526,33 +637,184 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </datalist>
             )}
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Location *</label>
-              <input
-                type="text"
-                value={formData.pickupLocation}
-                onChange={(e) => setFormData({ ...formData, pickupLocation: e.target.value })}
-                required
-                className="form-input"
-                list={locationSuggestions.length > 0 ? "booking-past-locations" : undefined}
-                placeholder="Type or pick a past location"
-                autoComplete="off"
-              />
-            </div>
+            {(() => {
+              const outbound = splitLocalDateTime(toDatetimeLocalValue(formData.pickupTime || formData.dateTime));
+              const ret = splitLocalDateTime(toDatetimeLocalValue(formData.returnPickupTime || ''));
+              const listId = locationSuggestions.length > 0 ? 'booking-past-locations' : undefined;
+              const setOutboundDateTime = (date: string, time: string) => {
+                setFormData({ ...formData, pickupTime: combineLocalDateTime(date, time) });
+              };
+              const setReturnDateTime = (date: string, time: string) => {
+                setFormData({ ...formData, returnPickupTime: combineLocalDateTime(date, time) });
+              };
+              return (
+                <>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center mb-3">
+                      <Clock className="w-5 h-5 text-green-600 mr-2" />
+                      <h4 className="text-md font-semibold text-green-900">
+                        {formData.bookingType === 'return' ? 'Outbound journey' : 'Journey'} *
+                      </h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                        <input
+                          type="date"
+                          value={outbound.date}
+                          onChange={(e) => setOutboundDateTime(e.target.value, outbound.time || '00:00')}
+                          required
+                          className="form-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Pickup time *</label>
+                        <input
+                          type="time"
+                          value={outbound.time}
+                          onChange={(e) => setOutboundDateTime(outbound.date, e.target.value)}
+                          required
+                          className="form-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pickup address *</label>
+                      <input
+                        type="text"
+                        value={formData.pickupLocation}
+                        onChange={(e) => setFormData({ ...formData, pickupLocation: e.target.value })}
+                        required
+                        className="form-input"
+                        list={listId}
+                        placeholder="Type or pick a past location"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Destination *</label>
+                      <input
+                        type="text"
+                        value={formData.destination}
+                        onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                        required
+                        className="form-input"
+                        list={listId}
+                        placeholder="Type or pick a past location"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={formData.airportCollection === true}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            airportCollection: e.target.checked,
+                            flightNumber: e.target.checked ? formData.flightNumber : '',
+                          })
+                        }
+                      />
+                      Airport collection
+                    </label>
+                    {formData.airportCollection && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
+                        <input
+                          type="text"
+                          value={formData.flightNumber || ''}
+                          onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
+                          className="form-input"
+                          placeholder="e.g. BA123"
+                        />
+                      </div>
+                    )}
+                  </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Destination *</label>
-              <input
-                type="text"
-                value={formData.destination}
-                onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                required
-                className="form-input"
-                list={locationSuggestions.length > 0 ? "booking-past-locations" : undefined}
-                placeholder="Type or pick a past location"
-                autoComplete="off"
-              />
-            </div>
+                  {formData.bookingType === 'return' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                      <div className="flex items-center mb-3">
+                        <Clock className="w-5 h-5 text-blue-700 mr-2" />
+                        <h4 className="text-md font-semibold text-blue-900">Return journey *</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+                          <input
+                            type="date"
+                            value={ret.date}
+                            onChange={(e) => setReturnDateTime(e.target.value, ret.time || '00:00')}
+                            required
+                            className="form-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Pickup time *</label>
+                          <input
+                            type="time"
+                            value={ret.time}
+                            onChange={(e) => setReturnDateTime(ret.date, e.target.value)}
+                            required
+                            className="form-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Pickup address *</label>
+                        <input
+                          type="text"
+                          value={formData.returnPickupLocation || ''}
+                          onChange={(e) => setFormData({ ...formData, returnPickupLocation: e.target.value })}
+                          required
+                          className="form-input"
+                          list={listId}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Destination *</label>
+                        <input
+                          type="text"
+                          value={formData.returnDestination || ''}
+                          onChange={(e) => setFormData({ ...formData, returnDestination: e.target.value })}
+                          required
+                          className="form-input"
+                          list={listId}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
+                        <input
+                          type="checkbox"
+                          checked={formData.returnAirportCollection === true}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              returnAirportCollection: e.target.checked,
+                              returnFlightNumber: e.target.checked ? formData.returnFlightNumber : '',
+                            })
+                          }
+                        />
+                        Airport collection
+                      </label>
+                      {formData.returnAirportCollection && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
+                          <input
+                            type="text"
+                            value={formData.returnFlightNumber || ''}
+                            onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })}
+                            className="form-input"
+                            placeholder="e.g. BA123"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
@@ -726,6 +988,59 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               )}
 
+              {formData.bookingType === 'return' && (
+                <div className="mb-4 p-3 rounded-md border border-gray-200 bg-white">
+                  <div className="font-semibold text-gray-900 mb-1">Payment schedule (optional)</div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Leave blank if the booking is paid in full. If used, deposit + outbound + return should equal the total fare.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Deposit</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.depositAmount || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            depositAmount: e.target.value,
+                            depositRequired: e.target.value !== '' ? true : formData.depositRequired,
+                          })
+                        }
+                        className="form-input"
+                        placeholder="e.g. 14"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due on outbound journey</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.dueOnOutbound || ''}
+                        onChange={(e) => setFormData({ ...formData, dueOnOutbound: e.target.value })}
+                        className="form-input"
+                        placeholder="e.g. 120"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due on return journey</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.dueOnReturn || ''}
+                        onChange={(e) => setFormData({ ...formData, dueOnReturn: e.target.value })}
+                        className="form-input"
+                        placeholder="e.g. 40"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {actualFareNum > 0 && (
                 <div className="bg-white p-3 rounded border">
                   <div className="flex justify-between text-sm">
@@ -816,6 +1131,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
           </div>
 
           <div className="modal-footer">
+            {formError ? (
+              <p className="text-sm" style={{ color: '#b91c1c', marginRight: 'auto' }}>{formError}</p>
+            ) : null}
             <button
               type="button"
               onClick={onClose}

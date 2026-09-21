@@ -154,6 +154,15 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     depositRequired: customerBooking.depositRequired === true,
     depositAmount: customerBooking.depositAmount,
     depositStatus: customerBooking.depositStatus,
+    bookingType: (customerBooking as any).bookingType,
+    airportCollection: (customerBooking as any).airportCollection === true,
+    returnPickupTime: (customerBooking as any).returnPickupTime,
+    returnPickupLocation: (customerBooking as any).returnPickupLocation,
+    returnDestination: (customerBooking as any).returnDestination,
+    returnAirportCollection: (customerBooking as any).returnAirportCollection === true,
+    returnFlightNumber: (customerBooking as any).returnFlightNumber,
+    dueOnOutbound: (customerBooking as any).dueOnOutbound,
+    dueOnReturn: (customerBooking as any).dueOnReturn,
     // Preserve customer status for customer app
     customerStatus: customerStatus,
   } as Partial<Booking>;

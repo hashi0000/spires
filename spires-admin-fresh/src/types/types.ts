@@ -79,6 +79,7 @@ export interface Booking {
   pickupTime: string;
   pickupLocation: string;
   destination: string;
+  flightNumber?: string;
   driverId?: string;
   vehicleId?: string;
   subContract?: string;
@@ -92,6 +93,17 @@ export interface Booking {
   depositRequired?: boolean;
   depositAmount?: number;
   depositStatus?: 'not_required' | 'pending' | 'paid' | string;
+  /** Same-booking return. Missing on older records = one_way. */
+  bookingType?: 'one_way' | 'return';
+  /** Outbound/primary leg is an airport collection (not merely an airport drop-off). */
+  airportCollection?: boolean;
+  returnPickupTime?: string;
+  returnPickupLocation?: string;
+  returnDestination?: string;
+  returnAirportCollection?: boolean;
+  returnFlightNumber?: string;
+  dueOnOutbound?: number;
+  dueOnReturn?: number;
   expenses?: TripExpense[];
   createdAt?: Date;
   updatedAt?: Date;
@@ -118,6 +130,15 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   depositRequired?: boolean;
   depositAmount?: number | string;
   depositStatus?: 'not_required' | 'pending' | 'paid' | string;
+  bookingType?: 'one_way' | 'return';
+  airportCollection?: boolean;
+  returnPickupTime?: string;
+  returnPickupLocation?: string;
+  returnDestination?: string;
+  returnAirportCollection?: boolean;
+  returnFlightNumber?: string;
+  dueOnOutbound?: number | string;
+  dueOnReturn?: number | string;
 }
 
 // Customer interface (from customers collection)

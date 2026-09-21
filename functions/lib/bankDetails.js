@@ -72,5 +72,14 @@ function normalizeBookingForEmail(booking, bookingId) {
         depositRequired: booking.depositRequired === true,
         depositAmount: booking.depositAmount,
         depositStatus: booking.depositStatus || (booking.depositRequired ? "pending" : "not_required"),
+        bookingType: booking.bookingType || "",
+        airportCollection: booking.airportCollection === true,
+        returnPickupTime: booking.returnPickupTime || "",
+        returnPickupLocation: booking.returnPickupLocation || "",
+        returnDestination: booking.returnDestination || "",
+        returnAirportCollection: booking.returnAirportCollection === true,
+        returnFlightNumber: booking.returnFlightNumber || "",
+        dueOnOutbound: booking.dueOnOutbound,
+        dueOnReturn: booking.dueOnReturn,
     };
 }

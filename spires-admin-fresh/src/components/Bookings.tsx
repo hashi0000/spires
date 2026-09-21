@@ -612,6 +612,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           <p style={{ margin: 0, fontSize: '0.875rem' }}>
                             <strong>Time:</strong> {new Date(booking.pickupTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                           </p>
+                          {booking.bookingType === 'return' || (booking.returnPickupLocation && booking.returnDestination) ? (
+                            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+                              <strong>Return:</strong> {booking.returnPickupLocation} → {booking.returnDestination}
+                              {booking.returnPickupTime
+                                ? ` · ${new Date(booking.returnPickupTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                                : ''}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: '#4b5563' }}>

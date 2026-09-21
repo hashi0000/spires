@@ -149,6 +149,7 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
                 : n.vehicleType || "—")}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(pay)}</td></tr>
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.flightNumber)}${n.terminal ? ` · Terminal ${(0, driverReminderEmail_1.escapeHtml)(n.terminal)}` : ""}</td></tr>` : ""}
+          ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.returnPickupLocation || "")} → ${(0, driverReminderEmail_1.escapeHtml)(n.returnDestination || "")}</td></tr>` : ""}
           ${n.notes ? `<tr><td style="padding:4px 8px;font-weight:600;">Notes</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.notes)}</td></tr>` : ""}
         </table>
         <p style="margin-top:16px;">Open the admin Bookings page to set the fare and confirm.</p>

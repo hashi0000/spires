@@ -2,8 +2,127 @@
 import { Booking, Driver, Vehicle } from "../types/types";
 import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
 import { formatVehicleTypeLabel } from "./vehicleTypes";
+import {
+  AIRPORT_WAITING_POLICY,
+  airportWaitingDisclaimerBody,
+  airportWaitingDisclaimerTitle,
+} from "./airportWaitingPolicy";
+import {
+  bookingHasAirportCollection,
+  hasPaymentSchedule,
+  parseMoney,
+  resolveBookingType,
+} from "./bookingJourney";
 
 export type AdminPDFType = "booking_confirmation" | "payment_request" | "payment_receipt";
+
+function escapePdfText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatPdfDate(value: string | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return escapePdfText(value);
+  return d.toLocaleDateString("en-GB");
+}
+
+function formatPdfTime(value: string | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return escapePdfText(value);
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function journeyDetailsHtml(
+  title: string,
+  pickupTime: string | undefined,
+  pickupLocation: string | undefined,
+  destination: string | undefined,
+  airportCollection: boolean,
+  flightNumber?: string
+): string {
+  const flightRow =
+    airportCollection && (flightNumber || "").trim()
+      ? `<div class="detail-row">
+            <span class="detail-label">Flight number</span>
+            <span class="detail-value">${escapePdfText(flightNumber)}</span>
+         </div>`
+      : "";
+  const collectionRow = airportCollection
+    ? `<div class="detail-row">
+            <span class="detail-label">Airport collection</span>
+            <span class="detail-value">Yes</span>
+         </div>`
+    : "";
+  return `
+    <div class="journey-block">
+      <h3 class="journey-heading">${escapePdfText(title)}</h3>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${formatPdfDate(pickupTime)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Pickup time</span>
+        <span class="detail-value">${formatPdfTime(pickupTime)}</span>
+      </div>
+      <div class="journey-section">
+        <div class="journey-flow">
+          <div class="journey-point">
+            <div class="journey-time">${formatPdfTime(pickupTime)}</div>
+            <div class="journey-location">${escapePdfText(pickupLocation || "")}</div>
+          </div>
+          <div class="journey-arrow">→</div>
+          <div class="journey-point">
+            <div class="journey-location">${escapePdfText(destination || "")}</div>
+          </div>
+        </div>
+      </div>
+      ${collectionRow}
+      ${flightRow}
+    </div>
+  `;
+}
+
+function paymentScheduleHtml(booking: Booking): string {
+  if (!hasPaymentSchedule(booking)) return "";
+  const total = parseMoney(booking.actualFare);
+  const deposit = parseMoney(booking.depositAmount) ?? 0;
+  const outbound = parseMoney(booking.dueOnOutbound) ?? 0;
+  const ret = parseMoney(booking.dueOnReturn) ?? 0;
+  const row = (label: string, amount: number) => `
+    <div class="detail-row">
+      <span class="detail-label">${label}</span>
+      <span class="detail-value">£${amount.toFixed(2)}</span>
+    </div>`;
+  return `
+    <div class="info-box full-width payment-schedule-box">
+      <h2 class="section-header">Payment Schedule</h2>
+      ${total != null ? row("Total fare", total) : ""}
+      ${row("Deposit paid", deposit)}
+      ${row("Due on outbound journey", outbound)}
+      ${row("Due on return journey", ret)}
+    </div>
+  `;
+}
+
+function airportWaitingHtml(booking: Booking): string {
+  if (!bookingHasAirportCollection(booking)) return "";
+  const body = airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY)
+    .split("\n\n")
+    .map((para) => `<p>${escapePdfText(para)}</p>`)
+    .join("");
+  return `
+    <div class="airport-waiting-note">
+      <div class="airport-waiting-title">${escapePdfText(airportWaitingDisclaimerTitle())}</div>
+      ${body}
+    </div>
+  `;
+}
 
 const getDocumentTitle = (type: AdminPDFType = "booking_confirmation") => {
   switch (type) {
@@ -260,17 +379,29 @@ export function buildBookingConfirmationHtml(
                 border-bottom: 1.5px solid #C5A572;
             }
 
-            .booking-pdf-root .detail-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
-            .booking-pdf-root .detail-label { font-size: 0.8rem; color: #666; }
-            .booking-pdf-root .detail-value { font-size: 0.9rem; color: #002147; text-align: right; }
+            .booking-pdf-root .detail-row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; align-items: flex-start; }
+            .booking-pdf-root .detail-label { font-size: 0.8rem; color: #666; flex-shrink: 0; }
+            .booking-pdf-root .detail-value { font-size: 0.9rem; color: #002147; text-align: right; max-width: 68%; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 
             .booking-pdf-root .full-width { grid-column: span 2; }
+
+            .booking-pdf-root .journey-block { margin-bottom: 12px; page-break-inside: avoid; }
+            .booking-pdf-root .journey-heading {
+                font-family: 'Playfair Display', serif;
+                font-size: 0.82rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                color: #002147;
+                margin: 0 0 8px;
+                text-transform: uppercase;
+            }
 
             .booking-pdf-root .journey-section {
                 background: #f7f4e9;
                 border-radius: 6px;
                 padding: 12px;
                 border-left: 3px solid #C5A572;
+                page-break-inside: avoid;
             }
 
             .booking-pdf-root .journey-flow {
@@ -280,8 +411,31 @@ export function buildBookingConfirmationHtml(
                 margin: 8px 0;
             }
 
-            .booking-pdf-root .journey-point { flex: 1; text-align: center; }
-            .booking-pdf-root .journey-arrow { font-size: 1.2rem; color: #C5A572; }
+            .booking-pdf-root .journey-point { flex: 1; text-align: center; min-width: 0; }
+            .booking-pdf-root .journey-location { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+            .booking-pdf-root .journey-arrow { font-size: 1.2rem; color: #C5A572; flex-shrink: 0; }
+
+            .booking-pdf-root .payment-schedule-box { page-break-inside: avoid; }
+
+            .booking-pdf-root .airport-waiting-note {
+                margin-top: 12px;
+                padding: 10px 12px;
+                border: 1px solid #e8e4da;
+                border-radius: 6px;
+                background: #fbfaf7;
+                color: #4b5563;
+                font-size: 0.72rem;
+                line-height: 1.45;
+                page-break-inside: avoid;
+            }
+            .booking-pdf-root .airport-waiting-title {
+                font-weight: 700;
+                color: #334155;
+                margin-bottom: 6px;
+                font-size: 0.76rem;
+            }
+            .booking-pdf-root .airport-waiting-note p { margin: 0 0 6px; overflow-wrap: anywhere; }
+            .booking-pdf-root .airport-waiting-note p:last-child { margin-bottom: 0; }
 
             .booking-pdf-root .payment-summary {
                 background: #002147;
@@ -351,21 +505,26 @@ export function buildBookingConfirmationHtml(
                         <div class="detail-row">
                             <span class="detail-label">Trip Date</span>
                             <span class="detail-value">
-                                ${new Date(booking.pickupTime).toLocaleDateString("en-GB")}
+                                ${formatPdfDate(booking.pickupTime)}
                             </span>
                         </div>
 
                         <div class="detail-row">
                             <span class="detail-label">Pickup Time</span>
                             <span class="detail-value">
-                                ${new Date(booking.pickupTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                ${formatPdfTime(booking.pickupTime)}
                             </span>
                         </div>
 
                         <div class="detail-row">
                             <span class="detail-label">Booking Method</span>
-                            <span class="detail-value">${booking.bookingMethod.replace("_", " ").toUpperCase()}</span>
+                            <span class="detail-value">${escapePdfText(booking.bookingMethod.replace("_", " ").toUpperCase())}</span>
                         </div>
+                        ${resolveBookingType(booking) === "return" ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Booking type</span>
+                            <span class="detail-value">Return</span>
+                        </div>` : ""}
                     </div>
 
                     <div class="info-box">
@@ -373,21 +532,21 @@ export function buildBookingConfirmationHtml(
 
                         <div class="detail-row">
                             <span class="detail-label">Name</span>
-                            <span class="detail-value">${booking.hirerName}</span>
+                            <span class="detail-value">${escapePdfText(booking.hirerName)}</span>
                         </div>
 
                         <div class="detail-row">
                             <span class="detail-label">Phone</span>
                             <span class="detail-value">
                                 <a href="${formattedWhatsAppLink}" target="_blank">
-                                    ${booking.hirerPhone}
+                                    ${escapePdfText(booking.hirerPhone)}
                                 </a>
                             </span>
                         </div>
 
                         <div class="detail-row">
                             <span class="detail-label">Address</span>
-                            <span class="detail-value">${booking.hirerAddress}</span>
+                            <span class="detail-value">${escapePdfText(booking.hirerAddress)}</span>
                         </div>
 
                     </div>
@@ -397,25 +556,42 @@ export function buildBookingConfirmationHtml(
                 <div class="info-box full-width">
 
                     <h2 class="section-header">Journey Details</h2>
-
-                    <div class="journey-section">
-                        <div class="journey-flow">
-
-                            <div class="journey-point">
-                                <div class="journey-time">
-                                    ${new Date(booking.pickupTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                                </div>
-                                <div class="journey-location">${booking.pickupLocation}</div>
-                            </div>
-
-                            <div class="journey-arrow">→</div>
-
-                            <div class="journey-point">
-                                <div class="journey-location">${booking.destination}</div>
-                            </div>
-
-                        </div>
-                    </div>
+                    ${
+                      resolveBookingType(booking) === "return"
+                        ? `${journeyDetailsHtml(
+                            "Outbound Journey",
+                            booking.pickupTime,
+                            booking.pickupLocation,
+                            booking.destination,
+                            booking.airportCollection === true,
+                            (booking as any).flightNumber
+                          )}
+                          ${journeyDetailsHtml(
+                            "Return Journey",
+                            booking.returnPickupTime,
+                            booking.returnPickupLocation,
+                            booking.returnDestination,
+                            booking.returnAirportCollection === true,
+                            booking.returnFlightNumber
+                          )}`
+                        : `${journeyDetailsHtml(
+                            "Journey",
+                            booking.pickupTime,
+                            booking.pickupLocation,
+                            booking.destination,
+                            booking.airportCollection === true,
+                            (booking as any).flightNumber
+                          )}
+                          ${
+                            (booking as any).returnTrip && (booking as any).returnDateTime
+                              ? `<div class="detail-row"><span class="detail-label">Return requested</span><span class="detail-value">${escapePdfText(
+                                  formatPdfDate((booking as any).returnDateTime) +
+                                    " " +
+                                    formatPdfTime((booking as any).returnDateTime)
+                                )}</span></div>`
+                              : ""
+                          }`
+                    }
 
                     <div class="detail-row" style="margin-top:10px;">
                         <span class="detail-label">Vehicle requested</span>
@@ -429,6 +605,8 @@ export function buildBookingConfirmationHtml(
                     ` : ""}
 
                 </div>
+
+                ${paymentScheduleHtml(booking)}
 
                 <div class="content-grid">
 
@@ -476,10 +654,12 @@ export function buildBookingConfirmationHtml(
                             ` : ""}
                         </div>
                         ${bankDetailsBlock}
-                        ${depositBlock}
+                        ${hasPaymentSchedule(booking) ? "" : depositBlock}
                     </div>
 
                 </div>
+
+                ${airportWaitingHtml(booking)}
 
             </div>
 
@@ -632,6 +812,17 @@ const PDF_EMAIL_CAPTURE_CSS = `
     text-align: center !important;
     font-size: 1.25rem !important;
   }
+  .booking-pdf-root.pdf-email-capture .journey-location,
+  .booking-pdf-root.pdf-email-capture .detail-value,
+  .booking-pdf-root.pdf-email-capture .airport-waiting-note {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+  }
+  .booking-pdf-root.pdf-email-capture .airport-waiting-note {
+    display: block !important;
+    margin-top: 12px !important;
+  }
   .booking-pdf-root.pdf-email-capture .header { padding: 16px 14px !important; }
   .booking-pdf-root.pdf-email-capture .logo-svg { width: 280px !important; height: 52px !important; }
   .booking-pdf-root.pdf-email-capture .logo-text { font-size: 30px !important; }
@@ -663,7 +854,7 @@ function buildHtml2PdfOptions(): Record<string, unknown> {
       windowWidth: 794,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+    pagebreak: { mode: ["css", "legacy"] },
   };
 }
 

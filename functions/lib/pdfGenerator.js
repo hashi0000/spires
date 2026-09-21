@@ -7,6 +7,7 @@ exports.generateBookingPDF = generateBookingPDF;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const date_fns_1 = require("date-fns");
 const bankDetails_1 = require("./bankDetails");
+const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const documentTitleMap = {
     confirmation: "Booking Confirmation",
     booking_confirmation: "Booking Confirmation",
@@ -50,21 +51,48 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     const paymentMethodLabel = (booking.paymentMethod || "To be confirmed")
         .toString()
         .replace(/_/g, " ");
-    doc
-        .fontSize(11)
-        .text(`Booking Number: ${booking.bookingNumber || "N/A"}`)
-        .text(`Customer: ${booking.hirerName || booking.name || "Customer"}`)
-        .text(`Phone: ${booking.hirerPhone || booking.phone || ""}`)
-        .text(`Email: ${booking.hirerEmail || booking.email || ""}`)
-        .text(`Pickup: ${booking.pickupLocation || booking.pickup || ""}`)
-        .text(`Destination: ${booking.destination || ""}`)
-        .text(`Pickup Time: ${booking.pickupTime || dateLabel}`)
-        .text(`Status: ${booking.status || "pending"}`);
-    if (booking.flightNumber) {
-        doc.text(`Flight: ${booking.flightNumber}`);
+    const writeWrapped = (label, value) => {
+        doc.fontSize(11).text(`${label}: ${value || ""}`, { width: 500 });
+    };
+    writeWrapped("Booking Number", booking.bookingNumber || "N/A");
+    writeWrapped("Customer", booking.hirerName || booking.name || "Customer");
+    writeWrapped("Phone", booking.hirerPhone || booking.phone || "");
+    writeWrapped("Email", booking.hirerEmail || booking.email || "");
+    if ((0, airportWaitingPolicy_1.isReturnBooking)(booking)) {
+        doc.moveDown(0.4).fontSize(12).text("OUTBOUND JOURNEY", { underline: true }).fontSize(11);
+        writeWrapped("Date / pickup time", String(booking.pickupTime || dateLabel));
+        writeWrapped("Pickup", booking.pickupLocation || booking.pickup || "");
+        writeWrapped("Destination", booking.destination || "");
+        writeWrapped("Airport collection", booking.airportCollection ? "Yes" : "No");
+        if (booking.airportCollection && booking.flightNumber) {
+            writeWrapped("Flight", booking.flightNumber);
+        }
+        doc.moveDown(0.4).fontSize(12).text("RETURN JOURNEY", { underline: true }).fontSize(11);
+        writeWrapped("Date / pickup time", String(booking.returnPickupTime || booking.returnDateTime || ""));
+        writeWrapped("Pickup", booking.returnPickupLocation || "");
+        writeWrapped("Destination", booking.returnDestination || "");
+        writeWrapped("Airport collection", booking.returnAirportCollection ? "Yes" : "No");
+        if (booking.returnAirportCollection && booking.returnFlightNumber) {
+            writeWrapped("Flight", booking.returnFlightNumber);
+        }
     }
+    else {
+        writeWrapped("Pickup", booking.pickupLocation || booking.pickup || "");
+        writeWrapped("Destination", booking.destination || "");
+        writeWrapped("Pickup Time", String(booking.pickupTime || dateLabel));
+        if (booking.airportCollection) {
+            writeWrapped("Airport collection", "Yes");
+        }
+        if (booking.flightNumber) {
+            writeWrapped("Flight", booking.flightNumber);
+        }
+        if (booking.returnTrip && booking.returnDateTime) {
+            writeWrapped("Return", String(booking.returnDateTime));
+        }
+    }
+    writeWrapped("Status", booking.status || "pending");
     if (booking.terminal) {
-        doc.text(`Terminal: ${booking.terminal}`);
+        writeWrapped("Terminal", booking.terminal);
     }
     if (booking.vehicleType) {
         const vt = booking.vehicleType === "8_seater" || booking.vehicleType === "8-seater"
@@ -72,13 +100,10 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             : booking.vehicleType === "standard"
                 ? "Standard car"
                 : String(booking.vehicleType);
-        doc.text(`Vehicle requested: ${vt}`);
+        writeWrapped("Vehicle requested", vt);
     }
     if (booking.passengers) {
-        doc.text(`Passengers: ${booking.passengers}`);
-    }
-    if (booking.returnTrip && booking.returnDateTime) {
-        doc.text(`Return: ${booking.returnDateTime}`);
+        writeWrapped("Passengers", String(booking.passengers));
     }
     doc.moveDown();
     const fare = typeof booking.actualFare === "number"
@@ -89,13 +114,27 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     doc
         .text(`Payment Method: ${paymentMethodLabel}`)
         .text(`Payment Status: ${booking.paymentStatus || "pending"}`);
+    const hasSchedule = (booking.dueOnOutbound != null && String(booking.dueOnOutbound) !== "") ||
+        (booking.dueOnReturn != null && String(booking.dueOnReturn) !== "");
     if (hasFare) {
         doc.text(`Fare: £${fare.toFixed(2)}`);
     }
     else {
         doc.text("Fare: To be confirmed");
     }
-    if (booking.depositRequired) {
+    if (hasSchedule) {
+        const deposit = Number(booking.depositAmount);
+        const outbound = Number(booking.dueOnOutbound);
+        const ret = Number(booking.dueOnReturn);
+        doc.moveDown(0.4).fontSize(12).text("Payment Schedule", { underline: true }).fontSize(11);
+        if (Number.isFinite(deposit))
+            doc.text(`Deposit paid: £${deposit.toFixed(2)}`);
+        if (Number.isFinite(outbound))
+            doc.text(`Due on outbound journey: £${outbound.toFixed(2)}`);
+        if (Number.isFinite(ret))
+            doc.text(`Due on return journey: £${ret.toFixed(2)}`);
+    }
+    else if (booking.depositRequired) {
         const depAmt = Number(booking.depositAmount);
         const depLabel = booking.depositStatus === "paid"
             ? `Deposit: Paid${Number.isFinite(depAmt) ? ` (£${depAmt.toFixed(2)})` : ""}`
@@ -131,7 +170,18 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             .moveDown();
     }
     if (booking.notes) {
-        doc.moveDown(0.3).text(`Notes: ${booking.notes}`);
+        doc.moveDown(0.3).text(`Notes: ${booking.notes}`, { width: 500 });
+    }
+    if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)) {
+        doc
+            .moveDown(0.6)
+            .fontSize(10)
+            .fillColor("#334155")
+            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerTitle)(), { underline: true })
+            .fontSize(9)
+            .fillColor("#4b5563")
+            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)(airportWaitingPolicy_1.AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
+            .fillColor("black");
     }
     doc
         .moveDown()

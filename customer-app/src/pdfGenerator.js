@@ -3,6 +3,12 @@
 
 import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
 import { formatVehicleTypeLabel } from "./vehicleTypes";
+import {
+  AIRPORT_WAITING_POLICY,
+  airportWaitingDisclaimerBody,
+  airportWaitingDisclaimerTitle,
+  bookingHasAirportCollection,
+} from "./airportWaitingPolicy";
 
 const getDocumentTitle = (type = "booking_confirmation") => {
   switch (type) {
@@ -554,6 +560,40 @@ export const generateBookingPDF = (
 
                 <div class="info-box full-width">
                     <h2 class="section-header">Journey Details</h2>
+                    ${booking.bookingType === "return" || (booking.returnPickupLocation && booking.returnDestination) ? `
+                    <div style="margin-bottom:10px;">
+                        <div style="font-weight:700;color:#002147;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Outbound Journey</div>
+                        <div class="journey-section">
+                            <div class="journey-flow">
+                                <div class="journey-point">
+                                    <div class="journey-time">Pick up: ${formatTime(booking.dateTime || booking.pickupTime)}</div>
+                                    <div class="journey-location">${booking.pickup || booking.pickupLocation || "N/A"}</div>
+                                </div>
+                                <div class="journey-arrow">→</div>
+                                <div class="journey-point">
+                                    <div class="journey-location">${booking.destination || "N/A"}</div>
+                                </div>
+                            </div>
+                        </div>
+                        ${booking.airportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.flightNumber ? ` · ${booking.flightNumber}` : ""}</span></div>` : ""}
+                    </div>
+                    <div>
+                        <div style="font-weight:700;color:#002147;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Return Journey</div>
+                        <div class="journey-section">
+                            <div class="journey-flow">
+                                <div class="journey-point">
+                                    <div class="journey-time">Pick up: ${formatTime(booking.returnPickupTime || booking.returnDateTime)}</div>
+                                    <div class="journey-location">${booking.returnPickupLocation || "N/A"}</div>
+                                </div>
+                                <div class="journey-arrow">→</div>
+                                <div class="journey-point">
+                                    <div class="journey-location">${booking.returnDestination || "N/A"}</div>
+                                </div>
+                            </div>
+                        </div>
+                        ${booking.returnAirportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.returnFlightNumber ? ` · ${booking.returnFlightNumber}` : ""}</span></div>` : ""}
+                    </div>
+                    ` : `
                     <div class="journey-section">
                         <div class="journey-flow">
                             <div class="journey-point">
@@ -566,6 +606,8 @@ export const generateBookingPDF = (
                             </div>
                         </div>
                     </div>
+                    ${booking.airportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.flightNumber ? ` · ${booking.flightNumber}` : ""}</span></div>` : ""}
+                    `}
                 </div>
 
                 <div class="content-grid">
@@ -740,6 +782,21 @@ export const generateBookingPDF = (
                     <div style="font-size: 0.85rem; color: #555; padding: 4px 0;">
                         ${booking.notes}
                     </div>
+                </div>
+                ` : ''}
+                ${booking.dueOnOutbound != null || booking.dueOnReturn != null ? `
+                <div class="info-box full-width" style="margin-top: 10px;">
+                    <h2 class="section-header">Payment Schedule</h2>
+                    <div class="detail-row"><span class="detail-label">Total fare</span><span class="detail-value">${booking.actualFare ? `£${Number(booking.actualFare).toFixed(2)}` : "TBC"}</span></div>
+                    <div class="detail-row"><span class="detail-label">Deposit paid</span><span class="detail-value">£${Number(booking.depositAmount || 0).toFixed(2)}</span></div>
+                    <div class="detail-row"><span class="detail-label">Due on outbound journey</span><span class="detail-value">£${Number(booking.dueOnOutbound || 0).toFixed(2)}</span></div>
+                    <div class="detail-row"><span class="detail-label">Due on return journey</span><span class="detail-value">£${Number(booking.dueOnReturn || 0).toFixed(2)}</span></div>
+                </div>
+                ` : ''}
+                ${bookingHasAirportCollection(booking) ? `
+                <div style="margin-top:12px;padding:10px 12px;border:1px solid #e8e4da;border-radius:6px;background:#fbfaf7;color:#4b5563;font-size:0.72rem;line-height:1.45;">
+                    <div style="font-weight:700;color:#334155;margin-bottom:6px;">${airportWaitingDisclaimerTitle()}</div>
+                    ${airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY).split("\n\n").map((p) => `<p style="margin:0 0 6px;">${p}</p>`).join("")}
                 </div>
                 ` : ''}
             </div>
