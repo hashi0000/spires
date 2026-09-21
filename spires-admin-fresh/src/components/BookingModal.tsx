@@ -1,6 +1,6 @@
 // components/BookingModal.tsx - FIXED CLEAN VERSION
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Calculator, CreditCard, Receipt, Clock } from 'lucide-react';
+import { Plus, Minus, Calculator, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails';
@@ -504,19 +504,47 @@ const BookingModal: React.FC<BookingModalProps> = ({
         <div className="modal-header">
           <button className="modal-close" onClick={onClose}>×</button>
           <h3 className="modal-title">
-            {editingBooking ? 'Edit Booking' : initialDraft ? 'Create return trip' : 'Create New Booking'}
+            {editingBooking ? 'Edit Booking' : 'Create New Booking'}
           </h3>
           <p className="modal-subtitle">
             {editingBooking
               ? 'Update booking details and expenses'
-              : initialDraft
-                ? 'Pickup and destination are swapped from the original. Change date & time for the return leg below.'
-                : 'Create a new taxi booking with fare tracking'}
+              : 'Choose One Way or Return. A return stays on this same booking.'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
+            <div className="mb-6 p-4 rounded-lg border-2 border-blue-800 bg-blue-50">
+              <label className="block text-sm font-semibold text-blue-900 mb-1">Booking type *</label>
+              <select
+                value={formData.bookingType === 'return' ? 'return' : 'one_way'}
+                onChange={(e) => {
+                  const nextType = e.target.value === 'return' ? 'return' : 'one_way';
+                  setFormData((prev) => ({
+                    ...prev,
+                    bookingType: nextType,
+                    returnTrip: nextType === 'return',
+                    returnPickupLocation:
+                      nextType === 'return'
+                        ? (prev.returnPickupLocation || prev.destination)
+                        : prev.returnPickupLocation,
+                    returnDestination:
+                      nextType === 'return'
+                        ? (prev.returnDestination || prev.pickupLocation)
+                        : prev.returnDestination,
+                  }));
+                }}
+                className="form-input"
+              >
+                <option value="one_way">One Way</option>
+                <option value="return">Return</option>
+              </select>
+              <p className="text-xs text-blue-900 mt-1">
+                Return stays on this same booking confirmation. It does not create a second booking.
+              </p>
+            </div>
+
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-center mb-3">
                 <Clock className="w-5 h-5 text-blue-600 mr-2" />
@@ -597,36 +625,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <option value="in person">In Person</option>
                 <option value="internet">Internet</option>
               </select>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Booking type *</label>
-              <select
-                value={formData.bookingType === 'return' ? 'return' : 'one_way'}
-                onChange={(e) => {
-                  const nextType = e.target.value === 'return' ? 'return' : 'one_way';
-                  setFormData((prev) => ({
-                    ...prev,
-                    bookingType: nextType,
-                    returnTrip: nextType === 'return',
-                    returnPickupLocation:
-                      nextType === 'return'
-                        ? (prev.returnPickupLocation || prev.destination)
-                        : prev.returnPickupLocation,
-                    returnDestination:
-                      nextType === 'return'
-                        ? (prev.returnDestination || prev.pickupLocation)
-                        : prev.returnDestination,
-                  }));
-                }}
-                className="form-input"
-              >
-                <option value="one_way">One Way</option>
-                <option value="return">Return</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Return stays on this same booking confirmation. It does not create a second booking.
-              </p>
             </div>
 
             {locationSuggestions.length > 0 && (

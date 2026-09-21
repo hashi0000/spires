@@ -4,7 +4,6 @@ import {
   query,
   where,
   getDocs,
-  updateDoc,
   doc,
   getDoc,
   Timestamp,
@@ -235,7 +234,6 @@ export const searchBookings = async (
   }
 ): Promise<Booking[]> => {
   const bookingsRef = collection(db, 'bookings');
-  const results: Booking[] = [];
   const queries: any[] = [];
 
   try {
@@ -366,7 +364,6 @@ export const linkBookingsToCustomer = async (
     return { success: 0, failed: 0, errors: [] };
   }
 
-  const batch = writeBatch(db);
   const errors: string[] = [];
   let successCount = 0;
   let failedCount = 0;

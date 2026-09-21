@@ -113,7 +113,7 @@ export interface Booking {
 }
 
 // Extended booking interface for form handling
-export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAmount'> {
+export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAmount' | 'dueOnOutbound' | 'dueOnReturn'> {
   actualFare?: number | string;
   // Customer booking fields (from customer app)
   uid?: string;

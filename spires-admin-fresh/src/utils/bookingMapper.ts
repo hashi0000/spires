@@ -72,19 +72,7 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
   }
 
   // Keep pending as pending - admin will confirm it
-  // Map status: customer uses 'confirmed'/'paid', admin uses 'allocated'/'completed'
-  let status: Booking['status'] = 'pending';
-  if (customerBooking.status === 'pending') {
-    status = 'pending'; // Keep pending so admin can see and confirm
-  } else if (customerBooking.status === 'confirmed') {
-    status = 'allocated';
-  } else if (customerBooking.status === 'paid') {
-    status = 'completed';
-  } else if (customerBooking.status === 'cancelled') {
-    status = 'cancelled';
-  } else {
-    status = 'pending';
-  }
+  // Customer-facing status is mapped separately below to adminStatus.
 
   // Generate booking number if missing
   const bookingNumber = customerBooking.id 

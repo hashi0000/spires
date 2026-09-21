@@ -42,6 +42,8 @@ const LinkBookings: React.FC = () => {
     }, 500);
 
     return () => clearTimeout(timeoutId);
+    // Debounced search on the current term only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerSearchTerm]);
 
   const handleCustomerSearch = async () => {
