@@ -63,7 +63,13 @@ for (const file of files) {
   const html = fs.readFileSync(filePath, 'utf8');
   if (!isIndexable(html)) continue;
   const locPath = canonicalPath(html, file);
-  if (locPath.includes('/admin') || locPath.includes('/login')) continue;
+  if (
+    locPath.includes('/admin') ||
+    locPath.includes('/login') ||
+    locPath === '/share' ||
+    locPath.startsWith('/share/') ||
+    locPath.includes('spires-share')
+  ) continue;
   entries.push({
     loc: `${BASE}${locPath === '/' ? '/' : locPath}`,
     lastmod: lastmod(filePath),

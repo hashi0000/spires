@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareProposeOrJoin = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -116,3 +116,12 @@ Object.defineProperty(exports, "getSchoolInvoiceVault", { enumerable: true, get:
 Object.defineProperty(exports, "saveSchoolInvoiceVault", { enumerable: true, get: function () { return schoolInvoiceVault_1.saveSchoolInvoiceVault; } });
 var sendGeneralInvoiceEmail_1 = require("./sendGeneralInvoiceEmail");
 Object.defineProperty(exports, "sendGeneralInvoiceEmail", { enumerable: true, get: function () { return sendGeneralInvoiceEmail_1.sendGeneralInvoiceEmail; } });
+var callables_1 = require("./spiresShare/callables");
+Object.defineProperty(exports, "spiresShareGetState", { enumerable: true, get: function () { return callables_1.spiresShareGetState; } });
+Object.defineProperty(exports, "spiresShareSaveConfig", { enumerable: true, get: function () { return callables_1.spiresShareSaveConfig; } });
+Object.defineProperty(exports, "spiresShareSearch", { enumerable: true, get: function () { return callables_1.spiresShareSearch; } });
+Object.defineProperty(exports, "spiresShareProposeOrJoin", { enumerable: true, get: function () { return callables_1.spiresShareProposeOrJoin; } });
+Object.defineProperty(exports, "spiresShareAdminAction", { enumerable: true, get: function () { return callables_1.spiresShareAdminAction; } });
+Object.defineProperty(exports, "spiresSharePublicAccess", { enumerable: true, get: function () { return callables_1.spiresSharePublicAccess; } });
+Object.defineProperty(exports, "spiresShareRunTick", { enumerable: true, get: function () { return callables_1.spiresShareRunTick; } });
+Object.defineProperty(exports, "scheduledSpiresShareTick", { enumerable: true, get: function () { return callables_1.scheduledSpiresShareTick; } });

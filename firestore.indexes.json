@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "spiresShareJourneys",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "airportId", "order": "ASCENDING" },
+        { "fieldPath": "travelDate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

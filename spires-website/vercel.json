@@ -165,6 +165,26 @@
       "source": "/nav-snippet",
       "destination": "/",
       "statusCode": 301
+    },
+    {
+      "source": "/share",
+      "destination": "/404.html",
+      "statusCode": 404
+    },
+    {
+      "source": "/share/:path*",
+      "destination": "/404.html",
+      "statusCode": 404
+    },
+    {
+      "source": "/spires-share",
+      "destination": "/404.html",
+      "statusCode": 404
+    },
+    {
+      "source": "/spires-share/:path*",
+      "destination": "/404.html",
+      "statusCode": 404
     }
   ]
 }

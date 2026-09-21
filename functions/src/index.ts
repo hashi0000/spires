@@ -91,3 +91,13 @@ export { sendDriverReminderManual } from "./sendDriverReminderManual";
 export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";
+export {
+  spiresShareGetState,
+  spiresShareSaveConfig,
+  spiresShareSearch,
+  spiresShareProposeOrJoin,
+  spiresShareAdminAction,
+  spiresSharePublicAccess,
+  spiresShareRunTick,
+  scheduledSpiresShareTick,
+} from "./spiresShare/callables";

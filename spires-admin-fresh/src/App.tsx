@@ -24,6 +24,7 @@ import LinkBookings from './components/LinkBookings';
 import Customers from './components/Customers';
 import SchoolInvoices from './components/SchoolInvoices';
 import GeneralInvoices from './components/GeneralInvoices';
+import SpiresShareAdmin from './components/SpiresShareAdmin';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -415,6 +416,8 @@ const App: React.FC = () => {
         return <GeneralInvoices />;
       case 'school-invoices':
         return <SchoolInvoices />;
+      case 'spires-share':
+        return <SpiresShareAdmin />;
       case 'link-bookings':
         return <LinkBookings />;
       default:

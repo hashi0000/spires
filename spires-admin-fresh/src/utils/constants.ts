@@ -1,5 +1,5 @@
 // constants.ts - Put this in a separate file
-import { Calendar, Car, FileText, Users, Link2, UserCircle, Receipt, DollarSign } from 'lucide-react';
+import { Calendar, Car, FileText, Users, Link2, UserCircle, Receipt, DollarSign, Share2 } from 'lucide-react';
 
 export const navigation = [
   { id: 'dashboard', name: 'Dashboard', icon: Calendar },
@@ -9,6 +9,7 @@ export const navigation = [
   { id: 'customers', name: 'Customers', icon: UserCircle },
   { id: 'invoices', name: 'Invoices', icon: DollarSign },
   { id: 'school-invoices', name: 'School invoices', icon: Receipt },
+  { id: 'spires-share', name: 'Spires Share (dev)', icon: Share2 },
   { id: 'link-bookings', name: 'Link Bookings', icon: Link2 },
 ];
 

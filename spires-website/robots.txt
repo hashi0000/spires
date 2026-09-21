@@ -6,6 +6,8 @@ Allow: /images/
 
 Disallow: /login
 Disallow: /admin
+Disallow: /share
+Disallow: /spires-share
 Disallow: /node_modules/
 Disallow: /scripts/
 Disallow: /includes/

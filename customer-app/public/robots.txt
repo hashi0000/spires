@@ -2,6 +2,12 @@
 # Public content lives on https://www.spires-taxis.com
 User-agent: *
 Allow: /
+Disallow: /share
+Disallow: /spires-share
+Disallow: /login
 
 User-agent: bingbot
 Allow: /
+Disallow: /share
+Disallow: /spires-share
+Disallow: /login
