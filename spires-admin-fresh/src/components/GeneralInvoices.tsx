@@ -89,7 +89,7 @@ const GeneralInvoices: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"save" | "download" | "email" | "delete" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -364,7 +364,7 @@ const GeneralInvoices: React.FC = () => {
       setError("Choose an invoice to edit first.");
       return;
     }
-    setBusy(true);
+    setBusy("save");
     try {
       const record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
       await persistInvoiceRecord(record, vault);
@@ -372,7 +372,7 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the invoice.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -388,7 +388,7 @@ const GeneralInvoices: React.FC = () => {
       setError("Invoice vault is not loaded yet.");
       return;
     }
-    setBusy(true);
+    setBusy("download");
     try {
       let record: GeneratedGeneralInvoice;
       let nextVault = vault;
@@ -409,7 +409,7 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate the PDF.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -441,7 +441,7 @@ const GeneralInvoices: React.FC = () => {
     }
     const to = askInvoiceRecipient(customer.email);
     if (!to) return;
-    setBusy(true);
+    setBusy("email");
     try {
       let record: GeneratedGeneralInvoice;
       let nextVault = vault;
@@ -464,7 +464,7 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not email the invoice.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -474,7 +474,7 @@ const GeneralInvoices: React.FC = () => {
     if (!to) return;
     setError("");
     setStatus("");
-    setBusy(true);
+    setBusy("email");
     try {
       const sent = await emailGeneralInvoicePdf(row, supplier, to);
       await markEmailed(history, row.invoiceNumber, sent.to, vault);
@@ -486,7 +486,7 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not email the invoice.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -497,7 +497,7 @@ const GeneralInvoices: React.FC = () => {
     );
     if (!ok) return;
     setError("");
-    setBusy(true);
+    setBusy("delete");
     try {
       const invoices = history.filter((row) => row.id !== id);
       await persist({ ...vault, supplier, clients, invoices, seq: rebuildGeneralInvoiceSeq(invoices) });
@@ -506,21 +506,21 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete invoice.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   const redownloadInvoice = async (row: GeneratedGeneralInvoice) => {
     setError("");
     setStatus("");
-    setBusy(true);
+    setBusy("download");
     try {
       await downloadGeneralInvoicePdf(pdfInputFromRecord(row, supplier));
       setStatus(`PDF ${row.invoiceNumber} downloaded again.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not download the PDF.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -531,7 +531,7 @@ const GeneralInvoices: React.FC = () => {
     );
     if (!ok) return;
     setError("");
-    setBusy(true);
+    setBusy("delete");
     try {
       await persist({ ...vault, supplier, clients, invoices: [], seq: {} });
       resetCreateForm();
@@ -539,7 +539,7 @@ const GeneralInvoices: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear invoices.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -695,7 +695,7 @@ const GeneralInvoices: React.FC = () => {
             {editingInvoice ? `Edit invoice ${editingInvoice.invoiceNumber}` : "Create invoice"}
           </h3>
           {editingInvoice ? (
-            <button type="button" className="btn btn-sm" onClick={cancelEdit} disabled={busy}>
+            <button type="button" className="btn btn-sm" onClick={cancelEdit} disabled={Boolean(busy)}>
               Cancel edit
             </button>
           ) : null}
@@ -836,17 +836,17 @@ const GeneralInvoices: React.FC = () => {
 
         <div className="flex flex-wrap gap-2">
           {editingInvoice ? (
-            <button type="button" className="btn btn-primary" onClick={handleSaveEdit} disabled={busy}>
-              {busy ? "Saving…" : "Save changes"}
+            <button type="button" className="btn btn-primary" onClick={handleSaveEdit} disabled={Boolean(busy)}>
+              {busy === "save" ? "Saving…" : "Save changes"}
             </button>
           ) : null}
-          <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={busy}>
+          <button type="button" className="btn btn-primary" onClick={handleDownload} disabled={Boolean(busy)}>
             <Download className="h-4 w-4 mr-2" />
-            {busy ? "Preparing PDF…" : editingInvoice ? "Save and download PDF" : "Download PDF invoice"}
+            {busy === "download" ? "Preparing PDF…" : editingInvoice ? "Save and download PDF" : "Download PDF invoice"}
           </button>
-          <button type="button" className="btn btn-success" onClick={handleEmail} disabled={busy}>
+          <button type="button" className="btn btn-success" onClick={handleEmail} disabled={Boolean(busy)}>
             <Mail className="h-4 w-4 mr-2" />
-            {busy ? "Sending…" : editingInvoice ? "Save and email PDF" : "Email PDF invoice"}
+            {busy === "email" ? "Sending…" : editingInvoice ? "Save and email PDF" : "Email PDF invoice"}
           </button>
         </div>
         <p className="text-xs text-gray-500" style={{ marginTop: "0.75rem" }}>
@@ -858,7 +858,7 @@ const GeneralInvoices: React.FC = () => {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Recently generated</h3>
-            <button type="button" className="btn btn-danger btn-sm" onClick={clearGeneratedInvoices} disabled={busy}>
+            <button type="button" className="btn btn-danger btn-sm" onClick={clearGeneratedInvoices} disabled={Boolean(busy)}>
               Clear all
             </button>
           </div>
@@ -888,7 +888,7 @@ const GeneralInvoices: React.FC = () => {
                     type="button"
                     className="btn btn-primary btn-sm"
                     onClick={() => startEdit(row)}
-                    disabled={busy}
+                    disabled={Boolean(busy)}
                     title="Edit this invoice"
                     aria-label={`Edit invoice ${row.invoiceNumber}`}
                   >
@@ -898,7 +898,7 @@ const GeneralInvoices: React.FC = () => {
                     type="button"
                     className="btn btn-success btn-sm"
                     onClick={() => redownloadInvoice(row)}
-                    disabled={busy}
+                    disabled={Boolean(busy)}
                     title="Download this invoice PDF again"
                     aria-label={`Redownload invoice ${row.invoiceNumber}`}
                   >
@@ -908,7 +908,7 @@ const GeneralInvoices: React.FC = () => {
                     type="button"
                     className="btn btn-success btn-sm"
                     onClick={() => emailSavedInvoice(row)}
-                    disabled={busy}
+                    disabled={Boolean(busy)}
                     title={`Email this invoice (copy to ${SPIRES_OFFICE_EMAIL})`}
                     aria-label={`Email invoice ${row.invoiceNumber}`}
                   >
@@ -918,7 +918,7 @@ const GeneralInvoices: React.FC = () => {
                     type="button"
                     className="btn btn-danger btn-sm"
                     onClick={() => removeGeneratedInvoice(row.id, row.invoiceNumber)}
-                    disabled={busy}
+                    disabled={Boolean(busy)}
                     aria-label={`Delete invoice ${row.invoiceNumber}`}
                   >
                     <Trash2 className="h-4 w-4" />
