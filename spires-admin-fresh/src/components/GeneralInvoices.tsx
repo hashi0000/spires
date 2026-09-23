@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
+import { BadgeCheck, Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import {
   DEFAULT_GENERAL_SUPPLIER,
   FORM_PAYMENT_METHODS,
@@ -17,6 +17,7 @@ import {
   invoicePaymentMethodLabel,
   invoicePaymentTermsLabel,
   invoiceTotals,
+  isInvoicePaid,
   normaliseInvoicePaymentMethod,
   paymentTermsFromDates,
   sanitiseInvoicePrefix,
@@ -72,6 +73,8 @@ function pdfInputFromRecord(
     notes: row.notes,
     supplier,
     paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
+    paid: Boolean(row.paidAt),
+    paidAt: row.paidAt,
   };
 }
 
@@ -93,9 +96,10 @@ const GeneralInvoices: React.FC = () => {
   const [destination, setDestination] = useState("");
   const [lines, setLines] = useState<GeneralInvoiceLine[]>([emptyLine()]);
   const [notes, setNotes] = useState("");
+  const [paid, setPaid] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState<"save" | "download" | "email" | "delete" | null>(null);
+  const [busy, setBusy] = useState<"save" | "download" | "email" | "delete" | "paid" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -277,6 +281,7 @@ const GeneralInvoices: React.FC = () => {
     setDestination("");
     setLines([emptyLine()]);
     setNotes("");
+    setPaid(false);
   };
 
   const startEdit = (row: GeneratedGeneralInvoice) => {
@@ -306,6 +311,7 @@ const GeneralInvoices: React.FC = () => {
         : [emptyLine()]
     );
     setNotes(row.notes || "");
+    setPaid(isInvoicePaid(row));
     setError("");
     setStatus(`Editing ${row.invoiceNumber}. The invoice number stays the same.`);
     window.requestAnimationFrame(() => {
@@ -347,6 +353,7 @@ const GeneralInvoices: React.FC = () => {
       createdAt: existing?.createdAt || new Date().toISOString(),
       emailedAt: existing?.emailedAt,
       emailedTo: existing?.emailedTo,
+      paidAt: paid ? existing?.paidAt || new Date().toISOString() : undefined,
     };
   };
 
@@ -448,7 +455,7 @@ const GeneralInvoices: React.FC = () => {
       setError("Invoice vault is not loaded yet.");
       return;
     }
-    const to = askInvoiceRecipient(customer.email);
+    const to = askInvoiceRecipient(customer.email, paid);
     if (!to) return;
     setBusy("email");
     try {
@@ -479,7 +486,7 @@ const GeneralInvoices: React.FC = () => {
 
   const emailSavedInvoice = async (row: GeneratedGeneralInvoice) => {
     if (!vault) return;
-    const to = askInvoiceRecipient(row.customer.email);
+    const to = askInvoiceRecipient(row.customer.email, isInvoicePaid(row));
     if (!to) return;
     setError("");
     setStatus("");
@@ -489,13 +496,46 @@ const GeneralInvoices: React.FC = () => {
       await markEmailed(history, row.invoiceNumber, sent.to, vault);
       setStatus(
         sent.cc
-          ? `Invoice ${row.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
-          : `Invoice ${row.invoiceNumber} emailed to ${sent.to}.`
+          ? `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
+          : `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} emailed to ${sent.to}.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not email the invoice.");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const toggleInvoicePaid = async (row: GeneratedGeneralInvoice, makePaid: boolean) => {
+    if (!vault) return;
+    setError("");
+    setStatus("");
+    setBusy("paid");
+    let handedOffToEmail = false;
+    try {
+      const updated: GeneratedGeneralInvoice = {
+        ...row,
+        paidAt: makePaid ? row.paidAt || new Date().toISOString() : undefined,
+      };
+      const invoices = history.map((item) => (item.id === row.id ? updated : item));
+      await persist({ ...vault, supplier, clients, invoices });
+      if (editingId === row.id) setPaid(makePaid);
+      if (!makePaid) {
+        setStatus(`${row.invoiceNumber} marked as unpaid.`);
+        return;
+      }
+      setStatus(`${row.invoiceNumber} marked as paid. You can email the paid PDF from the mail button.`);
+      const sendNow = window.confirm(
+        `${row.invoiceNumber} is marked as paid. Email the paid invoice to the customer now?`
+      );
+      if (sendNow) {
+        handedOffToEmail = true;
+        await emailSavedInvoice(updated);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update paid status.");
+    } finally {
+      if (!handedOffToEmail) setBusy(null);
     }
   };
 
@@ -855,6 +895,15 @@ const GeneralInvoices: React.FC = () => {
           <textarea className="form-textarea" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Waiting time, extras, or payment notes" />
         </label>
 
+        <label className="form-group" style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.75rem" }}>
+          <input
+            type="checkbox"
+            checked={paid}
+            onChange={(e) => setPaid(e.target.checked)}
+          />
+          <span className="form-label" style={{ margin: 0 }}>Paid — add the PAID stamp to the PDF</span>
+        </label>
+
         <div className="school-invoice-totals">
           <div>Net total <strong>{formatGbp(totals.net)}</strong></div>
           <div>VAT total <strong>{formatGbp(totals.vat)}</strong></div>
@@ -876,7 +925,7 @@ const GeneralInvoices: React.FC = () => {
           </button>
           <button type="button" className="btn btn-success" onClick={handleEmail} disabled={Boolean(busy)}>
             <Mail className="h-4 w-4 mr-2" />
-            {busy === "email" ? "Sending…" : editingInvoice ? "Save and email PDF" : "Email PDF invoice"}
+            {busy === "email" ? "Sending…" : paid ? (editingInvoice ? "Save and email paid PDF" : "Email paid invoice") : editingInvoice ? "Save and email PDF" : "Email PDF invoice"}
           </button>
         </div>
         <p className="text-xs text-gray-500" style={{ marginTop: "0.75rem" }}>
@@ -893,7 +942,7 @@ const GeneralInvoices: React.FC = () => {
             </button>
           </div>
           <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-            Download again with the current headed paper, edit and re-save, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
+            Download again with the current headed paper, mark as paid to add the stamp, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
           </p>
           <ul className="text-sm space-y-2">
             {history.map((row) => (
@@ -911,6 +960,9 @@ const GeneralInvoices: React.FC = () => {
                   {invoicePaymentMethodLabel(row.paymentMethod)}
                   {" · "}
                   {formatGbp(invoiceTotals(row.lines).total)}
+                  {isInvoicePaid(row) ? (
+                    <div className="text-xs" style={{ color: "#166534", fontWeight: 600 }}>Paid{row.paidAt ? ` · ${formatUkDate(row.paidAt.slice(0, 10))}` : ""}</div>
+                  ) : null}
                   {row.emailedTo ? (
                     <div className="text-xs text-gray-500">Emailed to {row.emailedTo}</div>
                   ) : null}
@@ -939,10 +991,21 @@ const GeneralInvoices: React.FC = () => {
                   <button
                     type="button"
                     className="btn btn-success btn-sm"
+                    onClick={() => toggleInvoicePaid(row, !isInvoicePaid(row))}
+                    disabled={Boolean(busy)}
+                    title={isInvoicePaid(row) ? "Remove paid stamp" : "Mark as paid and add the PAID stamp"}
+                    aria-label={isInvoicePaid(row) ? `Mark invoice ${row.invoiceNumber} unpaid` : `Mark invoice ${row.invoiceNumber} paid`}
+                    style={isInvoicePaid(row) ? { background: "#166534", borderColor: "#166534" } : undefined}
+                  >
+                    <BadgeCheck className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm"
                     onClick={() => emailSavedInvoice(row)}
                     disabled={Boolean(busy)}
-                    title={`Email this invoice (copy to ${SPIRES_OFFICE_EMAIL})`}
-                    aria-label={`Email invoice ${row.invoiceNumber}`}
+                    title={isInvoicePaid(row) ? `Email paid invoice (copy to ${SPIRES_OFFICE_EMAIL})` : `Email this invoice (copy to ${SPIRES_OFFICE_EMAIL})`}
+                    aria-label={isInvoicePaid(row) ? `Email paid invoice ${row.invoiceNumber}` : `Email invoice ${row.invoiceNumber}`}
                   >
                     <Mail className="h-4 w-4" />
                   </button>

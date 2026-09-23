@@ -111,3 +111,28 @@ describe("invoice PDF payment method", () => {
     expect(html).not.toContain("Account number");
   });
 });
+
+describe("invoice PDF paid stamp", () => {
+  test("unpaid invoices do not show the paid stamp", () => {
+    const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-27"));
+    expect(html).not.toContain('aria-label="Paid"');
+    expect(html).not.toContain("This invoice has been paid.");
+    expect(html).toContain("Pay by Bank transfer");
+  });
+
+  test("paid invoices stamp PAID and hide bank details", () => {
+    const html = buildGeneralInvoiceHtml({
+      ...pdfInput("2026-09-20", "2026-09-27"),
+      paid: true,
+      paidAt: "2026-09-23",
+    });
+    expect(html).toContain('aria-label="Paid"');
+    expect(html).toContain(">PAID</text>");
+    expect(html).toContain("This invoice has been paid.");
+    expect(html).toContain("Paid on 23 September 2026");
+    expect(html).toContain("INVOICE — PAID");
+    expect(html).toContain("Amount paid");
+    expect(html).not.toContain("Please pay by bank transfer");
+    expect(html).not.toContain("Sort code");
+  });
+});

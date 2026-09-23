@@ -107,7 +107,12 @@ export type GeneratedGeneralInvoice = {
   createdAt: string;
   emailedAt?: string;
   emailedTo?: string;
+  paidAt?: string;
 };
+
+export function isInvoicePaid(row?: { paidAt?: string | null } | null): boolean {
+  return Boolean(row?.paidAt);
+}
 
 export const DEFAULT_GENERAL_SUPPLIER: InvoiceSupplierDetails = {
   providerName: SPIRES_BANK_DETAILS.accountName,

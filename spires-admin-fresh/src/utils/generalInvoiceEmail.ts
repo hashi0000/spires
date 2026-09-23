@@ -7,6 +7,7 @@ import {
   GeneratedGeneralInvoice,
   InvoiceSupplierDetails,
   invoiceTotals,
+  isInvoicePaid,
   normaliseInvoicePaymentMethod,
 } from "./generalInvoiceTypes";
 
@@ -14,9 +15,11 @@ export const SPIRES_OFFICE_EMAIL = "bookings@spires-taxis.com";
 const MAX_EMAIL_PDF_BYTES = 4 * 1024 * 1024;
 const sendInvoiceEmail = httpsCallable(functions, "sendGeneralInvoiceEmail");
 
-export function askInvoiceRecipient(suggested: string): string | null {
+export function askInvoiceRecipient(suggested: string, paid = false): string | null {
   const toInput = window.prompt(
-    `Send the invoice PDF to this address. A copy will go to ${SPIRES_OFFICE_EMAIL}.`,
+    paid
+      ? `Send the paid invoice PDF to this address. A copy will go to ${SPIRES_OFFICE_EMAIL}.`
+      : `Send the invoice PDF to this address. A copy will go to ${SPIRES_OFFICE_EMAIL}.`,
     suggested.trim()
   );
   const to = toInput?.trim() || "";
@@ -47,6 +50,8 @@ export async function emailGeneralInvoicePdf(
     notes: row.notes,
     supplier,
     paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
+    paid: isInvoicePaid(row),
+    paidAt: row.paidAt,
   });
   if (blob.size > MAX_EMAIL_PDF_BYTES) {
     throw new Error(
@@ -64,6 +69,8 @@ export async function emailGeneralInvoicePdf(
       dueDate: row.dueDate,
       paymentTerms: row.paymentTerms,
       paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
+      paid: isInvoicePaid(row),
+      paidAt: row.paidAt || "",
       total: invoiceTotals(row.lines).total,
     });
     const data = result.data as { success?: boolean; to?: string; cc?: string | null };

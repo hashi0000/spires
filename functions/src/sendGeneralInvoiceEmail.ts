@@ -138,6 +138,8 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
   const paymentTermsLabelText = invoicePaymentTermsLabel(invoiceDate, dueDate, termsRaw);
   const paymentMethodRaw = typeof data?.paymentMethod === "string" ? data.paymentMethod : "";
   const paymentInstruction = invoicePaymentInstruction(paymentMethodRaw, invoiceNumber);
+  const paid = data?.paid === true || data?.paid === "true";
+  const paidAt = typeof data?.paidAt === "string" ? data.paidAt.trim() : "";
   const total = Number(data?.total);
   if (!Number.isFinite(total) || total <= 0) {
     throw new functions.https.HttpsError("invalid-argument", "Invoice total is required.");
@@ -171,7 +173,20 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
   const cc =
     toEmail.toLowerCase() === officeCc.toLowerCase() ? undefined : officeCc;
 
-  const html = `
+  const paidDate = paidAt ? formatUkDate(paidAt.slice(0, 10)) : "";
+  const html = paid
+    ? `
+      <div style="font-family:sans-serif;font-size:16px;color:#333;">
+        <p>Dear ${escapeHtml(customerName)},</p>
+        <p>Thank you. Payment has been received for invoice <strong>${escapeHtml(invoiceNumber)}</strong> (${formatGbpHtml(total)})${paidDate ? ` on ${escapeHtml(paidDate)}` : ""}.</p>
+        <p>Please find attached your paid invoice.</p>
+        <p>
+          📱 <a href="tel:07776897772">07776 897772</a><br>
+          📧 <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
+          🌐 <a href="https://www.spires-taxis.com">www.spires-taxis.com</a>
+        </p>
+      </div>`
+    : `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${escapeHtml(customerName)},</p>
         <p>Please find attached invoice <strong>${escapeHtml(invoiceNumber)}</strong> for <strong>${formatGbpHtml(total)}</strong>.</p>
@@ -190,7 +205,7 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
     from: mailFrom(),
     to: toEmail,
     cc,
-    subject: `Invoice ${invoiceNumber} — Spires Taxis`,
+    subject: paid ? `Invoice ${invoiceNumber} — Paid — Spires Taxis` : `Invoice ${invoiceNumber} — Spires Taxis`,
     html,
     attachments: [
       {

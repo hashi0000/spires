@@ -41,6 +41,8 @@ export type GeneralInvoicePdfInput = {
   notes: string;
   supplier: InvoiceSupplierDetails;
   paymentMethod?: InvoicePaymentMethod;
+  paid?: boolean;
+  paidAt?: string;
 };
 
 /** A4 at 96dpi — same iframe width as booking confirmation PDFs. */
@@ -85,9 +87,19 @@ const CAPTURE_CSS = `
   .booking-pdf-root.pdf-email-capture .page-container {
     display: flex !important;
     flex-direction: column !important;
+    position: relative !important;
     width: 100% !important;
     min-height: ${A4_PX.height}px !important;
     height: auto !important;
+  }
+  .booking-pdf-root.pdf-email-capture .paid-stamp {
+    display: block !important;
+    position: absolute !important;
+    top: 190px !important;
+    right: 24px !important;
+    width: 240px !important;
+    height: 90px !important;
+    z-index: 4 !important;
   }
   .booking-pdf-root.pdf-email-capture .main-content {
     flex: 1 1 auto !important;
@@ -155,17 +167,31 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
   const totals = invoiceTotals(input.lines);
   const paymentMethod = normaliseInvoicePaymentMethod(input.paymentMethod);
   const payByLabel = invoicePaymentMethodLabel(paymentMethod);
-  const paymentNotice = `${esc(invoicePaymentInstruction(paymentMethod))} ${esc(
-    paymentDueNotice(input.invoiceDate, input.dueDate)
-  )}`;
+  const paid = Boolean(input.paid || input.paidAt);
+  const paidLabel = input.paidAt ? `Paid on ${formatUkDate(input.paidAt.slice(0, 10))}` : "Paid";
+  const paymentNotice = paid
+    ? `This invoice has been paid. Thank you.`
+    : `${esc(invoicePaymentInstruction(paymentMethod))} ${esc(
+        paymentDueNotice(input.invoiceDate, input.dueDate)
+      )}`;
   const bankRows =
-    paymentMethod === "bank_transfer"
+    !paid && paymentMethod === "bank_transfer"
       ? `
             <div class="detail-row"><span class="detail-label">Account name</span><span class="detail-value">${esc(input.supplier.accountName)}</span></div>
             <div class="detail-row"><span class="detail-label">Sort code</span><span class="detail-value">${esc(input.supplier.sortCode)}</span></div>
             <div class="detail-row"><span class="detail-label">Account number</span><span class="detail-value">${esc(input.supplier.accountNumber)}</span></div>
             <div class="detail-row"><span class="detail-label">Payment reference</span><span class="detail-value">${esc(input.invoiceNumber)}</span></div>`
       : "";
+  const paidStamp = paid
+    ? `<div class="paid-stamp" aria-label="Paid">
+         <svg xmlns="http://www.w3.org/2000/svg" width="240" height="90" viewBox="0 0 240 90">
+           <g transform="rotate(-16 120 45)">
+             <rect x="16" y="18" width="208" height="54" rx="6" fill="none" stroke="#9b1c1c" stroke-width="5"/>
+             <text x="120" y="55" text-anchor="middle" fill="#9b1c1c" font-family="Times New Roman, serif" font-size="34" font-weight="700" letter-spacing="8">PAID</text>
+           </g>
+         </svg>
+       </div>`
+    : "";
   const rows = input.lines
     .map((line) => {
       const vatLabel =
@@ -252,8 +278,18 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
     .booking-pdf-root .page-container {
       display: flex;
       flex-direction: column;
+      position: relative;
       min-height: 100vh;
       width: 100%;
+    }
+    .booking-pdf-root .paid-stamp {
+      position: absolute;
+      top: 190px;
+      right: 24px;
+      width: 240px;
+      height: 90px;
+      z-index: 4;
+      pointer-events: none;
     }
     @media print {
       .booking-pdf-root .page-container {
@@ -422,10 +458,11 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
           </div>
         </div>
       </div>
+      ${paidStamp}
 
       <div class="main-content">
         <div class="document-banner">
-          <span>INVOICE</span>
+          <span>${paid ? "INVOICE — PAID" : "INVOICE"}</span>
         </div>
 
         <div class="content-grid">
@@ -439,6 +476,7 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
             <div class="detail-row" style="margin-top:8px;"><span class="detail-label">Invoice date</span><span class="detail-value">${esc(formatUkDate(input.invoiceDate))}</span></div>
             <div class="detail-row"><span class="detail-label">Payment terms</span><span class="detail-value">${esc(invoicePaymentTermsLabel(input.invoiceDate, input.dueDate))}</span></div>
             <div class="detail-row"><span class="detail-label">Due date</span><span class="detail-value">${esc(formatUkDate(input.dueDate))}</span></div>
+            ${paid ? `<div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(paidLabel)}</span></div>` : ""}
           </div>
         </div>
 
@@ -472,10 +510,10 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
             <div class="notice">${paymentNotice}</div>
           </div>
           <div class="info-box">
-            <h2 class="section-header">Amount due</h2>
+            <h2 class="section-header">${paid ? "Amount paid" : "Amount due"}</h2>
             <div class="payment-summary">
               <div class="payment-amount">${formatGbpHtml(totals.total)}</div>
-              <div class="payment-method">Pay by ${esc(payByLabel)}</div>
+              <div class="payment-method">${paid ? esc(paidLabel) : `Pay by ${esc(payByLabel)}`}</div>
               <div style="margin-top:8px;font-size:0.8rem;opacity:0.95;">
                 Net ${formatGbpHtml(totals.net)} · VAT ${formatGbpHtml(totals.vat)}
               </div>
