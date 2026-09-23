@@ -2,12 +2,16 @@ import {
   formatGbpHtml,
   formatUkDate,
   invoiceTotals,
+  invoicePaymentInstruction,
+  invoicePaymentMethodLabel,
   invoicePaymentTermsLabel,
   lineNet,
   lineTotal,
   lineVat,
+  normaliseInvoicePaymentMethod,
   paymentDueNotice,
   GeneratedGeneralInvoice,
+  InvoicePaymentMethod,
   InvoiceSupplierDetails,
 } from "./generalInvoiceTypes";
 
@@ -36,6 +40,7 @@ export type GeneralInvoicePdfInput = {
   lines: GeneratedGeneralInvoice["lines"];
   notes: string;
   supplier: InvoiceSupplierDetails;
+  paymentMethod?: InvoicePaymentMethod;
 };
 
 /** A4 at 96dpi — same iframe width as booking confirmation PDFs. */
@@ -70,6 +75,8 @@ const CAPTURE_CSS = `
     margin: 0 !important;
     padding: 0 !important;
     width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture {
     font-size: 11px !important;
@@ -77,12 +84,15 @@ const CAPTURE_CSS = `
     -webkit-font-smoothing: antialiased;
     width: ${A4_PX.width}px !important;
     max-width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .page-container {
     display: flex !important;
     flex-direction: column !important;
     width: ${A4_PX.width}px !important;
     min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .main-content {
     flex: 1 1 auto !important;
@@ -141,8 +151,47 @@ const CAPTURE_CSS = `
   }
 `;
 
+function pinInvoiceFooterToA4(doc: Document, iframe?: HTMLIFrameElement): number {
+  const root = doc.querySelector(".booking-pdf-root") as HTMLElement | null;
+  const page = doc.querySelector(".page-container") as HTMLElement | null;
+  const footer = doc.querySelector(".footer") as HTMLElement | null;
+  const main = doc.querySelector(".main-content") as HTMLElement | null;
+  if (page) {
+    page.style.display = "flex";
+    page.style.flexDirection = "column";
+  }
+  if (main) main.style.flex = "1 1 auto";
+  if (footer) {
+    footer.style.marginTop = "auto";
+    footer.style.flex = "0 0 auto";
+  }
+  const contentHeight = Math.max(page?.scrollHeight || 0, root?.scrollHeight || 0, A4_PX.height);
+  const height = Math.max(A4_PX.height, contentHeight);
+  for (const el of [doc.documentElement, doc.body, root, page]) {
+    if (!el) continue;
+    el.style.width = `${A4_PX.width}px`;
+    el.style.minHeight = `${height}px`;
+    el.style.height = `${height}px`;
+  }
+  if (iframe) iframe.style.height = `${height}px`;
+  return height;
+}
+
 export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
   const totals = invoiceTotals(input.lines);
+  const paymentMethod = normaliseInvoicePaymentMethod(input.paymentMethod);
+  const payByLabel = invoicePaymentMethodLabel(paymentMethod);
+  const paymentNotice = `${esc(invoicePaymentInstruction(paymentMethod))} ${esc(
+    paymentDueNotice(input.invoiceDate, input.dueDate)
+  )}`;
+  const bankRows =
+    paymentMethod === "bank_transfer"
+      ? `
+            <div class="detail-row"><span class="detail-label">Account name</span><span class="detail-value">${esc(input.supplier.accountName)}</span></div>
+            <div class="detail-row"><span class="detail-label">Sort code</span><span class="detail-value">${esc(input.supplier.sortCode)}</span></div>
+            <div class="detail-row"><span class="detail-label">Account number</span><span class="detail-value">${esc(input.supplier.accountNumber)}</span></div>
+            <div class="detail-row"><span class="detail-label">Payment reference</span><span class="detail-value">${esc(input.invoiceNumber)}</span></div>`
+      : "";
   const rows = input.lines
     .map((line) => {
       const vatLabel =
@@ -444,19 +493,15 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
         <div class="content-grid">
           <div class="info-box">
             <h2 class="section-header">Payment details</h2>
-            <div class="detail-row"><span class="detail-label">Account name</span><span class="detail-value">${esc(input.supplier.accountName)}</span></div>
-            <div class="detail-row"><span class="detail-label">Sort code</span><span class="detail-value">${esc(input.supplier.sortCode)}</span></div>
-            <div class="detail-row"><span class="detail-label">Account number</span><span class="detail-value">${esc(input.supplier.accountNumber)}</span></div>
-            <div class="detail-row"><span class="detail-label">Payment reference</span><span class="detail-value">${esc(input.invoiceNumber)}</span></div>
-            <div class="notice">
-              Please pay by bank transfer using the invoice number as the payment reference. ${esc(paymentDueNotice(input.invoiceDate, input.dueDate))}
-            </div>
+            <div class="detail-row"><span class="detail-label">Pay by</span><span class="detail-value">${esc(payByLabel)}</span></div>
+            ${bankRows}
+            <div class="notice">${paymentNotice}</div>
           </div>
           <div class="info-box">
             <h2 class="section-header">Amount due</h2>
             <div class="payment-summary">
               <div class="payment-amount">${formatGbpHtml(totals.total)}</div>
-              <div class="payment-method">Total payable</div>
+              <div class="payment-method">Pay by ${esc(payByLabel)}</div>
               <div style="margin-top:8px;font-size:0.8rem;opacity:0.95;">
                 Net ${formatGbpHtml(totals.net)} · VAT ${formatGbpHtml(totals.vat)}
               </div>
@@ -511,6 +556,7 @@ async function withInvoicePdfDocument<T>(
     fix.setAttribute("data-pdf-email-capture", "true");
     fix.textContent = CAPTURE_CSS;
     doc.body.appendChild(fix);
+    pinInvoiceFooterToA4(doc, iframe);
 
     await new Promise<void>((r) => setTimeout(r, 900));
     if (doc.fonts?.ready) {
@@ -522,6 +568,7 @@ async function withInvoicePdfDocument<T>(
         window.requestAnimationFrame(() => r());
       });
     });
+    pinInvoiceFooterToA4(doc, iframe);
 
     return await run(doc);
   } finally {
@@ -534,7 +581,8 @@ export async function downloadGeneralInvoicePdf(input: GeneralInvoicePdfInput): 
   const html2pdf = (await import("html2pdf.js")).default;
   const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
   await withInvoicePdfDocument(html, async (doc) => {
-    await html2pdf().set(html2pdfOptions(filename)).from(doc.body).save();
+    const source = (doc.querySelector(".booking-pdf-root") as HTMLElement) || doc.body;
+    await html2pdf().set(html2pdfOptions(filename)).from(source).save();
   });
 }
 
@@ -543,7 +591,8 @@ export async function generateGeneralInvoicePdfBlob(input: GeneralInvoicePdfInpu
   const html2pdf = (await import("html2pdf.js")).default;
   const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
   return withInvoicePdfDocument(html, async (doc) => {
-    const blob = (await html2pdf().set(html2pdfOptions(filename)).from(doc.body).outputPdf("blob")) as Blob;
+    const source = (doc.querySelector(".booking-pdf-root") as HTMLElement) || doc.body;
+    const blob = (await html2pdf().set(html2pdfOptions(filename)).from(source).outputPdf("blob")) as Blob;
     return blob;
   });
 }

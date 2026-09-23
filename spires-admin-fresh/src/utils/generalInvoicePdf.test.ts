@@ -77,3 +77,37 @@ describe("invoice PDF payment wording", () => {
     expect(html).not.toContain("Due on receipt");
   });
 });
+
+describe("invoice PDF payment method", () => {
+  test("defaults to bank transfer details and the invoice number as the reference", () => {
+    const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-27"));
+    expect(html).toContain("Pay by");
+    expect(html).toContain("Bank transfer");
+    expect(html).toContain("Please pay by bank transfer using the invoice number as the payment reference.");
+    expect(html).toContain("Sort code");
+    expect(html).toContain("ST-INV-202609-001");
+  });
+
+  test("card invoices hide bank details and ask for card payment", () => {
+    const html = buildGeneralInvoiceHtml({
+      ...pdfInput("2026-09-20", "2026-09-27"),
+      paymentMethod: "card",
+    });
+    expect(html).toContain("Pay by Card");
+    expect(html).toContain("Please pay by card.");
+    expect(html).not.toContain("Please pay by bank transfer");
+    expect(html).not.toContain("Sort code");
+    expect(html).toContain("Payment is due within 7 days.");
+  });
+
+  test("cash invoices hide bank details and ask for cash", () => {
+    const html = buildGeneralInvoiceHtml({
+      ...pdfInput("2026-09-20", "2026-09-20"),
+      paymentMethod: "cash",
+    });
+    expect(html).toContain("Pay by Cash");
+    expect(html).toContain("Please pay in cash");
+    expect(html).not.toContain("Please pay by bank transfer");
+    expect(html).not.toContain("Account number");
+  });
+});

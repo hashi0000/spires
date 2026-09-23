@@ -2,9 +2,11 @@ import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import {
   DEFAULT_GENERAL_SUPPLIER,
+  FORM_PAYMENT_METHODS,
   GeneratedGeneralInvoice,
   GeneralInvoiceCustomer,
   GeneralInvoiceLine,
+  InvoicePaymentMethod,
   InvoicePaymentTerms,
   InvoiceSupplierDetails,
   SavedInvoiceClient,
@@ -12,8 +14,10 @@ import {
   formPaymentTermsValue,
   formatGbp,
   formatUkDate,
+  invoicePaymentMethodLabel,
   invoicePaymentTermsLabel,
   invoiceTotals,
+  normaliseInvoicePaymentMethod,
   paymentTermsFromDates,
   sanitiseInvoicePrefix,
   suggestInvoicePrefix,
@@ -67,6 +71,7 @@ function pdfInputFromRecord(
     lines: row.lines,
     notes: row.notes,
     supplier,
+    paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
   };
 }
 
@@ -80,6 +85,7 @@ const GeneralInvoices: React.FC = () => {
   const [customer, setCustomer] = useState<GeneralInvoiceCustomer>(emptyCustomer);
   const [invoiceDate, setInvoiceDate] = useState(() => todayIsoDate());
   const [paymentTerms, setPaymentTerms] = useState<InvoicePaymentTerms>("due_on_receipt");
+  const [paymentMethod, setPaymentMethod] = useState<InvoicePaymentMethod>("bank_transfer");
   const [dueDate, setDueDate] = useState(() => todayIsoDate());
   const [bookingNumber, setBookingNumber] = useState("");
   const [travelDate, setTravelDate] = useState("");
@@ -263,6 +269,7 @@ const GeneralInvoices: React.FC = () => {
     setCustomer(emptyCustomer());
     setInvoiceDate(todayIsoDate());
     setPaymentTerms("due_on_receipt");
+    setPaymentMethod("bank_transfer");
     setDueDate(todayIsoDate());
     setBookingNumber("");
     setTravelDate("");
@@ -288,6 +295,7 @@ const GeneralInvoices: React.FC = () => {
     setInvoiceDate(nextInvoiceDate);
     setDueDate(nextDueDate);
     setPaymentTerms(paymentTermsFromDates(nextInvoiceDate, nextDueDate));
+    setPaymentMethod(normaliseInvoicePaymentMethod(row.paymentMethod));
     setBookingNumber(row.bookingNumber || "");
     setTravelDate(row.travelDate || "");
     setPickup(row.pickup || "");
@@ -322,6 +330,7 @@ const GeneralInvoices: React.FC = () => {
       invoiceDate,
       dueDate,
       paymentTerms: paymentTermsFromDates(invoiceDate, dueDate),
+      paymentMethod,
       customer: {
         name: customer.name.trim(),
         address: customer.address.trim(),
@@ -760,6 +769,27 @@ const GeneralInvoices: React.FC = () => {
             </span>
           </label>
           <label className="form-group">
+            <span className="form-label">Pay by</span>
+            <select
+              className="form-select"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as InvoicePaymentMethod)}
+            >
+              {FORM_PAYMENT_METHODS.map((method) => (
+                <option key={method.value} value={method.value}>
+                  {method.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-500" style={{ marginTop: "0.35rem" }}>
+              {paymentMethod === "bank_transfer"
+                ? "Bank details and the invoice number as the payment reference will appear on the PDF."
+                : paymentMethod === "card"
+                  ? "The invoice will ask the customer to pay by card."
+                  : "The invoice will ask the customer to pay in cash."}
+            </span>
+          </label>
+          <label className="form-group">
             <span className="form-label">Customer name</span>
             <input className="form-input" value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
           </label>
@@ -877,6 +907,8 @@ const GeneralInvoices: React.FC = () => {
                   {row.dueDate ? ` · due ${formatUkDate(row.dueDate)}` : ""}
                   {" · "}
                   {invoicePaymentTermsLabel(row.invoiceDate, row.dueDate)}
+                  {" · "}
+                  {invoicePaymentMethodLabel(row.paymentMethod)}
                   {" · "}
                   {formatGbp(invoiceTotals(row.lines).total)}
                   {row.emailedTo ? (

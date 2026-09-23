@@ -1,7 +1,10 @@
 import {
   calendarDaysBetween,
   dueDateFor,
+  invoicePaymentInstruction,
+  invoicePaymentMethodLabel,
   invoicePaymentTermsLabel,
+  normaliseInvoicePaymentMethod,
   paymentDueNotice,
   paymentTermsFromDates,
 } from "./generalInvoiceTypes";
@@ -53,5 +56,23 @@ describe("invoice payment terms from due date", () => {
     expect(paymentTermsFromDates("2026-10-20", "2026-10-27")).toBe("7_days");
     expect(calendarDaysBetween("2026-03-25", "2026-04-01")).toBe(7);
     expect(paymentTermsFromDates("2026-03-25", "2026-04-01")).toBe("7_days");
+  });
+});
+
+describe("invoice payment method", () => {
+  test("missing or unknown values default to bank transfer", () => {
+    expect(normaliseInvoicePaymentMethod(undefined)).toBe("bank_transfer");
+    expect(normaliseInvoicePaymentMethod("account")).toBe("bank_transfer");
+    expect(invoicePaymentMethodLabel(undefined)).toBe("Bank transfer");
+    expect(invoicePaymentInstruction()).toContain("bank transfer");
+  });
+
+  test("card and cash keep their own instructions", () => {
+    expect(normaliseInvoicePaymentMethod("Card")).toBe("card");
+    expect(normaliseInvoicePaymentMethod("cash")).toBe("cash");
+    expect(invoicePaymentMethodLabel("card")).toBe("Card");
+    expect(invoicePaymentInstruction("card")).toContain("pay by card");
+    expect(invoicePaymentInstruction("cash")).toContain("pay in cash");
+    expect(invoicePaymentInstruction("card")).not.toContain("bank transfer");
   });
 });

@@ -65,6 +65,8 @@ const CAPTURE_CSS = `
     margin: 0 !important;
     padding: 0 !important;
     width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture {
     font-size: 11px !important;
@@ -72,12 +74,15 @@ const CAPTURE_CSS = `
     -webkit-font-smoothing: antialiased;
     width: ${A4_PX.width}px !important;
     max-width: ${A4_PX.width}px !important;
+    min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .page-container {
     display: flex !important;
     flex-direction: column !important;
     width: ${A4_PX.width}px !important;
     min-height: ${A4_PX.height}px !important;
+    height: ${A4_PX.height}px !important;
   }
   .booking-pdf-root.pdf-email-capture .main-content {
     flex: 1 1 auto !important;
@@ -135,6 +140,32 @@ const CAPTURE_CSS = `
     print-color-adjust: exact !important;
   }
 `;
+
+function pinInvoiceFooterToA4(doc: Document, iframe?: HTMLIFrameElement): number {
+  const root = doc.querySelector(".booking-pdf-root") as HTMLElement | null;
+  const page = doc.querySelector(".page-container") as HTMLElement | null;
+  const footer = doc.querySelector(".footer") as HTMLElement | null;
+  const main = doc.querySelector(".main-content") as HTMLElement | null;
+  if (page) {
+    page.style.display = "flex";
+    page.style.flexDirection = "column";
+  }
+  if (main) main.style.flex = "1 1 auto";
+  if (footer) {
+    footer.style.marginTop = "auto";
+    footer.style.flex = "0 0 auto";
+  }
+  const contentHeight = Math.max(page?.scrollHeight || 0, root?.scrollHeight || 0, A4_PX.height);
+  const height = Math.max(A4_PX.height, contentHeight);
+  for (const el of [doc.documentElement, doc.body, root, page]) {
+    if (!el) continue;
+    el.style.width = `${A4_PX.width}px`;
+    el.style.minHeight = `${height}px`;
+    el.style.height = `${height}px`;
+  }
+  if (iframe) iframe.style.height = `${height}px`;
+  return height;
+}
 
 export function buildSchoolInvoiceHtml(input: SchoolInvoicePdfInput): string {
   const totals = invoiceTotals(input.lines);
@@ -496,6 +527,7 @@ export async function downloadSchoolInvoicePdf(input: SchoolInvoicePdfInput): Pr
     fix.setAttribute("data-pdf-email-capture", "true");
     fix.textContent = CAPTURE_CSS;
     doc.body.appendChild(fix);
+    pinInvoiceFooterToA4(doc, iframe);
 
     await new Promise<void>((r) => setTimeout(r, 900));
     if (doc.fonts?.ready) {
@@ -507,8 +539,10 @@ export async function downloadSchoolInvoicePdf(input: SchoolInvoicePdfInput): Pr
         window.requestAnimationFrame(() => r());
       });
     });
+    pinInvoiceFooterToA4(doc, iframe);
 
-    await html2pdf().set(html2pdfOptions(filename)).from(doc.body).save();
+    const source = (doc.querySelector(".booking-pdf-root") as HTMLElement) || doc.body;
+    await html2pdf().set(html2pdfOptions(filename)).from(source).save();
   } finally {
     if (iframe.parentNode) document.body.removeChild(iframe);
   }

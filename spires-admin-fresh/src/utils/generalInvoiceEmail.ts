@@ -7,6 +7,7 @@ import {
   GeneratedGeneralInvoice,
   InvoiceSupplierDetails,
   invoiceTotals,
+  normaliseInvoicePaymentMethod,
 } from "./generalInvoiceTypes";
 
 export const SPIRES_OFFICE_EMAIL = "bookings@spires-taxis.com";
@@ -45,6 +46,7 @@ export async function emailGeneralInvoicePdf(
     lines: row.lines,
     notes: row.notes,
     supplier,
+    paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
   });
   if (blob.size > MAX_EMAIL_PDF_BYTES) {
     throw new Error(
@@ -61,6 +63,7 @@ export async function emailGeneralInvoicePdf(
       invoiceDate: row.invoiceDate,
       dueDate: row.dueDate,
       paymentTerms: row.paymentTerms,
+      paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
       total: invoiceTotals(row.lines).total,
     });
     const data = result.data as { success?: boolean; to?: string; cc?: string | null };

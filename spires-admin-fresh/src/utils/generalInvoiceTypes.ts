@@ -53,12 +53,49 @@ export type SavedInvoiceClient = {
   invoicePrefix: string;
 };
 
+export type InvoicePaymentMethod = "bank_transfer" | "card" | "cash";
+
+export const FORM_PAYMENT_METHODS: { value: InvoicePaymentMethod; label: string }[] = [
+  { value: "bank_transfer", label: "Bank transfer" },
+  { value: "card", label: "Card" },
+  { value: "cash", label: "Cash" },
+];
+
+export function normaliseInvoicePaymentMethod(raw?: string | null): InvoicePaymentMethod {
+  const n = String(raw || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .trim();
+  if (n === "card") return "card";
+  if (n === "cash") return "cash";
+  return "bank_transfer";
+}
+
+export function invoicePaymentMethodLabel(method?: string | null): string {
+  const normalised = normaliseInvoicePaymentMethod(method);
+  if (normalised === "card") return "Card";
+  if (normalised === "cash") return "Cash";
+  return "Bank transfer";
+}
+
+export function invoicePaymentInstruction(method?: string | null): string {
+  const normalised = normaliseInvoicePaymentMethod(method);
+  if (normalised === "card") {
+    return "Please pay by card. Call 07776 897772 to take payment, or pay the driver if a card machine is available.";
+  }
+  if (normalised === "cash") {
+    return "Please pay in cash to the driver or at the office.";
+  }
+  return "Please pay by bank transfer using the invoice number as the payment reference.";
+}
+
 export type GeneratedGeneralInvoice = {
   id: string;
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
   paymentTerms: InvoicePaymentTerms;
+  paymentMethod?: InvoicePaymentMethod;
   customer: GeneralInvoiceCustomer;
   clientId?: string;
   bookingNumber: string;

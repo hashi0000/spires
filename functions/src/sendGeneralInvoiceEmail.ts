@@ -76,6 +76,17 @@ function formatUkDate(iso: string): string {
   });
 }
 
+function invoicePaymentInstruction(methodRaw: string, invoiceNumber: string): string {
+  const n = methodRaw.toLowerCase().replace(/_/g, " ").trim();
+  if (n === "card") {
+    return "Please pay by card. Call 07776 897772 to take payment, or pay the driver if a card machine is available.";
+  }
+  if (n === "cash") {
+    return "Please pay in cash to the driver or at the office.";
+  }
+  return `Please pay by bank transfer using the invoice number (${invoiceNumber}) as the payment reference. Bank details are on the attached invoice.`;
+}
+
 function formatGbpHtml(n: number): string {
   const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
     minimumFractionDigits: 2,
@@ -125,6 +136,8 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
   const dueDate = typeof data?.dueDate === "string" ? data.dueDate.trim() : "";
   const termsRaw = typeof data?.paymentTerms === "string" ? data.paymentTerms : "";
   const paymentTermsLabelText = invoicePaymentTermsLabel(invoiceDate, dueDate, termsRaw);
+  const paymentMethodRaw = typeof data?.paymentMethod === "string" ? data.paymentMethod : "";
+  const paymentInstruction = invoicePaymentInstruction(paymentMethodRaw, invoiceNumber);
   const total = Number(data?.total);
   if (!Number.isFinite(total) || total <= 0) {
     throw new functions.https.HttpsError("invalid-argument", "Invoice total is required.");
@@ -165,7 +178,7 @@ export const sendGeneralInvoiceEmail = functions.https.onCall(async (data, conte
         <p>Payment terms: ${escapeHtml(paymentTermsLabelText)}${
           dueDate ? `. Due ${escapeHtml(formatUkDate(dueDate))}` : ""
         }${invoiceDate ? `. Invoice date: ${escapeHtml(formatUkDate(invoiceDate))}` : ""}.</p>
-        <p>Please pay by bank transfer using the invoice number as the payment reference. Bank details are on the attached invoice.</p>
+        <p>${escapeHtml(paymentInstruction)}</p>
         <p>
           📱 <a href="tel:07776897772">07776 897772</a><br>
           📧 <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
