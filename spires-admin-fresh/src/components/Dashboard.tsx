@@ -20,6 +20,23 @@ interface DashboardProps {
   onDesktopRemindersChange: (enabled: boolean) => void | Promise<void>;
 }
 
+const FUEL_API = 'https://www.spires-taxis.com/api/uk-fuel-prices';
+
+function formatFuelPence(value: unknown): string | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${n.toFixed(1)}p/L`;
+}
+
+function formatFuelWeek(value: unknown): string | null {
+  const raw = String(value || '').trim();
+  const m = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const UPCOMING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const UPCOMING_LIST_MAX = 20;
 
@@ -35,10 +52,29 @@ const Dashboard: React.FC<DashboardProps> = ({
   onDesktopRemindersChange
 }) => {
   const [now, setNow] = useState(() => new Date());
+  const [fuelInfo, setFuelInfo] = useState<{ petrol: string; diesel: string; updated: string } | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(FUEL_API, { headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || data.available !== true) return;
+        const petrol = formatFuelPence(data.petrolPence);
+        const diesel = formatFuelPence(data.dieselPence);
+        const updated = formatFuelWeek(data.weekCommencing);
+        if (!petrol || !diesel || !updated) return;
+        setFuelInfo({ petrol, diesel, updated });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const upcoming = useMemo(
@@ -185,6 +221,23 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
       
+      {fuelInfo && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Car className="h-5 w-5 text-slate-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">UK average fuel prices</h3>
+              <p className="text-sm text-gray-700 mt-1">
+                Petrol {fuelInfo.petrol} · Diesel {fuelInfo.diesel}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Last updated {fuelInfo.updated} · informational only, not linked to fares
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Oxford City Council Compliance</h3>
         <div className="space-y-2">

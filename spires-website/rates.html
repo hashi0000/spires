@@ -74,7 +74,15 @@
             "name": "What does fixed price mean?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "We agree your fare before the journey starts. You are not charged by a running meter."
+              "text": "We agree your fare before the journey starts. You are not charged by a running meter. The price confirmed at the time of booking is the price you pay, subject to any clearly stated waiting-time, parking or additional-stop charges."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why do airport prices change from time to time?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Our airport transfer fares are fixed in advance and are regularly reviewed to reflect journey distance, airport charges and vehicle operating costs, including fuel. A confirmed quote is not changed when published prices are later reviewed."
             }
           },
           {
@@ -172,7 +180,7 @@
       </nav>
       <p class="hero__label">Fixed fares</p>
       <h1>Taxi prices from Oxford</h1>
-      <p class="hero__lead">Clear fixed fares for pre-booked journeys from Oxford. Read the short note below before you compare airport prices — “return booking” and “one-way” are not the same thing.</p>
+      <p class="hero__lead">Clear fixed fares for pre-booked journeys from Oxford. Airport prices are agreed at the time of booking. Heathrow Standard Car now has published one-way and return prices; other airports are still listed as return-booking rates until they are updated independently.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="/contact" class="btn btn--outline">Ask for a quote</a>
@@ -182,10 +190,19 @@
 
   <section class="section">
     <div class="container">
+      <div class="callout fade-in" id="price-update">
+        <div class="price-notice">
+          <h2>A small update to our airport transfer prices</h2>
+          <p>Due to the current increase in fuel prices and other vehicle operating costs, we are making a small adjustment to our airport transfer fares.</p>
+          <p>We would love to continue operating at our previous prices, and we have tried to keep our fares as competitive as possible. However, with the recent rise in fuel costs, maintaining the same prices is becoming increasingly difficult without compromising the reliable service we aim to provide.</p>
+          <p>Our airport transfers will continue to be offered at a fixed price agreed at the time of booking, with no unexpected changes to your fare. We will also continue to offer a small saving when an outbound and return airport transfer are booked together.</p>
+          <p>Thank you to all of our customers, particularly those who continue to use Spires Taxis for their regular airport journeys. We greatly appreciate your continued support.</p>
+        </div>
+      </div>
       <div class="callout fade-in">
         <p><strong>How to read airport prices on this site</strong></p>
-        <p>The airport figures below are <strong>return-booking prices per leg</strong> for up to 4 passengers (and a separate column for the Mercedes Vito). That means the published amount applies when you book a return airport journey. A one-way-only trip is quoted separately — message us with date, flight and address.</p>
-        <p>Example: Heathrow at £87 is the return-booking rate for that leg, not an invented “from £87 somewhere on the internet” meter fare.</p>
+        <p>Heathrow Standard Car fares are published as a one-way price and a return price when both journeys are booked together. Other airports currently show a return-booking rate per leg until their one-way and return totals are set separately.</p>
+        <p>Our airport transfer fares are fixed in advance and are regularly reviewed to reflect journey distance, airport charges and vehicle operating costs. The price confirmed at the time of booking is the price you pay, subject to any clearly stated waiting-time, parking or additional-stop charges.</p>
       </div>
       <div class="section__header fade-in" style="margin-top:2.5rem;">
         <p class="section__eyebrow">What's included</p>
@@ -194,14 +211,10 @@
       </div>
       <ul class="included-list fade-in">
         <li>Pre-booked private hire service with fixed quoted fare</li>
-        <li>Standard luggage for the booked vehicle type</li>
+        <li>Standard luggage for the booked vehicle class</li>
         <li>Airport pickup coordination and flight status checks</li>
         <li>Card or cash payment options</li>
       </ul>
-      <figure class="media-figure fade-in">
-        <img src="/images/airport-price-guide.png" alt="Spires Taxis airport return booking price guide for Heathrow, Gatwick, Stansted, Luton, Birmingham, London City and Bristol" width="1200" height="800" loading="lazy" decoding="async">
-        <figcaption>Official airport return-booking price guide. Same figures as the table below.</figcaption>
-      </figure>
     </div>
   </section>
 
@@ -209,19 +222,19 @@
     <div class="container">
       <div class="price-block fade-in">
         <div class="price-block__head">
-          <h2>Airport return booking prices from Oxford</h2>
-          <p class="price-block__note">Per leg when you book a return airport journey. Includes flight monitoring, meet &amp; greet, airport charges and 50 minutes complimentary waiting from actual landing. One-way-only fares: ask for a quote.</p>
+          <h2>Airport prices from Oxford</h2>
+          <p class="price-block__note">Standard Car is typically a Toyota RAV4 / Corolla or similar (up to 4 passengers). Mercedes Vito prices are for up to 8 passengers. Includes flight monitoring, meet &amp; greet, airport charges and 50 minutes complimentary waiting from actual landing. The fare confirmed when you book is the fare you pay.</p>
         </div>
         <table class="price-table">
           <thead>
             <tr>
               <th>Airport</th>
-              <th>Up to 4 passengers</th>
+              <th>Standard Car</th>
               <th>Mercedes Vito (up to 8)</th>
             </tr>
           </thead>
           <tbody id="airport-price-tbody">
-            <tr><td><a href="/oxford-to-heathrow-taxi">Heathrow</a></td><td>From £87</td><td>From £110</td></tr>
+            <tr><td><a href="/oxford-to-heathrow-taxi">Heathrow</a></td><td>£95 one way / £185 return</td><td>From £110</td></tr>
             <tr><td><a href="/oxford-to-gatwick-taxi">Gatwick</a></td><td>From £130</td><td>From £170</td></tr>
             <tr><td>Stansted</td><td>From £145</td><td>From £180</td></tr>
             <tr><td><a href="/oxford-to-luton-taxi">Luton</a></td><td>From £100</td><td>From £125</td></tr>
@@ -230,7 +243,9 @@
             <tr><td>Bristol</td><td>From £162</td><td>From £195</td></tr>
           </tbody>
         </table>
-        <p style="margin-top:1rem;font-size:0.95rem;color:var(--text-muted);">One-way airport fares and larger vehicles — message us with your date, flight and pickup address for a confirmed quote.</p>
+        <p class="vehicle-disclaimer" data-spires-disclaimer>Vehicle models shown are examples of the type of vehicle normally provided. The exact make and model may vary depending on availability. We will provide a suitable vehicle for the passenger and luggage requirements confirmed at the time of booking.</p>
+        <p style="margin-top:1rem;font-size:0.95rem;color:var(--text-muted);">Larger vehicles and unpublished one-way fares — message us with your date, flight and pickup address for a confirmed quote. Existing quotes and confirmed bookings keep the fare originally agreed.</p>
+        <div id="uk-fuel-tracker" class="fuel-tracker" hidden></div>
       </div>
     </div>
   </section>
@@ -322,7 +337,11 @@
       <h2>Rates FAQ</h2>
       <details>
         <summary>What does fixed price mean?</summary>
-        <p>We agree your fare before the journey starts. You are not charged by a running meter.</p>
+        <p>We agree your fare before the journey starts. You are not charged by a running meter. The price confirmed at the time of booking is the price you pay, subject to any clearly stated waiting-time, parking or additional-stop charges.</p>
+      </details>
+      <details>
+        <summary>Why do airport prices change from time to time?</summary>
+        <p>Our airport transfer fares are fixed in advance and are regularly reviewed to reflect journey distance, airport charges and vehicle operating costs, including fuel. A confirmed quote is not changed when published prices are later reviewed.</p>
       </details>
       <details>
         <summary>Is airport parking included?</summary>
@@ -349,7 +368,7 @@
         <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow transfers</a></li>
         <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
         <li><a href="/how-airport-pickup-works">How we handle airport pickup</a></li>
-        <li><a href="/our-vehicles">Standard cars and the Mercedes Vito</a></li>
+        <li><a href="/our-vehicles">Standard Car and the Mercedes Vito</a></li>
         <li><a href="/student-taxis">Student taxis and discount</a></li>
       </ul>
     </div>
@@ -414,34 +433,10 @@
 <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="whatsapp-float no-print" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
+<script src="/js/airport-prices.js" defer></script>
 <script src="/js/main.js" defer></script>
 <!-- /SITE-FOOTER -->
-<script src="/js/airport-prices.js" defer></script>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  var data = window.SPIRES_AIRPORT_PRICES;
-  var tbody = document.getElementById("airport-price-tbody");
-  if (!data || !tbody) return;
-  var order = ["heathrow", "gatwick", "stansted", "luton", "birmingham", "londonCity", "bristol"];
-  var money = window.SPIRES_formatMoney;
-  tbody.innerHTML = order.map(function (id) {
-    var r = data.routes[id];
-    if (!r) return "";
-    var name = r.slug
-      ? '<a href="' + r.slug + '">' + r.name + "</a>"
-      : r.name;
-    return (
-      "<tr><td>" +
-      name +
-      "</td><td>From " +
-      money(r.upTo4) +
-      "</td><td>From " +
-      money(r.vitoUpTo8) +
-      "</td></tr>"
-    );
-  }).join("");
-});
-</script>
+<script src="/js/fuel-tracker.js" defer></script>
 
 </body>
 </html>

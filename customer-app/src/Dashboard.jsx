@@ -11,7 +11,7 @@ import {
   formatPaymentMethodLabel,
   isBankTransferMethod,
 } from "./bankDetails";
-import { formatVehicleTypeLabel } from "./vehicleTypes";
+import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import "./styles.css";
 
 export default function Dashboard() {
@@ -378,8 +378,13 @@ export default function Dashboard() {
 
                   {booking.vehicleType && (
                     <div className="booking-info-row">
-                      <span className="info-label">Vehicle:</span>
-                      <span className="info-value">{formatVehicleTypeLabel(booking.vehicleType)}</span>
+                      <span className="info-label">Vehicle class:</span>
+                      <span className="info-value">
+                        {formatVehicleTypeLabel(booking.vehicleType)}
+                        {vehicleClassExamples(booking.vehicleType) ? (
+                          <span className="vehicle-examples">{vehicleClassExamples(booking.vehicleType)}</span>
+                        ) : null}
+                      </span>
                     </div>
                   )}
 

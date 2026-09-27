@@ -829,7 +829,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Actual vehicle</label>
                 <select
                   value={formData.vehicleId || ''}
                   onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
@@ -924,7 +924,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle class</label>
                   <select
                     value={formData.vehicleType || ''}
                     onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value })}
@@ -935,6 +935,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                  {formData.vehicleType === 'standard' && (
+                    <p className="text-xs text-gray-500 mt-1">Toyota RAV4 / Corolla or similar — customer-facing class only.</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Deposit required?</label>

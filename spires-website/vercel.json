@@ -3,6 +3,15 @@
   "trailingSlash": false,
   "headers": [
     {
+      "source": "/api/uk-fuel-prices",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=43200, stale-while-revalidate=1209600"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {

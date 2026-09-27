@@ -8,6 +8,7 @@ const pdfkit_1 = __importDefault(require("pdfkit"));
 const date_fns_1 = require("date-fns");
 const bankDetails_1 = require("./bankDetails");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
+const vehicleTypes_1 = require("./vehicleTypes");
 const documentTitleMap = {
     confirmation: "Booking Confirmation",
     booking_confirmation: "Booking Confirmation",
@@ -95,12 +96,11 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         writeWrapped("Terminal", booking.terminal);
     }
     if (booking.vehicleType) {
-        const vt = booking.vehicleType === "8_seater" || booking.vehicleType === "8-seater"
-            ? "8-seater"
-            : booking.vehicleType === "standard"
-                ? "Standard car"
-                : String(booking.vehicleType);
-        writeWrapped("Vehicle requested", vt);
+        writeWrapped("Vehicle Class", (0, vehicleTypes_1.formatVehicleTypeLabel)(booking.vehicleType));
+        const examples = (0, vehicleTypes_1.vehicleClassExamples)(booking.vehicleType);
+        if (examples) {
+            doc.fontSize(10).fillColor("#555555").text(examples, { width: 500 }).fillColor("black");
+        }
     }
     if (booking.passengers) {
         writeWrapped("Passengers", String(booking.passengers));

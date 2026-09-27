@@ -11,6 +11,7 @@ import {
   isBankTransferMethod,
   normalizeBookingForEmail,
 } from "./bankDetails";
+import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 
 type EmailDocType =
   | "confirmation"
@@ -149,13 +150,13 @@ export async function notifyAdminNewBookingRequest(
           <tr><td style="padding:4px 8px;font-weight:600;">Destination</td><td style="padding:4px 8px;">${escapeHtml(n.destination || "—")}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">When</td><td style="padding:4px 8px;">${escapeHtml(String(n.pickupTime || "—"))}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Passengers</td><td style="padding:4px 8px;">${escapeHtml(String(booking.passengers ?? "—"))}</td></tr>
-          <tr><td style="padding:4px 8px;font-weight:600;">Vehicle</td><td style="padding:4px 8px;">${escapeHtml(
-            n.vehicleType === "8_seater" || n.vehicleType === "8-seater"
-              ? "8-seater"
-              : n.vehicleType === "standard"
-                ? "Standard car"
-                : n.vehicleType || "—"
-          )}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Vehicle Class</td><td style="padding:4px 8px;">${escapeHtml(
+            formatVehicleTypeLabel(n.vehicleType)
+          )}${
+            vehicleClassExamples(n.vehicleType)
+              ? `<br><span style="font-size:13px;color:#555;">${escapeHtml(vehicleClassExamples(n.vehicleType))}</span>`
+              : ""
+          }</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${escapeHtml(pay)}</td></tr>
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${escapeHtml(n.flightNumber)}${n.terminal ? ` · Terminal ${escapeHtml(n.terminal)}` : ""}</td></tr>` : ""}
           ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${escapeHtml(n.returnPickupLocation || "")} → ${escapeHtml(n.returnDestination || "")}</td></tr>` : ""}

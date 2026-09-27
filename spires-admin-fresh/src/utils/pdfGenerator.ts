@@ -1,7 +1,7 @@
 // utils/pdfGenerator.ts - Booking PDF Generator
 import { Booking, Driver, Vehicle } from "../types/types";
 import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
-import { formatVehicleTypeLabel } from "./vehicleTypes";
+import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
   AIRPORT_WAITING_POLICY,
   airportWaitingDisclaimerBody,
@@ -594,8 +594,14 @@ export function buildBookingConfirmationHtml(
                     }
 
                     <div class="detail-row" style="margin-top:10px;">
-                        <span class="detail-label">Vehicle requested</span>
-                        <span class="detail-value">${formatVehicleTypeLabel((booking as any).vehicleType)}</span>
+                        <span class="detail-label">Vehicle Class</span>
+                        <span class="detail-value">${formatVehicleTypeLabel((booking as any).vehicleType)}${
+                          vehicleClassExamples((booking as any).vehicleType)
+                            ? `<br><span style="font-size:0.82rem;color:#5c6570;font-weight:400;">${escapePdfText(
+                                vehicleClassExamples((booking as any).vehicleType)
+                              )}</span>`
+                            : ""
+                        }</span>
                     </div>
                     ${(booking as any).passengers ? `
                     <div class="detail-row">
@@ -622,7 +628,7 @@ export function buildBookingConfirmationHtml(
                         </div>
 
                         <div class="detail-row">
-                            <span class="detail-label">Vehicle</span>
+                            <span class="detail-label">Allocated vehicle</span>
                             <span class="detail-value">${
                               vehicle ? `${vehicle.make} ${vehicle.model}` : "Not assigned"
                             }</span>

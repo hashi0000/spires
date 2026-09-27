@@ -38,7 +38,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
-  <script src="/js/airport-prices.js" defer></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -66,17 +65,24 @@
         "offers": [
           {
             "@type": "Offer",
-            "name": "Heathrow return-booking rate — up to 4 passengers",
-            "price": "87",
+            "name": "Heathrow Standard Car — one way",
+            "price": "95",
             "priceCurrency": "GBP",
-            "description": "Per vehicle, per leg, when you book a return airport journey. Not a one-way-only fare. Not per passenger."
+            "description": "Per vehicle. Standard Car (Toyota RAV4 / Corolla or similar), up to 4 passengers. Not per passenger."
           },
           {
             "@type": "Offer",
-            "name": "Heathrow return-booking rate — Mercedes Vito up to 8 passengers",
+            "name": "Heathrow Standard Car — return",
+            "price": "185",
+            "priceCurrency": "GBP",
+            "description": "Per vehicle when outbound and return are booked together. Standard Car, up to 4 passengers. Not per passenger."
+          },
+          {
+            "@type": "Offer",
+            "name": "Heathrow Mercedes Vito return-booking rate — up to 8 passengers",
             "price": "110",
             "priceCurrency": "GBP",
-            "description": "Per vehicle, per leg, when you book a return airport journey. Not a one-way-only fare. Not per passenger."
+            "description": "Per vehicle, per leg, when you book a return airport journey in the Mercedes Vito. Not a one-way-only fare. Not per passenger."
           }
         ]
       },
@@ -103,7 +109,7 @@
             "name": "How much is a taxi from Oxford to Heathrow?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Our published return-booking rate is £87 per vehicle per leg for up to 4 passengers, and £110 per vehicle per leg for the Mercedes Vito (up to 8). That rate applies when you book a return airport journey. One-way-only fares are quoted separately."
+              "text": "Our published Standard Car fare is £95 one way and £185 return when both journeys are booked together. That is per vehicle, for up to 4 passengers (Toyota RAV4 / Corolla or similar). The Mercedes Vito is £110 per leg as a return-booking rate for up to 8 passengers. The price confirmed at the time of booking is the price you pay."
             }
           },
           {
@@ -175,7 +181,7 @@
             "name": "How much luggage can each vehicle carry?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "The standard car suits up to four passengers with normal holiday luggage. The Vito is better for larger groups or several large cases. Tell us passenger and bag counts when you book."
+              "text": "The Standard Car suits up to four passengers with normal holiday luggage. It is typically a Toyota RAV4, Toyota Corolla or another suitable comparable vehicle. The Vito is better for larger groups or several large cases. Tell us passenger and bag counts when you book."
             }
           },
           {
@@ -308,23 +314,23 @@
             <dd>T2, T3, T4 and T5</dd>
           </div>
           <div>
-            <dt>Standard vehicle</dt>
-            <dd>Toyota RAV4 · up to 4 passengers · per vehicle</dd>
+            <dt>Standard Car</dt>
+            <dd>Toyota RAV4 / Corolla or similar · up to 4 passengers · per vehicle</dd>
           </div>
           <div>
-            <dt>Return booking (RAV4)</dt>
-            <dd>£174 total · £87 each way</dd>
+            <dt>Standard Car prices</dt>
+            <dd><span data-spires-price="heathrow.standardCar.oneWay">£95</span> one way · <span data-spires-price="heathrow.standardCar.return">£185</span> return</dd>
           </div>
           <div>
             <dt>Larger vehicle</dt>
             <dd>Mercedes Vito · up to 8 passengers · per vehicle</dd>
           </div>
           <div>
-            <dt>Return booking (Vito)</dt>
+            <dt>Vito return booking</dt>
             <dd>£220 total · £110 each way</dd>
           </div>
         </dl>
-        <p class="route-glance__note">Prices are <strong>per vehicle</strong>, not per passenger, and apply when you book a return airport journey. One-way-only trips: <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20fixed%20one%20way%20quote%20for%20Oxford%20to%20Heathrow.">get a fixed one way quote</a>. Journey time is not guaranteed.</p>
+        <p class="route-glance__note">Prices are <strong>per vehicle</strong>, not per passenger. Standard Car one-way and return prices are published below. Mercedes Vito one-way trips: <a href="https://wa.me/447776897772?text=Hello%2C%20I%20would%20like%20a%20fixed%20one%20way%20quote%20for%20Oxford%20to%20Heathrow.">get a fixed quote</a>. Journey time is not guaranteed.</p>
       </div>
     </div>
   </section>
@@ -335,40 +341,32 @@
       <div class="section__header fade-in">
         <p class="section__eyebrow">Prices</p>
         <h2>Clear price and vehicle options</h2>
-        <p>Published figures are <strong>return-booking prices per leg</strong>: the amount for each direction when you book a return airport journey. Prices are <strong>per vehicle</strong>, not per passenger. One-way-only Heathrow trips are quoted separately.</p>
+        <p>Heathrow Standard Car fares are published as a one-way price and a return price when both journeys are booked together. Prices are <strong>per vehicle</strong>, not per passenger. Mercedes Vito one-way trips are quoted separately.</p>
       </div>
 
       <div class="callout fade-in" id="pricing-model-note">
         <p><strong>How to read these prices</strong></p>
-        <p>If you book Oxford → Heathrow and Heathrow → Oxford together as a return, each leg uses the return-booking rate below. Example for the standard car: £87 outbound + £87 return = <strong>£174</strong> for both legs (before any online return offer). A one-way-only booking is a different quote.</p>
+        <p>Standard Car: <strong data-spires-price="heathrow.standardCar.oneWay">£95</strong> one way, or <strong data-spires-price="heathrow.standardCar.return">£185</strong> when you book the outbound and return together. That is a small saving compared with two separate one-way bookings. The fare confirmed at the time of booking is the fare you pay. <a href="/rates#price-update">Why prices are reviewed</a>.</p>
       </div>
 
       <div class="price-options fade-in" id="heathrow-price-options" aria-live="polite">
         <article class="price-option">
-          <h3>Four-seater car</h3>
-          <p class="price-option__amount" data-price="upTo4">£87</p>
-          <p class="price-option__meta">Per vehicle · per leg · return booking</p>
-          <p>Up to 4 passengers. Suitable for most couples and small families with normal holiday luggage.</p>
+          <h3>Standard Car</h3>
+          <p class="price-option__examples">Toyota RAV4 / Corolla or similar</p>
+          <p class="price-option__amount"><span data-spires-price="heathrow.standardCar.oneWay">£95</span> <span class="price-option__unit">one way</span></p>
+          <p class="price-option__amount price-option__amount--secondary"><span data-spires-price="heathrow.standardCar.return">£185</span> <span class="price-option__unit">return</span></p>
+          <p class="price-save" data-spires-save="heathrow.standardCar">Save £5 when booking your return together</p>
+          <p class="price-option__meta">Per vehicle · up to 4 passengers</p>
+          <p>Suitable for most couples and small families with normal holiday luggage.</p>
         </article>
         <article class="price-option">
           <h3>Mercedes Vito (up to 8)</h3>
-          <p class="price-option__amount" data-price="vitoUpTo8">£110</p>
+          <p class="price-option__amount" data-spires-price="heathrow.vito.returnPerLeg">£110</p>
           <p class="price-option__meta">Per vehicle · per leg · return booking</p>
-          <p>Up to 8 passengers, or four adults with several large cases. Ask for the Vito when you enquire.</p>
-        </article>
-        <article class="price-option">
-          <h3>One-way journey</h3>
-          <p class="price-option__amount price-option__amount--muted">Quote</p>
-          <p class="price-option__meta">Per vehicle · one direction only</p>
-          <p>One-way-only fares are not published as a single fixed figure. WhatsApp or call with your date, address and terminal for a confirmed price.</p>
-        </article>
-        <article class="price-option">
-          <h3>Return booking (both legs)</h3>
-          <p class="price-option__amount" data-price="returnTotal4">£174</p>
-          <p class="price-option__meta">Standard car · both legs at return-booking rate</p>
-          <p>Two legs at £87 each for up to 4 passengers. Vito return total at the return-booking rate: <strong data-price="returnTotalVito">£220</strong>.</p>
+          <p>Up to 8 passengers, or four adults with several large cases. Ask for the Vito when you enquire. One-way quoted separately.</p>
         </article>
       </div>
+      <p class="vehicle-disclaimer fade-in" data-spires-disclaimer>Vehicle models shown are examples of the type of vehicle normally provided. The exact make and model may vary depending on availability. We will provide a suitable vehicle for the passenger and luggage requirements confirmed at the time of booking.</p>
 
       <p class="fade-in" style="margin-top:1.5rem;">Full airport list: <a href="/rates">airport transfer prices</a>. Vehicles: <a href="/our-vehicles">our vehicles</a>.</p>
 
@@ -449,9 +447,10 @@
       </div>
       <div class="grid grid-2 fade-in">
         <article class="card">
-          <h3>Up to 4 passengers</h3>
-          <p>Our standard airport cars — often a Toyota RAV4 — suit up to four passengers with normal holiday luggage (typically a couple of large cases plus smaller bags, depending on bag size).</p>
-          <p class="card__meta">Return-booking rate from Oxford to Heathrow: £87 per leg</p>
+          <h3>Standard Car</h3>
+          <p class="price-option__examples">Toyota RAV4 / Corolla or similar</p>
+          <p>Our Standard Car airport transfers are typically operated using vehicles such as our Toyota RAV4, Toyota Corolla or another suitable comparable vehicle, for up to four passengers with normal holiday luggage.</p>
+          <p class="card__meta"><span data-spires-price="heathrow.standardCar.oneWay">£95</span> one way · <span data-spires-price="heathrow.standardCar.return">£185</span> return</p>
         </article>
         <article class="card">
           <h3>Mercedes Vito — up to 8</h3>
@@ -515,7 +514,7 @@
       <div class="faq fade-in">
         <details>
           <summary>How much is a taxi from Oxford to Heathrow?</summary>
-          <p>Our published return-booking rate is <strong>£87 per vehicle per leg</strong> for up to 4 passengers, and <strong>£110 per vehicle per leg</strong> for the Mercedes Vito (up to 8). That rate applies when you book a return airport journey. One-way-only fares are quoted separately.</p>
+          <p>Our published Standard Car fare is <strong>£95 one way</strong> and <strong>£185 return</strong> when both journeys are booked together (up to 4 passengers). The Mercedes Vito is <strong>£110 per vehicle per leg</strong> as a return-booking rate (up to 8). The price confirmed at the time of booking is the price you pay.</p>
         </details>
         <details>
           <summary>Is the displayed price per passenger or per vehicle?</summary>
@@ -551,7 +550,7 @@
         </details>
         <details>
           <summary>How much luggage can each vehicle carry?</summary>
-          <p>Standard car: up to four passengers with normal holiday bags. Vito: better for larger groups or several large cases. Tell us passenger and bag counts when you book — see <a href="/our-vehicles">our vehicles</a>.</p>
+          <p>Standard Car: up to four passengers with normal holiday bags, typically a Toyota RAV4, Toyota Corolla or similar. Vito: better for larger groups or several large cases. Tell us passenger and bag counts when you book — see <a href="/our-vehicles">our vehicles</a>.</p>
         </details>
         <details>
           <summary>Can students receive a discount?</summary>
@@ -631,6 +630,7 @@
 <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="whatsapp-float no-print" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
+<script src="/js/airport-prices.js" defer></script>
 <script src="/js/main.js" defer></script>
 <!-- /SITE-FOOTER -->
 

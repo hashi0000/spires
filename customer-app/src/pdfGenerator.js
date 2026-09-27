@@ -2,7 +2,7 @@
 // Matches admin app style with WhatsApp integration
 
 import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
-import { formatVehicleTypeLabel } from "./vehicleTypes";
+import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
   AIRPORT_WAITING_POLICY,
   airportWaitingDisclaimerBody,
@@ -618,8 +618,12 @@ export const generateBookingPDF = (
                             <span class="detail-value">${booking.passengers || 1}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">Vehicle</span>
-                            <span class="detail-value">${formatVehicleTypeLabel(booking.vehicleType)}</span>
+                            <span class="detail-label">Vehicle Class</span>
+                            <span class="detail-value">${formatVehicleTypeLabel(booking.vehicleType)}${
+                              vehicleClassExamples(booking.vehicleType)
+                                ? `<br><span style="font-size:0.82rem;color:#5c6570;font-weight:400;">${vehicleClassExamples(booking.vehicleType)}</span>`
+                                : ""
+                            }</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Luggage</span>
@@ -651,7 +655,7 @@ export const generateBookingPDF = (
                             <span class="detail-value">${driver ? driver.name : 'Not assigned'}</span>
                         </div>
                         <div class="detail-row">
-                            <span class="detail-label">Vehicle</span>
+                            <span class="detail-label">Allocated vehicle</span>
                             <span class="detail-value">${vehicle ? `${vehicle.make || ''} ${vehicle.model || ''}`.trim() || vehicle.registration : 'Not assigned'}</span>
                         </div>
                         <div class="detail-row">

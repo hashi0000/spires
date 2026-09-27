@@ -674,6 +674,8 @@ a.btn-primary, .btn.btn-primary {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
   overflow: hidden;
   margin-bottom: 2rem;
 }
@@ -995,6 +997,163 @@ a.btn-primary, .btn.btn-primary {
   font-size: 0.95rem;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+.price-option__examples {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  margin: 0 0 0.65rem;
+}
+
+.price-option__amount--secondary {
+  font-size: 1.45rem;
+  margin-top: 0.15rem;
+}
+
+.price-option__unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.price-save {
+  display: inline-block;
+  margin: 0.45rem 0 0.7rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--blue);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.price-save--table {
+  display: block;
+  width: fit-content;
+  margin: 0.4rem 0 0;
+}
+
+.price-notice {
+  max-width: 42rem;
+}
+
+.price-notice h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.price-notice p {
+  margin-bottom: 0.75rem;
+  color: var(--text);
+}
+
+.price-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.vehicle-disclaimer {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 0.85rem;
+}
+
+.card__price-lines {
+  margin: 0.45rem 0 0.25rem;
+}
+
+.card__price-lines .card__price {
+  margin: 0.1rem 0;
+  font-size: 1.25rem;
+}
+
+.fuel-tracker {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.fuel-tracker[hidden] {
+  display: none;
+}
+
+.fuel-tracker__head h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem;
+}
+
+.fuel-tracker__head p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0 0 0.9rem;
+}
+
+.fuel-tracker__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.fuel-tracker__item {
+  background: var(--blue-soft);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+}
+
+.fuel-tracker__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.fuel-tracker__value {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.fuel-tracker__meta,
+.fuel-tracker__source {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.7rem 0 0;
+}
+
+.fuel-tracker__source a {
+  color: var(--blue-mid);
+}
+
+@media (max-width: 640px) {
+  .fuel-tracker__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .price-option__amount {
+    font-size: 1.65rem;
+  }
+
+  .price-option__amount--secondary {
+    font-size: 1.3rem;
+  }
+
+  .price-table th,
+  .price-table td {
+    padding: 0.7rem 0.75rem;
+    font-size: 0.92rem;
+  }
+
+  .price-table td:last-child {
+    white-space: normal;
+  }
 }
 
 .terminal-list {

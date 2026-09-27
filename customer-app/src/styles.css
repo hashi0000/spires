@@ -715,3 +715,56 @@ input::placeholder {
     text-align: left;
   }
 }
+
+.vehicle-picker {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.vehicle-picker__option {
+  display: block;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+  background: #fff;
+}
+
+.vehicle-picker__option.is-selected {
+  border-color: #1d3c74;
+  box-shadow: 0 0 0 3px rgba(29, 60, 116, 0.1);
+}
+
+.vehicle-picker__option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vehicle-picker__name {
+  display: block;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+
+.vehicle-picker__examples,
+.vehicle-picker__capacity {
+  display: block;
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
+.vehicle-disclaimer {
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.vehicle-examples {
+  display: block;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 400;
+}

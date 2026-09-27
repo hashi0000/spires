@@ -11,6 +11,7 @@ import {
   bookingHasAirportCollection,
   isReturnBooking,
 } from "./airportWaitingPolicy";
+import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 
 type PDFDocumentType =
   | "confirmation"
@@ -119,13 +120,11 @@ export async function generateBookingPDF(
     writeWrapped("Terminal", booking.terminal);
   }
   if (booking.vehicleType) {
-    const vt =
-      booking.vehicleType === "8_seater" || booking.vehicleType === "8-seater"
-        ? "8-seater"
-        : booking.vehicleType === "standard"
-          ? "Standard car"
-          : String(booking.vehicleType);
-    writeWrapped("Vehicle requested", vt);
+    writeWrapped("Vehicle Class", formatVehicleTypeLabel(booking.vehicleType));
+    const examples = vehicleClassExamples(booking.vehicleType);
+    if (examples) {
+      doc.fontSize(10).fillColor("#555555").text(examples, { width: 500 }).fillColor("black");
+    }
   }
   if (booking.passengers) {
     writeWrapped("Passengers", String(booking.passengers));

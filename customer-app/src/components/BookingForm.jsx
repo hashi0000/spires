@@ -5,6 +5,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from "../bankDetails";
 import {
   VEHICLE_TYPES,
+  VEHICLE_ALLOCATION_DISCLAIMER,
   maxPassengersForVehicle,
 } from "../vehicleTypes";
 import "../styles.css";
@@ -150,7 +151,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     if (!formData.vehicleType) {
-      setError("Please choose a standard car or 8-seater.");
+      setError("Please choose a Standard Car or 8-seater.");
       setSubmitting(false);
       return;
     }
@@ -161,7 +162,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       setError(
         formData.vehicleType === "8_seater"
           ? "An 8-seater can take up to 8 passengers."
-          : "A standard car can take up to 4 passengers. Please choose the 8-seater for larger groups."
+          : "A Standard Car can take up to 4 passengers. Please choose the 8-seater for larger groups."
       );
       setSubmitting(false);
       return;
@@ -530,40 +531,41 @@ export default function BookingForm({ onClose, onBookingCreated }) {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
-              Vehicle type *
-            </label>
-            <select
-              name="vehicleType"
-              value={formData.vehicleType}
-              onChange={(e) => {
-                const vehicleType = e.target.value;
-                const maxPax = maxPassengersForVehicle(vehicleType);
-                const pax = parseInt(formData.passengers, 10) || 1;
-                setFormData({
-                  ...formData,
-                  vehicleType,
-                  passengers: String(Math.min(pax, maxPax)),
-                });
-              }}
-              required
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '1rem',
-                color: '#0b1c3d',
-                background: '#fff',
-              }}
-            >
-              <option value="">Select vehicle</option>
-              {VEHICLE_TYPES.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <span style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
+              Vehicle class *
+            </span>
+            <div className="vehicle-picker" role="radiogroup" aria-label="Vehicle class">
+              {VEHICLE_TYPES.map((opt) => {
+                const selected = formData.vehicleType === opt.value;
+                return (
+                  <label
+                    key={opt.value}
+                    className={`vehicle-picker__option${selected ? " is-selected" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="vehicleType"
+                      value={opt.value}
+                      checked={selected}
+                      required={opt.value === "standard"}
+                      onChange={() => {
+                        const maxPax = maxPassengersForVehicle(opt.value);
+                        const pax = parseInt(formData.passengers, 10) || 1;
+                        setFormData({
+                          ...formData,
+                          vehicleType: opt.value,
+                          passengers: String(Math.min(pax, maxPax)),
+                        });
+                      }}
+                    />
+                    <span className="vehicle-picker__name">{opt.label}</span>
+                    <span className="vehicle-picker__examples">{opt.examples}</span>
+                    <span className="vehicle-picker__capacity">{opt.capacity}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
                 Groups over 4 need the 8-seater.

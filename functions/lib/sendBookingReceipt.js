@@ -39,6 +39,7 @@ const functions = __importStar(require("firebase-functions"));
 const pdfGenerator_1 = require("./pdfGenerator");
 const driverReminderEmail_1 = require("./driverReminderEmail");
 const bankDetails_1 = require("./bankDetails");
+const vehicleTypes_1 = require("./vehicleTypes");
 const getSubjectLine = (type, bookingNumber) => {
     switch (type) {
         case "payment":
@@ -142,11 +143,9 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
           <tr><td style="padding:4px 8px;font-weight:600;">Destination</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.destination || "—")}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">When</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(String(n.pickupTime || "—"))}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Passengers</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(String(booking.passengers ?? "—"))}</td></tr>
-          <tr><td style="padding:4px 8px;font-weight:600;">Vehicle</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.vehicleType === "8_seater" || n.vehicleType === "8-seater"
-            ? "8-seater"
-            : n.vehicleType === "standard"
-                ? "Standard car"
-                : n.vehicleType || "—")}</td></tr>
+          <tr><td style="padding:4px 8px;font-weight:600;">Vehicle Class</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)((0, vehicleTypes_1.formatVehicleTypeLabel)(n.vehicleType))}${(0, vehicleTypes_1.vehicleClassExamples)(n.vehicleType)
+            ? `<br><span style="font-size:13px;color:#555;">${(0, driverReminderEmail_1.escapeHtml)((0, vehicleTypes_1.vehicleClassExamples)(n.vehicleType))}</span>`
+            : ""}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(pay)}</td></tr>
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.flightNumber)}${n.terminal ? ` · Terminal ${(0, driverReminderEmail_1.escapeHtml)(n.terminal)}` : ""}</td></tr>` : ""}
           ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.returnPickupLocation || "")} → ${(0, driverReminderEmail_1.escapeHtml)(n.returnDestination || "")}</td></tr>` : ""}

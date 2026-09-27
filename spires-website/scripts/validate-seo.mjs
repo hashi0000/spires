@@ -77,6 +77,7 @@ for (const f of files) {
 const forbidden = [
   ['Valid until Dec 31st 2025', /Valid until Dec 31st 2025/i],
   ['From £85', /From £85/],
+  ['From £87', /From £87/],
   ['Admin Panel', /Admin Panel/],
   ['Oxford’s Newest Premium Taxi Service', /Newest Premium Taxi Service/i],
   ['PayPal', /PayPal/i],
