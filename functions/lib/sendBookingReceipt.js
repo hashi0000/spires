@@ -40,6 +40,7 @@ const pdfGenerator_1 = require("./pdfGenerator");
 const driverReminderEmail_1 = require("./driverReminderEmail");
 const bankDetails_1 = require("./bankDetails");
 const vehicleTypes_1 = require("./vehicleTypes");
+const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const getSubjectLine = (type, bookingNumber) => {
     switch (type) {
         case "payment":
@@ -66,8 +67,12 @@ const getIntroCopy = (type, booking) => {
             return `<p>We've received your payment. Your receipt is attached below.</p>`;
         case "payment_request":
             return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
-        default:
-            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}`;
+        default: {
+            const collectionNote = (0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)
+                ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)())}</p>`
+                : "";
+            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}`;
+        }
     }
 };
 const getFilenamePrefix = (type) => {

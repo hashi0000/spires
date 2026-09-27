@@ -122,6 +122,9 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     else {
         doc.text("Fare: To be confirmed");
     }
+    if ((0, airportWaitingPolicy_1.bookingLooksLikeAirportTransfer)(booking)) {
+        doc.fontSize(10).text("Standard airport charge included").fontSize(11);
+    }
     if (hasSchedule) {
         const deposit = Number(booking.depositAmount);
         const outbound = Number(booking.dueOnOutbound);
@@ -173,13 +176,18 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         doc.moveDown(0.3).text(`Notes: ${booking.notes}`, { width: 500 });
     }
     if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)) {
+        const scope = (0, airportWaitingPolicy_1.airportWaitingScopeNote)(booking);
         doc
             .moveDown(0.6)
             .fontSize(10)
             .fillColor("#334155")
             .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerTitle)(), { underline: true })
             .fontSize(9)
-            .fillColor("#4b5563")
+            .fillColor("#4b5563");
+        if (scope) {
+            doc.text(scope, { width: 500, lineGap: 2 }).moveDown(0.2);
+        }
+        doc
             .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)(airportWaitingPolicy_1.AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
             .fillColor("black");
     }

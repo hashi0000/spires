@@ -5,6 +5,10 @@ import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
+import {
+  airportWaitingWebsiteBody,
+  calculateAirportWaitingCharge,
+} from '../utils/airportWaitingPolicy';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import {
@@ -32,6 +36,35 @@ interface BookingModalProps {
   /** Pre-fill a new booking (e.g. return trip); ignored when editing */
   initialDraft?: Partial<ExtendedBooking> | null;
 }
+
+const AirportWaitingAdminNote: React.FC = () => {
+  const [minutes, setMinutes] = useState('');
+  const parsed = Number(minutes);
+  const charge = Number.isFinite(parsed) && minutes !== '' ? calculateAirportWaitingCharge(parsed) : null;
+  return (
+    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-gray-800">
+      <h4 className="mb-2 font-semibold text-gray-900">Airport collection waiting</h4>
+      {airportWaitingWebsiteBody().split('\n\n').map((para) => (
+        <p key={para.slice(0, 48)} className="mb-2">{para}</p>
+      ))}
+      <p className="mt-2">The standard airport pickup charge is included in the fare. Extra waiting is recorded manually. Do not change a confirmed fare automatically.</p>
+      <label className="mt-3 block text-sm font-medium text-gray-700">Minutes after actual landing</label>
+      <div className="mt-1 flex items-center gap-3">
+        <input
+          type="number"
+          min="0"
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          className="form-input w-32"
+          placeholder="e.g. 55"
+        />
+        {charge != null && (
+          <span>Waiting charge: £{charge.toFixed(0)}</span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const BookingModal: React.FC<BookingModalProps> = ({
   isOpen,
@@ -814,6 +847,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
               );
             })()}
 
+            {(formData.airportCollection || formData.returnAirportCollection) && (
+              <AirportWaitingAdminNote />
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Driver</label>
@@ -885,6 +922,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, actualFare: e.target.value })}
                     className="form-input"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Published airport card is Oxford only (Oxford to airport or airport to Oxford). Quote Abingdon, Kidlington, Witney, Bicester, Didcot and other towns separately. Those fares are subject to change. Do not change an already agreed fare.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>

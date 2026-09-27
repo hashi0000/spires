@@ -6,6 +6,8 @@ import {
   AIRPORT_WAITING_POLICY,
   airportWaitingDisclaimerBody,
   airportWaitingDisclaimerTitle,
+  airportWaitingScopeNote,
+  bookingLooksLikeAirportTransfer,
 } from "./airportWaitingPolicy";
 import {
   bookingHasAirportCollection,
@@ -112,6 +114,7 @@ function paymentScheduleHtml(booking: Booking): string {
 
 function airportWaitingHtml(booking: Booking): string {
   if (!bookingHasAirportCollection(booking)) return "";
+  const scope = airportWaitingScopeNote(booking);
   const body = airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY)
     .split("\n\n")
     .map((para) => `<p>${escapePdfText(para)}</p>`)
@@ -119,6 +122,7 @@ function airportWaitingHtml(booking: Booking): string {
   return `
     <div class="airport-waiting-note">
       <div class="airport-waiting-title">${escapePdfText(airportWaitingDisclaimerTitle())}</div>
+      ${scope ? `<p class="airport-waiting-scope">${escapePdfText(scope)}</p>` : ""}
       ${body}
     </div>
   `;
@@ -436,6 +440,12 @@ export function buildBookingConfirmationHtml(
             }
             .booking-pdf-root .airport-waiting-note p { margin: 0 0 6px; overflow-wrap: anywhere; }
             .booking-pdf-root .airport-waiting-note p:last-child { margin-bottom: 0; }
+            .booking-pdf-root .airport-waiting-scope { font-weight: 600; color: #334155; }
+            .booking-pdf-root .airport-charge-note {
+                margin-top: 8px;
+                font-size: 0.78rem;
+                opacity: 0.95;
+            }
 
             .booking-pdf-root .payment-summary {
                 background: #002147;
@@ -612,6 +622,8 @@ export function buildBookingConfirmationHtml(
 
                 </div>
 
+                ${airportWaitingHtml(booking)}
+
                 ${paymentScheduleHtml(booking)}
 
                 <div class="content-grid">
@@ -658,14 +670,15 @@ export function buildBookingConfirmationHtml(
                                 Please arrange payment for this booking using the method above.
                             </div>
                             ` : ""}
+                            ${bookingLooksLikeAirportTransfer(booking) ? `
+                            <div class="airport-charge-note">Standard airport charge included</div>
+                            ` : ""}
                         </div>
                         ${bankDetailsBlock}
                         ${hasPaymentSchedule(booking) ? "" : depositBlock}
                     </div>
 
                 </div>
-
-                ${airportWaitingHtml(booking)}
 
             </div>
 

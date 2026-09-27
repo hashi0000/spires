@@ -1,18 +1,18 @@
 /**
- * SOURCE OF TRUTH for currently published airport fares.
+ * SOURCE OF TRUTH for currently published OXFORD airport fares.
  *
- * Change Heathrow / Gatwick / Luton (etc.) prices here. Customer-facing
- * pages hydrate from this file. HTML fallbacks exist for SEO / no-JS and
- * should be updated at the same time as this file.
+ * These fares apply only to journeys TO or FROM OXFORD (for example
+ * Oxford ↔ Heathrow). They do not apply automatically to Abingdon,
+ * Kidlington, Witney, Bicester, Didcot or other nearby towns.
  *
  * Historical bookings are NOT calculated from this file. Confirmed fares
  * are stored on each Firestore booking as `actualFare`.
  *
  * Per vehicle class:
  *   oneWay  advertised one way fare (null = quote on request)
- *   return  advertised return TOTAL when both journeys are booked together
+ *   return  advertised return TOTAL when both Oxford legs are booked together
  *
- * Return saving is (oneWay × 2) − return. Do not hard-code “Save £5”.
+ * Return saving is (oneWay × 2) − return. Do not hard-code a single saving.
  */
 (function () {
   var VEHICLE_CLASSES = {
@@ -28,7 +28,7 @@
     vito: {
       id: "vito",
       bookingValue: "8_seater",
-      name: "8-Seater",
+      name: "8 Seater",
       examples: "Mercedes Vito or similar",
       tableExamples: "Mercedes Vito or similar",
       capacity: "Up to 8 passengers",
@@ -41,10 +41,10 @@
 
   var PUBLISHED_ORDER = [
     "heathrow",
-    "luton",
-    "birmingham",
     "gatwick",
     "stansted",
+    "luton",
+    "birmingham",
     "londonCity",
     "bristol",
   ];
@@ -52,72 +52,90 @@
   var DATA = {
     currency: "GBP",
     currencySymbol: "£",
+    origin: {
+      id: "oxford",
+      name: "Oxford",
+      fareScope: "journeys to or from Oxford",
+      tableIntro: "Fixed fares for airport transfers to or from Oxford. Airport charges are included.",
+      outsideOxfordNote: "Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.",
+    },
+    waitingPolicy: {
+      freeMinutesAfterActualLanding: 50,
+      chargeBlockMinutes: 30,
+      chargePerBlock: 10,
+    },
     includes: [
-      "Flight monitoring",
-      "Meet & greet",
-      "Airport charges",
-      "50 minutes complimentary waiting from actual landing",
+      "Airport charges included",
+      "Flight monitoring included for airport collections",
+      "50 minutes waiting from actual landing included for airport collections",
     ],
     routes: {
       heathrow: {
         id: "heathrow",
         name: "Heathrow",
         slug: "/oxford-to-heathrow-taxi",
+        origin: "oxford",
         distanceMilesApprox: "45–50",
         durationMinutesApprox: "60–90",
         terminals: ["2", "3", "4", "5"],
         published: true,
         featured: true,
-        standardCar: { oneWay: 95, return: 185 },
-        vito: { oneWay: 125, return: 245 },
-      },
-      luton: {
-        id: "luton",
-        name: "Luton",
-        slug: "/oxford-to-luton-taxi",
-        published: true,
-        standardCar: { oneWay: 110, return: 215 },
-        vito: { oneWay: 145, return: 285 },
-      },
-      birmingham: {
-        id: "birmingham",
-        name: "Birmingham",
-        slug: null,
-        published: true,
-        standardCar: { oneWay: 115, return: 225 },
-        vito: { oneWay: 150, return: 295 },
+        standardCar: { oneWay: 92, return: 180 },
+        vito: { oneWay: 120, return: 235 },
       },
       gatwick: {
         id: "gatwick",
         name: "Gatwick",
         slug: "/oxford-to-gatwick-taxi",
+        origin: "oxford",
         published: true,
-        standardCar: { oneWay: 150, return: 295 },
-        vito: { oneWay: 195, return: 385 },
+        standardCar: { oneWay: 140, return: 270 },
+        vito: { oneWay: 175, return: 340 },
       },
       stansted: {
         id: "stansted",
         name: "Stansted",
         slug: null,
+        origin: "oxford",
         published: true,
-        standardCar: { oneWay: 160, return: 315 },
-        vito: { oneWay: 205, return: 405 },
+        standardCar: { oneWay: 150, return: 290 },
+        vito: { oneWay: 185, return: 360 },
+      },
+      luton: {
+        id: "luton",
+        name: "Luton",
+        slug: "/oxford-to-luton-taxi",
+        origin: "oxford",
+        published: true,
+        standardCar: { oneWay: 105, return: 205 },
+        vito: { oneWay: 130, return: 255 },
+      },
+      birmingham: {
+        id: "birmingham",
+        name: "Birmingham",
+        slug: null,
+        origin: "oxford",
+        published: true,
+        standardCar: { oneWay: 110, return: 215 },
+        vito: { oneWay: 145, return: 280 },
       },
       londonCity: {
         id: "londonCity",
         name: "London City",
         slug: null,
+        origin: "oxford",
         published: true,
-        standardCar: { oneWay: 160, return: 315 },
-        vito: { oneWay: 205, return: 405 },
+        standardCar: { oneWay: 150, return: 290 },
+        vito: { oneWay: 190, return: 370 },
       },
       bristol: {
         id: "bristol",
         name: "Bristol",
         slug: null,
+        origin: "oxford",
         published: true,
-        standardCar: { oneWay: 175, return: 345 },
-        vito: { oneWay: 220, return: 435 },
+        standardCar: { oneWay: 165, return: 320 },
+        vito: { oneWay: 205, return: 400 },
       },
       eastMidlands: {
         id: "eastMidlands",
@@ -230,7 +248,7 @@
         continue;
       }
       el.hidden = false;
-      el.textContent = "Save " + formatMoney(save) + " when booking your return together";
+      el.textContent = "Save " + formatMoney(save) + " when booking both journeys together.";
     }
   }
 
@@ -289,7 +307,7 @@
     }
     if (amounts.length === 1) {
       el.textContent =
-        "Book both journeys together and save " + formatMoney(amounts[0]) + " on the return fare.";
+        "Save " + formatMoney(amounts[0]) + " when booking both journeys together.";
       el.hidden = false;
       return;
     }
@@ -308,6 +326,20 @@
     el.innerHTML = DATA.includes.map(function (item) {
       return "<li>" + item + "</li>";
     }).join("");
+  }
+
+  function fillOriginCopy() {
+    var origin = DATA.origin || {};
+    var map = {
+      tableIntro: origin.tableIntro,
+      outsideOxfordNote: origin.outsideOxfordNote,
+      fareScope: origin.fareScope,
+    };
+    var nodes = document.querySelectorAll("[data-spires-origin]");
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute("data-spires-origin");
+      if (key && map[key]) nodes[i].textContent = map[key];
+    }
   }
 
   function fillRatesTable() {
@@ -365,6 +397,7 @@
           fareStackHtml(route.vito) +
           "</div>" +
           "</div>" +
+          '<p class="airport-fare-card__included">Airport charges included</p>' +
           "</article>"
       );
     }
@@ -380,6 +413,7 @@
     fillRatesTable();
     fillSavingNote();
     fillIncludedList();
+    fillOriginCopy();
   }
 
   window.SPIRES_VEHICLE_CLASSES = VEHICLE_CLASSES;

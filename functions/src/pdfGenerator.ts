@@ -8,7 +8,9 @@ import {
   AIRPORT_WAITING_POLICY,
   airportWaitingDisclaimerBody,
   airportWaitingDisclaimerTitle,
+  airportWaitingScopeNote,
   bookingHasAirportCollection,
+  bookingLooksLikeAirportTransfer,
   isReturnBooking,
 } from "./airportWaitingPolicy";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
@@ -130,6 +132,24 @@ export async function generateBookingPDF(
     writeWrapped("Passengers", String(booking.passengers));
   }
 
+  if (bookingHasAirportCollection(booking)) {
+    const scope = airportWaitingScopeNote(booking);
+    doc
+      .moveDown(0.6)
+      .fontSize(10)
+      .fillColor("#334155")
+      .text(airportWaitingDisclaimerTitle(), { underline: true })
+      .fontSize(9)
+      .fillColor("#4b5563");
+    if (scope) {
+      doc.text(scope, { width: 500, lineGap: 2 }).moveDown(0.2);
+    }
+    doc
+      .text(airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
+      .fillColor("black")
+      .fontSize(11);
+  }
+
   doc.moveDown();
 
   const fare =
@@ -150,6 +170,9 @@ export async function generateBookingPDF(
     doc.text(`Fare: £${fare.toFixed(2)}`);
   } else {
     doc.text("Fare: To be confirmed");
+  }
+  if (bookingLooksLikeAirportTransfer(booking)) {
+    doc.fontSize(10).text("Standard airport charge included").fontSize(11);
   }
 
   if (hasSchedule) {
@@ -203,18 +226,6 @@ export async function generateBookingPDF(
 
   if (booking.notes) {
     doc.moveDown(0.3).text(`Notes: ${booking.notes}`, { width: 500 });
-  }
-
-  if (bookingHasAirportCollection(booking)) {
-    doc
-      .moveDown(0.6)
-      .fontSize(10)
-      .fillColor("#334155")
-      .text(airportWaitingDisclaimerTitle(), { underline: true })
-      .fontSize(9)
-      .fillColor("#4b5563")
-      .text(airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
-      .fillColor("black");
   }
 
   doc

@@ -12,6 +12,10 @@ import {
   normalizeBookingForEmail,
 } from "./bankDetails";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
+import {
+  airportWaitingDisclaimerBody,
+  bookingHasAirportCollection,
+} from "./airportWaitingPolicy";
 
 type EmailDocType =
   | "confirmation"
@@ -55,8 +59,14 @@ const getIntroCopy = (type: EmailDocType, booking: any) => {
       return `<p>We've received your payment. Your receipt is attached below.</p>`;
     case "payment_request":
       return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
-    default:
-      return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}`;
+    default: {
+      const collectionNote = bookingHasAirportCollection(booking)
+        ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${escapeHtml(
+            airportWaitingDisclaimerBody()
+          )}</p>`
+        : "";
+      return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}`;
+    }
   }
 };
 

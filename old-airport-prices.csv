@@ -1,0 +1,30 @@
+Period,Airport,Vehicle class,How it was advertised,Amount (£),Notes
+Before first update,Heathrow,Standard Car,Return-booking rate per leg,87,Shown as From £87. Not a published one way fare.
+Before first update,Heathrow,8-Seater / Mercedes Vito,Return-booking rate per leg,110,Shown as From £110.
+Before first update,Gatwick,Standard Car,Return-booking rate per leg,130,Shown as From £130.
+Before first update,Gatwick,8-Seater / Mercedes Vito,Return-booking rate per leg,170,Shown as From £170.
+Before first update,Stansted,Standard Car,Return-booking rate per leg,145,Shown as From £145.
+Before first update,Stansted,8-Seater / Mercedes Vito,Return-booking rate per leg,180,Shown as From £180.
+Before first update,Luton,Standard Car,Return-booking rate per leg,100,Shown as From £100.
+Before first update,Luton,8-Seater / Mercedes Vito,Return-booking rate per leg,125,Shown as From £125.
+Before first update,Birmingham,Standard Car,Return-booking rate per leg,105,Shown as From £105.
+Before first update,Birmingham,8-Seater / Mercedes Vito,Return-booking rate per leg,135,Shown as From £135.
+Before first update,London City,Standard Car,Return-booking rate per leg,145,Shown as From £145.
+Before first update,London City,8-Seater / Mercedes Vito,Return-booking rate per leg,180,Shown as From £180.
+Before first update,Bristol,Standard Car,Return-booking rate per leg,162,Shown as From £162.
+Before first update,Bristol,8-Seater / Mercedes Vito,Return-booking rate per leg,195,Shown as From £195.
+After Heathrow-only update,Heathrow,Standard Car,One way,95,First published one way fare.
+After Heathrow-only update,Heathrow,Standard Car,Return total,185,Both journeys booked together. £5 saving vs two one way trips.
+After Heathrow-only update,Heathrow,8-Seater / Mercedes Vito,Return-booking rate per leg,110,Still From £110.
+After Heathrow-only update,Gatwick,Standard Car,Return-booking rate per leg,130,Unchanged.
+After Heathrow-only update,Gatwick,8-Seater / Mercedes Vito,Return-booking rate per leg,170,Unchanged.
+After Heathrow-only update,Stansted,Standard Car,Return-booking rate per leg,145,Unchanged.
+After Heathrow-only update,Stansted,8-Seater / Mercedes Vito,Return-booking rate per leg,180,Unchanged.
+After Heathrow-only update,Luton,Standard Car,Return-booking rate per leg,100,Unchanged.
+After Heathrow-only update,Luton,8-Seater / Mercedes Vito,Return-booking rate per leg,125,Unchanged.
+After Heathrow-only update,Birmingham,Standard Car,Return-booking rate per leg,105,Unchanged.
+After Heathrow-only update,Birmingham,8-Seater / Mercedes Vito,Return-booking rate per leg,135,Unchanged.
+After Heathrow-only update,London City,Standard Car,Return-booking rate per leg,145,Unchanged.
+After Heathrow-only update,London City,8-Seater / Mercedes Vito,Return-booking rate per leg,180,Unchanged.
+After Heathrow-only update,Bristol,Standard Car,Return-booking rate per leg,162,Unchanged.
+After Heathrow-only update,Bristol,8-Seater / Mercedes Vito,Return-booking rate per leg,195,Unchanged.

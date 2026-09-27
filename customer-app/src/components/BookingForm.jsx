@@ -8,6 +8,9 @@ import {
   VEHICLE_ALLOCATION_DISCLAIMER,
   maxPassengersForVehicle,
 } from "../vehicleTypes";
+import {
+  airportWaitingWebsiteBody,
+} from "../airportWaitingPolicy";
 import "../styles.css";
 
 const PAYMENT_OPTIONS = [
@@ -151,7 +154,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     if (!formData.vehicleType) {
-      setError("Please choose a Standard Car or 8-Seater.");
+      setError("Please choose a Standard Car or 8 Seater.");
       setSubmitting(false);
       return;
     }
@@ -161,8 +164,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     if (passengers > maxPax) {
       setError(
         formData.vehicleType === "8_seater"
-          ? "An 8-Seater can take up to 8 passengers."
-          : "A Standard Car can take up to 4 passengers. Please choose the 8-Seater for larger groups."
+          ? "An 8 Seater can take up to 8 passengers."
+          : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups."
       );
       setSubmitting(false);
       return;
@@ -498,6 +501,24 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             </div>
           )}
 
+          {(formData.airportCollection || formData.returnAirportCollection) && (
+            <div style={{
+              padding: '0.85rem 1rem',
+              borderRadius: '8px',
+              border: '1px solid #e8e4da',
+              background: '#fbfaf7',
+              fontSize: '0.875rem',
+              lineHeight: 1.5,
+              color: '#0b1c3d',
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '0.35rem' }}>Airport collection</div>
+              {airportWaitingWebsiteBody().split('\n\n').map((para) => (
+                <p key={para.slice(0, 40)} style={{ margin: '0 0 0.5rem' }}>{para}</p>
+              ))}
+              <p style={{ margin: 0 }}>The standard airport pickup charge is included in your fare.</p>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem', color: '#0b1c3d' }}>
@@ -568,7 +589,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
-                Groups over 4 need the 8-Seater.
+                Groups over 4 need the 8 Seater.
               </p>
             )}
           </div>

@@ -45,7 +45,8 @@ describe("booking journey helpers", () => {
   it("builds waiting copy from the central policy", () => {
     const body = airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY);
     expect(body).toContain("50 minutes");
-    expect(body).toContain("£5 per 15 minutes");
+    expect(body).toContain("£10 per additional 30 minutes");
     expect(body).not.toContain("Heathrow");
+    expect(body).not.toContain("complimentary");
   });
 });

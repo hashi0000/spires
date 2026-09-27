@@ -118,6 +118,16 @@ function formatUkDate(iso) {
         timeZone: "Europe/London",
     });
 }
+function invoicePaymentInstruction(methodRaw, invoiceNumber) {
+    const n = methodRaw.toLowerCase().replace(/_/g, " ").trim();
+    if (n === "card") {
+        return "Please pay by card. Call 07776 897772 to take payment, or pay the driver if a card machine is available.";
+    }
+    if (n === "cash") {
+        return "Please pay in cash to the driver or at the office.";
+    }
+    return `Please pay by bank transfer using the invoice number (${invoiceNumber}) as the payment reference. Bank details are on the attached invoice.`;
+}
 function formatGbpHtml(n) {
     const amount = (Number.isFinite(n) ? n : 0).toLocaleString("en-GB", {
         minimumFractionDigits: 2,
@@ -156,6 +166,10 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
     const dueDate = typeof data?.dueDate === "string" ? data.dueDate.trim() : "";
     const termsRaw = typeof data?.paymentTerms === "string" ? data.paymentTerms : "";
     const paymentTermsLabelText = invoicePaymentTermsLabel(invoiceDate, dueDate, termsRaw);
+    const paymentMethodRaw = typeof data?.paymentMethod === "string" ? data.paymentMethod : "";
+    const paymentInstruction = invoicePaymentInstruction(paymentMethodRaw, invoiceNumber);
+    const paid = data?.paid === true || data?.paid === "true";
+    const paidAt = typeof data?.paidAt === "string" ? data.paidAt.trim() : "";
     const total = Number(data?.total);
     if (!Number.isFinite(total) || total <= 0) {
         throw new functions.https.HttpsError("invalid-argument", "Invoice total is required.");
@@ -182,12 +196,25 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
     }
     const officeCc = driverReminderEmail_1.ADMIN_EMAIL;
     const cc = toEmail.toLowerCase() === officeCc.toLowerCase() ? undefined : officeCc;
-    const html = `
+    const paidDate = paidAt ? formatUkDate(paidAt.slice(0, 10)) : "";
+    const html = paid
+        ? `
+      <div style="font-family:sans-serif;font-size:16px;color:#333;">
+        <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(customerName)},</p>
+        <p>Thank you. Payment has been received for invoice <strong>${(0, driverReminderEmail_1.escapeHtml)(invoiceNumber)}</strong> (${formatGbpHtml(total)})${paidDate ? ` on ${(0, driverReminderEmail_1.escapeHtml)(paidDate)}` : ""}.</p>
+        <p>Please find attached your paid invoice.</p>
+        <p>
+          📱 <a href="tel:07776897772">07776 897772</a><br>
+          📧 <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
+          🌐 <a href="https://www.spires-taxis.com">www.spires-taxis.com</a>
+        </p>
+      </div>`
+        : `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(customerName)},</p>
         <p>Please find attached invoice <strong>${(0, driverReminderEmail_1.escapeHtml)(invoiceNumber)}</strong> for <strong>${formatGbpHtml(total)}</strong>.</p>
         <p>Payment terms: ${(0, driverReminderEmail_1.escapeHtml)(paymentTermsLabelText)}${dueDate ? `. Due ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(dueDate))}` : ""}${invoiceDate ? `. Invoice date: ${(0, driverReminderEmail_1.escapeHtml)(formatUkDate(invoiceDate))}` : ""}.</p>
-        <p>Please pay by bank transfer using the invoice number as the payment reference. Bank details are on the attached invoice.</p>
+        <p>${(0, driverReminderEmail_1.escapeHtml)(paymentInstruction)}</p>
         <p>
           📱 <a href="tel:07776897772">07776 897772</a><br>
           📧 <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a><br>
@@ -198,7 +225,7 @@ exports.sendGeneralInvoiceEmail = functions.https.onCall(async (data, context) =
         from: (0, driverReminderEmail_1.mailFrom)(),
         to: toEmail,
         cc,
-        subject: `Invoice ${invoiceNumber} — Spires Taxis`,
+        subject: paid ? `Invoice ${invoiceNumber} — Paid — Spires Taxis` : `Invoice ${invoiceNumber} — Spires Taxis`,
         html,
         attachments: [
             {

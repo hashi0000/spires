@@ -8,7 +8,7 @@ export const VEHICLE_TYPES = [
   },
   {
     value: "8_seater",
-    label: "8-Seater",
+    label: "8 Seater",
     examples: "Mercedes Vito or similar",
     capacity: "Up to 8 passengers",
     maxPassengers: 8,
@@ -20,7 +20,7 @@ export const VEHICLE_ALLOCATION_DISCLAIMER =
 
 export function formatVehicleTypeLabel(type) {
   if (!type) return "Not specified";
-  if (type === "8_seater" || type === "8-seater") return "8-Seater";
+  if (type === "8_seater" || type === "8-seater") return "8 Seater";
   if (type === "standard") return "Standard Car";
   return String(type).replace(/_/g, " ");
 }

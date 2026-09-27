@@ -7,7 +7,9 @@ import {
   AIRPORT_WAITING_POLICY,
   airportWaitingDisclaimerBody,
   airportWaitingDisclaimerTitle,
+  airportWaitingScopeNote,
   bookingHasAirportCollection,
+  bookingLooksLikeAirportTransfer,
 } from "./airportWaitingPolicy";
 
 const getDocumentTitle = (type = "booking_confirmation") => {
@@ -610,6 +612,14 @@ export const generateBookingPDF = (
                     `}
                 </div>
 
+                ${bookingHasAirportCollection(booking) ? `
+                <div class="airport-waiting-note" style="margin-top:12px;padding:10px 12px;border:1px solid #e8e4da;border-radius:6px;background:#fbfaf7;color:#4b5563;font-size:0.72rem;line-height:1.45;">
+                    <div style="font-weight:700;color:#334155;margin-bottom:6px;">${airportWaitingDisclaimerTitle()}</div>
+                    ${airportWaitingScopeNote(booking) ? `<p style="margin:0 0 6px;font-weight:600;color:#334155;">${airportWaitingScopeNote(booking)}</p>` : ""}
+                    ${airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY).split("\n\n").map((p) => `<p style="margin:0 0 6px;">${p}</p>`).join("")}
+                </div>
+                ` : ""}
+
                 <div class="content-grid">
                     <div class="info-box">
                         <h2 class="section-header">Trip Details</h2>
@@ -635,7 +645,7 @@ export const generateBookingPDF = (
                             <span class="detail-value">${
                               booking.depositStatus === "paid"
                                 ? `Paid${booking.depositAmount ? ` (£${Number(booking.depositAmount).toFixed(2)})` : ""}`
-                                : `Required${booking.depositAmount ? ` — £${Number(booking.depositAmount).toFixed(2)}` : ""}`
+                                : `Required${booking.depositAmount ? `: £${Number(booking.depositAmount).toFixed(2)}` : ""}`
                             }</span>
                         </div>
                         ` : ''}
@@ -680,6 +690,9 @@ export const generateBookingPDF = (
                           ? bankTransferDetailsHtml(booking.paymentStatus)
                           : '';
                         const depositAmt = Number(booking.depositAmount);
+                        const airportChargeNote = bookingLooksLikeAirportTransfer(booking)
+                          ? `<div style="margin-top:8px;font-size:0.78rem;opacity:0.95;">Standard airport charge included</div>`
+                          : "";
                         const depositBlock = booking.depositRequired && booking.depositStatus !== 'paid'
                           ? `
                             <div style="margin-top:12px;padding:12px;border:1px solid #C5A572;border-radius:8px;background:#fff8eb;font-size:0.9rem;line-height:1.5;color:#fff;">
@@ -702,6 +715,7 @@ export const generateBookingPDF = (
                                 <div class="payment-summary" style="background: #92400e; border: 2px solid #C5A572;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">Payment Required - ${paymentMethod}</div>
+                                    ${airportChargeNote}
                                     <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.95;">
                                         Please arrange payment for this booking using the method above.
                                     </div>
@@ -720,6 +734,7 @@ export const generateBookingPDF = (
                                 <div class="payment-summary">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">Paid by ${paymentMethod}</div>
+                                    ${airportChargeNote}
                                 </div>
                             </div>
                             `;
@@ -733,6 +748,7 @@ export const generateBookingPDF = (
                                 <div class="payment-summary" style="background: #92400e;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">Payment Pending - ${paymentMethod}</div>
+                                    ${airportChargeNote}
                                     ${bankBlock}
                                     ${depositBlock}
                                 </div>
@@ -748,6 +764,7 @@ export const generateBookingPDF = (
                                 <div class="payment-summary" style="background: #1d3c74;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
                                     <div class="payment-method">To be paid by ${paymentMethod}</div>
+                                    ${airportChargeNote}
                                     ${bankBlock}
                                     ${depositBlock}
                                 </div>
@@ -763,6 +780,7 @@ export const generateBookingPDF = (
                                 <span class="detail-label">Fare</span>
                                 <span class="detail-value">To be confirmed</span>
                             </div>
+                            ${airportChargeNote ? `<div class="detail-row"><span class="detail-label">Airport charge</span><span class="detail-value">Standard airport charge included</span></div>` : ""}
                             ${booking.paymentMethod ? `
                             <div class="detail-row">
                                 <span class="detail-label">Payment Method</span>
@@ -795,12 +813,6 @@ export const generateBookingPDF = (
                     <div class="detail-row"><span class="detail-label">Deposit paid</span><span class="detail-value">£${Number(booking.depositAmount || 0).toFixed(2)}</span></div>
                     <div class="detail-row"><span class="detail-label">Due on outbound journey</span><span class="detail-value">£${Number(booking.dueOnOutbound || 0).toFixed(2)}</span></div>
                     <div class="detail-row"><span class="detail-label">Due on return journey</span><span class="detail-value">£${Number(booking.dueOnReturn || 0).toFixed(2)}</span></div>
-                </div>
-                ` : ''}
-                ${bookingHasAirportCollection(booking) ? `
-                <div style="margin-top:12px;padding:10px 12px;border:1px solid #e8e4da;border-radius:6px;background:#fbfaf7;color:#4b5563;font-size:0.72rem;line-height:1.45;">
-                    <div style="font-weight:700;color:#334155;margin-bottom:6px;">${airportWaitingDisclaimerTitle()}</div>
-                    ${airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY).split("\n\n").map((p) => `<p style="margin:0 0 6px;">${p}</p>`).join("")}
                 </div>
                 ` : ''}
             </div>
