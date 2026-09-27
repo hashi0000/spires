@@ -180,7 +180,7 @@
       </nav>
       <p class="hero__label">Fixed fares</p>
       <h1>Taxi prices from Oxford</h1>
-      <p class="hero__lead">Clear fixed fares for pre-booked journeys from Oxford. Airport prices are agreed at the time of booking. Heathrow Standard Car now has published one-way and return prices; other airports are still listed as return-booking rates until they are updated independently.</p>
+      <p class="hero__lead">Clear fixed fares for pre-booked journeys from Oxford. Airport prices are agreed at the time of booking.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="/contact" class="btn btn--outline">Ask for a quote</a>
@@ -199,22 +199,6 @@
           <p>Thank you to all of our customers, particularly those who continue to use Spires Taxis for their regular airport journeys. We greatly appreciate your continued support.</p>
         </div>
       </div>
-      <div class="callout fade-in">
-        <p><strong>How to read airport prices on this site</strong></p>
-        <p>Heathrow Standard Car fares are published as a one-way price and a return price when both journeys are booked together. Other airports currently show a return-booking rate per leg until their one-way and return totals are set separately.</p>
-        <p>Our airport transfer fares are fixed in advance and are regularly reviewed to reflect journey distance, airport charges and vehicle operating costs. The price confirmed at the time of booking is the price you pay, subject to any clearly stated waiting-time, parking or additional-stop charges.</p>
-      </div>
-      <div class="section__header fade-in" style="margin-top:2.5rem;">
-        <p class="section__eyebrow">What's included</p>
-        <h2>What your fare covers before any extras</h2>
-        <p>Our standard fare includes the car, driver, fuel and normal routing. On airport collections, we include flight tracking and 50 minutes complimentary waiting from the actual landing time.</p>
-      </div>
-      <ul class="included-list fade-in">
-        <li>Pre-booked private hire service with fixed quoted fare</li>
-        <li>Standard luggage for the booked vehicle class</li>
-        <li>Airport pickup coordination and flight status checks</li>
-        <li>Card or cash payment options</li>
-      </ul>
     </div>
   </section>
 
@@ -223,28 +207,69 @@
       <div class="price-block fade-in">
         <div class="price-block__head">
           <h2>Airport prices from Oxford</h2>
-          <p class="price-block__note">Standard Car is typically a Toyota RAV4 / Corolla or similar (up to 4 passengers). Mercedes Vito prices are for up to 8 passengers. Includes flight monitoring, meet &amp; greet, airport charges and 50 minutes complimentary waiting from actual landing. The fare confirmed when you book is the fare you pay.</p>
+          <p class="price-block__note">Fixed-price airport transfers from Oxford. The price confirmed when you book is the price you pay.</p>
         </div>
-        <table class="price-table">
-          <thead>
-            <tr>
-              <th>Airport</th>
-              <th>Standard Car</th>
-              <th>Mercedes Vito (up to 8)</th>
-            </tr>
-          </thead>
-          <tbody id="airport-price-tbody">
-            <tr><td><a href="/oxford-to-heathrow-taxi">Heathrow</a></td><td>£95 one way / £185 return</td><td>From £110</td></tr>
-            <tr><td><a href="/oxford-to-gatwick-taxi">Gatwick</a></td><td>From £130</td><td>From £170</td></tr>
-            <tr><td>Stansted</td><td>From £145</td><td>From £180</td></tr>
-            <tr><td><a href="/oxford-to-luton-taxi">Luton</a></td><td>From £100</td><td>From £125</td></tr>
-            <tr><td>Birmingham</td><td>From £105</td><td>From £135</td></tr>
-            <tr><td>London City</td><td>From £145</td><td>From £180</td></tr>
-            <tr><td>Bristol</td><td>From £162</td><td>From £195</td></tr>
-          </tbody>
-        </table>
-        <p class="vehicle-disclaimer" data-spires-disclaimer>Vehicle models shown are examples of the type of vehicle normally provided. The exact make and model may vary depending on availability. We will provide a suitable vehicle for the passenger and luggage requirements confirmed at the time of booking.</p>
-        <p style="margin-top:1rem;font-size:0.95rem;color:var(--text-muted);">Larger vehicles and unpublished one-way fares — message us with your date, flight and pickup address for a confirmed quote. Existing quotes and confirmed bookings keep the fare originally agreed.</p>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead>
+              <tr>
+                <th>Airport</th>
+                <th>Standard Car<span class="th-sub">RAV4 / Corolla or similar</span></th>
+                <th>8-Seater<span class="th-sub">Mercedes Vito or similar</span></th>
+              </tr>
+            </thead>
+            <tbody id="airport-price-tbody">
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row"><a href="/oxford-to-heathrow-taxi">Heathrow</a></th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£95 one way</span><span class="fare-stack__line fare-stack__line--return">£185 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£125 one way</span><span class="fare-stack__line fare-stack__line--return">£245 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-luton-taxi">Luton</a></th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£110 one way</span><span class="fare-stack__line fare-stack__line--return">£215 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£145 one way</span><span class="fare-stack__line fare-stack__line--return">£285 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row">Birmingham</th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£115 one way</span><span class="fare-stack__line fare-stack__line--return">£225 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£150 one way</span><span class="fare-stack__line fare-stack__line--return">£295 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-gatwick-taxi">Gatwick</a></th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£150 one way</span><span class="fare-stack__line fare-stack__line--return">£295 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£195 one way</span><span class="fare-stack__line fare-stack__line--return">£385 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£160 one way</span><span class="fare-stack__line fare-stack__line--return">£315 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£205 one way</span><span class="fare-stack__line fare-stack__line--return">£405 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row">London City</th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£160 one way</span><span class="fare-stack__line fare-stack__line--return">£315 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£205 one way</span><span class="fare-stack__line fare-stack__line--return">£405 return</span></div></td>
+              </tr>
+              <tr>
+                <th scope="row">Bristol</th>
+                <td><div class="fare-stack"><span class="fare-stack__line">£175 one way</span><span class="fare-stack__line fare-stack__line--return">£345 return</span></div></td>
+                <td><div class="fare-stack"><span class="fare-stack__line">£220 one way</span><span class="fare-stack__line fare-stack__line--return">£435 return</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="airport-fare-cards" id="airport-price-cards"></div>
+        <p class="price-block__save-note" id="airport-return-saving-note">Book both journeys together and save £5 on the return fare.</p>
+        <div class="airport-included">
+          <h3>Included with your airport transfer</h3>
+          <ul class="included-list" id="airport-included-list">
+            <li>Flight monitoring</li>
+            <li>Meet &amp; greet</li>
+            <li>Airport charges</li>
+            <li>50 minutes complimentary waiting from actual landing</li>
+          </ul>
+        </div>
+        <p class="vehicle-disclaimer" data-spires-disclaimer>Vehicle models are examples only and may vary depending on availability and booking requirements. Luggage capacity depends on passenger numbers. Please tell us about large or additional luggage when booking.</p>
+        <p class="price-block__quote">Need a different journey? Send us your pickup address, travel date and flight details for a fixed quote. Existing quotes and confirmed bookings keep the fare originally agreed.</p>
         <div id="uk-fuel-tracker" class="fuel-tracker" hidden></div>
       </div>
     </div>
@@ -254,7 +279,7 @@
     <div class="container">
       <div class="price-block fade-in">
         <h2>Local and regional fares</h2>
-        <p>Guide one-way fares from Oxford.</p>
+        <p>Guide one way fares from Oxford.</p>
         <table class="price-table">
           <thead>
             <tr>
@@ -280,7 +305,6 @@
   <section class="section section--soft">
     <div class="container">
       <div class="section__header fade-in">
-        <p class="section__eyebrow">Extras</p>
         <h2>Additional charges when they apply</h2>
       </div>
       <div class="grid grid-2 fade-in">
@@ -305,7 +329,6 @@
   <section class="section">
     <div class="container">
       <div class="section__header fade-in">
-        <p class="section__eyebrow">Day hire</p>
         <h2>Half day, full day and custom hires</h2>
       </div>
       <div class="grid grid-2 fade-in">
@@ -368,7 +391,7 @@
         <li><a href="/oxford-to-heathrow-taxi">Oxford to Heathrow transfers</a></li>
         <li><a href="/airport-transfers">Airport transfers from Oxford</a></li>
         <li><a href="/how-airport-pickup-works">How we handle airport pickup</a></li>
-        <li><a href="/our-vehicles">Standard Car and the Mercedes Vito</a></li>
+        <li><a href="/our-vehicles">Standard Car and 8-Seater</a></li>
         <li><a href="/student-taxis">Student taxis and discount</a></li>
       </ul>
     </div>
@@ -377,7 +400,7 @@
   <section class="section section--blue">
     <div class="container" style="text-align:center;max-width:36rem;margin-inline:auto;">
       <h2 class="fade-in">Get a confirmed price</h2>
-      <p class="fade-in">Send your journey details on WhatsApp or book online — we confirm the fare before you travel.</p>
+      <p class="fade-in">Send your journey details on WhatsApp or book online. We confirm the fare before you travel.</p>
       <div class="btn-group fade-in" style="justify-content:center;">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="/contact" class="btn btn--outline" style="border-color:rgba(255,255,255,.4);color:#fff;">Contact us</a>
@@ -426,7 +449,7 @@
   <div class="site-footer__bottom">
     <div class="container site-footer__bottom-inner">
       <p>&copy; 2026 Spires Taxis. Oxford, Oxfordshire.</p>
-      <p class="site-footer__license">Licensed private hire operator — Oxford City Council. All journeys are pre-booked.</p>
+      <p class="site-footer__license">Licensed private hire operator, Oxford City Council. All journeys are pre-booked.</p>
     </div>
   </div>
 </footer>

@@ -9,9 +9,8 @@
  * are stored on each Firestore booking as `actualFare`.
  *
  * Per vehicle class:
- *   oneWay       — advertised one-way fare (null = quote on request)
- *   return       — advertised return TOTAL when both journeys are booked together
- *   returnPerLeg — published per-leg rate while one-way has not been set yet
+ *   oneWay  advertised one way fare (null = quote on request)
+ *   return  advertised return TOTAL when both journeys are booked together
  *
  * Return saving is (oneWay × 2) − return. Do not hard-code “Save £5”.
  */
@@ -22,27 +21,43 @@
       bookingValue: "standard",
       name: "Standard Car",
       examples: "Toyota RAV4 / Corolla or similar",
+      tableExamples: "RAV4 / Corolla or similar",
       capacity: "Up to 4 passengers",
       maxPassengers: 4,
     },
     vito: {
       id: "vito",
       bookingValue: "8_seater",
-      name: "Mercedes Vito",
+      name: "8-Seater",
       examples: "Mercedes Vito or similar",
+      tableExamples: "Mercedes Vito or similar",
       capacity: "Up to 8 passengers",
       maxPassengers: 8,
     },
   };
 
   var VEHICLE_DISCLAIMER =
-    "Vehicle models shown are examples of the type of vehicle normally provided. The exact make and model may vary depending on availability. We will provide a suitable vehicle for the passenger and luggage requirements confirmed at the time of booking.";
+    "Vehicle models are examples only and may vary depending on availability and booking requirements. Luggage capacity depends on passenger numbers. Please tell us about large or additional luggage when booking.";
+
+  var PUBLISHED_ORDER = [
+    "heathrow",
+    "luton",
+    "birmingham",
+    "gatwick",
+    "stansted",
+    "londonCity",
+    "bristol",
+  ];
 
   var DATA = {
     currency: "GBP",
     currencySymbol: "£",
-    includes:
-      "Flight monitoring on collections, meet & greet where arranged, normal airport approach charges, and 50 minutes complimentary waiting from the actual landing time.",
+    includes: [
+      "Flight monitoring",
+      "Meet & greet",
+      "Airport charges",
+      "50 minutes complimentary waiting from actual landing",
+    ],
     routes: {
       heathrow: {
         id: "heathrow",
@@ -52,56 +67,57 @@
         durationMinutesApprox: "60–90",
         terminals: ["2", "3", "4", "5"],
         published: true,
+        featured: true,
         standardCar: { oneWay: 95, return: 185 },
-        vito: { oneWay: null, returnPerLeg: 110 },
-      },
-      gatwick: {
-        id: "gatwick",
-        name: "Gatwick",
-        slug: "/oxford-to-gatwick-taxi",
-        published: true,
-        standardCar: { oneWay: null, returnPerLeg: 130 },
-        vito: { oneWay: null, returnPerLeg: 170 },
-      },
-      stansted: {
-        id: "stansted",
-        name: "Stansted",
-        slug: null,
-        published: true,
-        standardCar: { oneWay: null, returnPerLeg: 145 },
-        vito: { oneWay: null, returnPerLeg: 180 },
+        vito: { oneWay: 125, return: 245 },
       },
       luton: {
         id: "luton",
         name: "Luton",
         slug: "/oxford-to-luton-taxi",
         published: true,
-        standardCar: { oneWay: null, returnPerLeg: 100 },
-        vito: { oneWay: null, returnPerLeg: 125 },
+        standardCar: { oneWay: 110, return: 215 },
+        vito: { oneWay: 145, return: 285 },
       },
       birmingham: {
         id: "birmingham",
         name: "Birmingham",
         slug: null,
         published: true,
-        standardCar: { oneWay: null, returnPerLeg: 105 },
-        vito: { oneWay: null, returnPerLeg: 135 },
+        standardCar: { oneWay: 115, return: 225 },
+        vito: { oneWay: 150, return: 295 },
+      },
+      gatwick: {
+        id: "gatwick",
+        name: "Gatwick",
+        slug: "/oxford-to-gatwick-taxi",
+        published: true,
+        standardCar: { oneWay: 150, return: 295 },
+        vito: { oneWay: 195, return: 385 },
+      },
+      stansted: {
+        id: "stansted",
+        name: "Stansted",
+        slug: null,
+        published: true,
+        standardCar: { oneWay: 160, return: 315 },
+        vito: { oneWay: 205, return: 405 },
       },
       londonCity: {
         id: "londonCity",
         name: "London City",
         slug: null,
         published: true,
-        standardCar: { oneWay: null, returnPerLeg: 145 },
-        vito: { oneWay: null, returnPerLeg: 180 },
+        standardCar: { oneWay: 160, return: 315 },
+        vito: { oneWay: 205, return: 405 },
       },
       bristol: {
         id: "bristol",
         name: "Bristol",
         slug: null,
         published: true,
-        standardCar: { oneWay: null, returnPerLeg: 162 },
-        vito: { oneWay: null, returnPerLeg: 195 },
+        standardCar: { oneWay: 175, return: 345 },
+        vito: { oneWay: 220, return: 435 },
       },
       eastMidlands: {
         id: "eastMidlands",
@@ -144,7 +160,6 @@
   function returnTotal(prices) {
     if (!prices) return null;
     if (isFiniteNumber(prices.return)) return prices.return;
-    if (isFiniteNumber(prices.returnPerLeg)) return prices.returnPerLeg * 2;
     return null;
   }
 
@@ -152,9 +167,6 @@
     if (!prices) return "Quote on request";
     if (isFiniteNumber(prices.oneWay) && isFiniteNumber(prices.return)) {
       return formatMoney(prices.oneWay) + " one way / " + formatMoney(prices.return) + " return";
-    }
-    if (isFiniteNumber(prices.returnPerLeg)) {
-      return "From " + formatMoney(prices.returnPerLeg);
     }
     if (isFiniteNumber(prices.return)) {
       return "Return " + formatMoney(prices.return);
@@ -168,7 +180,6 @@
   function headlineFrom(prices) {
     if (!prices) return "";
     if (isFiniteNumber(prices.oneWay)) return formatMoney(prices.oneWay);
-    if (isFiniteNumber(prices.returnPerLeg)) return "From " + formatMoney(prices.returnPerLeg);
     if (isFiniteNumber(prices.return)) return "From " + formatMoney(prices.return);
     return "";
   }
@@ -182,6 +193,7 @@
       if (parts[2] === "name") return vc.name;
       if (parts[2] === "examples") return vc.examples;
       if (parts[2] === "capacity") return vc.capacity;
+      if (parts[2] === "tableExamples") return vc.tableExamples || vc.examples;
       return vc.name;
     }
 
@@ -194,9 +206,6 @@
     if (field === "return") {
       var total = returnTotal(prices);
       return isFiniteNumber(total) ? formatMoney(total) : null;
-    }
-    if (field === "returnPerLeg") {
-      return isFiniteNumber(prices.returnPerLeg) ? formatMoney(prices.returnPerLeg) : null;
     }
     if (field === "summary") return formatClassPrice(prices);
     if (field === "headline") return headlineFrom(prices);
@@ -241,43 +250,127 @@
     }
   }
 
+  function airportNameHtml(route) {
+    if (route.slug) return '<a href="' + route.slug + '">' + route.name + "</a>";
+    return route.name;
+  }
+
+  function fareStackHtml(prices) {
+    if (prices && isFiniteNumber(prices.oneWay) && isFiniteNumber(prices.return)) {
+      return (
+        '<div class="fare-stack">' +
+        '<span class="fare-stack__line">' +
+        formatMoney(prices.oneWay) +
+        " one way</span>" +
+        '<span class="fare-stack__line fare-stack__line--return">' +
+        formatMoney(prices.return) +
+        " return</span>" +
+        "</div>"
+      );
+    }
+    return (
+      '<div class="fare-stack"><span class="fare-stack__line">' +
+      formatClassPrice(prices) +
+      "</span></div>"
+    );
+  }
+
+  function fillSavingNote() {
+    var el = document.getElementById("airport-return-saving-note");
+    if (!el) return;
+    var amounts = [];
+    for (var i = 0; i < PUBLISHED_ORDER.length; i++) {
+      var route = DATA.routes[PUBLISHED_ORDER[i]];
+      if (!route || route.published === false) continue;
+      var standardSave = returnSaving(route.standardCar);
+      var eightSave = returnSaving(route.vito);
+      if (standardSave && amounts.indexOf(standardSave) === -1) amounts.push(standardSave);
+      if (eightSave && amounts.indexOf(eightSave) === -1) amounts.push(eightSave);
+    }
+    if (amounts.length === 1) {
+      el.textContent =
+        "Book both journeys together and save " + formatMoney(amounts[0]) + " on the return fare.";
+      el.hidden = false;
+      return;
+    }
+    if (amounts.length > 1) {
+      el.textContent = "Book both journeys together and save on the return fare.";
+      el.hidden = false;
+      return;
+    }
+    el.textContent = "";
+    el.hidden = true;
+  }
+
+  function fillIncludedList() {
+    var el = document.getElementById("airport-included-list");
+    if (!el || !DATA.includes || !DATA.includes.length) return;
+    el.innerHTML = DATA.includes.map(function (item) {
+      return "<li>" + item + "</li>";
+    }).join("");
+  }
+
   function fillRatesTable() {
     var tbody = document.getElementById("airport-price-tbody");
-    if (!tbody) return;
-    var order = [
-      "heathrow",
-      "gatwick",
-      "stansted",
-      "luton",
-      "birmingham",
-      "londonCity",
-      "bristol",
-    ];
-    tbody.innerHTML = order
-      .map(function (id) {
-        var r = DATA.routes[id];
-        if (!r || r.published === false) return "";
-        var name = r.slug ? '<a href="' + r.slug + '">' + r.name + "</a>" : r.name;
-        var standard = formatClassPrice(r.standardCar);
-        var vito = formatClassPrice(r.vito);
-        var save = returnSaving(r.standardCar);
-        var saveHtml = save
-          ? '<div class="price-save price-save--table">Save ' +
-            formatMoney(save) +
-            " when booking your return together</div>"
-          : "";
-        return (
-          "<tr><td>" +
+    var cards = document.getElementById("airport-price-cards");
+    var rows = [];
+    var cardHtml = [];
+
+    for (var i = 0; i < PUBLISHED_ORDER.length; i++) {
+      var id = PUBLISHED_ORDER[i];
+      var route = DATA.routes[id];
+      if (!route || route.published === false) continue;
+      var name = airportNameHtml(route);
+      var cardFeatured = route.featured ? " airport-fare-card--featured" : "";
+      rows.push(
+        "<tr" +
+          (route.featured ? ' class="airport-fare-table__row--featured"' : "") +
+          ">" +
+          '<th scope="row">' +
           name +
-          "</td><td>" +
-          standard +
-          saveHtml +
-          "</td><td>" +
-          vito +
-          "</td></tr>"
-        );
-      })
-      .join("");
+          "</th>" +
+          "<td>" +
+          fareStackHtml(route.standardCar) +
+          "</td>" +
+          "<td>" +
+          fareStackHtml(route.vito) +
+          "</td>" +
+          "</tr>"
+      );
+
+      cardHtml.push(
+        '<article class="airport-fare-card' +
+          cardFeatured +
+          '">' +
+          '<h3 class="airport-fare-card__name">' +
+          name +
+          "</h3>" +
+          '<div class="airport-fare-card__grid">' +
+          '<div class="airport-fare-card__col">' +
+          '<p class="airport-fare-card__class">' +
+          VEHICLE_CLASSES.standardCar.name +
+          "</p>" +
+          '<p class="airport-fare-card__examples">' +
+          VEHICLE_CLASSES.standardCar.tableExamples +
+          "</p>" +
+          fareStackHtml(route.standardCar) +
+          "</div>" +
+          '<div class="airport-fare-card__col">' +
+          '<p class="airport-fare-card__class">' +
+          VEHICLE_CLASSES.vito.name +
+          "</p>" +
+          '<p class="airport-fare-card__examples">' +
+          VEHICLE_CLASSES.vito.tableExamples +
+          "</p>" +
+          fareStackHtml(route.vito) +
+          "</div>" +
+          "</div>" +
+          "</article>"
+      );
+    }
+
+    if (tbody) tbody.innerHTML = rows.join("");
+    if (cards) cards.innerHTML = cardHtml.join("");
   }
 
   function applyPublishedPrices() {
@@ -285,6 +378,8 @@
     fillSaveBadges();
     fillDisclaimers();
     fillRatesTable();
+    fillSavingNote();
+    fillIncludedList();
   }
 
   window.SPIRES_VEHICLE_CLASSES = VEHICLE_CLASSES;

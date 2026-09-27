@@ -78,6 +78,8 @@ const forbidden = [
   ['Valid until Dec 31st 2025', /Valid until Dec 31st 2025/i],
   ['From £85', /From £85/],
   ['From £87', /From £87/],
+  ['From £130', /From £130/],
+  ['Mercedes Vito (up to 8)', /Mercedes Vito \(up to 8\)/],
   ['Admin Panel', /Admin Panel/],
   ['Oxford’s Newest Premium Taxi Service', /Newest Premium Taxi Service/i],
   ['PayPal', /PayPal/i],

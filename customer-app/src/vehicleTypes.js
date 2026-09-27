@@ -8,7 +8,7 @@ export const VEHICLE_TYPES = [
   },
   {
     value: "8_seater",
-    label: "8-seater",
+    label: "8-Seater",
     examples: "Mercedes Vito or similar",
     capacity: "Up to 8 passengers",
     maxPassengers: 8,
@@ -16,11 +16,11 @@ export const VEHICLE_TYPES = [
 ];
 
 export const VEHICLE_ALLOCATION_DISCLAIMER =
-  "Vehicle models shown are examples of the type of vehicle normally provided. The exact make and model may vary depending on availability. We will provide a suitable vehicle for the passenger and luggage requirements confirmed at the time of booking.";
+  "Vehicle models are examples only and may vary depending on availability and booking requirements. Luggage capacity depends on passenger numbers. Please tell us about large or additional luggage when booking.";
 
 export function formatVehicleTypeLabel(type) {
   if (!type) return "Not specified";
-  if (type === "8_seater" || type === "8-seater") return "8-seater";
+  if (type === "8_seater" || type === "8-seater") return "8-Seater";
   if (type === "standard") return "Standard Car";
   return String(type).replace(/_/g, " ");
 }

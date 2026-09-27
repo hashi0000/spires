@@ -151,7 +151,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     if (!formData.vehicleType) {
-      setError("Please choose a Standard Car or 8-seater.");
+      setError("Please choose a Standard Car or 8-Seater.");
       setSubmitting(false);
       return;
     }
@@ -161,8 +161,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     if (passengers > maxPax) {
       setError(
         formData.vehicleType === "8_seater"
-          ? "An 8-seater can take up to 8 passengers."
-          : "A Standard Car can take up to 4 passengers. Please choose the 8-seater for larger groups."
+          ? "An 8-Seater can take up to 8 passengers."
+          : "A Standard Car can take up to 4 passengers. Please choose the 8-Seater for larger groups."
       );
       setSubmitting(false);
       return;
@@ -568,7 +568,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
-                Groups over 4 need the 8-seater.
+                Groups over 4 need the 8-Seater.
               </p>
             )}
           </div>
