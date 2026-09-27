@@ -25,6 +25,7 @@ function initMobileMenu() {
     overlay.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     menu.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('is-menu-open');
     document.body.style.overflow = 'hidden';
   };
 
@@ -33,6 +34,7 @@ function initMobileMenu() {
     overlay.classList.remove('is-open');
     toggle.setAttribute('aria-expanded', 'false');
     menu.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('is-menu-open');
     document.body.style.overflow = '';
     setTimeout(() => { overlay.hidden = true; }, 280);
   };
