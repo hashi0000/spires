@@ -29,7 +29,13 @@ const PAGES = [
   '/terms-and-conditions',
   '/offer-terms',
   '/thank-you',
-  '/404.html'
+  '/404.html',
+  '/oxford-to-southampton-cruise-terminal',
+  '/oxford-to-st-pancras-taxi',
+  '/oxford-to-silverstone-taxi',
+  '/cotswolds-tours-from-oxford',
+  '/oxford-to-london-city-airport-taxi',
+  '/long-distance-taxis'
 ];
 
 const VIEWPORTS = [

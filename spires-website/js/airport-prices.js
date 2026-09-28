@@ -122,7 +122,7 @@
       londonCity: {
         id: "londonCity",
         name: "London City",
-        slug: null,
+        slug: "/oxford-to-london-city-airport-taxi",
         origin: "oxford",
         published: true,
         standardCar: { oneWay: 150, return: 290 },
