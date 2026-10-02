@@ -60,8 +60,6 @@ type ShareState = {
     journeyType?: string;
     originCity?: string;
     destinationCity?: string;
-    journeyType?: string;
-    farePence: number;
     fourPassengerFallbackEnabled?: boolean;
     destinationMatchingEnabled?: boolean;
     proposedSharedDropoffHubId?: string;
