@@ -371,14 +371,14 @@ li + li { margin-top: 0.35rem; }
   .site-nav__list a.site-nav__promo { padding: 0.4rem 0.8rem; }
 }
 
+@media (max-width: 1200px) {
+  .site-header__phone { display: none; }
+}
+
 @media (max-width: 900px) {
   .site-nav { display: none; }
   .site-header__phone { display: none; }
   .site-menu-toggle { display: flex; }
-}
-
-@media (min-width: 901px) {
-  .site-header__share { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -442,6 +442,12 @@ li + li { margin-top: 0.35rem; }
 .btn--whatsapp:hover { background: #1fb855; color: var(--white); }
 
 .btn--block { width: 100%; }
+
+.btn.site-header__share { display: none; }
+
+@media (max-width: 900px) {
+  .btn.site-header__share { display: inline-flex; }
+}
 
 .btn-group {
   display: flex;
