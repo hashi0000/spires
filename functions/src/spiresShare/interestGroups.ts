@@ -1,3 +1,4 @@
+import { publicInterestSafeFields } from "./shareProgress";
 import { flexibilityMinutes, minutesToHm, parseHmToMinutes } from "./logic";
 import {
   Flexibility,
@@ -188,6 +189,7 @@ export function toPublicInterestGroup(group: ShareInterestGroup): PublicInterest
     interestedSeatCount: group.interestedSeatCount,
     status: group.status,
     journeyType: group.journeyType,
+    ...publicInterestSafeFields(group),
   };
 }
 

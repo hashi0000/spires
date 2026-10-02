@@ -31,6 +31,12 @@ import {
   terminalTransferWarning,
 } from "./terminalGuide";
 import {
+  bookingCustomerStage,
+  customerStageLabel,
+  PAYMENT_GUARANTEE_NOTICE,
+  TRAVEL_PLANS_NOTICE,
+} from "./shareProgress";
+import {
   canPassengerEnterPayment,
   destinationMatchingEnabled,
   journeyTypeOf,
@@ -358,6 +364,15 @@ export function toCustomerBookingView(
     terminalTransferWarning: terminalWarning || undefined,
     actionRequired,
     fourPassengerFallbackEnabled: fourPassengerFallbackEnabled(journey),
+    customerStage: bookingCustomerStage(journey, booking),
+    customerStageLabel: customerStageLabel(bookingCustomerStage(journey, booking)),
+    paymentsReceived: paidPlaces,
+    paymentsRequired: journey.capacity,
+    remainingPaymentsNeeded: Math.max(0, journey.capacity - paidPlaces),
+    ownPaymentReceived: reservationStatus === "PAID" || hostedPaymentStatus === "PAID",
+    ownPaymentVerified: reservationStatus === "PAID" && (hostedPaymentStatus === "PAID" || !booking.hostedPaymentStatus),
+    confirmationGuardNotice: confirmed ? undefined : PAYMENT_GUARANTEE_NOTICE,
+    travelPlansNotice: confirmed ? undefined : TRAVEL_PLANS_NOTICE,
   };
 }
 

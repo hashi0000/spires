@@ -131,6 +131,15 @@ export function computePaymentDeadline(
   };
 }
 
+export function computeInterestDeadline(
+  createdAtIso: string,
+  windowHours = 48,
+  quietStart = DEFAULT_QUIET_HOURS_START,
+  quietEnd = DEFAULT_QUIET_HOURS_END
+): PaymentDeadlineResult {
+  return computePaymentDeadline(createdAtIso, windowHours > 0 ? windowHours : 48, quietStart, quietEnd);
+}
+
 export function computeJoinerPaymentDeadline(
   nowIso: string,
   journeyDeadlineAt: string | undefined,

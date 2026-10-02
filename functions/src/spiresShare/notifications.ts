@@ -3,6 +3,7 @@ import { ShareConfig } from "./types";
 import { penceToGbp } from "./logic";
 import { formatLondonDateTime } from "./paymentDeadline";
 import { FOUR_PASSENGER_FARE_PENCE, SUPPLEMENT_PENCE } from "./hostedPayment";
+import { PAYMENT_GUARANTEE_NOTICE, SHARE_CUSTOMER_DASHBOARD_URL, SHARE_ADMIN_DASHBOARD_URL, SHARE_PUBLIC_BOARD_URL } from "./shareProgress";
 
 export type NotificationDraft = {
   type: NotificationType;
@@ -28,6 +29,27 @@ export type NotificationExtra = {
   fourPassengerFallbackEnabled?: boolean;
   terminalGuideUrl?: string;
   terminalGuideLabel?: string;
+  firstName?: string;
+  origin?: string;
+  destination?: string;
+  travelDate?: string;
+  preferredTime?: string;
+  seatsRequested?: number;
+  interestedSeatCount?: number;
+  requiredSeats?: number;
+  remainingNeeded?: number;
+  interestDeadlineAt?: string;
+  paymentsReceived?: number;
+  paymentsRequired?: number;
+  remainingPayments?: number;
+  pickup?: string;
+  sharedDropoff?: string;
+  potentialRevenuePence?: number;
+  paymentLinkStatus?: string;
+  adminDashboardUrl?: string;
+  customerDashboardUrl?: string;
+  publicBoardUrl?: string;
+  refundStatus?: string;
 };
 
 export function shareNotificationsEnabled(config: ShareConfig): boolean {
@@ -71,16 +93,16 @@ export function buildNotification(
       text: `${ref} now has more places reserved. Your place is still provisional until payment is completed and the journey is confirmed.`,
     },
     JOURNEY_CONFIRMED: {
-      subject: "Spires Share Pilot: your airport transfer is confirmed",
-      text: `${ref} is confirmed. ${CONFIRMED_NOTICE} Meeting point: Thornhill Park & Ride. ${STRICT_DEPARTURE_NOTICE} ${FLIGHT_DISCLAIMER}`,
+      subject: "Your Spires Share journey is confirmed",
+      text: `JOURNEY CONFIRMED\n\n${ref} is confirmed. ${CONFIRMED_NOTICE}\nPickup: ${extra.pickup || "the departure location shown in your dashboard"}\nShared drop off: ${extra.sharedDropoff || "the shared destination shown in your dashboard"}\nAll required payments received.\n\nMeeting point: Thornhill Park & Ride. ${STRICT_DEPARTURE_NOTICE} ${FLIGHT_DISCLAIMER}${terminalGuideLine}`,
     },
     PAYMENT_PROBLEM: {
       subject: "Spires Share Pilot: payment still needs to be completed",
       text: `${ref}. Please complete payment from your signed in Spires Share dashboard. Payment received does not mean the journey is confirmed until all required passengers have paid.`,
     },
     PAYMENT_REQUIRED: {
-      subject: "Spires Share Pilot: payment required to secure your place",
-      text: `Your proposed Spires Share journey has reached the payment stage.\n\n${ref}\nMeeting point: Thornhill Park & Ride\nPassengers on your reservation: ${pax}\nAmount due: ${amount}\nPay by: ${deadline}\n\n${payLine}\n\n${FILL_NOTICE}\n\nPayment secures your place. Returning from the payment page does not mean payment has been confirmed. If you do not pay by the deadline, your provisional place may be released.${fourReminder ? `\n\n${fourReminder}` : ""}`,
+      subject: "Payment required for your Spires Share journey",
+      text: `Good news — enough passengers have registered for your proposed Spires Share journey.\n\nYour journey is NOT confirmed yet.\n\nAll required passengers must now pay before the payment deadline.\n\n${ref}\nShared drop off: ${extra.sharedDropoff || "the shared destination shown in your dashboard"}\nFare: ${amount}\nPayment deadline: ${deadline}\n\n${payLine}\n\n${PAYMENT_GUARANTEE_NOTICE}${fourReminder ? `\n\n${fourReminder}` : ""}`,
     },
     PAYMENT_DEADLINE_APPROACHING: {
       subject: "Spires Share Pilot: payment deadline approaching",
@@ -131,12 +153,12 @@ export function buildNotification(
       text: `A place has become available on your Spires Share journey.\n\nYou have ${extra.offerMinutes || 60} minutes to claim the place before it is offered to the next passenger.\n\n${ref}\n\nSign in to claim or decline. Claiming a place does not skip payment, shared drop off acceptance, or the Spires Share terms.`,
     },
     INTEREST_RECEIVED: {
-      subject: "Spires Share: interest registered",
-      text: `We have recorded your interest in a shared journey. This is not a booking and no payment has been taken. You will be asked to accept a proposed departure time before any payment is requested.`,
+      subject: "We've registered your Spires Share interest",
+      text: `Hi ${extra.firstName || "there"},\n\nWe've registered your interest in:\n\n${extra.origin || "your origin"} → ${extra.destination || "your destination"}\n${extra.travelDate || ""}\nAround ${extra.preferredTime || "your preferred time"}\n\nThere are currently ${extra.interestedSeatCount ?? 0} of ${extra.requiredSeats ?? 0} places interested.\n\n${extra.remainingNeeded === 1 ? "1 more passenger is needed before payment can be requested." : extra.remainingNeeded && extra.remainingNeeded > 1 ? `${extra.remainingNeeded} more passengers are needed before payment can be requested.` : "Enough passengers have registered. Payment requests can now be sent."}\n\nRegistration closes: ${extra.interestDeadlineAt ? formatLondonDateTime(extra.interestDeadlineAt) : "the registration deadline"}\n\nYou have not been charged.\n\nWe'll email you if enough passengers register and payment becomes available.\n\nRegistering interest does not confirm the journey.\n\nView my Share journey: ${extra.customerDashboardUrl || SHARE_CUSTOMER_DASHBOARD_URL}`,
     },
     INTEREST_GROUP_READY: {
-      subject: "Spires Share: enough interest to review a shared journey",
-      text: `Enough compatible passengers have registered interest for a shared journey. Spires Taxis will review this and may propose an exact departure. No payment has been taken.`,
+      subject: "Spires Share: Payment threshold reached — action required",
+      text: `Enough passengers have registered. Review the journey and open the payment window.\n\nThis does not confirm the journey.`,
     },
     JOURNEY_PROPOSED_FROM_INTEREST: {
       subject: "Spires Share: please review the proposed shared journey",
@@ -157,6 +179,42 @@ export function buildNotification(
     SHARED_DROPOFF_CHANGED: {
       subject: "Spires Share: the proposed shared drop off has changed",
       text: `${ref}. The proposed shared drop off has changed. Previous acceptance no longer applies. Sign in to review and accept or decline the new shared drop off.`,
+    },
+    ADMIN_NEW_INTEREST: {
+      subject: `Spires Share: New interest — ${extra.origin || "Origin"} → ${extra.destination || "destination"}`,
+      text: `New Spires Share interest registered.\n\nRoute: ${extra.origin || ""} → ${extra.destination || ""}\nDate: ${extra.travelDate || ""}\nPreferred time: ${extra.preferredTime || ""}\nSeats requested: ${extra.seatsRequested || 1}\nCurrent interest: ${extra.interestedSeatCount ?? 0} of ${extra.requiredSeats ?? 0}\nMore needed: ${extra.remainingNeeded ?? 0}\nInterest deadline: ${extra.interestDeadlineAt ? formatLondonDateTime(extra.interestDeadlineAt) : "not set"}\nAdmin dashboard: ${extra.adminDashboardUrl || SHARE_ADMIN_DASHBOARD_URL}`,
+    },
+    ADMIN_THRESHOLD_REACHED: {
+      subject: "Spires Share: Payment threshold reached — action required",
+      text: `Enough passengers have registered. Review the journey and open the payment window.\n\nRoute: ${extra.origin || ""} → ${extra.destination || ""}\nDate: ${extra.travelDate || ""}\nRequired passengers: ${extra.requiredSeats ?? 0}\nInterested passengers: ${extra.interestedSeatCount ?? 0}\nFare: ${extra.farePence != null ? penceToGbp(extra.farePence) : "see dashboard"}\nPotential revenue: ${extra.potentialRevenuePence != null ? penceToGbp(extra.potentialRevenuePence) : "see dashboard"}\nPayment link status: ${extra.paymentLinkStatus || "not added"}\n\nDo not mark the journey confirmed. Open the payment window after review.`,
+    },
+    ADMIN_ALL_PAYMENTS_RECEIVED: {
+      subject: "Spires Share: All payments received — journey confirmed",
+      text: `All required payments have been received and verified. The journey is confirmed.\n\n${ref}`,
+    },
+    ADMIN_PAYMENT_WINDOW_EXPIRED: {
+      subject: "Spires Share: Payment deadline missed — action required",
+      text: `Not all required passenger payments were received by the deadline. This Spires Share journey has not been confirmed.\n\n${ref}\n\nReview unpaid reservations, waitlist offers, and any payments already received. No automatic refund has been issued.`,
+    },
+    INTEREST_PROGRESS_ONE_MORE: {
+      subject: "Spires Share: Just 1 more passenger needed",
+      text: `Your shared journey now has ${extra.interestedSeatCount ?? 0} of ${extra.requiredSeats ?? 0} places interested.\n\nJust one more passenger is needed before the journey can move to payment.\n\nRegistration closes: ${extra.interestDeadlineAt ? formatLondonDateTime(extra.interestDeadlineAt) : "the registration deadline"}\n\nRegistering interest does not confirm the journey.`,
+    },
+    INTEREST_EXPIRED: {
+      subject: "Update on your Spires Share request",
+      text: `Unfortunately, we did not receive enough passenger interest before the registration deadline.\n\nThe shared journey will therefore not proceed to payment.\n\nNo payment was taken.\n\nView other Share journeys: ${extra.publicBoardUrl || SHARE_PUBLIC_BOARD_URL}`,
+    },
+    PAYMENT_RECEIVED: {
+      subject: "We've received your Spires Share payment",
+      text: `We've confirmed receipt of your ${amount} payment.\n\nYour individual payment has been received.\n\nThe shared journey is not yet confirmed unless all required passenger payments have also been received.\n\nPayments received: ${extra.paymentsReceived ?? 0} of ${extra.paymentsRequired ?? 0}\n${extra.remainingPayments ? `${extra.remainingPayments} payment${extra.remainingPayments === 1 ? " is" : "s are"} still outstanding.` : "All required payments have been received."}\n\n${PAYMENT_GUARANTEE_NOTICE}`,
+    },
+    PAYMENT_WINDOW_EXPIRED_CUSTOMER: {
+      subject: "Update on your Spires Share journey",
+      text: `Unfortunately, not all required passenger payments were received by the deadline, so this Spires Share journey has not yet been confirmed.\n\n${ref}\n\nIf you have already paid, Spires Taxis has recorded your payment and will contact you about the next steps. No automatic refund has been issued.\nPayment status: ${extra.refundStatus || "recorded, awaiting admin review"}`,
+    },
+    PAYMENT_DEADLINE_EXTENDED: {
+      subject: "Spires Share: payment deadline updated",
+      text: `${ref}. The payment deadline has been updated to ${deadline}. ${PAYMENT_GUARANTEE_NOTICE}`,
     },
   };
   const row = templates[type];

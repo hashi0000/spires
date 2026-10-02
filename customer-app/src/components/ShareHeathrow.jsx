@@ -5,6 +5,42 @@ import { functions } from "../firebase";
 const TERMS_URL = "https://www.spires-taxis.com/share-terms";
 const GUIDE_URL = "https://www.spires-taxis.com/share/heathrow-terminal-transfer";
 
+function formatCountdown(deadlineAt, nowMs) {
+  if (!deadlineAt) return "";
+  const ms = new Date(deadlineAt).getTime() - nowMs;
+  if (!Number.isFinite(ms)) return "";
+  if (ms <= 0) return "Closed";
+  const totalMins = Math.floor(ms / 60000);
+  const days = Math.floor(totalMins / (24 * 60));
+  const hours = Math.floor((totalMins % (24 * 60)) / 60);
+  const mins = totalMins % 60;
+  const secs = Math.floor((ms % 60000) / 1000);
+  const pad = (n) => String(Math.max(0, n)).padStart(2, "0");
+  if (days >= 1) return `${days} day${days === 1 ? "" : "s"} ${pad(hours)} hrs ${pad(mins)} mins`;
+  return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+}
+
+function ProgressDots({ filled, total }) {
+  const capacity = Math.max(0, Number(total) || 0);
+  const taken = Math.max(0, Number(filled) || 0);
+  return (
+    <div className="share-occupancy" aria-hidden="true">
+      {Array.from({ length: capacity }, (_, index) => (
+        <span key={index} className={`share-dot${index < taken ? " is-filled" : ""}`} />
+      ))}
+    </div>
+  );
+}
+
+function GuaranteeNotice() {
+  return (
+    <div className="share-guarantee">
+      <p>Your journey is only confirmed once all required passenger payments have been received and verified by Spires Taxis.</p>
+      <p>Please do not make travel plans on the assumption that registering interest or making an individual payment confirms the journey.</p>
+    </div>
+  );
+}
+
 function gbp(pence) {
   return `£${(Number(pence || 0) / 100).toFixed(2)}`;
 }
@@ -106,8 +142,9 @@ function terminalWarning(terminal) {
 }
 
 function bookingStatusLabel(row) {
-  if (row.journeyStatus === "CONFIRMED") return "Confirmed";
-  if (row.hostedPaymentStatus === "PAID" || row.reservationStatus === "PAID") return "Paid";
+  if (row.journeyStatus === "CONFIRMED" || row.customerStage === "JOURNEY_CONFIRMED") return "Journey confirmed";
+  if (row.customerStageLabel) return row.customerStageLabel;
+  if (row.hostedPaymentStatus === "PAID" || row.reservationStatus === "PAID") return "Awaiting all payments";
   if (row.paymentSubmittedNotice && row.hostedPaymentStatus !== "PAID") return "Payment submitted";
   if (row.paymentLinkAvailable || row.reservationStatus === "PAYMENT_PENDING") return "Payment required";
   if (row.canAcceptSharedDropoff) return "Action required";
@@ -117,9 +154,12 @@ function bookingStatusLabel(row) {
 }
 
 function interestStatusLabel(row) {
+  if (row.groupStatus === "EXPIRED") return "Not enough interest";
+  if (row.groupStatus === "CANCELLED") return "Cancelled";
+  if (row.customerStageLabel) return row.customerStageLabel;
   if (row.canAcceptProposal) return "Action required";
   if (row.groupStatus === "CONVERTED_TO_JOURNEY") return "Journey proposed";
-  if (row.groupStatus === "READY_FOR_REVIEW") return "Matching";
+  if (row.groupStatus === "READY_FOR_REVIEW") return "Enough interest received";
   if (row.status === "ACTIVE") return "Interest registered";
   if (row.status === "CONVERTED") return "Converted";
   if (row.status === "WITHDRAWN") return "Cancelled";
@@ -167,6 +207,7 @@ export default function ShareHeathrow() {
     departureTerminal: "T3",
   });
   const [contact, setContact] = useState({ name: "", mobile: "", email: "" });
+  const [nowMs, setNowMs] = useState(Date.now());
   const [form, setForm] = useState({
     origin: params.get("origin") || "Oxford",
     destinationRegion: params.get("destination") || "",
@@ -212,6 +253,23 @@ export default function ShareHeathrow() {
     loadJourneys().catch(() => undefined);
   }, [session]);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    const refresh = () => {
+      if (!session?.available) return;
+      loadDashboard().catch(() => undefined);
+      loadJourneys().catch(() => undefined);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refresh();
+    });
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [session]);
+
   const call = async (name, payload) => {
     const fn = httpsCallable(functions, name);
     const result = await fn(payload);
@@ -225,7 +283,13 @@ export default function ShareHeathrow() {
     try {
       await fn();
     } catch (err) {
-      setError(err.message || "Spires Share is not available.");
+      const code = typeof err?.code === "string" ? err.code : "";
+      const raw = typeof err?.message === "string" ? err.message : "";
+      setError(
+        !raw || raw === "INTERNAL" || code === "functions/internal"
+          ? "Could not save your Spires Share request. Please try again."
+          : raw.replace(/^FirebaseError:\s*/i, "")
+      );
     } finally {
       setBusy(false);
     }
@@ -281,7 +345,14 @@ export default function ShareHeathrow() {
       flexibility: form.flexibility,
       passengers: form.passengers,
     });
-    setMatch(data?.match || null);
+    const found = data?.match || null;
+    if (!found || Number(found.interestedSeatCount || 0) < 1) {
+      setMatch(null);
+      setSkipMatch(true);
+      return;
+    }
+    setSkipMatch(false);
+    setMatch(found);
   };
 
   const submitInterest = async (publicNumber) => {
@@ -328,12 +399,27 @@ export default function ShareHeathrow() {
       : `Interest registered as ${data.publicNumber}. We'll try to match you with other passengers travelling in the same direction. This is not yet a confirmed booking and no payment has been taken.`);
   };
 
+  const termsChecks = (
+    <div className="share-terms-block">
+      <p className="share-app-note">This registers your interest in a shared journey. It does not confirm a booking and no payment will be taken now.</p>
+      <p><a href={TERMS_URL} target="_blank" rel="noopener noreferrer">Read the Spires Share Terms and Conditions</a></p>
+      <label className="share-terms-check">
+        <input type="checkbox" checked={requestAck} onChange={(e) => setRequestAck(e.target.checked)} />
+        I understand that this is a request to join or create Spires Share interest and is not yet a confirmed journey.
+      </label>
+      <label className="share-terms-check">
+        <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+        I have read and agree to the current Spires Share terms
+      </label>
+    </div>
+  );
+
   const nav = (
     <div className="share-app-actions">
-      <button type="button" className={`btn-profile${view === "home" ? " share-nav-active" : ""}`} onClick={() => setView("home")}>Spires Share</button>
-      <button type="button" className={`btn-profile${view === "request" ? " share-nav-active" : ""}`} onClick={() => { setView("request"); setStep(1); }}>Request</button>
-      <button type="button" className={`btn-profile${view === "explore" ? " share-nav-active" : ""}`} onClick={() => setView("explore")}>Available</button>
-      <button type="button" className={`btn-profile${view === "mine" ? " share-nav-active" : ""}`} onClick={() => setView("mine")}>My Share journeys</button>
+      <button type="button" className={`btn-secondary${view === "home" ? " share-nav-active" : ""}`} onClick={() => setView("home")}>Spires Share</button>
+      <button type="button" className={`btn-secondary${view === "request" ? " share-nav-active" : ""}`} onClick={() => { setView("request"); setStep(1); }}>Request</button>
+      <button type="button" className={`btn-secondary${view === "explore" ? " share-nav-active" : ""}`} onClick={() => setView("explore")}>Available</button>
+      <button type="button" className={`btn-secondary${view === "mine" ? " share-nav-active" : ""}`} onClick={() => setView("mine")}>My Share journeys</button>
     </div>
   );
 
@@ -352,14 +438,14 @@ export default function ShareHeathrow() {
             <div className="share-offer">
               <h4>Needs your attention</h4>
               {actions.map((item) => (
-                <button key={item.key} type="button" className="btn-profile" onClick={item.go}>{item.title}</button>
+                <button key={item.key} type="button" className="btn-secondary" onClick={item.go}>{item.title}</button>
               ))}
             </div>
           ) : null}
           <div className="share-app-actions">
             <button type="button" className="btn-new-booking share-pay-btn" onClick={() => { setView("request"); setStep(1); }}>Request a shared journey</button>
-            <button type="button" className="btn-profile" onClick={() => setView("explore")}>View available shared journeys</button>
-            <button type="button" className="btn-profile" onClick={() => setView("mine")}>My Share journeys</button>
+            <button type="button" className="btn-secondary" onClick={() => setView("explore")}>View available shared journeys</button>
+            <button type="button" className="btn-secondary" onClick={() => setView("mine")}>My Share journeys</button>
           </div>
         </>
       ) : null}
@@ -459,9 +545,10 @@ export default function ShareHeathrow() {
               <p>{formatDate(match.travelDate)}</p>
               <p>Preferred departure: around {form.preferredDepartureTime}</p>
               <p>{match.interestedSeatCount} {match.interestedSeatCount === 1 ? "passenger currently interested" : "passengers currently interested"}</p>
+              {termsChecks}
               <div className="share-app-actions">
-                <button type="button" className="btn-new-booking share-pay-btn" disabled={busy} onClick={() => run(() => submitInterest(match.publicNumber))}>Join this group</button>
-                <button type="button" className="btn-logout" onClick={() => { setSkipMatch(true); setMatch(null); }}>My times don't match</button>
+                <button type="button" className="btn-new-booking share-pay-btn" disabled={busy || !termsAccepted || !requestAck} onClick={() => run(() => submitInterest(match.publicNumber))}>Join this group</button>
+                <button type="button" className="btn-logout" onClick={() => { setSkipMatch(true); setMatch(null); }}>My times do not match</button>
               </div>
             </div>
           ) : null}
@@ -478,16 +565,7 @@ export default function ShareHeathrow() {
                 {city ? <div><dt>Intended destination</dt><dd>{form.intendedDestinationText}</dd></div> : null}
                 {heathrow ? <div><dt>Flight terminal</dt><dd>{form.departureTerminal === "UNSURE" ? "Not sure" : form.departureTerminal} · Share drop off T3</dd></div> : null}
               </dl>
-              <p className="share-app-note">This registers your interest in a shared journey. It does not confirm a booking and no payment will be taken now.</p>
-              <p><a href={TERMS_URL} target="_blank" rel="noopener noreferrer">Read the Spires Share Terms and Conditions</a></p>
-              <label className="share-terms-check">
-                <input type="checkbox" checked={requestAck} onChange={(e) => setRequestAck(e.target.checked)} />
-                I understand that this is a request to join or create Spires Share interest and is not yet a confirmed journey.
-              </label>
-              <label className="share-terms-check">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
-                I have read and agree to the current Spires Share terms
-              </label>
+              {termsChecks}
               <button type="button" className="btn-new-booking share-pay-btn" disabled={busy || !termsAccepted || !requestAck} onClick={() => run(() => submitInterest(joinInterestNumber))}>Register interest</button>
             </div>
           ) : null}
@@ -496,7 +574,8 @@ export default function ShareHeathrow() {
             {step < 8 ? (
               <button
                 type="button"
-                className="btn-profile"
+                className="btn-new-booking"
+                disabled={busy}
                 onClick={() => run(async () => {
                   if (step === 1 && !form.origin.trim()) { setError("Enter where you are travelling from."); return; }
                   if (step === 2 && !form.destinationRegion.trim()) { setError("Enter where you are travelling to."); return; }
@@ -524,9 +603,12 @@ export default function ShareHeathrow() {
             <article key={row.publicNumber} className="share-dash-card">
               <p className="share-dash-kicker">{row.origin} → {row.destinationRegion}</p>
               <h4>{formatDate(row.travelDate)}</h4>
-              <p>{row.timeLabel}</p>
-              <p>{row.interestedSeatCount} {row.interestedSeatCount === 1 ? "passenger interested" : "passengers interested"}</p>
-              <button type="button" className="btn-profile" onClick={() => {
+              <p>Departure around {row.preferredDepartureTime || row.timeLabel}</p>
+              <p>{row.placesLabel || `${row.interestedSeatCount} of ${row.requiredSeats || 5} places interested`}</p>
+              <ProgressDots filled={row.interestedSeatCount} total={row.requiredSeats || 5} />
+              <p className="share-needed">{row.enoughInterest ? "Enough interest received. Payment requests can now be sent." : row.neededLabel}</p>
+              {row.interestDeadlineAt ? <p className="share-deadline">Registration closes in: {formatCountdown(row.interestDeadlineAt, nowMs)}</p> : null}
+              <button type="button" className="btn-secondary" onClick={() => {
                 setJoinInterestNumber(row.publicNumber);
                 setForm({ ...form, origin: row.origin, destinationRegion: row.destinationRegion, travelDate: row.travelDate });
                 setView("request");
@@ -546,9 +628,9 @@ export default function ShareHeathrow() {
                 <p className="share-app-note">Shared drop off: Terminal 3. <a href={`${GUIDE_URL}#t3`} target="_blank" rel="noopener noreferrer">Terminal transfer instructions</a></p>
               ) : null}
               {row.remainingSeats > 0 ? (
-                <button type="button" className="btn-profile" onClick={() => setSelectedNumber(row.publicNumber)}>Select this departure</button>
+                <button type="button" className="btn-secondary" onClick={() => setSelectedNumber(row.publicNumber)}>Select this departure</button>
               ) : (
-                <button type="button" className="btn-profile" disabled={busy} onClick={() => run(async () => {
+                <button type="button" className="btn-secondary" disabled={busy} onClick={() => run(async () => {
                   if (!termsAccepted) { setError("You must agree to the Spires Share terms before joining the waitlist."); return; }
                   await call("spiresShareCustomerAction", {
                     action: "join-waitlist",
@@ -635,11 +717,8 @@ export default function ShareHeathrow() {
                 <label>Mobile<input required value={contact.mobile} onChange={(e) => setContact({ ...contact, mobile: e.target.value })} /></label>
                 <label>Email<input type="email" required value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} /></label>
               </div>
-              <label className="share-terms-check">
-                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
-                I have read and agree to the current Spires Share terms
-              </label>
-              <button type="submit" className="btn-new-booking share-pay-btn" disabled={busy || !termsAccepted}>Register interest</button>
+              {termsChecks}
+              <button type="submit" className="btn-new-booking share-pay-btn" disabled={busy || !termsAccepted || !requestAck}>Register interest</button>
             </form>
           ) : null}
         </>
@@ -650,6 +729,7 @@ export default function ShareHeathrow() {
           {dashboard.map((row) => (
             <article key={row.bookingId} className="share-dash-card">
               <p className="share-dash-kicker">{row.originLabel || "Oxford"} → {row.destinationLabel || row.destinationCity}</p>
+              {row.journeyStatus === "CONFIRMED" ? <p className="share-confirmed-kicker">Journey confirmed</p> : null}
               <h4>{formatDate(row.travelDate)}</h4>
               <p>Status: {bookingStatusLabel(row)}</p>
               <dl className="share-dash-grid">
@@ -661,13 +741,34 @@ export default function ShareHeathrow() {
                     <div><dt>Shared drop off</dt><dd>{row.proposedSharedDropoffDisplayName || "Not selected yet"}</dd></div>
                   </>
                 ) : (
-                  <div><dt>Share drop off</dt><dd>Terminal 3</dd></div>
+                  <div><dt>Shared drop off</dt><dd>Heathrow Terminal 3</dd></div>
                 )}
                 <div><dt>Fare</dt><dd>{gbp(row.amountDuePence || row.farePence)}</dd></div>
               </dl>
-              {row.journeyStatus === "CONFIRMED" ? <p className="share-app-status">This shared journey is confirmed. It is not an ordinary private taxi booking, but your Share place is locked.</p> : <p className="share-app-note">{row.customerStatusLabel === "Payment received — awaiting journey confirmation" ? "Payment received. We are still confirming the overall journey." : "This is not yet a confirmed booking."}</p>}
+              {row.journeyStatus === "CONFIRMED" ? (
+                <p className="share-app-status">All required payments received. This shared journey is confirmed.</p>
+              ) : (
+                <>
+                  <p>{row.paymentsReceived || 0} of {row.paymentsRequired || row.capacity} payments received</p>
+                  <ProgressDots filled={row.paymentsReceived || 0} total={row.paymentsRequired || row.capacity} />
+                  {row.ownPaymentVerified ? (
+                    <>
+                      <p className="share-app-status">Your payment received</p>
+                      <p>Waiting for {row.remainingPaymentsNeeded || 0} remaining payment{(row.remainingPaymentsNeeded || 0) === 1 ? "" : "s"}</p>
+                      <p className="share-app-note">There's nothing else you need to do right now. We'll email you when the journey is confirmed.</p>
+                    </>
+                  ) : row.paymentLinkAvailable ? (
+                    <>
+                      <p>Your payment: {gbp(row.amountDuePence)} required</p>
+                      {row.paymentDeadlineAt ? <p className="share-deadline">Pay within: {formatCountdown(row.paymentDeadlineAt, nowMs)}</p> : null}
+                    </>
+                  ) : (
+                    <p className="share-app-note">Journey not yet confirmed.</p>
+                  )}
+                  <GuaranteeNotice />
+                </>
+              )}
               {row.paymentSubmittedNotice ? <p className="share-app-status">Payment submitted. We are confirming your payment. Your journey will show as paid once Spires Taxis has verified it.</p> : null}
-              {row.paymentDeadlineAt && row.hostedPaymentStatus !== "PAID" ? <p className="share-deadline">Pay by {formatDeadline(row.paymentDeadlineAt)}</p> : null}
               {row.departureTerminal && String(row.destinationLabel || "").toLowerCase().includes("heathrow") ? (
                 <p className="share-app-note">{terminalWarning(row.departureTerminal)} {row.departureTerminal !== "T3" ? <a href={row.terminalGuideUrl || guideHref(row.departureTerminal)} target="_blank" rel="noopener noreferrer">{row.terminalGuideLabel || guideLinkText(row.departureTerminal)}</a> : "No terminal transfer required."}</p>
               ) : null}
@@ -678,7 +779,7 @@ export default function ShareHeathrow() {
                   <p>Your intended destination: {row.intendedDestinationText}</p>
                   <p>You will need to make your own onward journey from {row.proposedSharedDropoffDisplayName}.</p>
                   <div className="share-app-actions">
-                    <button type="button" className="btn-profile" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-shared-dropoff", bookingId: row.bookingId }); await loadDashboard(); setStatus("Shared drop off accepted."); })}>Accept drop off</button>
+                    <button type="button" className="btn-secondary" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-shared-dropoff", bookingId: row.bookingId }); await loadDashboard(); setStatus("Shared drop off accepted."); })}>Accept drop off</button>
                     <button type="button" className="btn-logout" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "decline-shared-dropoff", bookingId: row.bookingId }); await loadDashboard(); setStatus("Proposed drop off declined. Your place has been released."); })}>Decline</button>
                   </div>
                 </div>
@@ -688,7 +789,7 @@ export default function ShareHeathrow() {
                   <h4>Four passenger departure option</h4>
                   <p>We currently have four passengers ready to travel. The journey can still operate if all four passengers agree to a total fare of £43.75 each. You have already paid £35. If everyone accepts, an additional £8.75 payment will be required.</p>
                   <div className="share-app-actions">
-                    <button type="button" className="btn-profile" disabled={busy || row.fourPassengerOffer.accepted} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-four-passenger", bookingId: row.bookingId }); await loadDashboard(); setStatus("Four passenger option accepted."); })}>Accept £43.75 fare</button>
+                    <button type="button" className="btn-secondary" disabled={busy || row.fourPassengerOffer.accepted} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-four-passenger", bookingId: row.bookingId }); await loadDashboard(); setStatus("Four passenger option accepted."); })}>Accept £43.75 fare</button>
                     <button type="button" className="btn-logout" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "reject-four-passenger", bookingId: row.bookingId }); await loadDashboard(); setStatus("Four passenger option declined."); })}>Decline</button>
                   </div>
                 </div>
@@ -711,6 +812,11 @@ export default function ShareHeathrow() {
               <p className="share-dash-kicker">{row.origin} → {row.destinationRegion}</p>
               <h4>{formatDate(row.travelDate)}</h4>
               <p>Status: {interestStatusLabel(row)}</p>
+              <p>{row.placesLabel || `${row.interestedSeatCount || 0} / ${row.requiredSeats || 5} interested`}</p>
+              <ProgressDots filled={row.interestedSeatCount || 0} total={row.requiredSeats || 5} />
+              <p className="share-needed">{row.enoughInterest ? "Enough interest received. Payment has not confirmed this journey." : row.neededLabel}</p>
+              {row.interestDeadlineAt ? <p className="share-deadline">Registration closes in: {formatCountdown(row.interestDeadlineAt, nowMs)}</p> : null}
+              {row.groupStatus === "EXPIRED" ? <p className="share-app-note">Not enough interest. No payment was taken.</p> : <p className="share-app-note">We'll email you when enough passengers have registered. Registering interest does not confirm the journey.</p>}
               <p>Preferred departure: {row.preferredDepartureTime || row.timeLabel}. Passengers: {row.passengers}</p>
               {row.intendedDestinationText ? <p className="share-app-note">Your intended destination (private): {row.intendedDestinationText}</p> : null}
               {row.departureTerminal ? <p className="share-app-note">{terminalWarning(row.departureTerminal)} {row.departureTerminal !== "T3" ? <a href={guideHref(row.departureTerminal)} target="_blank" rel="noopener noreferrer">{guideLinkText(row.departureTerminal)}</a> : null}</p> : null}
@@ -720,7 +826,7 @@ export default function ShareHeathrow() {
                   <p>Departure: {row.proposedDepartureLocation} at {row.proposedDepartureTime}. {gbp(row.proposedFarePence)} per passenger.</p>
                   <p className="share-app-note">You must accept this proposed departure before payment. Registering interest at an approximate time does not commit you to this time.</p>
                   <div className="share-app-actions">
-                    <button type="button" className="btn-profile" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-interest-proposal", interestEntryId: row.interestEntryId }); await loadDashboard(); setStatus("Proposed journey accepted."); })}>Accept journey</button>
+                    <button type="button" className="btn-secondary" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "accept-interest-proposal", interestEntryId: row.interestEntryId }); await loadDashboard(); setStatus("Proposed journey accepted."); })}>Accept journey</button>
                     <button type="button" className="btn-logout" disabled={busy} onClick={() => run(async () => { await call("spiresShareCustomerAction", { action: "decline-interest-proposal", interestEntryId: row.interestEntryId }); await loadDashboard(); setStatus("Proposed journey declined."); })}>Decline</button>
                   </div>
                 </div>
@@ -772,7 +878,7 @@ export default function ShareHeathrow() {
                         ) : null}
                       </div>
                       <div className="share-app-actions">
-                        <button type="button" className="btn-profile" disabled={busy} onClick={() => run(async () => {
+                        <button type="button" className="btn-secondary" disabled={busy} onClick={() => run(async () => {
                           const data = await call("spiresShareCustomerAction", {
                             action: "update-interest",
                             interestEntryId: row.interestEntryId,
@@ -792,12 +898,12 @@ export default function ShareHeathrow() {
                           setEditingInterestId("");
                           setStatus(data?.rematched ? "Your request was moved to a compatible interest group because the time no longer matched." : "Interest updated.");
                         })}>Save changes</button>
-                        <button type="button" className="btn-profile" onClick={() => setEditingInterestId("")}>Cancel</button>
+                        <button type="button" className="btn-secondary" onClick={() => setEditingInterestId("")}>Cancel</button>
                       </div>
                     </div>
                   ) : (
                     <div className="share-app-actions">
-                      <button type="button" className="btn-profile" onClick={() => {
+                      <button type="button" className="btn-secondary" onClick={() => {
                         setEditingInterestId(row.interestEntryId);
                         setInterestPatch({
                           preferredDepartureTime: row.preferredDepartureTime || "10:00",

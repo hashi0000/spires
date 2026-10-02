@@ -100,8 +100,24 @@
     </article>`;
   }
 
+  function formatCountdown(deadlineAt) {
+    if (!deadlineAt) return "";
+    const ms = new Date(deadlineAt).getTime() - Date.now();
+    if (!Number.isFinite(ms) || ms <= 0) return "Closed";
+    const totalMins = Math.floor(ms / 60000);
+    const days = Math.floor(totalMins / (24 * 60));
+    const hours = Math.floor((totalMins % (24 * 60)) / 60);
+    const mins = totalMins % 60;
+    const secs = Math.floor((ms % 60000) / 1000);
+    const pad = function (n) { return String(Math.max(0, n)).padStart(2, "0"); };
+    if (days >= 1) return days + " day" + (days === 1 ? "" : "s") + " " + pad(hours) + " hrs " + pad(mins) + " mins";
+    return pad(hours) + ":" + pad(mins) + ":" + pad(secs);
+  }
+
   function interestCardHtml(row) {
+    const required = Number(row.requiredSeats || 5);
     const seats = Number(row.interestedSeatCount || 0);
+    const remaining = Number(row.remainingSeatsNeeded != null ? row.remainingSeatsNeeded : Math.max(0, required - seats));
     const params = new URLSearchParams({
       share: "1",
       interest: row.publicNumber || "",
@@ -109,12 +125,18 @@
       destination: row.destinationRegion || "",
       travelDate: row.travelDate || "",
     });
+    const around = row.preferredDepartureTime || row.timeLabel || "";
+    const needed = remaining === 1 ? "1 more passenger needed" : remaining > 1 ? remaining + " more passengers needed" : "Enough interest received";
+    const deadline = row.interestDeadlineAt ? formatCountdown(row.interestDeadlineAt) : "";
     return `<article class="card share-card">
       <p class="share-card__kicker">${escapeHtml(row.origin || "Oxford")} → ${escapeHtml(row.destinationRegion || "")}</p>
       <h3>${escapeHtml(formatDate(row.travelDate))}</h3>
-      <p class="share-card__time">${escapeHtml(row.timeLabel || "")}</p>
-      <p>${seats} ${seats === 1 ? "passenger interested" : "passengers interested"}</p>
-      <p class="share-warning">This is aggregate interest only. Exact destinations and passenger details are not shown.</p>
+      <p class="share-card__time">Departure around ${escapeHtml(around)}</p>
+      <p>${seats} of ${required} interested</p>
+      ${occupancyBar(seats, required)}
+      <p>${escapeHtml(needed)}</p>
+      ${deadline ? `<p>Registration closes in: ${escapeHtml(deadline)}</p>` : ""}
+      <p class="share-warning">Registering interest does not confirm the journey. No payment is taken at this stage.</p>
       <a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${params.toString()}">Join interest</a>
     </article>`;
   }
@@ -125,11 +147,20 @@
     listEl.innerHTML = rows.length ? rows.map((row) => cardHtml(row)).join("") : "";
   }
 
+  let lastInterest = [];
+  let lastInterestNote = "";
+
   function setInterest(rows, note) {
     if (!interestStatus || !interestEl) return;
+    lastInterest = rows;
+    lastInterestNote = note;
     interestStatus.textContent = note;
     interestEl.innerHTML = rows.length ? rows.map((row) => interestCardHtml(row)).join("") : "";
   }
+
+  setInterval(function () {
+    if (lastInterest.length) setInterest(lastInterest, lastInterestNote);
+  }, 1000);
 
   function layoutPreview() {
     return [
@@ -161,6 +192,10 @@
         travelDate: "2026-10-10",
         timeLabel: "Morning",
         interestedSeatCount: 3,
+        requiredSeats: 5,
+        remainingSeatsNeeded: 2,
+        interestDeadlineAt: new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString(),
+        preferredDepartureTime: "09:00",
       },
       {
         publicNumber: "IG-LAYOUT-2",

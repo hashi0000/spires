@@ -20,6 +20,7 @@ exports.fifoWaitlist = fifoWaitlist;
 exports.waitlistOrder = waitlistOrder;
 exports.derivedWaitlistPosition = derivedWaitlistPosition;
 exports.publicRemainingSeats = publicRemainingSeats;
+const shareProgress_1 = require("./shareProgress");
 const logic_1 = require("./logic");
 const REGION_ALIASES = {
     oxford: "Oxford",
@@ -169,6 +170,7 @@ function toPublicInterestGroup(group) {
         interestedSeatCount: group.interestedSeatCount,
         status: group.status,
         journeyType: group.journeyType,
+        ...(0, shareProgress_1.publicInterestSafeFields)(group),
     };
 }
 function publicInterestHasPrivateData(value) {

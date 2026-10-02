@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBookingForm, setShowBookingForm] = useState(false);
-  const [showShare, setShowShare] = useState(() => new URLSearchParams(window.location.search).get("share") === "1");
+  const [portal, setPortal] = useState(() => new URLSearchParams(window.location.search).get("share") === "1" ? "share" : "hire");
   const [showProfile, setShowProfile] = useState(false);
   const [userName, setUserName] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -282,7 +282,7 @@ export default function Dashboard() {
     <div className="dashboard-wrapper">
       <header className="dashboard-navbar">
         <div className="navbar-left">
-          <img src="/images/spireslogo.svg" alt="Spires Taxis" className="navbar-logo" />
+          <img src="/images/spireslogo-white.svg" alt="Spires Taxis" className="navbar-logo" />
         </div>
         <div className="navbar-center">
           <span className="welcome-text">
@@ -300,34 +300,52 @@ export default function Dashboard() {
       </header>
 
       <main className="dashboard-main">
+        <div className="portal-switch" role="tablist" aria-label="Booking type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={portal === "hire"}
+            className={portal === "hire" ? "is-active" : ""}
+            onClick={() => setPortal("hire")}
+          >
+            Private hire
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={portal === "share"}
+            className={`portal-share${portal === "share" ? " is-active" : ""}`}
+            onClick={() => setPortal("share")}
+          >
+            Spires Share
+          </button>
+        </div>
+
+        {portal === "share" ? (
+          <ShareHeathrow />
+        ) : (
+          <>
         <div className="dashboard-header-section">
-          <h2 className="dashboard-title">Journey History</h2>
+          <div>
+            <p className="share-pilot-kicker">Private hire</p>
+            <h2 className="dashboard-title">Your taxi bookings</h2>
+          </div>
           <button
             onClick={() => setShowBookingForm(true)}
             className="btn-new-booking"
           >
             + New Booking
           </button>
-          <button
-            onClick={() => setShowShare((open) => !open)}
-            className="btn-profile"
-          >
-            Spires Share
-          </button>
         </div>
 
-        {!showShare ? (
-          <article className="share-compact-card">
-            <p className="share-pilot-kicker">Spires Share</p>
-            <h3>Going somewhere?</h3>
-            <p>See whether other passengers are travelling the same way. This is a shared journey request, not a private taxi booking.</p>
-            <div className="share-app-actions">
-              <button type="button" className="btn-profile" onClick={() => setShowShare(true)}>Explore Share</button>
-            </div>
-          </article>
-        ) : null}
-
-        {showShare ? <ShareHeathrow /> : null}
+        <article className="share-compact-card">
+          <p className="share-pilot-kicker">Spires Share</p>
+          <h3>Going the same way as someone else?</h3>
+          <p>Spires Share is separate from a private taxi booking. Register interest in a shared journey and we will try to match you with other passengers.</p>
+          <div className="share-app-actions">
+            <button type="button" className="btn-secondary" onClick={() => setPortal("share")}>Open Spires Share</button>
+          </div>
+        </article>
 
         <div className="filter-section">
           <button
@@ -562,6 +580,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
       </main>
 

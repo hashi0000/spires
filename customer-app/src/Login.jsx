@@ -1,21 +1,34 @@
 import React, { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./firebase";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./styles.css";
+
+function afterLoginPath(location) {
+  const from = location.state?.from;
+  if (typeof from === "string" && from.startsWith("/") && !from.startsWith("//")) {
+    return from;
+  }
+  const params = new URLSearchParams(location.search || "");
+  if (params.get("share") === "1" || params.get("request") === "1") {
+    return `/dashboard${location.search || ""}`;
+  }
+  return "/dashboard";
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard");
+      navigate(afterLoginPath(location));
     } catch (err) {
       setError("Invalid email or password.");
     }
@@ -50,7 +63,7 @@ export default function Login() {
 
         <p className="switch-text">
           Don’t have an account?{" "}
-          <Link to="/signup" className="link">Sign up</Link>
+          <Link to="/signup" state={location.state} className="link">Sign up</Link>
         </p>
       </div>
     </div>

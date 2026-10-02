@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./styles.css";
 
 export default function Signup() {
@@ -19,6 +19,7 @@ export default function Signup() {
   const [addressNickname, setAddressNickname] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -97,7 +98,8 @@ export default function Signup() {
         createdAt: new Date(),
       });
       
-      navigate("/dashboard");
+      const from = location.state?.from;
+      navigate(typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard");
     } catch (err) {
       setError(err.message || "Could not create account.");
     }
@@ -224,7 +226,7 @@ export default function Signup() {
 
         <p className="switch-text">
           Already have an account?{" "}
-          <Link to="/" className="link">Log in</Link>
+          <Link to="/" state={location.state} className="link">Log in</Link>
         </p>
       </div>
     </div>

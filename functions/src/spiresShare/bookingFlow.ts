@@ -56,7 +56,6 @@ import {
   supplementDuePence,
   validateHostedPaymentUrl,
 } from "./hostedPayment";
-import { computeJoinerPaymentDeadline, computePaymentDeadline } from "./paymentDeadline";
 import {
   applyMatchingSuggestion,
   assertCanOpenPaymentWindow,
@@ -88,6 +87,19 @@ import {
   type InterestRequest,
 } from "./interestGroups";
 import { cityJourneyRequiresOwnFare, fourPassengerFallbackEnabled } from "./routePricing";
+import {
+  confirmationGuard,
+  interestCustomerStage,
+  customerStageLabel,
+  publicInterestSafeFields,
+  morePassengersNeededCopy,
+  notificationDedupeKey,
+  paymentWindowMayOpen,
+  recordShareNotification,
+  requiredSeatsForGroup,
+  seatProgress,
+} from "./shareProgress";
+import { computeInterestDeadline, computeJoinerPaymentDeadline, computePaymentDeadline } from "./paymentDeadline";
 import { isHeathrowShare, parseFlightTerminal } from "./terminalGuide";
 
 export type ContactInput = {
@@ -882,7 +894,14 @@ export function openPaymentWindow(
     booking.paymentDeadlineAt = deadline.deadlineAt;
     booking.paymentRequiredNotifiedAt = now;
     emailedBookingIds.push(booking.id);
-    db.notifications.push({ type: "PAYMENT_REQUIRED", bookingId: booking.id, email: booking.email, journeyId });
+    recordShareNotification(db.notifications, {
+      type: "PAYMENT_REQUIRED",
+      bookingId: booking.id,
+      email: booking.email,
+      journeyId,
+      paymentDeadlineAt: deadline.deadlineAt,
+      deduplicationKey: notificationDedupeKey(["PAYMENT_REQUIRED", booking.id]),
+    });
   }
   db.audit.push({ type: "PAYMENT_WINDOW_OPENED", journeyId, deadlineAt: deadline.deadlineAt, at: now });
   return { journey, emailedBookingIds, deadlineAt: deadline.deadlineAt };
@@ -922,6 +941,14 @@ export function markReservationPaid(
     confirmedBy: actor,
     confirmedAt: now,
     paymentMethod: "hosted_payment_link",
+  });
+  recordShareNotification(db.notifications, {
+    type: "PAYMENT_RECEIVED",
+    bookingId,
+    email: booking.email,
+    journeyId: journey.id,
+    amountPence: booking.paidAmountPence,
+    deduplicationKey: notificationDedupeKey(["PAYMENT_RECEIVED", booking.id]),
   });
   const confirmed = confirmHostedIfEligible(db, journey.id, now);
   return { previousStatus, newStatus: "PAID", confirmed: confirmed.ok };
@@ -988,10 +1015,36 @@ export function expireUnpaidReservations(db: InMemoryShareDb, nowIso?: string): 
     }
     journey.updatedAt = now;
   }
-  for (const journeyId of new Set(
+  const flagged = new Set(
     [...db.bookings.values()].filter((row) => row.reservationStatus === "PAYMENT_EXPIRED").map((row) => row.journeyId)
-  )) {
+  );
+  for (const journeyId of flagged) {
     void offerWaitlistIfPossible(db, journeyId, now);
+    const journey = db.journeys.get(journeyId);
+    if (!journey || journey.status === "CONFIRMED" || journey.locked) continue;
+    const bookings = [...db.bookings.values()].filter((row) => row.journeyId === journeyId);
+    const guard = confirmationGuard(bookings, journey, db.config);
+    if (guard.ok) continue;
+    journey.paymentActionRequired = true;
+    if (!journey.paymentWindowExpiredNotifiedAt) {
+      journey.paymentWindowExpiredNotifiedAt = now;
+      recordShareNotification(db.notifications, {
+        type: "ADMIN_PAYMENT_WINDOW_EXPIRED",
+        journeyId,
+        email: "admin",
+        deduplicationKey: notificationDedupeKey(["ADMIN_PAYMENT_WINDOW_EXPIRED", journeyId]),
+      });
+      for (const booking of bookings.filter((row) => row.reservationStatus === "PAID")) {
+        recordShareNotification(db.notifications, {
+          type: "PAYMENT_WINDOW_EXPIRED_CUSTOMER",
+          bookingId: booking.id,
+          email: booking.email,
+          journeyId,
+          refundStatus: booking.refundStatus || "PENDING",
+          deduplicationKey: notificationDedupeKey(["PAYMENT_WINDOW_EXPIRED_CUSTOMER", booking.id]),
+        });
+      }
+    }
   }
   return { expired };
 }
@@ -1098,9 +1151,8 @@ export function confirmHostedIfEligible(
     return { ok: true, alreadyConfirmed: true, status: "CONFIRMED" };
   }
   const bookings = [...db.bookings.values()].filter((row) => row.journeyId === journeyId);
-  const five = fivePassengerConfirmReady(bookings, journey.capacity);
-  const four = fourPassengerConfirmReady(bookings, db.config.earlyDepartureThreshold);
-  if (!five.ok && !four.ok) return { ok: false, status: journey.status };
+  const guard = confirmationGuard(bookings, journey, db.config);
+  if (!guard.ok) return { ok: false, status: journey.status };
   const now = nowIso || new Date().toISOString();
   journey.status = "CONFIRMED";
   journey.locked = true;
@@ -1108,8 +1160,20 @@ export function confirmHostedIfEligible(
   journey.confirmationEmailSentAt = now;
   journey.updatedAt = now;
   for (const booking of bookings.filter(reservationHoldsSeat)) {
-    db.notifications.push({ type: "JOURNEY_CONFIRMED", bookingId: booking.id, email: booking.email, journeyId });
+    recordShareNotification(db.notifications, {
+      type: "JOURNEY_CONFIRMED",
+      bookingId: booking.id,
+      email: booking.email,
+      journeyId,
+      deduplicationKey: notificationDedupeKey(["JOURNEY_CONFIRMED", journeyId, booking.id]),
+    });
   }
+  recordShareNotification(db.notifications, {
+    type: "ADMIN_ALL_PAYMENTS_RECEIVED",
+    journeyId,
+    email: "admin",
+    deduplicationKey: notificationDedupeKey(["ADMIN_ALL_PAYMENTS_RECEIVED", journeyId]),
+  });
   db.audit.push({ type: "JOURNEY_CONFIRMED", journeyId, at: now });
   return { ok: true, status: "CONFIRMED" };
 }
@@ -1798,6 +1862,12 @@ export function expressInterest(
         interestedSeatCount: 0,
         minPassengerThreshold: db.config.pilotDefaults.minPassengerThreshold,
         status: "GATHERING_INTEREST",
+        interestDeadlineAt: computeInterestDeadline(
+          now,
+          db.config.interestRegistrationHours || 48,
+          db.config.paymentQuietHoursStart,
+          db.config.paymentQuietHoursEnd
+        ).deadlineAt,
         matchingUncertain,
         createdAt: now,
         updatedAt: now,
@@ -1834,12 +1904,151 @@ export function expressInterest(
   if (matchingUncertain) group.matchingUncertain = true;
   recountInterestGroup(db, group);
   group.updatedAt = now;
-  db.notifications.push({ type: "INTEREST_RECEIVED", email: entry.email, interestGroupId: group.id, entryId: entry.id });
-  if (group.status === "READY_FOR_REVIEW") {
-    db.notifications.push({ type: "INTEREST_GROUP_READY", interestGroupId: group.id });
-  }
+  notifyInterestRegistration(db, group, entry, now);
   db.audit.push({ type: compatible ? "INTEREST_JOINED" : "INTEREST_CREATED", interestGroupId: group.id, entryId: entry.id, at: now });
   return { group, entry, joinedExisting: Boolean(compatible), matchingUncertain: Boolean(group.matchingUncertain) };
+}
+
+function notifyInterestRegistration(
+  db: InMemoryShareDb,
+  group: ShareInterestGroup,
+  entry: ShareInterestEntry,
+  now: string
+): void {
+  const required = requiredSeatsForGroup(group);
+  const progress = seatProgress(group.interestedSeatCount, required);
+  recordShareNotification(db.notifications, {
+    type: "INTEREST_RECEIVED",
+    email: entry.email,
+    interestGroupId: group.id,
+    entryId: entry.id,
+    seatsRequested: entry.passengers,
+    interestedSeatCount: group.interestedSeatCount,
+    requiredSeats: required,
+    remainingNeeded: progress.remaining,
+    interestDeadlineAt: group.interestDeadlineAt,
+    deduplicationKey: notificationDedupeKey(["INTEREST_RECEIVED", entry.id]),
+  });
+  recordShareNotification(db.notifications, {
+    type: "ADMIN_NEW_INTEREST",
+    email: "admin",
+    interestGroupId: group.id,
+    entryId: entry.id,
+    name: entry.name,
+    customerEmail: entry.email,
+    seatsRequested: entry.passengers,
+    interestedSeatCount: group.interestedSeatCount,
+    requiredSeats: required,
+    remainingNeeded: progress.remaining,
+    interestDeadlineAt: group.interestDeadlineAt,
+    deduplicationKey: notificationDedupeKey(["ADMIN_NEW_INTEREST", entry.id]),
+  });
+  if (progress.remaining === 1 && !group.oneMorePassengerNotifiedAt) {
+    group.oneMorePassengerNotifiedAt = now;
+    for (const row of activeInterestEntries(db, group.id)) {
+      recordShareNotification(db.notifications, {
+        type: "INTEREST_PROGRESS_ONE_MORE",
+        email: row.email,
+        interestGroupId: group.id,
+        entryId: row.id,
+        interestedSeatCount: group.interestedSeatCount,
+        requiredSeats: required,
+        remainingNeeded: 1,
+        interestDeadlineAt: group.interestDeadlineAt,
+        deduplicationKey: notificationDedupeKey(["INTEREST_PROGRESS_ONE_MORE", group.id, row.id]),
+      });
+    }
+  }
+  if (progress.enough && !group.thresholdReachedNotifiedAt) {
+    group.thresholdReachedNotifiedAt = now;
+    recordShareNotification(db.notifications, {
+      type: "ADMIN_THRESHOLD_REACHED",
+      interestGroupId: group.id,
+      email: "admin",
+      interestedSeatCount: group.interestedSeatCount,
+      requiredSeats: required,
+      remainingNeeded: 0,
+      deduplicationKey: notificationDedupeKey(["ADMIN_THRESHOLD_REACHED", group.id]),
+    });
+    recordShareNotification(db.notifications, {
+      type: "INTEREST_GROUP_READY",
+      interestGroupId: group.id,
+      email: "admin",
+      deduplicationKey: notificationDedupeKey(["INTEREST_GROUP_READY", group.id]),
+    });
+  }
+}
+
+export function expireInsufficientInterest(db: InMemoryShareDb, nowIso?: string): number {
+  const now = nowIso || new Date().toISOString();
+  let expired = 0;
+  for (const group of db.interestGroups.values()) {
+    if (group.status !== "GATHERING_INTEREST") continue;
+    if (!group.interestDeadlineAt || !isPast(group.interestDeadlineAt, now)) continue;
+    if (seatProgress(group.interestedSeatCount, requiredSeatsForGroup(group)).enough) continue;
+    group.status = "EXPIRED";
+    group.expiryReason = "INSUFFICIENT_INTEREST";
+    group.updatedAt = now;
+    if (!group.expiredNotifiedAt) {
+      group.expiredNotifiedAt = now;
+      for (const entry of activeInterestEntries(db, group.id)) {
+        recordShareNotification(db.notifications, {
+          type: "INTEREST_EXPIRED",
+          email: entry.email,
+          interestGroupId: group.id,
+          entryId: entry.id,
+          deduplicationKey: notificationDedupeKey(["INTEREST_EXPIRED", group.id, entry.id]),
+        });
+      }
+      recordShareNotification(db.notifications, {
+        type: "INTEREST_EXPIRED",
+        email: "admin",
+        interestGroupId: group.id,
+        note: "Interest expired without enough passengers",
+        deduplicationKey: notificationDedupeKey(["INTEREST_EXPIRED_ADMIN", group.id]),
+      });
+    }
+    db.audit.push({ type: "INTEREST_EXPIRED", interestGroupId: group.id, at: now });
+    expired += 1;
+  }
+  return expired;
+}
+
+export function setInterestDeadline(
+  db: InMemoryShareDb,
+  interestGroupId: string,
+  deadlineAt: string,
+  actor: string,
+  nowIso?: string
+): ShareInterestGroup {
+  const group = db.interestGroups.get(interestGroupId);
+  if (!group) throw new Error("Interest group not found.");
+  const now = nowIso || new Date().toISOString();
+  group.interestDeadlineAt = deadlineAt;
+  group.updatedAt = now;
+  db.audit.push({ type: "INTEREST_DEADLINE_CHANGED", interestGroupId, actor, deadlineAt, at: now });
+  return group;
+}
+
+export function setPaymentDeadline(
+  db: InMemoryShareDb,
+  journeyId: string,
+  deadlineAt: string,
+  actor: string,
+  nowIso?: string
+): ShareJourney {
+  const journey = db.journeys.get(journeyId);
+  if (!journey) throw new Error("Journey not found.");
+  const now = nowIso || new Date().toISOString();
+  const previous = journey.paymentDeadlineAt;
+  journey.paymentDeadlineAt = deadlineAt;
+  journey.updatedAt = now;
+  for (const booking of db.bookings.values()) {
+    if (booking.journeyId !== journeyId || booking.reservationStatus !== "PAYMENT_PENDING") continue;
+    booking.paymentDeadlineAt = deadlineAt;
+  }
+  db.audit.push({ type: "PAYMENT_DEADLINE_CHANGED", journeyId, actor, previousDeadlineAt: previous, deadlineAt, at: now });
+  return journey;
 }
 
 export function previewInterest(db: InMemoryShareDb, input: InterestRequest): PublicInterestGroupView | null {
@@ -1979,6 +2188,9 @@ export function proposeJourneyFromInterest(
 ): ShareJourney {
   const group = db.interestGroups.get(interestGroupId);
   if (!group) throw new Error("Interest group not found.");
+  if (group.status === "EXPIRED") {
+    throw new Error("This interest group expired without enough passengers and cannot proceed to payment.");
+  }
   if (group.status !== "GATHERING_INTEREST" && group.status !== "READY_FOR_REVIEW") {
     throw new Error("This interest group cannot be converted.");
   }
@@ -2187,13 +2399,15 @@ export function customerInterestViews(db: InMemoryShareDb, uid: string): Custome
         canDeclineProposal: row.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
         intendedDestinationText: row.intendedDestinationText,
         journeyType: group.journeyType,
-        preferredDepartureTime: row.preferredDepartureTime,
         flexibility: row.flexibility,
         canUpdate: row.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
         canWithdraw: row.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
         flightNumber: row.flightNumber,
         flightDepartureTime: row.flightDepartureTime,
         departureTerminal: row.departureTerminal,
+        ...publicInterestSafeFields(group),
+        preferredDepartureTime: row.preferredDepartureTime,
+        paymentNotOpened: group.status === "READY_FOR_REVIEW" || group.status === "CONVERTED_TO_JOURNEY",
       } as CustomerInterestView;
     })
     .filter((row): row is CustomerInterestView => Boolean(row));

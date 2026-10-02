@@ -1,5 +1,7 @@
 {
-  "cleanUrls": true,
+  "framework": "create-react-app",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
   "headers": [
     {
       "source": "/(.*)",
@@ -19,8 +21,7 @@
       "statusCode": 301
     }
   ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

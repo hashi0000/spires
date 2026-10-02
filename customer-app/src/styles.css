@@ -221,6 +221,30 @@ input::placeholder {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
+.btn-secondary {
+  background-color: #fff;
+  color: #0b1c3d;
+  border: 1.5px solid #0b1c3d;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.btn-secondary:hover {
+  background-color: #f3f4f6;
+  color: #0b1c3d;
+  border-color: #0b1c3d;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .btn-logout {
   background-color: #1d3c74;
   color: white;
@@ -258,6 +282,40 @@ input::placeholder {
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
   gap: 1rem;
+}
+
+.portal-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  background: #e8eef6;
+  padding: 0.35rem;
+  border-radius: 16px;
+  margin-bottom: 1.6rem;
+}
+
+.portal-switch button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.portal-switch button.is-active {
+  background: #0b1c3d;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(11, 28, 61, 0.18);
+}
+
+.portal-switch button.portal-share.is-active {
+  background: #c5a572;
+  color: #0b1c3d;
 }
 
 .filter-section {
@@ -879,6 +937,19 @@ input::placeholder {
   align-items: flex-start;
   font-weight: 600;
 }
+.share-terms-check input {
+  width: auto;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+.share-terms-block {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
 .share-compact-card {
   background: #fff;
   border-radius: 16px;
@@ -902,6 +973,49 @@ input::placeholder {
   min-height: 44px;
   font-size: 1rem;
 }
-.share-nav-active {
-  outline: 2px solid #0b1c3d;
+.btn-secondary.share-nav-active {
+  background-color: #0b1c3d;
+  color: #fff;
+  border-color: #0b1c3d;
+  outline: none;
+}
+
+.btn-secondary.share-nav-active:hover {
+  background-color: #152a5a;
+  color: #fff;
+  border-color: #152a5a;
+}
+.share-occupancy {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.55rem 0;
+}
+.share-dot {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  border: 2px solid #c9a227;
+  background: transparent;
+}
+.share-dot.is-filled { background: #c9a227; }
+.share-guarantee {
+  margin: 0.85rem 0;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.share-guarantee p {
+  margin: 0 0 0.4rem;
+  font-size: 0.92rem;
+}
+.share-needed {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.share-confirmed-kicker {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #166534;
+  margin: 0 0 0.35rem;
 }

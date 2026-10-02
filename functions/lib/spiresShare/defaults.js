@@ -62,6 +62,9 @@ exports.DEFAULT_SHARE_CONFIG = {
     ],
     notificationsSend: false,
     cityMatchingPublicEnabled: false,
+    interestRegistrationHours: 48,
+    paymentReminderMinutesBeforeDeadline: 30,
+    paymentFinalReminderMinutesBeforeDeadline: 10,
     pilotDefaults: {
         airportId: "heathrow",
         originLabel: "Oxford",

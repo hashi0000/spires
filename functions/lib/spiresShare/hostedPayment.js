@@ -27,6 +27,7 @@ const types_1 = require("./types");
 const logic_1 = require("./logic");
 const routePricing_1 = require("./routePricing");
 const terminalGuide_1 = require("./terminalGuide");
+const shareProgress_1 = require("./shareProgress");
 const destinationMatching_1 = require("./destinationMatching");
 function reservationHoldsSeat(booking) {
     return (0, logic_1.bookingHoldsSeat)(booking);
@@ -322,6 +323,15 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
         terminalTransferWarning: terminalWarning || undefined,
         actionRequired,
         fourPassengerFallbackEnabled: (0, routePricing_1.fourPassengerFallbackEnabled)(journey),
+        customerStage: (0, shareProgress_1.bookingCustomerStage)(journey, booking),
+        customerStageLabel: (0, shareProgress_1.customerStageLabel)((0, shareProgress_1.bookingCustomerStage)(journey, booking)),
+        paymentsReceived: paidPlaces,
+        paymentsRequired: journey.capacity,
+        remainingPaymentsNeeded: Math.max(0, journey.capacity - paidPlaces),
+        ownPaymentReceived: reservationStatus === "PAID" || hostedPaymentStatus === "PAID",
+        ownPaymentVerified: reservationStatus === "PAID" && (hostedPaymentStatus === "PAID" || !booking.hostedPaymentStatus),
+        confirmationGuardNotice: confirmed ? undefined : shareProgress_1.PAYMENT_GUARANTEE_NOTICE,
+        travelPlansNotice: confirmed ? undefined : shareProgress_1.TRAVEL_PLANS_NOTICE,
     };
 }
 function adminPaymentSummary(journey, bookings) {

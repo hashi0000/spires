@@ -135,6 +135,8 @@ type ShareState = {
     timeWindowStart: string;
     timeWindowEnd: string;
     interestedSeatCount: number;
+    minPassengerThreshold?: number;
+    interestDeadlineAt?: string;
     journeyType?: string;
     status: string;
     matchingUncertain?: boolean;
@@ -154,6 +156,30 @@ const runTick = httpsCallable(functions, "spiresShareRunTick");
 
 function gbp(pence: number): string {
   return `£${((pence || 0) / 100).toFixed(2)}`;
+}
+
+function formatCountdown(deadlineAt?: string, now = Date.now()): string {
+  if (!deadlineAt) return "not set";
+  const ms = new Date(deadlineAt).getTime() - now;
+  if (!Number.isFinite(ms)) return "not set";
+  if (ms <= 0) return "closed";
+  const totalMins = Math.floor(ms / 60000);
+  const days = Math.floor(totalMins / (24 * 60));
+  const hours = Math.floor((totalMins % (24 * 60)) / 60);
+  const mins = totalMins % 60;
+  const secs = Math.floor((ms % 60000) / 1000);
+  const pad = (n: number) => String(Math.max(0, n)).padStart(2, "0");
+  if (days >= 1) return `${days} day${days === 1 ? "" : "s"} ${pad(hours)} hrs ${pad(mins)} mins remaining`;
+  return `${pad(hours)}:${pad(mins)}:${pad(secs)} remaining`;
+}
+
+function LiveCountdown({ deadlineAt }: { deadlineAt?: string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [deadlineAt]);
+  return <span>{formatCountdown(deadlineAt, now)}</span>;
 }
 
 const SpiresShareAdmin: React.FC = () => {
@@ -181,6 +207,7 @@ const SpiresShareAdmin: React.FC = () => {
   const [paymentLink, setPaymentLink] = useState("");
   const [supplementLink, setSupplementLink] = useState("");
   const [deadlineValue, setDeadlineValue] = useState("");
+  const [interestDeadlineValue, setInterestDeadlineValue] = useState("");
   const [journeyNote, setJourneyNote] = useState("");
   const [refundDraft, setRefundDraft] = useState({ bookingId: "", refundStatus: "PENDING", amountRefundedPence: "0", amountRetainedPence: "0", adminNotes: "" });
   const [createForm, setCreateForm] = useState({
@@ -545,6 +572,18 @@ const SpiresShareAdmin: React.FC = () => {
                   <div>
                     <p style={{ fontWeight: 700, letterSpacing: "0.04em" }}>{(row.originLabel || row.originCity || "OXFORD").toUpperCase()} → {(row.destinationLabel || row.destinationCity || "HEATHROW T3").toUpperCase()}</p>
                     <p>{row.travelDate} · Departure {row.departureTime}</p>
+                    {row.status === "CONFIRMED" ? (
+                      <p>PAYMENTS {paidPlaces} / {row.capacity} VERIFIED · JOURNEY CONFIRMED</p>
+                    ) : row.paymentStageStatus === "OPEN" ? (
+                      <>
+                        <p>PAYMENTS {paidPlaces} / {row.capacity} VERIFIED · {Math.max(0, row.capacity - paidPlaces)} outstanding</p>
+                        <p>Payment deadline: <LiveCountdown deadlineAt={row.paymentDeadlineAt} /></p>
+                      </>
+                    ) : paidPlaces >= row.capacity || row.occupiedSeats >= row.capacity ? (
+                      <p>{row.occupiedSeats} / {row.capacity} INTERESTED · PAYMENT NOT OPEN</p>
+                    ) : (
+                      <p>INTEREST {row.occupiedSeats} / {row.capacity} · {Math.max(0, row.capacity - row.occupiedSeats)} more passenger{row.capacity - row.occupiedSeats === 1 ? "" : "s"} needed</p>
+                    )}
                     <p>Places: {row.occupiedSeats} / {row.capacity}</p>
                     <p>Provisional: {provisional} · Payment pending: {pending} · Paid: {paidPlaces}</p>
                     <p>Collected: {gbp(received)} · Target: {gbp(row.targetRevenuePence)}</p>
@@ -685,7 +724,10 @@ const SpiresShareAdmin: React.FC = () => {
                 {(state.interestGroups || []).map((group) => (
                   <li key={group.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.85rem" }}>
                     <strong>{group.origin} → {group.destinationRegion}</strong>
-                    <p className="text-sm">{group.journeyType || "OTHER"} · {group.travelDate} · {group.timeWindowStart} to {group.timeWindowEnd} · {group.interestedSeatCount} interested · {group.status}{group.matchingUncertain ? " · needs review" : ""}</p>
+                    <p className="text-sm">{group.journeyType || "OTHER"} · {group.travelDate} · {group.timeWindowStart} to {group.timeWindowEnd}</p>
+                    <p>INTEREST {group.interestedSeatCount} / {group.minPassengerThreshold || 5}{group.interestedSeatCount >= (group.minPassengerThreshold || 5) ? " INTERESTED · PAYMENT NOT OPEN" : ` · ${Math.max(0, (group.minPassengerThreshold || 5) - group.interestedSeatCount)} more passenger${(group.minPassengerThreshold || 5) - group.interestedSeatCount === 1 ? "" : "s"} needed`}</p>
+                    <p>Registration: <LiveCountdown deadlineAt={group.interestDeadlineAt} /></p>
+                    <p className="text-sm">{group.status}{group.matchingUncertain ? " · needs review" : ""}</p>
                     {group.destinationSpread && group.destinationSpread.some((row) => row.intendedDestinationText) ? (
                       <div className="text-sm" style={{ marginTop: "0.5rem" }}>
                         <p style={{ fontWeight: 700 }}>Private destination spread</p>
@@ -708,6 +750,8 @@ const SpiresShareAdmin: React.FC = () => {
                     ) : null}
                     <div className="flex flex-wrap gap-2" style={{ marginTop: "0.65rem" }}>
                       <button type="button" className="btn btn-sm" onClick={() => setProposeForm({ ...proposeForm, interestGroupId: group.id })}>Review</button>
+                      <input className="form-input" placeholder="Interest deadline ISO" value={interestDeadlineValue} onChange={(e) => setInterestDeadlineValue(e.target.value)} />
+                      <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run(async () => { await adminAction({ action: "set-interest-deadline", interestGroupId: group.id, interestDeadlineAt: interestDeadlineValue }); setStatus("Interest deadline updated."); })}>Change interest deadline</button>
                       <button type="button" className="btn btn-danger btn-sm" disabled={busy || group.status === "CONVERTED_TO_JOURNEY"} onClick={() => run(async () => { await adminAction({ action: "close-interest", interestGroupId: group.id }); setStatus("Interest group closed."); })}>Close interest group</button>
                     </div>
                   </li>

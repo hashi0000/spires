@@ -1,7 +1,7 @@
 import * as crypto from "crypto";
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import { COLLECTIONS, DEFAULT_SHARE_CONFIG, SPIRES_SHARE_PILOT_ENABLED, SPIRES_SHARE_PUBLIC_ENABLED } from "./defaults";
+import { ADMIN_EMAILS, COLLECTIONS, DEFAULT_SHARE_CONFIG, SPIRES_SHARE_PILOT_ENABLED, SPIRES_SHARE_PUBLIC_ENABLED } from "./defaults";
 import {
   acceptedPassengerCount,
   airportById,
@@ -70,7 +70,7 @@ import {
   validateHostedPaymentUrl,
   hostedPaymentUrlForCustomer,
 } from "./hostedPayment";
-import { computePaymentDeadline } from "./paymentDeadline";
+import { computeInterestDeadline, computePaymentDeadline, isLondonQuietHours } from "./paymentDeadline";
 import {
   adminDestinationSummary,
   applyMatchingSuggestion,
@@ -114,6 +114,20 @@ import {
 } from "./interestGroups";
 import { cityJourneyRequiresOwnFare, fourPassengerFallbackEnabled } from "./routePricing";
 import { flightTerminalOf, isHeathrowShare, parseFlightTerminal, terminalGuideHref, terminalGuideLinkText, terminalTransferWarning } from "./terminalGuide";
+import {
+  confirmationGuard,
+  firstNameFrom,
+  notificationDedupeKey,
+  PAYMENT_GUARANTEE_NOTICE,
+  publicInterestSafeFields,
+  reminderDue,
+  requiredSeatsForGroup,
+  seatProgress,
+  SHARE_ADMIN_DASHBOARD_URL,
+  SHARE_CUSTOMER_DASHBOARD_URL,
+  SHARE_PUBLIC_BOARD_URL,
+  verifiedPassengerPlaces,
+} from "./shareProgress";
 
 function db() {
   return admin.firestore();
@@ -209,37 +223,67 @@ async function queueNotification(
   type: NotificationType,
   to: string,
   journey: ShareJourney | null,
-  extra?: NotificationExtra & { bookingId?: string }
+  extra?: NotificationExtra & {
+    bookingId?: string;
+    interestGroupId?: string;
+    journeyDocId?: string;
+    deduplicationKey?: string;
+    admin?: boolean;
+  }
 ): Promise<void> {
   if (!to) return;
+  const key = extra?.deduplicationKey;
+  if (key) {
+    const existing = await db().collection(COLLECTIONS.NOTIFICATIONS).where("deduplicationKey", "==", key).limit(1).get();
+    if (!existing.empty) return;
+  }
   const draft = buildNotification(type, to, journey, extra);
   const send = shareNotificationsEnabled(config);
+  const now = new Date().toISOString();
+  const adminType = type.startsWith("ADMIN_") || extra?.admin === true;
   const doc = {
+    notificationType: draft.type,
     type: draft.type,
+    recipient: draft.to,
     to: draft.to,
     subject: draft.subject,
-    text: draft.text,
-    journeyId: draft.journeyId || "",
+    journeyId: extra?.journeyDocId || journey?.id || draft.journeyId || "",
+    interestGroupId: extra?.interestGroupId || "",
     bookingId: extra?.bookingId || "",
-    dryRun: !send,
+    createdAt: now,
+    sentAt: send ? null : now,
     status: send ? "PENDING" : "DRY_RUN",
-    at: admin.firestore.FieldValue.serverTimestamp(),
+    deduplicationKey: key || "",
+    dryRun: !send,
+    ...(adminType ? {} : { text: draft.text }),
   };
-  await db().collection(COLLECTIONS.NOTIFICATIONS).add(doc);
+  const ref = await db().collection(COLLECTIONS.NOTIFICATIONS).add(doc);
   if (!send) return;
   try {
-    await getTransporter().sendMail({
+    const result = await getTransporter().sendMail({
       from: mailFrom(),
       to,
-      bcc: ADMIN_EMAIL,
+      bcc: adminType ? ADMIN_EMAILS.filter((email) => email !== to) : ADMIN_EMAIL,
       subject: draft.subject,
       text: draft.text,
       html: draft.html || `<p style="font-family:Arial,sans-serif;color:#002147;white-space:pre-wrap">${escapeHtml(draft.text)}</p>`,
     });
-    await db().collection(COLLECTIONS.NOTIFICATIONS).add({ ...doc, status: "SENT" });
+    await ref.set(
+      {
+        status: "SENT",
+        sentAt: new Date().toISOString(),
+        providerMessageId: String(result.messageId || ""),
+      },
+      { merge: true }
+    );
   } catch (err) {
     functions.logger.warn("Share notification send failed", err);
+    await ref.set({ status: "FAILED", error: String((err as Error).message || err) }, { merge: true });
   }
+}
+
+function shareAdminInbox(): string {
+  return ADMIN_EMAIL;
 }
 
 function asJourney(id: string, data: FirebaseFirestore.DocumentData): ShareJourney {
@@ -258,6 +302,18 @@ async function loadBookingsForJourney(
 function shareFail(err: unknown, fallback = "Spires Share request failed."): never {
   if (err instanceof functions.https.HttpsError) throw err;
   throw new functions.https.HttpsError("failed-precondition", (err as Error)?.message || fallback);
+}
+
+function omitUndefined<T extends object>(data: T): T {
+  return Object.fromEntries(Object.entries(data as Record<string, unknown>).filter(([, value]) => value !== undefined)) as T;
+}
+
+function callableFail(err: unknown, fallback: string): never {
+  if (err instanceof functions.https.HttpsError) throw err;
+  functions.logger.error(fallback, err);
+  const raw = err instanceof Error ? err.message : "";
+  const message = raw && !/^INTERNAL$/i.test(raw) ? raw.replace(/^Value for argument "data" is not a valid Firestore document\.?\s*/i, "") : fallback;
+  throw new functions.https.HttpsError("failed-precondition", message || fallback);
 }
 
 function asInterestGroup(id: string, data: FirebaseFirestore.DocumentData): ShareInterestGroup {
@@ -301,6 +357,7 @@ function journeyStubFromInterest(group: ShareInterestGroup): ShareJourney {
 }
 
 function customerInterestView(entry: ShareInterestEntry, group: ShareInterestGroup): CustomerInterestView {
+  const extras = publicInterestSafeFields(group);
   return {
     interestEntryId: entry.id,
     publicNumber: group.publicNumber,
@@ -318,13 +375,15 @@ function customerInterestView(entry: ShareInterestEntry, group: ShareInterestGro
     canDeclineProposal: entry.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
     intendedDestinationText: entry.intendedDestinationText,
     journeyType: group.journeyType,
-    preferredDepartureTime: entry.preferredDepartureTime,
     flexibility: entry.flexibility,
     canUpdate: entry.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
     canWithdraw: entry.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
     flightNumber: entry.flightNumber,
     flightDepartureTime: entry.flightDepartureTime,
     departureTerminal: entry.departureTerminal,
+    ...extras,
+    preferredDepartureTime: entry.preferredDepartureTime,
+    paymentNotOpened: group.status === "READY_FOR_REVIEW" || group.status === "CONVERTED_TO_JOURNEY",
   };
 }
 
@@ -470,7 +529,7 @@ function attachPassengerWrites(
     waitlistOfferOutstanding: opts.claimingWaitlist ? false : journey.waitlistOfferOutstanding || false,
     updatedAt: now,
   });
-  tx.set(bookingRef, bookingPatch);
+  tx.set(bookingRef, omitUndefined(bookingPatch));
   tx.set(db().collection(COLLECTIONS.PAYMENTS).doc(paymentId), {
     id: paymentId,
     bookingId: bookingRef.id,
@@ -636,6 +695,12 @@ async function expressInterestForCustomer(
       interestedSeatCount: 0,
       minPassengerThreshold: config.pilotDefaults.minPassengerThreshold,
       status: "GATHERING_INTEREST",
+      interestDeadlineAt: computeInterestDeadline(
+        now,
+        config.interestRegistrationHours || 48,
+        config.paymentQuietHoursStart,
+        config.paymentQuietHoursEnd
+      ).deadlineAt,
       matchingUncertain,
       createdAt: now,
       updatedAt: now,
@@ -674,13 +739,63 @@ async function expressInterestForCustomer(
     status: "ACTIVE",
     createdAt: now,
   };
-  await entryRef.set(entry);
+  await entryRef.set(omitUndefined(entry));
   if (matchingUncertain) await groupRef.set({ matchingUncertain: true }, { merge: true });
   await recountInterestGroupDoc(groupRef, group);
   const live = asInterestGroup(group.id, (await groupRef.get()).data() || {});
-  await queueNotification(config, "INTEREST_RECEIVED", email, journeyStubFromInterest(live));
-  if (live.status === "READY_FOR_REVIEW") {
-    await queueNotification(config, "INTEREST_GROUP_READY", email, journeyStubFromInterest(live));
+  const required = requiredSeatsForGroup(live);
+  const progress = seatProgress(live.interestedSeatCount, required);
+  const interestExtra = {
+    firstName: firstNameFrom(name),
+    origin: live.origin,
+    destination: live.destinationRegion,
+    travelDate: live.travelDate,
+    preferredTime: window.preferred,
+    seatsRequested: passengers,
+    interestedSeatCount: live.interestedSeatCount,
+    requiredSeats: required,
+    remainingNeeded: progress.remaining,
+    interestDeadlineAt: live.interestDeadlineAt,
+    customerDashboardUrl: SHARE_CUSTOMER_DASHBOARD_URL,
+    adminDashboardUrl: SHARE_ADMIN_DASHBOARD_URL,
+    interestGroupId: live.id,
+  };
+  await queueNotification(config, "INTEREST_RECEIVED", email, journeyStubFromInterest(live), {
+    ...interestExtra,
+    deduplicationKey: notificationDedupeKey(["INTEREST_RECEIVED", entryRef.id]),
+  });
+  await queueNotification(config, "ADMIN_NEW_INTEREST", shareAdminInbox(), journeyStubFromInterest(live), {
+    ...interestExtra,
+    admin: true,
+    deduplicationKey: notificationDedupeKey(["ADMIN_NEW_INTEREST", entryRef.id]),
+  });
+  if (progress.remaining === 1 && !live.oneMorePassengerNotifiedAt) {
+    await groupRef.set({ oneMorePassengerNotifiedAt: now }, { merge: true });
+    const entries = await db().collection(COLLECTIONS.INTEREST_ENTRIES).where("interestGroupId", "==", live.id).get();
+    for (const doc of entries.docs) {
+      const row = { id: doc.id, ...doc.data() } as ShareInterestEntry;
+      if (row.status !== "ACTIVE" || !row.email) continue;
+      await queueNotification(config, "INTEREST_PROGRESS_ONE_MORE", row.email, journeyStubFromInterest(live), {
+        ...interestExtra,
+        firstName: firstNameFrom(row.name),
+        remainingNeeded: 1,
+        interestGroupId: live.id,
+        deduplicationKey: notificationDedupeKey(["INTEREST_PROGRESS_ONE_MORE", live.id, row.id]),
+      });
+    }
+  }
+  if (progress.enough && !live.thresholdReachedNotifiedAt) {
+    await groupRef.set({ thresholdReachedNotifiedAt: now, status: "READY_FOR_REVIEW" }, { merge: true });
+    await queueNotification(config, "ADMIN_THRESHOLD_REACHED", shareAdminInbox(), journeyStubFromInterest(live), {
+      ...interestExtra,
+      remainingNeeded: 0,
+      farePence: live.proposedFarePence,
+      potentialRevenuePence: (live.proposedFarePence || 0) * required,
+      paymentLinkStatus: "not added",
+      admin: true,
+      interestGroupId: live.id,
+      deduplicationKey: notificationDedupeKey(["ADMIN_THRESHOLD_REACHED", live.id]),
+    });
   }
   await writeAudit(joinedExisting ? "INTEREST_JOINED" : "INTEREST_CREATED", access.email, {
     interestGroupId: group.id,
@@ -1036,7 +1151,7 @@ async function joinDestinationMatchingJourney(opts: {
           matchingOccupancyContext(journey, [...existingBookings, bookingForStatus])
         );
     tx.update(journeyRef, { occupiedSeats: occupied, status, updatedAt: now });
-    tx.set(bookingRef, bookingPatch);
+    tx.set(bookingRef, omitUndefined(bookingPatch));
     tx.set(db().collection(COLLECTIONS.PAYMENTS).doc(paymentId), {
       id: paymentId,
       bookingId: bookingRef.id,
@@ -1286,9 +1401,8 @@ async function confirmHostedJourney(
   journey: ShareJourney,
   bookings: ShareBooking[]
 ): Promise<{ ok: boolean; status: JourneyStatus; alreadyConfirmed?: boolean; failedBookingIds: string[] }> {
-  const five = fivePassengerConfirmReady(bookings, journey.capacity);
-  const four = fourPassengerConfirmReady(bookings, config.earlyDepartureThreshold);
-  if (!five.ok && !four.ok) return { ok: false, status: journey.status, failedBookingIds: [] };
+  const guard = confirmationGuard(bookings, journey, config);
+  if (!guard.ok) return { ok: false, status: journey.status, failedBookingIds: [] };
   const journeyRef = db().collection(COLLECTIONS.JOURNEYS).doc(journey.id);
   const outcome = await db().runTransaction(async (tx) => {
     const live = await tx.get(journeyRef);
@@ -1311,8 +1425,22 @@ async function confirmHostedJourney(
     return { ok: true, status: "CONFIRMED", alreadyConfirmed: true, failedBookingIds: [] };
   }
   for (const booking of bookings.filter(reservationHoldsSeat)) {
-    await queueNotification(config, "JOURNEY_CONFIRMED", booking.email, { ...journey, status: "CONFIRMED" }, { bookingId: booking.id });
+    await queueNotification(config, "JOURNEY_CONFIRMED", booking.email, { ...journey, status: "CONFIRMED" }, {
+      bookingId: booking.id,
+      journeyDocId: journey.id,
+      pickup: journey.departureLocation || journey.originLabel,
+      sharedDropoff: journey.destinationLabel,
+      amountPence: booking.paidAmountPence || bookingAmountDuePence(booking, journey.farePence),
+      terminalGuideUrl: isHeathrowShare(journey) ? terminalGuideHref(flightTerminalOf(booking)) : undefined,
+      terminalGuideLabel: isHeathrowShare(journey) ? terminalGuideLinkText(flightTerminalOf(booking)) : undefined,
+      deduplicationKey: notificationDedupeKey(["JOURNEY_CONFIRMED", journey.id, booking.id]),
+    });
   }
+  await queueNotification(config, "ADMIN_ALL_PAYMENTS_RECEIVED", shareAdminInbox(), { ...journey, status: "CONFIRMED" }, {
+    admin: true,
+    journeyDocId: journey.id,
+    deduplicationKey: notificationDedupeKey(["ADMIN_ALL_PAYMENTS_RECEIVED", journey.id]),
+  });
   return { ok: true, status: "CONFIRMED", failedBookingIds: [] };
 }
 
@@ -1860,7 +1988,7 @@ export const spiresShareCustomerAction = functions.https.onCall(async (data, con
         group.timeWindowStart <= window.end &&
         group.timeWindowEnd >= window.start;
       if (stillMatches) {
-        await entryRef.set(patch, { merge: true });
+        await entryRef.set(omitUndefined(patch), { merge: true });
         await recountInterestGroupDoc(groupRef, group);
         return { ok: true, rematched: false, publicNumber: group.publicNumber, interestEntryId: entry.id };
       }
@@ -2202,9 +2330,13 @@ async function offerNextWaitlist(config: ShareConfig, journeyId: string): Promis
 }
 
 export const spiresShareExpressInterest = functions.https.onCall(async (data, context) => {
-  const config = await loadConfig();
-  const access = await assertShareAccess(context, config, "customer");
-  return expressInterestForCustomer(config, access, (data || {}) as Record<string, unknown>);
+  try {
+    const config = await loadConfig();
+    const access = await assertShareAccess(context, config, "customer");
+    return await expressInterestForCustomer(config, access, (data || {}) as Record<string, unknown>);
+  } catch (err) {
+    callableFail(err, "Could not register Spires Share interest.");
+  }
 });
 
 export const spiresSharePreviewInterest = functions.https.onCall(async (data, context) => {
@@ -2418,7 +2550,7 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
       createdAt: now,
       updatedAt: now,
     };
-    await hubRef.set(hub);
+    await hubRef.set(omitUndefined(hub));
     await writeAudit("DROPOFF_HUB_CREATED", actor, { hubId: hubRef.id });
     return { ok: true, hubId: hubRef.id };
   }
@@ -2487,6 +2619,9 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
       await recountInterestGroupDoc(targetRef, target);
       await writeAudit("INTEREST_MERGED", actor, { sourceInterestGroupId: group.id, interestGroupId: target.id });
       return { ok: true, interestGroupId: target.id };
+    }
+    if (group.status === "EXPIRED") {
+      throw new functions.https.HttpsError("failed-precondition", "This interest group expired without enough passengers and cannot proceed to payment.");
     }
     if (group.status !== "GATHERING_INTEREST" && group.status !== "READY_FOR_REVIEW") {
       throw new functions.https.HttpsError("failed-precondition", "This interest group cannot be converted.");
@@ -2655,10 +2790,14 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
         );
       await queueNotification(config, "PAYMENT_REQUIRED", booking.email, { ...journey, paymentDeadlineAt: deadline.deadlineAt }, {
         bookingId: booking.id,
+        journeyDocId: journey.id,
         amountPence: bookingAmountDuePence(booking, journey.farePence),
         passengers: booking.passengers,
         paymentDeadlineAt: deadline.deadlineAt,
         paymentUrl: journey.paymentLinkUrl,
+        sharedDropoff: journey.destinationLabel,
+        pickup: journey.departureLocation || journey.originLabel,
+        deduplicationKey: notificationDedupeKey(["PAYMENT_REQUIRED", booking.id]),
       });
     }
     await writeAudit("PAYMENT_WINDOW_OPENED", actor, { journeyId, deadlineAt: deadline.deadlineAt });
@@ -2668,7 +2807,23 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
   if (action === "set-payment-deadline") {
     const deadlineAt = String((data as { paymentDeadlineAt?: string })?.paymentDeadlineAt || "");
     if (!deadlineAt) throw new functions.https.HttpsError("invalid-argument", "paymentDeadlineAt is required.");
-    await journeyRef.set({ paymentDeadlineAt: deadlineAt, updatedAt: new Date().toISOString() }, { merge: true });
+    const now = new Date().toISOString();
+    const previous = journey.paymentDeadlineAt;
+    await journeyRef.set({ paymentDeadlineAt: deadlineAt, updatedAt: now }, { merge: true });
+    for (const booking of bookings.filter((row) => row.reservationStatus === "PAYMENT_PENDING")) {
+      await db().collection(COLLECTIONS.BOOKINGS).doc(booking.id).set({ paymentDeadlineAt: deadlineAt }, { merge: true });
+    }
+    await writeAudit("PAYMENT_DEADLINE_CHANGED", actor, { journeyId, previousDeadlineAt: previous || "", deadlineAt });
+    if (previous && Math.abs(new Date(deadlineAt).getTime() - new Date(previous).getTime()) >= 5 * 60 * 1000) {
+      for (const booking of bookings.filter((row) => row.reservationStatus === "PAYMENT_PENDING")) {
+        await queueNotification(config, "PAYMENT_DEADLINE_EXTENDED", booking.email, { ...journey, paymentDeadlineAt: deadlineAt }, {
+          bookingId: booking.id,
+          journeyDocId: journey.id,
+          paymentDeadlineAt: deadlineAt,
+          deduplicationKey: notificationDedupeKey(["PAYMENT_DEADLINE_EXTENDED", booking.id, deadlineAt]),
+        });
+      }
+    }
     return { ok: true, paymentDeadlineAt: deadlineAt };
   }
 
@@ -2721,6 +2876,18 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
         : row
     );
     const confirmed = paid ? await confirmHostedJourney(config, journey, nextBookings) : { ok: false, status: journey.status, failedBookingIds: [] as string[], alreadyConfirmed: false };
+    if (paid) {
+      const paidPlaces = verifiedPassengerPlaces(nextBookings.filter(reservationHoldsSeat));
+      await queueNotification(config, "PAYMENT_RECEIVED", booking.email, journey, {
+        bookingId: booking.id,
+        journeyDocId: journey.id,
+        amountPence: amount,
+        paymentsReceived: paidPlaces,
+        paymentsRequired: journey.capacity,
+        remainingPayments: Math.max(0, journey.capacity - paidPlaces),
+        deduplicationKey: notificationDedupeKey(["PAYMENT_RECEIVED", booking.id]),
+      });
+    }
     if (confirmed.ok && !confirmed.alreadyConfirmed) {
       await writeAudit("JOURNEY_CONFIRMED", actor, { journeyId });
     }
@@ -3177,6 +3344,18 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     return { ok: true, journeyStillConfirmed: wasConfirmed };
   }
 
+  if (action === "set-interest-deadline") {
+    const interestGroupId = String(payload.interestGroupId || "");
+    const deadlineAt = String(payload.interestDeadlineAt || "");
+    if (!interestGroupId || !deadlineAt) throw new functions.https.HttpsError("invalid-argument", "interestGroupId and interestDeadlineAt are required.");
+    const groupRef = db().collection(COLLECTIONS.INTEREST_GROUPS).doc(interestGroupId);
+    const snap = await groupRef.get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Interest group not found.");
+    await groupRef.set({ interestDeadlineAt: deadlineAt, updatedAt: new Date().toISOString() }, { merge: true });
+    await writeAudit("INTEREST_DEADLINE_CHANGED", actor, { interestGroupId, deadlineAt });
+    return { ok: true, interestDeadlineAt: deadlineAt };
+  }
+
   throw new functions.https.HttpsError("invalid-argument", "Unknown admin action.");
 });
 
@@ -3283,9 +3462,38 @@ export async function runShareDeadlineTick(): Promise<{ expired: number; waitlis
   let waitlistExpired = 0;
   let reminders = 0;
   let unpaidExpired = 0;
+  const gathering = await db().collection(COLLECTIONS.INTEREST_GROUPS).where("status", "==", "GATHERING_INTEREST").limit(200).get();
+  for (const doc of gathering.docs) {
+    const group = asInterestGroup(doc.id, doc.data() || {});
+    if (!group.interestDeadlineAt || !isPast(group.interestDeadlineAt, now)) continue;
+    if (seatProgress(group.interestedSeatCount, requiredSeatsForGroup(group)).enough) continue;
+    await doc.ref.set(
+      { status: "EXPIRED", expiryReason: "INSUFFICIENT_INTEREST", expiredNotifiedAt: now, updatedAt: now },
+      { merge: true }
+    );
+    if (!group.expiredNotifiedAt) {
+      const entries = await db().collection(COLLECTIONS.INTEREST_ENTRIES).where("interestGroupId", "==", group.id).get();
+      for (const entryDoc of entries.docs) {
+        const entry = { id: entryDoc.id, ...entryDoc.data() } as ShareInterestEntry;
+        if (entry.status !== "ACTIVE" || !entry.email) continue;
+        await queueNotification(config, "INTEREST_EXPIRED", entry.email, journeyStubFromInterest(group), {
+          interestGroupId: group.id,
+          publicBoardUrl: SHARE_PUBLIC_BOARD_URL,
+          deduplicationKey: notificationDedupeKey(["INTEREST_EXPIRED", group.id, entry.id]),
+        });
+      }
+      await queueNotification(config, "INTEREST_EXPIRED", shareAdminInbox(), journeyStubFromInterest(group), {
+        admin: true,
+        interestGroupId: group.id,
+        deduplicationKey: notificationDedupeKey(["INTEREST_EXPIRED_ADMIN", group.id]),
+      });
+    }
+    expired += 1;
+  }
   for (const doc of open.docs) {
     const journey = asJourney(doc.id, doc.data());
     const bookings = await loadBookingsForJourney(null, journey.id);
+    let journeyUnpaidExpired = 0;
     for (const booking of bookings) {
       if (booking.reservationStatus === "PAYMENT_PENDING" && booking.paymentDeadlineAt && isPast(booking.paymentDeadlineAt, now)) {
         await db().runTransaction(async (tx) => {
@@ -3325,21 +3533,41 @@ export async function runShareDeadlineTick(): Promise<{ expired: number; waitlis
         }
         await writeAudit("RESERVATION_EXPIRED", "system", { journeyId: journey.id, bookingId: booking.id });
         unpaidExpired += 1;
+        journeyUnpaidExpired += 1;
         await offerNextWaitlist(config, journey.id);
       }
+      const quietNow = isLondonQuietHours(now, config.paymentQuietHoursStart, config.paymentQuietHoursEnd);
+      const reminderMinutes = config.paymentReminderMinutesBeforeDeadline || 30;
+      const finalMinutes = config.paymentFinalReminderMinutesBeforeDeadline || 10;
       if (
         booking.reservationStatus === "PAYMENT_PENDING" &&
-        booking.paymentDeadlineAt &&
-        !booking.paymentReminderNotifiedAt &&
-        new Date(booking.paymentDeadlineAt).getTime() - new Date(now).getTime() <= 30 * 60 * 1000 &&
-        !isPast(booking.paymentDeadlineAt, now)
+        reminderDue(booking.paymentDeadlineAt, now, reminderMinutes, booking.paymentReminderNotifiedAt, quietNow)
       ) {
         await db().collection(COLLECTIONS.BOOKINGS).doc(booking.id).set({ paymentReminderNotifiedAt: now }, { merge: true });
         await queueNotification(config, "PAYMENT_DEADLINE_APPROACHING", booking.email, journey, {
           bookingId: booking.id,
+          journeyDocId: journey.id,
           paymentDeadlineAt: booking.paymentDeadlineAt,
           amountPence: bookingAmountDuePence(booking, journey.farePence),
           passengers: booking.passengers,
+          paymentUrl: journey.paymentLinkUrl,
+          deduplicationKey: notificationDedupeKey(["PAYMENT_DEADLINE_APPROACHING", booking.id]),
+        });
+        reminders += 1;
+      }
+      if (
+        booking.reservationStatus === "PAYMENT_PENDING" &&
+        reminderDue(booking.paymentDeadlineAt, now, finalMinutes, booking.paymentFinalReminderNotifiedAt, quietNow)
+      ) {
+        await db().collection(COLLECTIONS.BOOKINGS).doc(booking.id).set({ paymentFinalReminderNotifiedAt: now }, { merge: true });
+        await queueNotification(config, "PAYMENT_DEADLINE_APPROACHING", booking.email, journey, {
+          bookingId: booking.id,
+          journeyDocId: journey.id,
+          paymentDeadlineAt: booking.paymentDeadlineAt,
+          amountPence: bookingAmountDuePence(booking, journey.farePence),
+          passengers: booking.passengers,
+          paymentUrl: journey.paymentLinkUrl,
+          deduplicationKey: notificationDedupeKey(["PAYMENT_DEADLINE_FINAL", booking.id]),
         });
         reminders += 1;
       }
@@ -3379,6 +3607,27 @@ export async function runShareDeadlineTick(): Promise<{ expired: number; waitlis
       }
       await writeAudit("JOURNEY_EXPIRED", "system", { journeyId: journey.id });
       expired += 1;
+    }
+    const liveAfter = asJourney(doc.id, (await doc.ref.get()).data() || {});
+    if (journeyUnpaidExpired > 0 && liveAfter.status !== "CONFIRMED" && !liveAfter.locked && !liveAfter.paymentWindowExpiredNotifiedAt) {
+      const remaining = await loadBookingsForJourney(null, journey.id);
+      const guard = confirmationGuard(remaining, liveAfter, config);
+      if (!guard.ok) {
+        await doc.ref.set({ paymentWindowExpiredNotifiedAt: now, paymentActionRequired: true, updatedAt: now }, { merge: true });
+        await queueNotification(config, "ADMIN_PAYMENT_WINDOW_EXPIRED", shareAdminInbox(), liveAfter, {
+          admin: true,
+          journeyDocId: journey.id,
+          deduplicationKey: notificationDedupeKey(["ADMIN_PAYMENT_WINDOW_EXPIRED", journey.id]),
+        });
+        for (const paid of remaining.filter((row) => row.reservationStatus === "PAID")) {
+          await queueNotification(config, "PAYMENT_WINDOW_EXPIRED_CUSTOMER", paid.email, liveAfter, {
+            bookingId: paid.id,
+            journeyDocId: journey.id,
+            refundStatus: paid.refundStatus || "recorded, awaiting admin review",
+            deduplicationKey: notificationDedupeKey(["PAYMENT_WINDOW_EXPIRED_CUSTOMER", paid.id]),
+          });
+        }
+      }
     }
   }
   const wait = await db().collection(COLLECTIONS.WAITLIST).where("status", "==", "OFFERED").get();

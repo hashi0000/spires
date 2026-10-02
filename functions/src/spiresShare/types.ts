@@ -125,7 +125,16 @@ export type NotificationType =
   | "INTEREST_RECEIVED"
   | "INTEREST_GROUP_READY"
   | "JOURNEY_PROPOSED_FROM_INTEREST"
-  | "WAITLIST_PLACE_AVAILABLE";
+  | "WAITLIST_PLACE_AVAILABLE"
+  | "ADMIN_NEW_INTEREST"
+  | "ADMIN_THRESHOLD_REACHED"
+  | "ADMIN_ALL_PAYMENTS_RECEIVED"
+  | "ADMIN_PAYMENT_WINDOW_EXPIRED"
+  | "INTEREST_PROGRESS_ONE_MORE"
+  | "INTEREST_EXPIRED"
+  | "PAYMENT_RECEIVED"
+  | "PAYMENT_WINDOW_EXPIRED_CUSTOMER"
+  | "PAYMENT_DEADLINE_EXTENDED";
 
 export type AuditEventType =
   | "JOURNEY_CREATED"
@@ -176,7 +185,10 @@ export type AuditEventType =
   | "INTEREST_CLOSED"
   | "WAITLIST_CLAIMED"
   | "WAITLIST_DECLINED"
-  | "WAITLIST_PROMOTED";
+  | "WAITLIST_PROMOTED"
+  | "INTEREST_DEADLINE_CHANGED"
+  | "PAYMENT_DEADLINE_CHANGED"
+  | "INTEREST_EXPIRED";
 
 export type ShareAirport = {
   id: string;
@@ -230,6 +242,9 @@ export type ShareConfig = {
   airports: ShareAirport[];
   notificationsSend: boolean;
   cityMatchingPublicEnabled: boolean;
+  interestRegistrationHours: number;
+  paymentReminderMinutesBeforeDeadline: number;
+  paymentFinalReminderMinutesBeforeDeadline: number;
   pilotDefaults: SharePilotDefaults;
 };
 
@@ -332,6 +347,8 @@ export type ShareJourney = {
   supplementDeadlineAt?: string;
   confirmedAt?: string;
   confirmationEmailSentAt?: string;
+  paymentWindowExpiredNotifiedAt?: string;
+  paymentActionRequired?: boolean;
   locked?: boolean;
   fourPassengerFallbackEnabled?: boolean;
   fallbackFarePerPassengerPence?: number;
@@ -405,7 +422,10 @@ export type ShareBooking = {
   createdAt: string;
   paymentRequiredNotifiedAt?: string;
   paymentReminderNotifiedAt?: string;
+  paymentFinalReminderNotifiedAt?: string;
+  paymentReceivedNotifiedAt?: string;
   paymentExpiredNotifiedAt?: string;
+  paymentWindowExpiredCustomerNotifiedAt?: string;
   reminder24hNotifiedAt?: string;
   departureReminderNotifiedAt?: string;
   waitlistId?: string;
@@ -448,6 +468,17 @@ export type InterestGroupStatus =
   | "EXPIRED"
   | "CANCELLED";
 
+export type CustomerShareStage =
+  | "REGISTERING_INTEREST"
+  | "ENOUGH_INTEREST"
+  | "PAYMENT_REQUIRED"
+  | "AWAITING_ALL_PAYMENTS"
+  | "JOURNEY_CONFIRMED"
+  | "NOT_ENOUGH_INTEREST"
+  | "EXPIRED"
+  | "CANCELLED"
+  | "COMPLETED";
+
 export type InterestEntryStatus = "ACTIVE" | "WITHDRAWN" | "CONVERTED" | "DECLINED_PROPOSAL";
 
 export type ShareInterestGroup = {
@@ -464,6 +495,11 @@ export type ShareInterestGroup = {
   interestedSeatCount: number;
   minPassengerThreshold: number;
   status: InterestGroupStatus;
+  interestDeadlineAt?: string;
+  expiryReason?: "INSUFFICIENT_INTEREST" | "CLOSED" | "PAYMENT_FAILED";
+  thresholdReachedNotifiedAt?: string;
+  oneMorePassengerNotifiedAt?: string;
+  expiredNotifiedAt?: string;
   matchingUncertain?: boolean;
   convertedJourneyId?: string;
   proposedDepartureLocation?: string;
@@ -510,6 +546,16 @@ export type PublicInterestGroupView = {
   interestedSeatCount: number;
   status: InterestGroupStatus;
   journeyType: JourneyType;
+  requiredSeats: number;
+  remainingSeatsNeeded: number;
+  enoughInterest: boolean;
+  interestDeadlineAt?: string;
+  customerStage: CustomerShareStage;
+  customerStageLabel: string;
+  placesLabel: string;
+  neededLabel: string;
+  neededHeadline: string;
+  preferredDepartureTime?: string;
 };
 
 export type ShareWaitlistEntry = {
@@ -576,6 +622,16 @@ export type CustomerInterestView = {
   flightNumber?: string;
   flightDepartureTime?: string;
   departureTerminal?: FlightTerminal;
+  interestedSeatCount?: number;
+  requiredSeats?: number;
+  remainingSeatsNeeded?: number;
+  enoughInterest?: boolean;
+  interestDeadlineAt?: string;
+  customerStage?: CustomerShareStage;
+  customerStageLabel?: string;
+  placesLabel?: string;
+  neededLabel?: string;
+  paymentNotOpened?: boolean;
 };
 
 export type CustomerBookingView = {
@@ -637,6 +693,15 @@ export type CustomerBookingView = {
   terminalTransferWarning?: string;
   actionRequired?: string;
   fourPassengerFallbackEnabled?: boolean;
+  customerStage?: CustomerShareStage;
+  customerStageLabel?: string;
+  paymentsReceived?: number;
+  paymentsRequired?: number;
+  remainingPaymentsNeeded?: number;
+  ownPaymentReceived?: boolean;
+  ownPaymentVerified?: boolean;
+  confirmationGuardNotice?: string;
+  travelPlansNotice?: string;
 };
 
 export const UNCONFIRMED_WARNING =

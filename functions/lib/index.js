@@ -44,6 +44,7 @@ Object.defineProperty(exports, "createPaymentIntent", { enumerable: true, get: f
 Object.defineProperty(exports, "confirmPayment", { enumerable: true, get: function () { return payment_1.confirmPayment; } });
 Object.defineProperty(exports, "stripeWebhook", { enumerable: true, get: function () { return payment_1.stripeWebhook; } });
 admin.initializeApp();
+admin.firestore().settings({ ignoreUndefinedProperties: true });
 function isConfirmedStatus(data) {
     if (!data)
         return false;

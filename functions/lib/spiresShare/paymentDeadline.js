@@ -6,6 +6,7 @@ exports.londonIsoFromWall = londonIsoFromWall;
 exports.isLondonQuietHours = isLondonQuietHours;
 exports.nextQuietHoursEndIso = nextQuietHoursEndIso;
 exports.computePaymentDeadline = computePaymentDeadline;
+exports.computeInterestDeadline = computeInterestDeadline;
 exports.computeJoinerPaymentDeadline = computeJoinerPaymentDeadline;
 exports.formatLondonDateTime = formatLondonDateTime;
 const defaults_1 = require("./defaults");
@@ -112,6 +113,9 @@ function computePaymentDeadline(openedAtIso, windowHours = exports.DEFAULT_PAYME
         quietHoursApplied: true,
         timezone: defaults_1.SHARE_TIMEZONE,
     };
+}
+function computeInterestDeadline(createdAtIso, windowHours = 48, quietStart = exports.DEFAULT_QUIET_HOURS_START, quietEnd = exports.DEFAULT_QUIET_HOURS_END) {
+    return computePaymentDeadline(createdAtIso, windowHours > 0 ? windowHours : 48, quietStart, quietEnd);
 }
 function computeJoinerPaymentDeadline(nowIso, journeyDeadlineAt, windowHours = exports.DEFAULT_PAYMENT_WINDOW_HOURS, quietStart = exports.DEFAULT_QUIET_HOURS_START, quietEnd = exports.DEFAULT_QUIET_HOURS_END, minimumMinutes = exports.DEFAULT_JOINER_MINIMUM_MINUTES) {
     const computed = computePaymentDeadline(nowIso, windowHours, quietStart, quietEnd);

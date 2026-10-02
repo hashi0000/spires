@@ -9,6 +9,7 @@ import { processBookingReminders } from "./sendBookingReminderEmails";
 import { createPaymentIntent, confirmPayment, stripeWebhook } from "./payment";
 
 admin.initializeApp();
+admin.firestore().settings({ ignoreUndefinedProperties: true });
 
 function isConfirmedStatus(data: admin.firestore.DocumentData | undefined | null): boolean {
   if (!data) return false;
