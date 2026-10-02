@@ -71,6 +71,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         await strict_1.default.rejects(() => (0, bookingFlow_1.reservePlace)(db, new paymentProvider_1.MockPaymentProvider(), {
             action: "join",
@@ -94,6 +95,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const result = await joinCity(db, journey.id, "Cara", "South Kensington", "city-dest-1");
         const booking = db.bookings.get(String(result.bookingId));
@@ -110,6 +112,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const a = await joinCity(db, journey.id, "Dana", "Paddington", "city-a");
         const b = await joinCity(db, journey.id, "Eli", "Chelsea", "city-b");
@@ -131,6 +134,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         await joinCity(db, journey.id, "Fay", "Mayfair", "city-f");
         const pub = (0, logic_1.toPublicJourney)(db.journeys.get(journey.id), defaults_1.DEFAULT_SHARE_CONFIG);
@@ -148,6 +152,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         await joinCity(db, journey.id, "Gina", "Westminster", "city-g");
         const summary = (0, destinationMatching_1.adminDestinationSummary)(db.journeys.get(journey.id), [...db.bookings.values()], [...db.hubs.values()]);
@@ -162,6 +167,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const disabled = (0, bookingFlow_1.createDropoffHub)(db, { name: "Marble Arch", city: "London", enabled: false });
         const enabled = (0, bookingFlow_1.createDropoffHub)(db, { name: "Victoria", city: "London", enabled: true });
@@ -180,6 +186,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const hub = (0, bookingFlow_1.createDropoffHub)(db, { name: "Victoria", city: "London", enabled: true });
         const result = await joinCity(db, journey.id, "Ivy", "South Kensington", "city-i");
@@ -203,6 +210,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const hub = (0, bookingFlow_1.createDropoffHub)(db, { name: "Victoria", city: "London", enabled: true });
         const first = await joinCity(db, journey.id, "Jade", "Mayfair", "city-j");
@@ -226,6 +234,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const names = ["Mia", "Ned", "Ora", "Pat"];
         for (const [index, name] of names.entries()) {
@@ -249,6 +258,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const victoria = (0, bookingFlow_1.createDropoffHub)(db, { name: "Victoria", city: "London", enabled: true });
         const marble = (0, bookingFlow_1.createDropoffHub)(db, { name: "Marble Arch", city: "London", enabled: true });
@@ -331,6 +341,7 @@ async function joinCity(db, journeyId, name, destination, key) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-11",
             departureTime: "10:00",
+            farePence: 4500,
         });
         city.customerVisible = true;
         strict_1.default.equal((0, access_1.isCustomerListableJourney)(city, "customer"), false);

@@ -60,6 +60,9 @@ type ShareState = {
     journeyType?: string;
     originCity?: string;
     destinationCity?: string;
+    journeyType?: string;
+    farePence: number;
+    fourPassengerFallbackEnabled?: boolean;
     destinationMatchingEnabled?: boolean;
     proposedSharedDropoffHubId?: string;
     proposedSharedDropoffDisplayName?: string;
@@ -92,6 +95,10 @@ type ShareState = {
     earlyDepartureAccepted: boolean;
     intendedDestinationText?: string;
     intendedDestinationPostcode?: string;
+    flightNumber?: string;
+    flightDepartureTime?: string;
+    departureTerminal?: string;
+    dropoffTerminal?: string;
     sharedDropoffAcceptedAt?: string;
     sharedDropoffDeclinedAt?: string;
     acceptedDropoffProposalVersion?: number;
@@ -130,10 +137,11 @@ type ShareState = {
     timeWindowStart: string;
     timeWindowEnd: string;
     interestedSeatCount: number;
+    journeyType?: string;
     status: string;
     matchingUncertain?: boolean;
     destinationSpread?: Array<{ index: number; name: string; intendedDestinationText: string; timeWindowStart: string; timeWindowEnd: string }>;
-    entries?: Array<{ id: string; name: string; email: string; passengers: number; status: string; intendedDestinationText?: string }>;
+    entries?: Array<{ id: string; name: string; email: string; passengers: number; status: string; intendedDestinationText?: string; flightNumber?: string; departureTerminal?: string }>;
   }>;
   audit: Array<{ id: string; type: string; actorEmail?: string }>;
   notifications: Array<{ id: string; type?: string; to?: string; status?: string; dryRun?: boolean }>;
@@ -155,7 +163,7 @@ const SpiresShareAdmin: React.FC = () => {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"board" | "interest" | "preview" | "driver" | "config">("board");
+  const [view, setView] = useState<"board" | "interest" | "proposed" | "active" | "waitlists" | "completed" | "preview" | "driver" | "config">("board");
   const [selectedId, setSelectedId] = useState("");
   const [preview, setPreview] = useState({
     airportId: "heathrow",
@@ -199,7 +207,7 @@ const SpiresShareAdmin: React.FC = () => {
     travelDate: "",
     departureTime: "10:00",
     capacity: 5,
-    farePence: 3500,
+    farePence: 0,
     minPassengerThreshold: 4,
     notes: "",
   });
@@ -216,7 +224,7 @@ const SpiresShareAdmin: React.FC = () => {
     interestGroupId: "",
     departureLocation: "Thornhill Park & Ride",
     departureTime: "10:00",
-    farePence: 3500,
+    farePence: 0,
     capacity: 5,
     hubId: "",
     notes: "",
@@ -344,18 +352,36 @@ const SpiresShareAdmin: React.FC = () => {
     );
   }
 
+  const listedJourneys = state.journeys.filter((row) => {
+    if (view === "proposed") {
+      return ["PROPOSED", "GATHERING_INTEREST", "AWAITING_DROPOFF_SELECTION", "READY_FOR_PAYMENT_SETUP"].includes(row.status);
+    }
+    if (view === "active") {
+      return ["FILLING", "PAYMENT_WINDOW_OPEN", "AWAITING_FINAL_PASSENGER", "FOUR_PASSENGER_OPTION", "SUPPLEMENT_PAYMENT", "CONFIRMED", "PAYMENT_ACTION_REQUIRED"].includes(row.status);
+    }
+    if (view === "completed") {
+      return ["COMPLETED", "CANCELLED", "DID_NOT_FILL", "EXPIRED"].includes(row.status);
+    }
+    return true;
+  });
+  const showJourneyBoard = view === "board" || view === "proposed" || view === "active" || view === "completed";
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Spires Share — Pilot Service</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Spires Share</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Shared journeys. The live pilot is Oxford to Heathrow Terminal 3. City destination matching is admin only and is not publicly enabled. Hosted payment links are verified by admin. Saving a payment link does not email passengers.
+          Demand led shared private hire. The current Heathrow pilot remains Oxford to Heathrow Terminal 3. City matching stays unpublished. Hosted payment links are verified by admin. Saving a payment link does not email passengers. Fares are set per journey and are not inherited from Heathrow.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <button type="button" className={`btn btn-sm ${view === "board" ? "btn-primary" : ""}`} onClick={() => setView("board")}>Board</button>
-        <button type="button" className={`btn btn-sm ${view === "interest" ? "btn-primary" : ""}`} onClick={() => setView("interest")}>Interest</button>
+        <button type="button" className={`btn btn-sm ${view === "interest" ? "btn-primary" : ""}`} onClick={() => setView("interest")}>Interest groups</button>
+        <button type="button" className={`btn btn-sm ${view === "proposed" ? "btn-primary" : ""}`} onClick={() => setView("proposed")}>Proposed journeys</button>
+        <button type="button" className={`btn btn-sm ${view === "active" ? "btn-primary" : ""}`} onClick={() => setView("active")}>Active journeys</button>
+        <button type="button" className={`btn btn-sm ${view === "waitlists" ? "btn-primary" : ""}`} onClick={() => setView("waitlists")}>Waitlists</button>
+        <button type="button" className={`btn btn-sm ${view === "completed" ? "btn-primary" : ""}`} onClick={() => setView("completed")}>Completed journeys</button>
         <button type="button" className={`btn btn-sm ${view === "preview" ? "btn-primary" : ""}`} onClick={() => setView("preview")}>Customer preview</button>
         <button type="button" className={`btn btn-sm ${view === "driver" ? "btn-primary" : ""}`} onClick={() => setView("driver")}>Driver view</button>
         <button type="button" className={`btn btn-sm ${view === "config" ? "btn-primary" : ""}`} onClick={() => setView("config")}>Configuration</button>
@@ -367,7 +393,7 @@ const SpiresShareAdmin: React.FC = () => {
       {error ? <p className="text-sm" style={{ color: "#b91c1c" }}>{error}</p> : null}
       {status ? <p className="text-sm" style={{ color: "#166534" }}>{status}</p> : null}
 
-      {view === "board" && (
+      {showJourneyBoard && (
         <div className="space-y-6">
           <form
             className="card"
@@ -449,11 +475,11 @@ const SpiresShareAdmin: React.FC = () => {
               <label className="form-group"><span className="form-label">Date</span><input className="form-input" type="date" required value={cityForm.travelDate} onChange={(e) => setCityForm({ ...cityForm, travelDate: e.target.value })} /></label>
               <label className="form-group"><span className="form-label">Departure time</span><input className="form-input" type="time" required value={cityForm.departureTime} onChange={(e) => setCityForm({ ...cityForm, departureTime: e.target.value })} /></label>
               <label className="form-group"><span className="form-label">Capacity</span><input className="form-input" type="number" min="1" max="5" value={cityForm.capacity} onChange={(e) => setCityForm({ ...cityForm, capacity: Number(e.target.value) || 5 })} /></label>
-              <label className="form-group"><span className="form-label">Fare per passenger (pence)</span><input className="form-input" type="number" value={cityForm.farePence} onChange={(e) => setCityForm({ ...cityForm, farePence: Number(e.target.value) || 3500 })} /></label>
+              <label className="form-group"><span className="form-label">Fare per passenger (pence)</span><input className="form-input" type="number" value={cityForm.farePence || ""} onChange={(e) => setCityForm({ ...cityForm, farePence: Number(e.target.value) || 0 })} /></label>
               <label className="form-group"><span className="form-label">Minimum passengers</span><input className="form-input" type="number" value={cityForm.minPassengerThreshold} onChange={(e) => setCityForm({ ...cityForm, minPassengerThreshold: Number(e.target.value) || 4 })} /></label>
               <label className="form-group"><span className="form-label">Notes</span><input className="form-input" value={cityForm.notes} onChange={(e) => setCityForm({ ...cityForm, notes: e.target.value })} /></label>
             </div>
-            <p className="text-sm" style={{ marginTop: "0.75rem" }}>Target revenue: {gbp(cityForm.farePence * cityForm.capacity)}. Destination matching enabled. Not published to customers.</p>
+            <p className="text-sm" style={{ marginTop: "0.75rem" }}>Target revenue: {cityForm.farePence ? gbp(cityForm.farePence * cityForm.capacity) : "set a fare first"}. This fare is independent of the Heathrow £35 fare. Destination matching enabled. Not published to customers.</p>
             <button type="submit" className="btn btn-primary" disabled={busy} style={{ marginTop: "1rem" }}>Create city journey</button>
           </form>
 
@@ -501,12 +527,12 @@ const SpiresShareAdmin: React.FC = () => {
           </form>
 
           <div className="card">
-          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Journeys</h3>
-          {state.journeys.length === 0 ? (
-            <p className="text-sm text-gray-500">No pilot journeys yet. Create one above.</p>
+          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>{view === "proposed" ? "Proposed journeys" : view === "active" ? "Active journeys" : view === "completed" ? "Completed journeys" : "Journeys"}</h3>
+          {listedJourneys.length === 0 ? (
+            <p className="text-sm text-gray-500">No journeys in this section yet.</p>
           ) : (
             <ul className="space-y-2">
-              {state.journeys.map((row) => {
+              {listedJourneys.map((row) => {
                 const journeyBookings = state.bookings.filter((booking) => booking.journeyId === row.id);
                 const holding = journeyBookings.filter((booking) => ["PROVISIONAL", "PAYMENT_PENDING", "PAID"].includes(booking.reservationStatus || ""));
                 const paidPlaces = journeyBookings
@@ -524,7 +550,8 @@ const SpiresShareAdmin: React.FC = () => {
                     <p>Places: {row.occupiedSeats} / {row.capacity}</p>
                     <p>Provisional: {provisional} · Payment pending: {pending} · Paid: {paidPlaces}</p>
                     <p>Collected: {gbp(received)} · Target: {gbp(row.targetRevenuePence)}</p>
-                    <p>STATUS: {row.status.replace(/_/g, " ")}{row.customerVisible ? " · VISIBLE TO CUSTOMERS" : " · HIDDEN FROM CUSTOMERS"}{row.locked ? " · LOCKED" : ""}</p>
+                    <p>STATUS: {row.status.replace(/_/g, " ")}{row.journeyType ? ` · ${row.journeyType}` : ""}{row.customerVisible ? " · VISIBLE TO CUSTOMERS" : " · HIDDEN FROM CUSTOMERS"}{row.locked ? " · LOCKED" : ""}</p>
+                    <p>Fare: {gbp(row.farePence)} per passenger{row.fourPassengerFallbackEnabled ? " · four passenger fallback available" : ""}</p>
                     <p>Payment deadline: {row.paymentDeadlineAt || "not open"}</p>
                     {needsLink ? <p className="text-sm" style={{ color: "#b45309", fontWeight: 700 }}>4 passengers reached — create payment link</p> : null}
                   </div>
@@ -587,7 +614,7 @@ const SpiresShareAdmin: React.FC = () => {
                         {journeyBookings.map((booking) => (
                           <li key={booking.id} style={{ padding: "0.45rem 0", borderBottom: "1px solid #f3f4f6" }}>
                             <div>
-                              {booking.name} · {booking.email} · {booking.mobile} · {booking.passengers} passengers · {booking.reservationStatus || booking.paymentStatus} · paid {gbp(booking.paidAmountPence || 0)} · four person {booking.fourPassengerAccepted ? "accepted" : "not accepted"} · supplement {gbp(booking.supplementPaidPence || 0)} · refund {booking.refundStatus || "NONE"} · {booking.cancellationCategory || (booking.reservationStatus === "DROP_OFF_DECLINED" ? "drop off declined" : "active")}{row.destinationMatchingEnabled ? ` · intended destination ${booking.intendedDestinationText || "not entered"}` : ""}
+                              {booking.name} · {booking.email} · {booking.mobile} · {booking.passengers} passengers · {booking.reservationStatus || booking.paymentStatus} · paid {gbp(booking.paidAmountPence || 0)} · four person {booking.fourPassengerAccepted ? "accepted" : "not accepted"} · supplement {gbp(booking.supplementPaidPence || 0)} · refund {booking.refundStatus || "NONE"} · {booking.cancellationCategory || (booking.reservationStatus === "DROP_OFF_DECLINED" ? "drop off declined" : "active")}{row.destinationMatchingEnabled ? ` · intended destination ${booking.intendedDestinationText || "not entered"}` : ""}{booking.flightNumber ? ` · flight ${booking.flightNumber}` : ""}{booking.departureTerminal ? ` · flight terminal ${booking.departureTerminal}` : ""}{booking.dropoffTerminal ? ` · share drop off ${booking.dropoffTerminal}` : ""}
                             </div>
                             <span className="flex flex-wrap gap-2" style={{ marginTop: "0.35rem" }}>
                               <button type="button" className="btn btn-sm" disabled={busy} onClick={() => run(async () => { await adminAction({ action: "mark-paid", journeyId: row.id, bookingId: booking.id }); setStatus("Marked paid."); })}>Mark passenger paid</button>
@@ -660,13 +687,23 @@ const SpiresShareAdmin: React.FC = () => {
                 {(state.interestGroups || []).map((group) => (
                   <li key={group.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.85rem" }}>
                     <strong>{group.origin} → {group.destinationRegion}</strong>
-                    <p className="text-sm">{group.travelDate} · {group.timeWindowStart} to {group.timeWindowEnd} · {group.interestedSeatCount} interested · {group.status}{group.matchingUncertain ? " · needs review" : ""}</p>
+                    <p className="text-sm">{group.journeyType || "OTHER"} · {group.travelDate} · {group.timeWindowStart} to {group.timeWindowEnd} · {group.interestedSeatCount} interested · {group.status}{group.matchingUncertain ? " · needs review" : ""}</p>
                     {group.destinationSpread && group.destinationSpread.some((row) => row.intendedDestinationText) ? (
                       <div className="text-sm" style={{ marginTop: "0.5rem" }}>
                         <p style={{ fontWeight: 700 }}>Private destination spread</p>
                         <ul>
                           {group.destinationSpread.map((row) => (
                             <li key={row.index}>Passenger {row.index}: {row.intendedDestinationText || "not entered"} · {row.timeWindowStart} to {row.timeWindowEnd}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {group.entries && group.entries.some((row) => row.flightNumber || row.departureTerminal) ? (
+                      <div className="text-sm" style={{ marginTop: "0.5rem" }}>
+                        <p style={{ fontWeight: 700 }}>Flight terminals (private)</p>
+                        <ul>
+                          {group.entries.map((row) => (
+                            <li key={row.id}>{row.name}: {row.departureTerminal || "not entered"}{row.flightNumber ? ` · ${row.flightNumber}` : ""}</li>
                           ))}
                         </ul>
                       </div>
@@ -712,7 +749,7 @@ const SpiresShareAdmin: React.FC = () => {
               </label>
               <label className="form-group"><span className="form-label">Exact departure location</span><input className="form-input" required value={proposeForm.departureLocation} onChange={(e) => setProposeForm({ ...proposeForm, departureLocation: e.target.value })} /></label>
               <label className="form-group"><span className="form-label">Exact departure time</span><input className="form-input" type="time" required value={proposeForm.departureTime} onChange={(e) => setProposeForm({ ...proposeForm, departureTime: e.target.value })} /></label>
-              <label className="form-group"><span className="form-label">Fare per passenger (pence)</span><input className="form-input" type="number" value={proposeForm.farePence} onChange={(e) => setProposeForm({ ...proposeForm, farePence: Number(e.target.value) || 3500 })} /></label>
+              <label className="form-group"><span className="form-label">Fare per passenger (pence)</span><input className="form-input" type="number" required min="1" value={proposeForm.farePence || ""} onChange={(e) => setProposeForm({ ...proposeForm, farePence: Number(e.target.value) || 0 })} /></label>
               <label className="form-group"><span className="form-label">Capacity</span><input className="form-input" type="number" min="1" max="5" value={proposeForm.capacity} onChange={(e) => setProposeForm({ ...proposeForm, capacity: Number(e.target.value) || 5 })} /></label>
               <label className="form-group">
                 <span className="form-label">Shared drop off hub (city only, optional)</span>
@@ -764,6 +801,29 @@ const SpiresShareAdmin: React.FC = () => {
             </div>
             <button type="submit" className="btn btn-primary" disabled={busy} style={{ marginTop: "1rem" }}>Merge groups</button>
           </form>
+        </div>
+      )}
+
+      {view === "waitlists" && (
+        <div className="card">
+          <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Waitlists</h3>
+          <p className="text-sm text-gray-600">FIFO by joined time. Customers never see other people in a queue. A valid offer holds the seat until it is claimed, declined or expired.</p>
+          {(state.waitlist || []).length === 0 ? (
+            <p className="text-sm text-gray-500" style={{ marginTop: "1rem" }}>No waitlist entries.</p>
+          ) : (
+            <ul className="space-y-2" style={{ marginTop: "1rem" }}>
+              {state.waitlist.map((item) => {
+                const journey = state.journeys.find((row) => row.id === item.journeyId);
+                return (
+                  <li key={item.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "0.85rem" }}>
+                    <strong>{journey ? `${journey.originLabel || journey.originCity || "Oxford"} → ${journey.destinationLabel || journey.destinationCity || ""}` : item.journeyId}</strong>
+                    <p className="text-sm">{journey?.travelDate} · {journey?.departureTime} · {item.name} · {item.email} · {item.passengers} seats · {item.status} · position {item.waitlistPosition || "—"}</p>
+                    <p className="text-sm">Joined {item.joinedWaitlistAt || item.createdAt || "—"}{item.offerExpiresAt ? ` · offer deadline ${item.offerExpiresAt}` : ""}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
 

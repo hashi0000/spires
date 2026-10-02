@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -128,6 +128,7 @@ Object.defineProperty(exports, "spiresShareGetMyBookings", { enumerable: true, g
 Object.defineProperty(exports, "spiresShareGetPaymentLink", { enumerable: true, get: function () { return callables_1.spiresShareGetPaymentLink; } });
 Object.defineProperty(exports, "spiresShareCustomerAction", { enumerable: true, get: function () { return callables_1.spiresShareCustomerAction; } });
 Object.defineProperty(exports, "spiresShareExpressInterest", { enumerable: true, get: function () { return callables_1.spiresShareExpressInterest; } });
+Object.defineProperty(exports, "spiresSharePreviewInterest", { enumerable: true, get: function () { return callables_1.spiresSharePreviewInterest; } });
 Object.defineProperty(exports, "spiresShareAcceptWaitlist", { enumerable: true, get: function () { return callables_1.spiresShareAcceptWaitlist; } });
 Object.defineProperty(exports, "spiresShareAdminAction", { enumerable: true, get: function () { return callables_1.spiresShareAdminAction; } });
 Object.defineProperty(exports, "spiresSharePublicAccess", { enumerable: true, get: function () { return callables_1.spiresSharePublicAccess; } });

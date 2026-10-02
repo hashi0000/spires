@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SHARE_TERMS_VERSION = exports.PROVISIONAL_PLACE_LABEL = exports.PAID_AWAITING_CONFIRMATION = exports.GEOCODING_PROVIDER_NEEDED = exports.ROUTING_PROVIDER_NEEDED = exports.DROPOFF_DECLINED_LABEL = exports.DROPOFF_ACCEPTED_WAITING_PAYMENT_LABEL = exports.REVIEW_PROPOSED_DROPOFF_LABEL = exports.WAITING_FOR_MATCHING_LABEL = exports.SHARED_DROPOFF_ACK_HELP = exports.INTENDED_DESTINATION_HELP = exports.SHARED_JOURNEY_CONFIRMED_NOTICE = exports.CONFIRMED_NOTICE = exports.FILL_NOTICE = exports.STRICT_DEPARTURE_NOTICE = exports.FLIGHT_DISCLAIMER = exports.INTEREST_NOTICE = exports.UNCONFIRMED_WARNING = void 0;
+exports.SHARE_TERMS_VERSION = exports.PREVIOUS_SHARE_TERMS_VERSION = exports.PROVISIONAL_PLACE_LABEL = exports.PAID_AWAITING_CONFIRMATION = exports.GEOCODING_PROVIDER_NEEDED = exports.ROUTING_PROVIDER_NEEDED = exports.DROPOFF_DECLINED_LABEL = exports.DROPOFF_ACCEPTED_WAITING_PAYMENT_LABEL = exports.REVIEW_PROPOSED_DROPOFF_LABEL = exports.WAITING_FOR_MATCHING_LABEL = exports.SHARED_DROPOFF_ACK_HELP = exports.INTENDED_DESTINATION_HELP = exports.SHARED_JOURNEY_CONFIRMED_NOTICE = exports.CONFIRMED_NOTICE = exports.FILL_NOTICE = exports.STRICT_DEPARTURE_NOTICE = exports.FLIGHT_DISCLAIMER = exports.INTEREST_NOTICE = exports.UNCONFIRMED_WARNING = void 0;
+exports.isCurrentShareTermsVersion = isCurrentShareTermsVersion;
 exports.UNCONFIRMED_WARNING = "Your place is currently provisional. We will contact you when enough passengers have registered and payment opens.";
 exports.INTEREST_NOTICE = "Registering interest does not confirm your journey and no payment is taken at this stage.";
 exports.FLIGHT_DISCLAIMER = "Flight times are used only as a safety check. Spires Share does not promise that you will catch your flight.";
@@ -8,7 +9,7 @@ exports.STRICT_DEPARTURE_NOTICE = "Please arrive at least 15 minutes before depa
 exports.FILL_NOTICE = "We aim to confirm the journey with five passengers. If five passengers are not secured, Spires Taxis may offer the four passenger departure option. If the required passenger numbers are not reached, the shared journey will not operate and affected passengers will be contacted regarding their payment.";
 exports.CONFIRMED_NOTICE = "Your airport transfer is now confirmed.";
 exports.SHARED_JOURNEY_CONFIRMED_NOTICE = "Your shared journey is now confirmed.";
-exports.INTENDED_DESTINATION_HELP = "Tell us where in London you're ultimately travelling to. We'll use passenger destinations to choose a practical shared drop off point. Your intended destination is used for matching and does not mean the vehicle will take you directly to that address.";
+exports.INTENDED_DESTINATION_HELP = "Tell us where you're ultimately travelling to. We use this information to help choose a practical shared drop off point for passengers travelling together. Your intended destination is used for matching and does not mean the vehicle will take you directly to that address.";
 exports.SHARED_DROPOFF_ACK_HELP = "We use this to help choose the most practical shared drop off point for everyone travelling. Your final destination is not necessarily where the shared vehicle will drop you.";
 exports.WAITING_FOR_MATCHING_LABEL = "Waiting for passenger matching";
 exports.REVIEW_PROPOSED_DROPOFF_LABEL = "Please review the proposed drop off";
@@ -18,4 +19,8 @@ exports.ROUTING_PROVIDER_NEEDED = "Accurate road distance and travel time scorin
 exports.GEOCODING_PROVIDER_NEEDED = "Turning addresses and postcodes into coordinates needs a geocoding provider such as Google Maps Geocoding or Mapbox Geocoding. No paid mapping API is enabled.";
 exports.PAID_AWAITING_CONFIRMATION = "Payment received — awaiting journey confirmation";
 exports.PROVISIONAL_PLACE_LABEL = "Provisional place";
-exports.SHARE_TERMS_VERSION = "share-heathrow-mvp-2026-09-28";
+exports.PREVIOUS_SHARE_TERMS_VERSION = "share-heathrow-mvp-2026-09-28";
+exports.SHARE_TERMS_VERSION = "spires-share-pilot-2026-10";
+function isCurrentShareTermsVersion(version) {
+    return version === exports.SHARE_TERMS_VERSION;
+}

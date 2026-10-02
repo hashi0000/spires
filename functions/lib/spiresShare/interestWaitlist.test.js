@@ -160,6 +160,7 @@ async function fillHeathrow(db, journeyId, count, prefix) {
         (0, bookingFlow_1.proposeJourneyFromInterest)(db, otherGroup.id, {
             departureLocation: "Thornhill Park & Ride",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const accepted = (0, bookingFlow_1.acceptProposedInterestJourney)(db, second.entry.id, second.entry.uid);
         strict_1.default.equal(accepted.booking.reservationStatus, "PROVISIONAL");
@@ -283,6 +284,7 @@ async function fillHeathrow(db, journeyId, count, prefix) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const hub = (0, bookingFlow_1.createDropoffHub)(db, { name: "South Kensington", city: "London", enabled: true });
         const provider = new paymentProvider_1.MockPaymentProvider();
@@ -370,6 +372,7 @@ async function fillHeathrow(db, journeyId, count, prefix) {
             departureLocation: "Thornhill Park & Ride",
             travelDate: "2026-10-10",
             departureTime: "10:00",
+            farePence: 4500,
         });
         const hub = (0, bookingFlow_1.createDropoffHub)(db, { name: "South Kensington", city: "London", enabled: true });
         const provider = new paymentProvider_1.MockPaymentProvider();

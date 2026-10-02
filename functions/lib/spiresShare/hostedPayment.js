@@ -25,6 +25,8 @@ exports.adminPaymentSummary = adminPaymentSummary;
 exports.stripPaymentSecrets = stripPaymentSecrets;
 const types_1 = require("./types");
 const logic_1 = require("./logic");
+const routePricing_1 = require("./routePricing");
+const terminalGuide_1 = require("./terminalGuide");
 const destinationMatching_1 = require("./destinationMatching");
 function reservationHoldsSeat(booking) {
     return (0, logic_1.bookingHoldsSeat)(booking);
@@ -223,12 +225,16 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
     const reservationStatus = booking.reservationStatus || "PROVISIONAL";
     const hostedPaymentStatus = booking.hostedPaymentStatus || hostedFromReservation(reservationStatus);
     const amountDue = bookingAmountDuePence(booking, journey.farePence);
-    const fourAvailable = journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT";
+    const fourAvailable = (0, routePricing_1.fourPassengerFallbackEnabled)(journey) &&
+        (journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT");
     const canPay = Boolean(hostedPaymentUrlForCustomer(journey, booking));
     const confirmed = journey.status === "CONFIRMED";
     const paidAwaiting = !confirmed && (reservationStatus === "PAID" || hostedPaymentStatus === "PAID");
     const matching = (0, destinationMatching_1.destinationMatchingEnabled)(journey);
     const dropoffStatus = matching ? (0, destinationMatching_1.passengerSharedDropoffStatus)(journey, booking) : undefined;
+    const heathrow = (0, terminalGuide_1.isHeathrowShare)(journey);
+    const flightTerminal = (0, terminalGuide_1.flightTerminalOf)(booking);
+    const terminalWarning = heathrow ? (0, terminalGuide_1.terminalTransferWarning)(flightTerminal) : null;
     const confirmedNotice = confirmed
         ? (0, destinationMatching_1.journeyTypeOf)(journey) === "AIRPORT"
             ? types_1.CONFIRMED_NOTICE
@@ -236,7 +242,17 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
         : undefined;
     const paidAwaitingLine = matching
         ? `${types_1.PAID_AWAITING_CONFIRMATION}. Your shared journey is not confirmed until all required passengers have paid.`
-        : `${types_1.PAID_AWAITING_CONFIRMATION}. Your airport transfer is not confirmed until all required passengers have paid.`;
+        : `${types_1.PAID_AWAITING_CONFIRMATION}. Your journey is not confirmed until all required passengers have paid.`;
+    let actionRequired;
+    if (matching && dropoffStatus === "PROPOSED")
+        actionRequired = "Shared drop off waiting for acceptance";
+    else if (canPay)
+        actionRequired = "Payment required";
+    else if (fourAvailable && !booking.fourPassengerAccepted)
+        actionRequired = "Four passenger option requires response";
+    const paymentSubmittedNotice = booking.paymentSubmittedAt
+        ? "Payment submitted. We are confirming your payment. Your journey will show as paid once Spires Taxis has verified it."
+        : undefined;
     return {
         publicNumber: pub.publicNumber,
         travelDate: pub.travelDate,
@@ -274,16 +290,14 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
             : undefined,
         cancellationDeadlineAt: journey.departureAt,
         customerStatusLabel: customerStatusLabel(journey, booking),
-        fillNotice: confirmed ? undefined : types_1.FILL_NOTICE,
+        fillNotice: confirmed ? undefined : (0, routePricing_1.fillNoticeForJourney)(journey),
         confirmedNotice,
         warning: confirmed
             ? `${confirmedNotice} ${types_1.STRICT_DEPARTURE_NOTICE}`
             : paidAwaiting
                 ? paidAwaitingLine
                 : types_1.UNCONFIRMED_WARNING,
-        paymentSubmittedNotice: booking.paymentSubmittedAt
-            ? "Payment submitted? Payments are currently verified by Spires Taxis. Your booking will show as paid once your payment has been confirmed."
-            : undefined,
+        paymentSubmittedNotice,
         journeyType: (0, destinationMatching_1.journeyTypeOf)(journey),
         destinationMatchingEnabled: matching,
         destinationCity: journey.destinationCity,
@@ -298,6 +312,16 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
             : matching && dropoffStatus === "NOT_SELECTED"
                 ? "Shared drop off: Not selected yet"
                 : undefined,
+        flightNumber: booking.flightNumber,
+        flightDepartureTime: booking.flightDepartureTime,
+        departureTerminal: flightTerminal,
+        sharedDropoffLabel: heathrow ? "Heathrow Terminal 3" : journey.proposedSharedDropoffDisplayName,
+        terminalTransferRequired: heathrow ? (0, terminalGuide_1.terminalTransferRequired)(flightTerminal) : false,
+        terminalGuideUrl: heathrow ? (0, terminalGuide_1.terminalGuideHref)(flightTerminal) : undefined,
+        terminalGuideLabel: heathrow ? (0, terminalGuide_1.terminalGuideLinkText)(flightTerminal) : undefined,
+        terminalTransferWarning: terminalWarning || undefined,
+        actionRequired,
+        fourPassengerFallbackEnabled: (0, routePricing_1.fourPassengerFallbackEnabled)(journey),
     };
 }
 function adminPaymentSummary(journey, bookings) {

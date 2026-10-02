@@ -44,6 +44,8 @@ export type Flexibility = "exact" | "plus_minus_15" | "plus_minus_30" | "plus_mi
 
 export type HeathrowTerminal = "T2" | "T3" | "T4" | "T5";
 
+export type FlightTerminal = HeathrowTerminal | "UNSURE";
+
 export type DropoffMode = "per_passenger_terminal" | "common_dropoff";
 
 export type JourneyType = "AIRPORT" | "CITY" | "EVENT" | "OTHER";
@@ -331,6 +333,8 @@ export type ShareJourney = {
   confirmedAt?: string;
   confirmationEmailSentAt?: string;
   locked?: boolean;
+  fourPassengerFallbackEnabled?: boolean;
+  fallbackFarePerPassengerPence?: number;
   journeyType?: JourneyType;
   originCity?: string;
   destinationCity?: string;
@@ -363,6 +367,7 @@ export type ShareBooking = {
   flightNumber?: string;
   flightDepartureTime?: string;
   dropoffTerminal?: HeathrowTerminal;
+  departureTerminal?: FlightTerminal;
   flexibility: Flexibility;
   luggage: LuggageDeclaration;
   homePostcode?: string;
@@ -488,6 +493,11 @@ export type ShareInterestEntry = {
   termsAcceptedAt?: string;
   status: InterestEntryStatus;
   convertedBookingId?: string;
+  termsVersion?: string;
+  flightNumber?: string;
+  flightDepartureTime?: string;
+  departureTerminal?: FlightTerminal;
+  dropoffTerminal?: HeathrowTerminal;
   createdAt: string;
 };
 
@@ -558,6 +568,14 @@ export type CustomerInterestView = {
   canAcceptProposal: boolean;
   canDeclineProposal: boolean;
   intendedDestinationText?: string;
+  journeyType?: JourneyType;
+  preferredDepartureTime?: string;
+  flexibility?: Flexibility;
+  canUpdate?: boolean;
+  canWithdraw?: boolean;
+  flightNumber?: string;
+  flightDepartureTime?: string;
+  departureTerminal?: FlightTerminal;
 };
 
 export type CustomerBookingView = {
@@ -609,6 +627,16 @@ export type CustomerBookingView = {
   canAcceptSharedDropoff?: boolean;
   canDeclineSharedDropoff?: boolean;
   sharedDropoffNotice?: string;
+  flightNumber?: string;
+  flightDepartureTime?: string;
+  departureTerminal?: FlightTerminal;
+  sharedDropoffLabel?: string;
+  terminalTransferRequired?: boolean;
+  terminalGuideUrl?: string;
+  terminalGuideLabel?: string;
+  terminalTransferWarning?: string;
+  actionRequired?: string;
+  fourPassengerFallbackEnabled?: boolean;
 };
 
 export const UNCONFIRMED_WARNING =
@@ -631,7 +659,7 @@ export const CONFIRMED_NOTICE = "Your airport transfer is now confirmed.";
 export const SHARED_JOURNEY_CONFIRMED_NOTICE = "Your shared journey is now confirmed.";
 
 export const INTENDED_DESTINATION_HELP =
-  "Tell us where in London you're ultimately travelling to. We'll use passenger destinations to choose a practical shared drop off point. Your intended destination is used for matching and does not mean the vehicle will take you directly to that address.";
+  "Tell us where you're ultimately travelling to. We use this information to help choose a practical shared drop off point for passengers travelling together. Your intended destination is used for matching and does not mean the vehicle will take you directly to that address.";
 
 export const SHARED_DROPOFF_ACK_HELP =
   "We use this to help choose the most practical shared drop off point for everyone travelling. Your final destination is not necessarily where the shared vehicle will drop you.";
@@ -654,4 +682,10 @@ export const PAID_AWAITING_CONFIRMATION = "Payment received — awaiting journey
 
 export const PROVISIONAL_PLACE_LABEL = "Provisional place";
 
-export const SHARE_TERMS_VERSION = "share-heathrow-mvp-2026-09-28";
+export const PREVIOUS_SHARE_TERMS_VERSION = "share-heathrow-mvp-2026-09-28";
+
+export const SHARE_TERMS_VERSION = "spires-share-pilot-2026-10";
+
+export function isCurrentShareTermsVersion(version?: string): boolean {
+  return version === SHARE_TERMS_VERSION;
+}

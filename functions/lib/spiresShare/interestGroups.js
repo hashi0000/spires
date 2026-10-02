@@ -5,6 +5,7 @@ exports.windowFromPreference = windowFromPreference;
 exports.windowsOverlap = windowsOverlap;
 exports.journeyTypeForRegion = journeyTypeForRegion;
 exports.destinationMatchingForRegion = destinationMatchingForRegion;
+exports.previewCompatibleInterest = previewCompatibleInterest;
 exports.interestPublicNumber = interestPublicNumber;
 exports.timeLabelForWindow = timeLabelForWindow;
 exports.resolveInterestWindow = resolveInterestWindow;
@@ -30,7 +31,30 @@ const REGION_ALIASES = {
     lhr: "Heathrow",
     "heathrow t3": "Heathrow",
     "heathrow terminal 3": "Heathrow",
+    gatwick: "Gatwick",
+    "gatwick airport": "Gatwick",
+    lgw: "Gatwick",
+    luton: "Luton",
+    "luton airport": "Luton",
+    stansted: "Stansted",
+    "stansted airport": "Stansted",
+    "london city": "London City",
+    "london city airport": "London City",
+    wembley: "Wembley",
+    "wembley stadium": "Wembley",
+    "allianz stadium": "Allianz Stadium",
+    tottenham: "Allianz Stadium",
+    "the o2": "The O2",
+    o2: "The O2",
+    "o2 arena": "The O2",
+    "north greenwich": "The O2",
+    birmingham: "Birmingham",
+    "birmingham city": "Birmingham",
+    "birmingham airport": "Birmingham Airport",
 };
+const AIRPORT_REGIONS = new Set(["Heathrow", "Gatwick", "Luton", "Stansted", "London City", "Birmingham Airport"]);
+const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2"]);
+const CITY_REGIONS = new Set(["London", "Birmingham"]);
 function normalizePlace(value) {
     const key = String(value || "")
         .trim()
@@ -64,10 +88,32 @@ function windowsOverlap(aStart, aEnd, bStart, bEnd) {
     return startA <= endB && startB <= endA;
 }
 function journeyTypeForRegion(destinationRegion) {
-    return destinationRegion === "Heathrow" ? "AIRPORT" : destinationRegion === "London" ? "CITY" : "OTHER";
+    const label = normalizePlace(destinationRegion).label || destinationRegion;
+    if (AIRPORT_REGIONS.has(label))
+        return "AIRPORT";
+    if (EVENT_REGIONS.has(label))
+        return "EVENT";
+    if (CITY_REGIONS.has(label))
+        return "CITY";
+    return "OTHER";
 }
 function destinationMatchingForRegion(destinationRegion) {
     return journeyTypeForRegion(destinationRegion) === "CITY";
+}
+function previewCompatibleInterest(groups, request) {
+    const origin = normalizePlace(request.origin);
+    const destination = normalizePlace(request.destinationRegion);
+    if (!origin.label || !destination.label || !request.travelDate)
+        return null;
+    const window = resolveInterestWindow(request);
+    const match = findCompatibleInterestGroup(groups, {
+        origin: origin.label,
+        destinationRegion: destination.label,
+        travelDate: request.travelDate,
+        timeWindowStart: window.start,
+        timeWindowEnd: window.end,
+    });
+    return match ? toPublicInterestGroup(match) : null;
 }
 function interestPublicNumber(origin, destination, travelDate, start, end) {
     const o = origin.slice(0, 3).toUpperCase();

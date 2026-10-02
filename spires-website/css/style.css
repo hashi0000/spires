@@ -2042,6 +2042,75 @@ header:not(.site-header) .logo-img { height: 44px; width: auto; }
   scroll-margin-top: calc(var(--header-h) + 0.75rem);
 }
 
+.terminal-guide h1 { font-size: 1.7rem; line-height: 1.25; }
+.terminal-selector {
+  background: #f4e7c3;
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 1.25rem 0;
+  position: sticky;
+  top: calc(var(--header-h, 64px) + 0.35rem);
+  z-index: 2;
+}
+.terminal-selector p { font-weight: 700; margin: 0 0 0.65rem; }
+.terminal-selector__btns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.terminal-selector__btns .btn { text-align: center; min-height: 44px; }
+.terminal-official { font-size: 1.05rem; }
+.terminal-block { margin: 1.75rem 0; scroll-margin-top: 7.5rem; }
+.terminal-label {
+  display: inline-block;
+  background: #0c2340;
+  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 8px;
+  margin: 0 0 0.75rem;
+}
+.terminal-steps { padding-left: 1.2rem; display: grid; gap: 0.65rem; font-size: 1.05rem; }
+.terminal-warn { font-weight: 700; background: #fff4e5; padding: 0.75rem; border-radius: 8px; }
+.terminal-alert {
+  background: #0c2340;
+  color: #fff;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  margin: 1.5rem 0;
+}
+.terminal-alert h2 { color: #fff; font-size: 1.2rem; }
+.share-announce { max-width: 40rem; }
+.share-announce__lead {
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 1.1rem + 1vw, 1.75rem);
+  color: var(--blue);
+  margin: 0.35rem 0 1rem;
+}
+.share-announce .btn-group { margin: 1.15rem 0 1.5rem; }
+.share-announce__interest {
+  margin-top: 0.5rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--border);
+}
+.share-announce__interest h3 { font-size: 1.05rem; margin-bottom: 0.65rem; }
+.share-announce__interest ul {
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+.share-announce__interest li {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+}
+@media (max-width: 430px) {
+  .terminal-guide h1 { font-size: 1.45rem; }
+  .terminal-label { font-size: 1.25rem; }
+}
+
 /* Print */
 @media print {
   .no-print, .whatsapp-float, .site-header, header { display: none !important; }

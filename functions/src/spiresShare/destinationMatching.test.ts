@@ -109,6 +109,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     await assert.rejects(
       () =>
@@ -137,6 +138,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const result = await joinCity(db, journey.id, "Cara", "South Kensington", "city-dest-1");
     const booking = db.bookings.get(String(result.bookingId)) as ShareBooking;
@@ -154,6 +156,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const a = await joinCity(db, journey.id, "Dana", "Paddington", "city-a");
     const b = await joinCity(db, journey.id, "Eli", "Chelsea", "city-b");
@@ -179,6 +182,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     await joinCity(db, journey.id, "Fay", "Mayfair", "city-f");
     const pub = toPublicJourney(db.journeys.get(journey.id)!, DEFAULT_SHARE_CONFIG);
@@ -197,6 +201,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     await joinCity(db, journey.id, "Gina", "Westminster", "city-g");
     const summary = adminDestinationSummary(db.journeys.get(journey.id)!, [...db.bookings.values()], [...db.hubs.values()]);
@@ -212,6 +217,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const disabled = createDropoffHub(db, { name: "Marble Arch", city: "London", enabled: false });
     const enabled = createDropoffHub(db, { name: "Victoria", city: "London", enabled: true });
@@ -231,6 +237,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const hub = createDropoffHub(db, { name: "Victoria", city: "London", enabled: true });
     const result = await joinCity(db, journey.id, "Ivy", "South Kensington", "city-i");
@@ -255,6 +262,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const hub = createDropoffHub(db, { name: "Victoria", city: "London", enabled: true });
     const first = await joinCity(db, journey.id, "Jade", "Mayfair", "city-j");
@@ -279,6 +287,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const names = ["Mia", "Ned", "Ora", "Pat"];
     for (const [index, name] of names.entries()) {
@@ -303,6 +312,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const victoria = createDropoffHub(db, { name: "Victoria", city: "London", enabled: true });
     const marble = createDropoffHub(db, { name: "Marble Arch", city: "London", enabled: true });
@@ -394,6 +404,7 @@ describe("destination matching architecture", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-11",
       departureTime: "10:00",
+      farePence: 4500,
     });
     city.customerVisible = true;
     assert.equal(isCustomerListableJourney(city, "customer"), false);

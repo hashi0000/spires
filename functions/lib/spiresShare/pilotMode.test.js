@@ -71,7 +71,7 @@ async function book(db, opts) {
         const booking = db.bookings.get(String(result.bookingId));
         strict_1.default.equal(booking.reservationStatus, "PROVISIONAL");
         strict_1.default.equal(booking.termsAcceptedAt != null, true);
-        strict_1.default.equal(booking.termsVersion, "share-heathrow-mvp-2026-09-28");
+        strict_1.default.equal(booking.termsVersion, "spires-share-pilot-2026-10");
     });
     (0, node_test_1.it)("4. Customer cannot access another reservation", async () => {
         const db = new bookingFlow_1.InMemoryShareDb();

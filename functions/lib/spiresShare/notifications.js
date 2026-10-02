@@ -19,13 +19,18 @@ function journeyLine(journey) {
 }
 function buildNotification(type, to, journey, extra = {}) {
     const ref = journeyLine(journey);
-    const amount = extra.amountPence != null ? (0, logic_1.penceToGbp)(extra.amountPence) : extra.farePence != null ? (0, logic_1.penceToGbp)(extra.farePence) : "£35.00";
+    const amount = extra.amountPence != null ? (0, logic_1.penceToGbp)(extra.amountPence) : extra.farePence != null ? (0, logic_1.penceToGbp)(extra.farePence) : "the fare shown on your dashboard";
     const pax = extra.passengers || 1;
     const deadline = extra.paymentDeadlineAt ? (0, paymentDeadline_1.formatLondonDateTime)(extra.paymentDeadlineAt) : "the payment deadline";
     const payLine = extra.paymentUrl
         ? `Pay securely using the hosted payment page: ${extra.paymentUrl}`
         : "Open your Spires Share dashboard while signed in to pay.";
-    const fourReminder = "If five passengers travel, the fare is £35 per passenger. If only four passengers are available, you may be offered the option to proceed for an additional £8.75 per passenger, bringing the total fare to £43.75 per passenger. You will never be charged the additional amount without agreeing to proceed.";
+    const fourReminder = extra.fourPassengerFallbackEnabled
+        ? "If five passengers travel, the fare is £35 per passenger. If only four passengers are available, you may be offered the option to proceed for an additional £8.75 per passenger, bringing the total fare to £43.75 per passenger. You will never be charged the additional amount without agreeing to proceed."
+        : "";
+    const terminalGuideLine = extra.terminalGuideUrl
+        ? `\n\n${extra.terminalGuideLabel || "Terminal transfer instructions"}: ${extra.terminalGuideUrl}`
+        : "";
     const templates = {
         BOOKING_RECEIVED: {
             subject: "Spires Share Pilot: interest registered (provisional place)",
@@ -45,7 +50,7 @@ function buildNotification(type, to, journey, extra = {}) {
         },
         PAYMENT_REQUIRED: {
             subject: "Spires Share Pilot: payment required to secure your place",
-            text: `Your proposed Spires Share journey has reached the payment stage.\n\n${ref}\nMeeting point: Thornhill Park & Ride\nPassengers on your reservation: ${pax}\nAmount due: ${amount}\nPay by: ${deadline}\n\n${payLine}\n\n${types_1.FILL_NOTICE}\n\nPayment secures your place. Returning from the payment page does not mean payment has been confirmed. If you do not pay by the deadline, your provisional place may be released.\n\n${fourReminder}`,
+            text: `Your proposed Spires Share journey has reached the payment stage.\n\n${ref}\nMeeting point: Thornhill Park & Ride\nPassengers on your reservation: ${pax}\nAmount due: ${amount}\nPay by: ${deadline}\n\n${payLine}\n\n${types_1.FILL_NOTICE}\n\nPayment secures your place. Returning from the payment page does not mean payment has been confirmed. If you do not pay by the deadline, your provisional place may be released.${fourReminder ? `\n\n${fourReminder}` : ""}`,
         },
         PAYMENT_DEADLINE_APPROACHING: {
             subject: "Spires Share Pilot: payment deadline approaching",
@@ -81,11 +86,11 @@ function buildNotification(type, to, journey, extra = {}) {
         },
         JOURNEY_REMINDER_24H: {
             subject: "Spires Share Pilot: 24 hour journey reminder",
-            text: `${ref} is tomorrow. ${types_1.STRICT_DEPARTURE_NOTICE}`,
+            text: `${ref} is tomorrow. ${types_1.STRICT_DEPARTURE_NOTICE}${terminalGuideLine}`,
         },
         DEPARTURE_REMINDER: {
             subject: "Spires Share Pilot: departure reminder",
-            text: `${ref} leaves soon. Meeting point: Thornhill Park & Ride. ${types_1.STRICT_DEPARTURE_NOTICE}`,
+            text: `${ref} leaves soon. Meeting point: Thornhill Park & Ride. ${types_1.STRICT_DEPARTURE_NOTICE}${terminalGuideLine}`,
         },
         WAITLIST_OFFERED: {
             subject: "Spires Share Pilot: a place is available",

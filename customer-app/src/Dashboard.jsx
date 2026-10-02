@@ -316,6 +316,17 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {!showShare ? (
+          <article className="share-compact-card">
+            <p className="share-pilot-kicker">Spires Share</p>
+            <h3>Going somewhere?</h3>
+            <p>See whether other passengers are travelling the same way. This is a shared journey request, not a private taxi booking.</p>
+            <div className="share-app-actions">
+              <button type="button" className="btn-profile" onClick={() => setShowShare(true)}>Explore Share</button>
+            </div>
+          </article>
+        ) : null}
+
         {showShare ? <ShareHeathrow /> : null}
 
         <div className="filter-section">

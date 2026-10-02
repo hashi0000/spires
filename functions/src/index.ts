@@ -103,6 +103,7 @@ export {
   spiresShareGetPaymentLink,
   spiresShareCustomerAction,
   spiresShareExpressInterest,
+  spiresSharePreviewInterest,
   spiresShareAcceptWaitlist,
   spiresShareAdminAction,
   spiresSharePublicAccess,

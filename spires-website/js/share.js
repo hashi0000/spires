@@ -66,8 +66,9 @@
   function cardHtml(row) {
     const remaining = row.remainingSeats;
     const arrival = row.recommendedArrivalTime || recommendedArrival(row.departureTime);
-    const origin = row.meetingPointName || "Thornhill Park & Ride";
-    const destination = row.destinationLabel || "Heathrow Airport Terminal 3";
+    const origin = row.originLabel || row.meetingPointName || "Oxford";
+    const destination = row.destinationLabel || row.destinationCity || "";
+    const heathrow = String(destination).toLowerCase().includes("heathrow") || String(row.airportId || "").toLowerCase() === "heathrow";
     const params = new URLSearchParams({
       share: "1",
       publicNumber: row.publicNumber || "",
@@ -82,17 +83,17 @@
       preferredDepartureTime: row.departureTime || "",
     });
     return `<article class="card share-card">
-      <p class="share-card__kicker">Oxford → Heathrow Terminal 3</p>
+      <p class="share-card__kicker">${escapeHtml(origin)} → ${escapeHtml(destination)}</p>
       <h3>${escapeHtml(formatDate(row.travelDate))}</h3>
       <p class="share-card__time">Departure: ${escapeHtml(row.departureTime)}</p>
-      <p>Recommended arrival: ${escapeHtml(arrival)}</p>
-      <p>${escapeHtml(origin)}<br>→ ${escapeHtml(destination)}</p>
+      ${arrival ? `<p>Recommended arrival: ${escapeHtml(arrival)}</p>` : ""}
       <p class="card__price" data-share-fare>${gbp(row.farePence)} per passenger</p>
       <p>${Number(row.occupiedSeats || 0)} of ${Number(row.capacity || DEFAULT_CAPACITY)} places reserved</p>
       ${occupancyBar(row.occupiedSeats, row.capacity)}
       <p>${remaining} ${remaining === 1 ? "place" : "places"} remaining</p>
       <p class="share-badge">${statusLabel(row)}</p>
-      <p class="share-warning">Please arrive at least 15 minutes before departure. Registering interest does not confirm your journey and no payment is taken at this stage.</p>
+      ${heathrow ? `<p class="share-warning">Shared drop off: Terminal 3. If your flight leaves from another terminal, see the <a href="/share/heathrow-terminal-transfer">terminal transfer guide</a>.</p>` : ""}
+      <p class="share-warning">Registering interest does not confirm your journey and no payment is taken at this stage.</p>
       ${remaining > 0
         ? `<a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${params.toString()}">Register interest</a>`
         : `<a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${waitParams.toString()}">Join waitlist</a>`}
@@ -114,12 +115,12 @@
       <p class="share-card__time">${escapeHtml(row.timeLabel || "")}</p>
       <p>${seats} ${seats === 1 ? "passenger interested" : "passengers interested"}</p>
       <p class="share-warning">This is aggregate interest only. Exact destinations and passenger details are not shown.</p>
-      <a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${params.toString()}">Join</a>
+      <a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${params.toString()}">Join interest</a>
     </article>`;
   }
 
   function setList(rows, note) {
-    fareLine.textContent = "From " + gbp(rows[0]?.farePence || DEFAULT_FARE_PENCE) + " per passenger. Direct shared airport transfer. Maximum five passengers.";
+    fareLine.textContent = "The fare for each journey is shown on the card. Different routes can have different fares.";
     listStatus.textContent = note;
     listEl.innerHTML = rows.length ? rows.map((row) => cardHtml(row)).join("") : "";
   }

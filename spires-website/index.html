@@ -159,6 +159,25 @@
     </div>
   </section>
 
+  <section class="section section--soft" id="spires-share">
+    <div class="container share-announce">
+      <p class="section__eyebrow">Now available</p>
+      <h2>Spires Share</h2>
+      <p class="share-announce__lead">Share the journey. Split the cost.</p>
+      <p>Travelling from Oxford? Register interest in a shared journey and we'll try to match you with other passengers travelling in the same direction.</p>
+      <p>Spires Share is a pre booked shared private hire service. Registering interest does not confirm a booking, does not take payment, and does not guarantee that a journey will operate.</p>
+      <div class="btn-group">
+        <a class="btn btn--primary" href="/share">View shared journeys</a>
+        <a class="btn btn--outline" href="https://customer.spires-taxis.com/dashboard?share=1&amp;request=1">Request a shared journey</a>
+      </div>
+      <div class="share-announce__interest" id="spires-share-teaser">
+        <h3>People currently interested in</h3>
+        <p id="spires-share-interest-status">Checking current interest…</p>
+        <ul id="spires-share-interest-list"></ul>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="popular-airport-routes">
     <div class="container">
       <div class="section__header fade-in">
@@ -193,7 +212,6 @@
         </a>
       </div>
       <p class="fade-in" style="margin-top:1.5rem;"><a href="/airport-transfers">All airport transfers</a> · <a href="/how-airport-pickup-works">How pickup works</a> · <a href="/rates">Full rate card</a></p>
-      <!-- Do not add homepage navigation to /share. /share is config gated, noindex, and not in this sitemap. -->
       <p class="fade-in" data-spires-origin="outsideOxfordNote" style="margin-top:0.75rem;">Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.</p>
     </div>
   </section>
@@ -309,7 +327,7 @@
   <div class="container site-footer__grid">
     <div class="site-footer__brand">
       <img src="/images/spireslogo.svg" alt="Spires Taxis" width="140" height="42" class="site-footer__logo" loading="lazy">
-      <p>Licensed private hire taxis in Oxford. Fixed prices, pre-booked journeys, airport work across Oxfordshire.</p>
+      <p>Licensed private hire taxis in Oxford. Fixed prices, pre booked journeys, airport work across Oxfordshire.</p>
       <ul class="site-footer__contact">
         <li><a href="tel:+447776897772">07776 897772</a></li>
         <li><a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a></li>
@@ -339,6 +357,7 @@
         <li><a href="/about">About us</a></li>
         <li><a href="/contact">Contact &amp; booking</a></li>
         <li><a href="/terms-and-conditions">Terms</a></li>
+        <li><a href="/share">Spires Share</a></li>
         <li><a href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">My account</a></li>
       </ul>
     </div>
@@ -354,6 +373,7 @@
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
 <script src="/js/airport-prices.js" defer></script>
+<script src="/js/share-teaser.js" defer></script>
 <script src="/js/main.js" defer></script>
 <!-- /SITE-FOOTER -->
 

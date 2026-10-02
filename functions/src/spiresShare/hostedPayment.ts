@@ -21,6 +21,15 @@ import {
   WAITING_FOR_MATCHING_LABEL,
 } from "./types";
 import { bookingHoldsSeat, minutesToHm, parseHmToMinutes, remainingSeats, toPublicJourney } from "./logic";
+import { fillNoticeForJourney, fourPassengerFallbackEnabled } from "./routePricing";
+import {
+  flightTerminalOf,
+  isHeathrowShare,
+  terminalGuideHref,
+  terminalGuideLinkText,
+  terminalTransferRequired,
+  terminalTransferWarning,
+} from "./terminalGuide";
 import {
   canPassengerEnterPayment,
   destinationMatchingEnabled,
@@ -252,13 +261,18 @@ export function toCustomerBookingView(
   const reservationStatus = booking.reservationStatus || "PROVISIONAL";
   const hostedPaymentStatus = booking.hostedPaymentStatus || hostedFromReservation(reservationStatus);
   const amountDue = bookingAmountDuePence(booking, journey.farePence);
-  const fourAvailable = journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT";
+  const fourAvailable =
+    fourPassengerFallbackEnabled(journey) &&
+    (journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT");
   const canPay = Boolean(hostedPaymentUrlForCustomer(journey, booking));
   const confirmed = journey.status === "CONFIRMED";
   const paidAwaiting =
     !confirmed && (reservationStatus === "PAID" || hostedPaymentStatus === "PAID");
   const matching = destinationMatchingEnabled(journey);
   const dropoffStatus = matching ? passengerSharedDropoffStatus(journey, booking) : undefined;
+  const heathrow = isHeathrowShare(journey);
+  const flightTerminal = flightTerminalOf(booking);
+  const terminalWarning = heathrow ? terminalTransferWarning(flightTerminal) : null;
   const confirmedNotice = confirmed
     ? journeyTypeOf(journey) === "AIRPORT"
       ? CONFIRMED_NOTICE
@@ -266,7 +280,14 @@ export function toCustomerBookingView(
     : undefined;
   const paidAwaitingLine = matching
     ? `${PAID_AWAITING_CONFIRMATION}. Your shared journey is not confirmed until all required passengers have paid.`
-    : `${PAID_AWAITING_CONFIRMATION}. Your airport transfer is not confirmed until all required passengers have paid.`;
+    : `${PAID_AWAITING_CONFIRMATION}. Your journey is not confirmed until all required passengers have paid.`;
+  let actionRequired: string | undefined;
+  if (matching && dropoffStatus === "PROPOSED") actionRequired = "Shared drop off waiting for acceptance";
+  else if (canPay) actionRequired = "Payment required";
+  else if (fourAvailable && !booking.fourPassengerAccepted) actionRequired = "Four passenger option requires response";
+  const paymentSubmittedNotice = booking.paymentSubmittedAt
+    ? "Payment submitted. We are confirming your payment. Your journey will show as paid once Spires Taxis has verified it."
+    : undefined;
   return {
     publicNumber: pub.publicNumber,
     travelDate: pub.travelDate,
@@ -304,16 +325,14 @@ export function toCustomerBookingView(
       : undefined,
     cancellationDeadlineAt: journey.departureAt,
     customerStatusLabel: customerStatusLabel(journey, booking),
-    fillNotice: confirmed ? undefined : FILL_NOTICE,
+    fillNotice: confirmed ? undefined : fillNoticeForJourney(journey),
     confirmedNotice,
     warning: confirmed
       ? `${confirmedNotice} ${STRICT_DEPARTURE_NOTICE}`
       : paidAwaiting
         ? paidAwaitingLine
         : UNCONFIRMED_WARNING,
-    paymentSubmittedNotice: booking.paymentSubmittedAt
-      ? "Payment submitted? Payments are currently verified by Spires Taxis. Your booking will show as paid once your payment has been confirmed."
-      : undefined,
+    paymentSubmittedNotice,
     journeyType: journeyTypeOf(journey),
     destinationMatchingEnabled: matching,
     destinationCity: journey.destinationCity,
@@ -329,6 +348,16 @@ export function toCustomerBookingView(
         : matching && dropoffStatus === "NOT_SELECTED"
           ? "Shared drop off: Not selected yet"
           : undefined,
+    flightNumber: booking.flightNumber,
+    flightDepartureTime: booking.flightDepartureTime,
+    departureTerminal: flightTerminal,
+    sharedDropoffLabel: heathrow ? "Heathrow Terminal 3" : journey.proposedSharedDropoffDisplayName,
+    terminalTransferRequired: heathrow ? terminalTransferRequired(flightTerminal) : false,
+    terminalGuideUrl: heathrow ? terminalGuideHref(flightTerminal) : undefined,
+    terminalGuideLabel: heathrow ? terminalGuideLinkText(flightTerminal) : undefined,
+    terminalTransferWarning: terminalWarning || undefined,
+    actionRequired,
+    fourPassengerFallbackEnabled: fourPassengerFallbackEnabled(journey),
   };
 }
 

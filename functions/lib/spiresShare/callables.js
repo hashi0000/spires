@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = void 0;
+exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = void 0;
 exports.runShareDeadlineTick = runShareDeadlineTick;
 const crypto = __importStar(require("crypto"));
 const functions = __importStar(require("firebase-functions/v1"));
@@ -51,6 +51,8 @@ const paymentDeadline_1 = require("./paymentDeadline");
 const destinationMatching_1 = require("./destinationMatching");
 const access_1 = require("./access");
 const interestGroups_1 = require("./interestGroups");
+const routePricing_1 = require("./routePricing");
+const terminalGuide_1 = require("./terminalGuide");
 function db() {
     return admin.firestore();
 }
@@ -231,6 +233,14 @@ function customerInterestView(entry, group) {
         canAcceptProposal: entry.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
         canDeclineProposal: entry.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
         intendedDestinationText: entry.intendedDestinationText,
+        journeyType: group.journeyType,
+        preferredDepartureTime: entry.preferredDepartureTime,
+        flexibility: entry.flexibility,
+        canUpdate: entry.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
+        canWithdraw: entry.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
+        flightNumber: entry.flightNumber,
+        flightDepartureTime: entry.flightDepartureTime,
+        departureTerminal: entry.departureTerminal,
     };
 }
 function customerWaitlistView(entry, journey, siblings, now) {
@@ -302,6 +312,9 @@ function attachPassengerWrites(tx, opts) {
         flexibility: opts.flexibility || "plus_minus_30",
         luggage: opts.luggage,
         dropoffTerminal: opts.dropoffTerminal || journey.destinationTerminal || "",
+        departureTerminal: (0, terminalGuide_1.parseFlightTerminal)(opts.departureTerminal || opts.dropoffTerminal || journey.destinationTerminal) || "",
+        flightNumber: opts.flightNumber || "",
+        flightDepartureTime: opts.flightDepartureTime || "",
         homeCollection: "HOME_COLLECTION_UNAVAILABLE",
         homeCollectionSurchargePence: 0,
         paymentId,
@@ -520,6 +533,15 @@ async function expressInterestForCustomer(config, access, data) {
         intendedDestinationPostcode: data.intendedDestinationPostcode ? String(data.intendedDestinationPostcode) : undefined,
         sharedDropoffAcknowledgedAt: data.sharedDropoffAcknowledged === true ? now : undefined,
         termsAcceptedAt: now,
+        termsVersion: types_1.SHARE_TERMS_VERSION,
+        flightNumber: data.flightNumber ? String(data.flightNumber) : undefined,
+        flightDepartureTime: data.flightDepartureTime ? String(data.flightDepartureTime) : undefined,
+        departureTerminal: (0, terminalGuide_1.parseFlightTerminal)(data.departureTerminal || data.dropoffTerminal),
+        dropoffTerminal: (0, logic_1.isHeathrowTerminal)(String(data.dropoffTerminal || ""), ["T2", "T3", "T4", "T5"])
+            ? String(data.dropoffTerminal)
+            : destinationPlace.label === "Heathrow"
+                ? "T3"
+                : undefined,
         status: "ACTIVE",
         createdAt: now,
     };
@@ -914,7 +936,7 @@ exports.spiresShareSession = functions.https.onCall(async (_data, context) => {
         interestNotice: types_1.INTEREST_NOTICE,
         fillNotice: types_1.FILL_NOTICE,
         warning: (0, access_1.sharePilotActive)(flags)
-            ? "Spires Share is a pilot service on selected Oxford to Heathrow Terminal 3 departures. Registering interest is a provisional place only."
+            ? "Spires Share is a pre booked shared private hire service. Registering interest does not confirm a journey and no payment is taken at that stage."
             : "Spires Share is not currently available.",
     };
 });
@@ -966,6 +988,9 @@ exports.spiresShareGetState = functions.https.onCall(async (_data, context) => {
                 timeWindowStart: row.timeWindowStart,
                 timeWindowEnd: row.timeWindowEnd,
                 intendedDestinationText: row.intendedDestinationText || "",
+                flightNumber: row.flightNumber || "",
+                flightDepartureTime: row.flightDepartureTime || "",
+                departureTerminal: row.departureTerminal || "",
             })),
         })),
         interestEntries,
@@ -1054,18 +1079,20 @@ exports.spiresShareSearch = functions.https.onCall(async (data, context) => {
 exports.spiresShareListDepartures = functions.https.onCall(async (data, context) => {
     const config = await loadConfig();
     const access = await assertShareAccess(context, config, "customer");
-    const airportId = String(data?.airportId || "heathrow");
-    if (!(0, logic_1.isMvpAirport)(config, airportId)) {
+    const airportId = String(data?.airportId || "");
+    const snap = airportId && airportId !== "all"
+        ? await db().collection(defaults_1.COLLECTIONS.JOURNEYS).where("airportId", "==", airportId).limit(100).get()
+        : await db().collection(defaults_1.COLLECTIONS.JOURNEYS).limit(200).get();
+    if (airportId && airportId !== "all" && !airportId.startsWith("city:") && !(0, logic_1.isMvpAirport)(config, airportId)) {
         throw new functions.https.HttpsError("failed-precondition", "This Spires Share route is not available yet.");
     }
-    const snap = await db().collection(defaults_1.COLLECTIONS.JOURNEYS).where("airportId", "==", airportId).limit(100).get();
     const journeys = snap.docs
         .map((doc) => asJourney(doc.id, doc.data()))
         .filter((row) => (0, access_1.isCustomerListableJourney)(row, access.role))
         .sort((a, b) => `${a.travelDate}T${a.departureTime}`.localeCompare(`${b.travelDate}T${b.departureTime}`));
     const defaults = config.pilotDefaults;
     return {
-        farePence: defaults.farePence || (0, logic_1.airportById)(config, airportId)?.farePence || 3500,
+        farePence: defaults.farePence || (0, logic_1.airportById)(config, "heathrow")?.farePence || 3500,
         capacity: defaults.capacity || config.passengerCapacity,
         meetingPointName: defaults.departureLocation || config.meetingPoint.publicName,
         originLabel: defaults.originLabel,
@@ -1560,7 +1587,7 @@ exports.spiresShareCustomerAction = functions.https.onCall(async (data, context)
     if (action === "decline-waitlist") {
         return declineWaitlistForCustomer(config, access, String(payload.waitlistId || ""));
     }
-    if (action === "accept-interest-proposal" || action === "decline-interest-proposal" || action === "withdraw-interest") {
+    if (action === "accept-interest-proposal" || action === "decline-interest-proposal" || action === "withdraw-interest" || action === "update-interest") {
         const entryId = String(payload.interestEntryId || "");
         if (!entryId)
             throw new functions.https.HttpsError("invalid-argument", "Interest record not found.");
@@ -1585,6 +1612,70 @@ exports.spiresShareCustomerAction = functions.https.onCall(async (data, context)
             await entryRef.set({ status: "WITHDRAWN" }, { merge: true });
             await recountInterestGroupDoc(groupRef, group);
             return { ok: true, status: "WITHDRAWN" };
+        }
+        if (action === "update-interest") {
+            if (group.status === "CONVERTED_TO_JOURNEY") {
+                throw new functions.https.HttpsError("failed-precondition", "This request cannot be changed after an exact journey has been proposed.");
+            }
+            const origin = (0, interestGroups_1.normalizePlace)(String(payload.origin || group.origin));
+            const destination = (0, interestGroups_1.normalizePlace)(String(payload.destinationRegion || group.destinationRegion));
+            const travelDate = String(payload.travelDate || group.travelDate);
+            const window = (0, interestGroups_1.resolveInterestWindow)({
+                origin: origin.label,
+                destinationRegion: destination.label,
+                travelDate,
+                preferredDepartureTime: String(payload.preferredDepartureTime || entry.preferredDepartureTime || group.preferredDepartureTime || group.timeWindowStart),
+                flexibility: (payload.flexibility || entry.flexibility || "plus_minus_30"),
+                passengers: Number(payload.passengers || entry.passengers),
+            });
+            if ((0, interestGroups_1.destinationMatchingForRegion)(destination.label)) {
+                (0, destinationMatching_1.requireIntendedDestination)({
+                    intendedDestinationText: String(payload.intendedDestinationText || entry.intendedDestinationText || ""),
+                    intendedDestinationPostcode: String(payload.intendedDestinationPostcode || entry.intendedDestinationPostcode || ""),
+                    sharedDropoffAcknowledged: payload.sharedDropoffAcknowledged === true || Boolean(entry.sharedDropoffAcknowledgedAt),
+                }, destination.label);
+            }
+            const patch = {
+                preferredDepartureTime: window.preferred,
+                timeWindowStart: window.start,
+                timeWindowEnd: window.end,
+                flexibility: window.flexibility,
+                passengers: Number(payload.passengers || entry.passengers),
+                intendedDestinationText: payload.intendedDestinationText != null ? String(payload.intendedDestinationText) : entry.intendedDestinationText,
+                intendedDestinationPostcode: payload.intendedDestinationPostcode != null ? String(payload.intendedDestinationPostcode) : entry.intendedDestinationPostcode,
+                flightNumber: payload.flightNumber != null ? String(payload.flightNumber) : entry.flightNumber,
+                flightDepartureTime: payload.flightDepartureTime != null ? String(payload.flightDepartureTime) : entry.flightDepartureTime,
+                departureTerminal: (0, terminalGuide_1.parseFlightTerminal)(payload.departureTerminal || entry.departureTerminal) || entry.departureTerminal || "",
+            };
+            const stillMatches = group.origin === origin.label &&
+                group.destinationRegion === destination.label &&
+                group.travelDate === travelDate &&
+                group.timeWindowStart <= window.end &&
+                group.timeWindowEnd >= window.start;
+            if (stillMatches) {
+                await entryRef.set(patch, { merge: true });
+                await recountInterestGroupDoc(groupRef, group);
+                return { ok: true, rematched: false, publicNumber: group.publicNumber, interestEntryId: entry.id };
+            }
+            await entryRef.set({ status: "WITHDRAWN" }, { merge: true });
+            await recountInterestGroupDoc(groupRef, group);
+            const moved = await expressInterestForCustomer(config, access, {
+                ...payload,
+                origin: origin.label,
+                destinationRegion: destination.label,
+                travelDate,
+                preferredDepartureTime: window.preferred,
+                flexibility: window.flexibility,
+                passengers: Number(payload.passengers || entry.passengers),
+                name: entry.name,
+                email: entry.email,
+                mobile: entry.mobile,
+                termsAccepted: true,
+                intendedDestinationText: patch.intendedDestinationText,
+                intendedDestinationPostcode: patch.intendedDestinationPostcode,
+                sharedDropoffAcknowledged: true,
+            });
+            return { ok: true, rematched: true, ...moved };
         }
         if (group.status !== "CONVERTED_TO_JOURNEY" || !group.convertedJourneyId) {
             throw new functions.https.HttpsError("failed-precondition", "A proposed journey is not ready to accept yet.");
@@ -1623,6 +1714,10 @@ exports.spiresShareCustomerAction = functions.https.onCall(async (data, context)
                 flexibility: entry.flexibility,
                 destination,
                 interestEntryId: entry.id,
+                dropoffTerminal: entry.dropoffTerminal,
+                departureTerminal: entry.departureTerminal,
+                flightNumber: entry.flightNumber,
+                flightDepartureTime: entry.flightDepartureTime,
                 now,
             });
             tx.set(entryRef, { status: "CONVERTED", convertedBookingId: attached.bookingId }, { merge: true });
@@ -1873,6 +1968,48 @@ exports.spiresShareExpressInterest = functions.https.onCall(async (data, context
     const access = await assertShareAccess(context, config, "customer");
     return expressInterestForCustomer(config, access, (data || {}));
 });
+exports.spiresSharePreviewInterest = functions.https.onCall(async (data, context) => {
+    const config = await loadConfig();
+    await assertShareAccess(context, config, "customer");
+    const payload = (data || {});
+    const origin = (0, interestGroups_1.normalizePlace)(String(payload.origin || ""));
+    const destination = (0, interestGroups_1.normalizePlace)(String(payload.destinationRegion || payload.destination || ""));
+    const travelDate = String(payload.travelDate || "");
+    if (!origin.label || !destination.label || !travelDate) {
+        return { match: null };
+    }
+    let window;
+    try {
+        window = (0, interestGroups_1.resolveInterestWindow)({
+            origin: origin.label,
+            destinationRegion: destination.label,
+            travelDate,
+            preferredDepartureTime: String(payload.preferredDepartureTime || ""),
+            flexibility: (payload.flexibility || "plus_minus_30"),
+            passengers: Number(payload.passengers) || 1,
+        });
+    }
+    catch {
+        return { match: null };
+    }
+    const openSnap = await db().collection(defaults_1.COLLECTIONS.INTEREST_GROUPS).limit(200).get();
+    const match = (0, interestGroups_1.previewCompatibleInterest)(openSnap.docs.map((doc) => asInterestGroup(doc.id, doc.data() || {})), {
+        origin: origin.label,
+        destinationRegion: destination.label,
+        travelDate,
+        preferredDepartureTime: window.preferred,
+        flexibility: window.flexibility,
+        timeWindowStart: window.start,
+        timeWindowEnd: window.end,
+        passengers: Number(payload.passengers) || 1,
+    });
+    return {
+        match,
+        journeyType: (0, interestGroups_1.journeyTypeForRegion)(destination.label),
+        destinationMatchingEnabled: (0, interestGroups_1.destinationMatchingForRegion)(destination.label),
+        matchingUncertain: !origin.known || !destination.known,
+    };
+});
 exports.spiresShareAcceptWaitlist = functions.https.onCall(async (data, context) => {
     const config = await loadConfig();
     const access = await assertShareAccess(context, config, "customer");
@@ -2116,12 +2253,14 @@ exports.spiresShareAdminAction = functions.https.onCall(async (data, context) =>
             throw new functions.https.HttpsError("invalid-argument", "Exact departure location and departure time are required.");
         }
         const capacity = Number(payload.capacity) || config.pilotDefaults.capacity;
-        const farePence = Number(payload.farePence) || config.pilotDefaults.farePence;
+        const airport = group.journeyType === "AIRPORT";
+        const farePence = airport
+            ? Number(payload.farePence) || config.pilotDefaults.farePence
+            : (0, routePricing_1.cityJourneyRequiresOwnFare)(Number(payload.farePence) || undefined);
         const targetRevenuePence = farePence * capacity;
         const minPassengerThreshold = Number(payload.minPassengerThreshold) || group.minPassengerThreshold || config.pilotDefaults.minPassengerThreshold;
         const deadlineHours = config.pilotDefaults.confirmationDeadlineHoursBeforeDeparture || config.confirmationDeadlineHoursBeforeDeparture;
         const departureAt = (0, timezone_1.londonDateTimeToUtcIso)(group.travelDate, departureTime);
-        const airport = group.journeyType === "AIRPORT";
         const airportId = airport ? "heathrow" : (0, destinationMatching_1.cityRouteKey)(group.origin, group.destinationRegion);
         const customerVisible = payload.customerVisible === true || (payload.customerVisible !== false && airport);
         if (!airport && customerVisible) {
@@ -2170,6 +2309,8 @@ exports.spiresShareAdminAction = functions.https.onCall(async (data, context) =>
             homeCollectionCount: 0,
             waitlistCount: 0,
             paymentStageStatus: "NOT_CREATED",
+            fourPassengerFallbackEnabled: airport && group.destinationRegion === "Heathrow",
+            fallbackFarePerPassengerPence: airport && group.destinationRegion === "Heathrow" ? 4375 : 0,
             createdAt: now,
             updatedAt: now,
         });
@@ -2372,6 +2513,9 @@ exports.spiresShareAdminAction = functions.https.onCall(async (data, context) =>
         return result;
     }
     if (action === "offer-early-departure" || action === "offer-four-passenger") {
+        if (!(0, routePricing_1.fourPassengerFallbackEnabled)(journey)) {
+            throw new functions.https.HttpsError("failed-precondition", "The four passenger option applies to the Heathrow Share pilot only unless this journey has it enabled.");
+        }
         if (!(0, logic_1.earlyDepartureEligible)(journey.occupiedSeats, journey.capacity, config.earlyDepartureThreshold, journey.status === "CONFIRMED")) {
             throw new functions.https.HttpsError("failed-precondition", "Early confirmation is only available at 4/5 for this MVP.");
         }
@@ -2890,7 +3034,11 @@ async function runShareDeadlineTick() {
                 const reminderAt = (0, timezone_1.subtractHoursIso)(journey.departureAt, 24);
                 if ((0, timezone_1.isPast)(reminderAt, now) && !(0, timezone_1.isPast)(journey.departureAt, now) && (0, hostedPayment_1.reservationHoldsSeat)(booking)) {
                     await db().collection(defaults_1.COLLECTIONS.BOOKINGS).doc(booking.id).set({ reminder24hNotifiedAt: now }, { merge: true });
-                    await queueNotification(config, "JOURNEY_REMINDER_24H", booking.email, journey, { bookingId: booking.id });
+                    await queueNotification(config, "JOURNEY_REMINDER_24H", booking.email, journey, {
+                        bookingId: booking.id,
+                        terminalGuideUrl: (0, terminalGuide_1.isHeathrowShare)(journey) ? (0, terminalGuide_1.terminalGuideHref)((0, terminalGuide_1.flightTerminalOf)(booking)) : undefined,
+                        terminalGuideLabel: (0, terminalGuide_1.isHeathrowShare)(journey) ? (0, terminalGuide_1.terminalGuideLinkText)((0, terminalGuide_1.flightTerminalOf)(booking)) : undefined,
+                    });
                     reminders += 1;
                 }
             }
@@ -2898,7 +3046,11 @@ async function runShareDeadlineTick() {
                 const reminderAt = (0, timezone_1.subtractHoursIso)(journey.departureAt, 3);
                 if ((0, timezone_1.isPast)(reminderAt, now) && !(0, timezone_1.isPast)(journey.departureAt, now) && (0, hostedPayment_1.reservationHoldsSeat)(booking)) {
                     await db().collection(defaults_1.COLLECTIONS.BOOKINGS).doc(booking.id).set({ departureReminderNotifiedAt: now }, { merge: true });
-                    await queueNotification(config, "DEPARTURE_REMINDER", booking.email, journey, { bookingId: booking.id });
+                    await queueNotification(config, "DEPARTURE_REMINDER", booking.email, journey, {
+                        bookingId: booking.id,
+                        terminalGuideUrl: (0, terminalGuide_1.isHeathrowShare)(journey) ? (0, terminalGuide_1.terminalGuideHref)((0, terminalGuide_1.flightTerminalOf)(booking)) : undefined,
+                        terminalGuideLabel: (0, terminalGuide_1.isHeathrowShare)(journey) ? (0, terminalGuide_1.terminalGuideLinkText)((0, terminalGuide_1.flightTerminalOf)(booking)) : undefined,
+                    });
                     reminders += 1;
                 }
             }

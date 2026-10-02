@@ -79,12 +79,16 @@ import {
   interestPublicNumber,
   journeyTypeForRegion,
   normalizePlace,
+  previewCompatibleInterest,
   resolveInterestWindow,
   timeLabelForWindow,
   toPublicInterestGroup,
   waitlistOrder,
+  windowsOverlap,
   type InterestRequest,
 } from "./interestGroups";
+import { cityJourneyRequiresOwnFare, fourPassengerFallbackEnabled } from "./routePricing";
+import { isHeathrowShare, parseFlightTerminal } from "./terminalGuide";
 
 export type ContactInput = {
   name: string;
@@ -95,6 +99,7 @@ export type ContactInput = {
   flightDepartureTime?: string;
   flexibility: Flexibility;
   dropoffTerminal?: string;
+  departureTerminal?: string;
 };
 
 export type ReserveInput = {
@@ -355,7 +360,8 @@ export async function reservePlace(
         email: input.contact.email,
         flightNumber: input.contact.flightNumber,
         flightDepartureTime: input.contact.flightDepartureTime,
-        dropoffTerminal: terminal,
+        dropoffTerminal: isHeathrowShare(journey) ? "T3" : terminal,
+        departureTerminal: parseFlightTerminal(input.contact.departureTerminal || terminal),
         flexibility: input.contact.flexibility,
         luggage,
         homeCollection: home.eligibility,
@@ -454,7 +460,8 @@ export async function reservePlace(
       email: input.contact.email,
       flightNumber: input.contact.flightNumber,
       flightDepartureTime: input.contact.flightDepartureTime,
-      dropoffTerminal: terminal,
+      dropoffTerminal: isHeathrowShare(journey) ? "T3" : terminal,
+      departureTerminal: parseFlightTerminal(input.contact.departureTerminal || terminal),
       flexibility: input.contact.flexibility,
       luggage,
       homeCollection: "HOME_COLLECTION_UNAVAILABLE",
@@ -992,6 +999,9 @@ export function expireUnpaidReservations(db: InMemoryShareDb, nowIso?: string): 
 export function offerFourPassengerOption(db: InMemoryShareDb, journeyId: string, nowIso?: string): { proposedFarePence: number } {
   const journey = db.journeys.get(journeyId);
   if (!journey) throw new Error("Journey not found.");
+  if (!fourPassengerFallbackEnabled(journey)) {
+    throw new Error("The four passenger option applies to the Heathrow Share pilot only unless this journey has it enabled.");
+  }
   const bookings = [...db.bookings.values()].filter((row) => row.journeyId === journeyId && reservationHoldsSeat(row));
   const occupied = occupiedFromBookings(bookings);
   if (occupied !== db.config.earlyDepartureThreshold) {
@@ -1223,6 +1233,9 @@ export function createPilotJourney(
     dropoffMode: db.config.dropoffMode,
     journeyType: "AIRPORT",
     destinationMatchingEnabled: false,
+    fourPassengerFallbackEnabled: true,
+    fallbackFarePerPassengerPence: 4375,
+    commonDropoffTerminal: input.destinationTerminal || defaults.destinationTerminal || "T3",
     earlyDepartureOffered: false,
     earlyDepartureAcceptedBookingIds: [],
     homeCollectionCount: 0,
@@ -1300,7 +1313,7 @@ export function createCityMatchingJourney(
   }
   const capacity = input.capacity || db.config.pilotDefaults.capacity;
   if (capacity < 1 || capacity > 5) throw new Error("Capacity must be between 1 and 5.");
-  const farePence = input.farePence ?? db.config.pilotDefaults.farePence;
+  const farePence = cityJourneyRequiresOwnFare(input.farePence);
   const targetRevenuePence = input.targetRevenuePence ?? farePence * capacity;
   const now = input.nowIso || new Date().toISOString();
   const departureAt = londonDateTimeToUtcIso(input.travelDate, input.departureTime);
@@ -1333,8 +1346,9 @@ export function createCityMatchingJourney(
     customerVisible: false,
     adminNotes: input.notes || "",
     dropoffMode: "common_dropoff",
-    journeyType: "CITY",
-    destinationMatchingEnabled: true,
+    journeyType: journeyTypeForRegion(destinationCity),
+    destinationMatchingEnabled: destinationMatchingForRegion(destinationCity),
+    fourPassengerFallbackEnabled: false,
     destinationMatchingPublicEnabled: false,
     sharedDropoffProposalVersion: 0,
     earlyDepartureOffered: false,
@@ -1587,6 +1601,9 @@ function addIncomingBooking(
     uid?: string;
     luggage?: LuggageDeclaration;
     dropoffTerminal?: HeathrowTerminal;
+    departureTerminal?: string;
+    flightNumber?: string;
+    flightDepartureTime?: string;
     flexibility?: Flexibility;
     intendedDestinationText?: string;
     intendedDestinationPostcode?: string;
@@ -1648,7 +1665,10 @@ function addIncomingBooking(
     name: input.name,
     mobile: input.mobile || "",
     email: input.email,
-    dropoffTerminal: input.dropoffTerminal || journey.destinationTerminal,
+    flightNumber: input.flightNumber,
+    flightDepartureTime: input.flightDepartureTime,
+    dropoffTerminal: isHeathrowShare(journey) ? "T3" : input.dropoffTerminal || journey.destinationTerminal,
+    departureTerminal: parseFlightTerminal(input.departureTerminal || input.dropoffTerminal || journey.destinationTerminal),
     flexibility: input.flexibility || "plus_minus_30",
     luggage,
     homeCollection: "HOME_COLLECTION_UNAVAILABLE",
@@ -1802,6 +1822,11 @@ export function expressInterest(
     intendedDestinationPostcode: input.intendedDestinationPostcode,
     sharedDropoffAcknowledgedAt: input.sharedDropoffAcknowledged ? now : undefined,
     termsAcceptedAt: now,
+    termsVersion: SHARE_TERMS_VERSION,
+    flightNumber: input.flightNumber,
+    flightDepartureTime: input.flightDepartureTime,
+    departureTerminal: parseFlightTerminal(input.departureTerminal),
+    dropoffTerminal: isHeathrowTerminal(String(input.dropoffTerminal || ""), ["T2", "T3", "T4", "T5"]) ? (input.dropoffTerminal as HeathrowTerminal) : undefined,
     status: "ACTIVE",
     createdAt: now,
   };
@@ -1815,6 +1840,98 @@ export function expressInterest(
   }
   db.audit.push({ type: compatible ? "INTEREST_JOINED" : "INTEREST_CREATED", interestGroupId: group.id, entryId: entry.id, at: now });
   return { group, entry, joinedExisting: Boolean(compatible), matchingUncertain: Boolean(group.matchingUncertain) };
+}
+
+export function previewInterest(db: InMemoryShareDb, input: InterestRequest): PublicInterestGroupView | null {
+  return previewCompatibleInterest([...db.interestGroups.values()], input);
+}
+
+export function updateInterestEntry(
+  db: InMemoryShareDb,
+  entryId: string,
+  uid: string | undefined,
+  patch: Partial<InterestRequest> & { name?: string; mobile?: string }
+): { group: ShareInterestGroup; entry: ShareInterestEntry; rematched: boolean } {
+  const entry = db.interestEntries.get(entryId);
+  if (!entry || entry.status !== "ACTIVE") throw new Error("Interest record not found.");
+  requireShareAuth(uid);
+  if (entry.uid && entry.uid !== uid) throw new Error("Interest record not found.");
+  const group = db.interestGroups.get(entry.interestGroupId);
+  if (!group) throw new Error("Interest group not found.");
+  if (group.status === "CONVERTED_TO_JOURNEY") {
+    throw new Error("This request cannot be changed after an exact journey has been proposed.");
+  }
+  const origin = normalizePlace(patch.origin || group.origin);
+  const destination = normalizePlace(patch.destinationRegion || group.destinationRegion);
+  const travelDate = patch.travelDate || group.travelDate;
+  const window = resolveInterestWindow({
+    origin: origin.label,
+    destinationRegion: destination.label,
+    travelDate,
+    preferredDepartureTime: patch.preferredDepartureTime || entry.preferredDepartureTime || group.preferredDepartureTime || group.timeWindowStart,
+    flexibility: patch.flexibility || entry.flexibility,
+    timeWindowStart: patch.timeWindowStart,
+    timeWindowEnd: patch.timeWindowEnd,
+    passengers: patch.passengers || entry.passengers,
+  });
+  if (destinationMatchingForRegion(destination.label)) {
+    requireIntendedDestination(
+      {
+        intendedDestinationText: patch.intendedDestinationText ?? entry.intendedDestinationText,
+        intendedDestinationPostcode: patch.intendedDestinationPostcode ?? entry.intendedDestinationPostcode,
+        sharedDropoffAcknowledged: patch.sharedDropoffAcknowledged === true || Boolean(entry.sharedDropoffAcknowledgedAt),
+      },
+      destination.label
+    );
+  }
+  if (patch.passengers) {
+    assertPartyFitsCapacity(patch.passengers, db.config.passengerCapacity);
+    entry.passengers = patch.passengers;
+  }
+  entry.preferredDepartureTime = window.preferred;
+  entry.timeWindowStart = window.start;
+  entry.timeWindowEnd = window.end;
+  entry.flexibility = window.flexibility;
+  if (patch.intendedDestinationText != null) entry.intendedDestinationText = patch.intendedDestinationText;
+  if (patch.intendedDestinationPostcode != null) entry.intendedDestinationPostcode = patch.intendedDestinationPostcode;
+  if (patch.flightNumber != null) entry.flightNumber = patch.flightNumber;
+  if (patch.flightDepartureTime != null) entry.flightDepartureTime = patch.flightDepartureTime;
+  if (patch.departureTerminal != null) entry.departureTerminal = parseFlightTerminal(patch.departureTerminal);
+  if (patch.name) entry.name = patch.name;
+  if (patch.mobile) entry.mobile = patch.mobile;
+  const stillMatches =
+    group.origin === origin.label &&
+    group.destinationRegion === destination.label &&
+    group.travelDate === travelDate &&
+    windowsOverlap(group.timeWindowStart, group.timeWindowEnd, window.start, window.end);
+  if (stillMatches) {
+    recountInterestGroup(db, group);
+    return { group, entry, rematched: false };
+  }
+  entry.status = "WITHDRAWN";
+  recountInterestGroup(db, group);
+  const moved = expressInterest(db, {
+    origin: origin.label,
+    destinationRegion: destination.label,
+    travelDate,
+    preferredDepartureTime: window.preferred,
+    flexibility: window.flexibility,
+    timeWindowStart: window.start,
+    timeWindowEnd: window.end,
+    passengers: entry.passengers,
+    intendedDestinationText: entry.intendedDestinationText,
+    intendedDestinationPostcode: entry.intendedDestinationPostcode,
+    sharedDropoffAcknowledged: Boolean(entry.sharedDropoffAcknowledgedAt),
+    flightNumber: entry.flightNumber,
+    flightDepartureTime: entry.flightDepartureTime,
+    departureTerminal: entry.departureTerminal,
+    name: entry.name,
+    email: entry.email,
+    mobile: entry.mobile,
+    uid,
+    termsAccepted: true,
+  });
+  return { group: moved.group, entry: moved.entry, rematched: true };
 }
 
 export function joinInterestGroup(
@@ -1949,12 +2066,33 @@ export function acceptProposedInterestJourney(
     sharedDropoffAcknowledged: Boolean(entry.sharedDropoffAcknowledgedAt),
     interestEntryId: entry.id,
     flexibility: entry.flexibility,
+    flightNumber: entry.flightNumber,
+    flightDepartureTime: entry.flightDepartureTime,
+    departureTerminal: entry.departureTerminal,
+    dropoffTerminal: entry.dropoffTerminal,
     nowIso: now,
   });
   entry.status = "CONVERTED";
   entry.convertedBookingId = result.booking.id;
   db.audit.push({ type: "INTEREST_CONVERTED", interestGroupId: group.id, bookingId: result.booking.id, at: now });
   return result;
+}
+
+export function withdrawInterest(db: InMemoryShareDb, entryId: string, uid?: string, nowIso?: string): ShareInterestEntry {
+  const entry = db.interestEntries.get(entryId);
+  if (!entry || entry.status !== "ACTIVE") throw new Error("Interest record not found.");
+  requireShareAuth(uid);
+  if (entry.uid && entry.uid !== uid) throw new Error("Interest record not found.");
+  const group = db.interestGroups.get(entry.interestGroupId);
+  if (group?.status === "CONVERTED_TO_JOURNEY") {
+    throw new Error("Withdraw this as a proposed journey decline or reservation cancellation instead.");
+  }
+  entry.status = "WITHDRAWN";
+  if (group) {
+    recountInterestGroup(db, group);
+    group.updatedAt = nowIso || new Date().toISOString();
+  }
+  return entry;
 }
 
 export function declineProposedInterestJourney(db: InMemoryShareDb, entryId: string, uid?: string, nowIso?: string): ShareInterestEntry {
@@ -2048,6 +2186,14 @@ export function customerInterestViews(db: InMemoryShareDb, uid: string): Custome
         canAcceptProposal: row.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
         canDeclineProposal: row.status === "ACTIVE" && group.status === "CONVERTED_TO_JOURNEY",
         intendedDestinationText: row.intendedDestinationText,
+        journeyType: group.journeyType,
+        preferredDepartureTime: row.preferredDepartureTime,
+        flexibility: row.flexibility,
+        canUpdate: row.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
+        canWithdraw: row.status === "ACTIVE" && group.status !== "CONVERTED_TO_JOURNEY",
+        flightNumber: row.flightNumber,
+        flightDepartureTime: row.flightDepartureTime,
+        departureTerminal: row.departureTerminal,
       } as CustomerInterestView;
     })
     .filter((row): row is CustomerInterestView => Boolean(row));

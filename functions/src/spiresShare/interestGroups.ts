@@ -22,6 +22,10 @@ export type InterestRequest = {
   intendedDestinationText?: string;
   intendedDestinationPostcode?: string;
   sharedDropoffAcknowledged?: boolean;
+  flightNumber?: string;
+  flightDepartureTime?: string;
+  departureTerminal?: string;
+  dropoffTerminal?: string;
 };
 
 const REGION_ALIASES: Record<string, string> = {
@@ -34,7 +38,31 @@ const REGION_ALIASES: Record<string, string> = {
   lhr: "Heathrow",
   "heathrow t3": "Heathrow",
   "heathrow terminal 3": "Heathrow",
+  gatwick: "Gatwick",
+  "gatwick airport": "Gatwick",
+  lgw: "Gatwick",
+  luton: "Luton",
+  "luton airport": "Luton",
+  stansted: "Stansted",
+  "stansted airport": "Stansted",
+  "london city": "London City",
+  "london city airport": "London City",
+  wembley: "Wembley",
+  "wembley stadium": "Wembley",
+  "allianz stadium": "Allianz Stadium",
+  tottenham: "Allianz Stadium",
+  "the o2": "The O2",
+  o2: "The O2",
+  "o2 arena": "The O2",
+  "north greenwich": "The O2",
+  birmingham: "Birmingham",
+  "birmingham city": "Birmingham",
+  "birmingham airport": "Birmingham Airport",
 };
+
+const AIRPORT_REGIONS = new Set(["Heathrow", "Gatwick", "Luton", "Stansted", "London City", "Birmingham Airport"]);
+const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2"]);
+const CITY_REGIONS = new Set(["London", "Birmingham"]);
 
 export function normalizePlace(value: string): { label: string; known: boolean } {
   const key = String(value || "")
@@ -68,11 +96,33 @@ export function windowsOverlap(aStart: string, aEnd: string, bStart: string, bEn
 }
 
 export function journeyTypeForRegion(destinationRegion: string): JourneyType {
-  return destinationRegion === "Heathrow" ? "AIRPORT" : destinationRegion === "London" ? "CITY" : "OTHER";
+  const label = normalizePlace(destinationRegion).label || destinationRegion;
+  if (AIRPORT_REGIONS.has(label)) return "AIRPORT";
+  if (EVENT_REGIONS.has(label)) return "EVENT";
+  if (CITY_REGIONS.has(label)) return "CITY";
+  return "OTHER";
 }
 
 export function destinationMatchingForRegion(destinationRegion: string): boolean {
   return journeyTypeForRegion(destinationRegion) === "CITY";
+}
+
+export function previewCompatibleInterest(
+  groups: ShareInterestGroup[],
+  request: InterestRequest
+): PublicInterestGroupView | null {
+  const origin = normalizePlace(request.origin);
+  const destination = normalizePlace(request.destinationRegion);
+  if (!origin.label || !destination.label || !request.travelDate) return null;
+  const window = resolveInterestWindow(request);
+  const match = findCompatibleInterestGroup(groups, {
+    origin: origin.label,
+    destinationRegion: destination.label,
+    travelDate: request.travelDate,
+    timeWindowStart: window.start,
+    timeWindowEnd: window.end,
+  });
+  return match ? toPublicInterestGroup(match) : null;
 }
 
 export function interestPublicNumber(origin: string, destination: string, travelDate: string, start: string, end: string): string {

@@ -203,6 +203,7 @@ describe("Spires Share interest groups and waitlist", () => {
     proposeJourneyFromInterest(db, otherGroup.id, {
       departureLocation: "Thornhill Park & Ride",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const accepted = acceptProposedInterestJourney(db, second.entry.id, second.entry.uid);
     assert.equal(accepted.booking.reservationStatus, "PROVISIONAL");
@@ -335,6 +336,7 @@ describe("Spires Share interest groups and waitlist", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const hub = createDropoffHub(db, { name: "South Kensington", city: "London", enabled: true });
     const provider = new MockPaymentProvider();
@@ -426,6 +428,7 @@ describe("Spires Share interest groups and waitlist", () => {
       departureLocation: "Thornhill Park & Ride",
       travelDate: "2026-10-10",
       departureTime: "10:00",
+      farePence: 4500,
     });
     const hub = createDropoffHub(db, { name: "South Kensington", city: "London", enabled: true });
     const provider = new MockPaymentProvider();

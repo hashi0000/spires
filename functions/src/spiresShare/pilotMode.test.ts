@@ -102,7 +102,7 @@ describe("pilot booking and payment", () => {
     const booking = db.bookings.get(String(result.bookingId))!;
     assert.equal(booking.reservationStatus, "PROVISIONAL");
     assert.equal(booking.termsAcceptedAt != null, true);
-    assert.equal(booking.termsVersion, "share-heathrow-mvp-2026-09-28");
+    assert.equal(booking.termsVersion, "spires-share-pilot-2026-10");
   });
 
   it("4. Customer cannot access another reservation", async () => {
