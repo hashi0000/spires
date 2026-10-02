@@ -2,6 +2,7 @@
   const list = document.getElementById("spires-share-interest-list");
   const status = document.getElementById("spires-share-interest-status");
   if (!list) return;
+  const LIST_URL = "https://us-central1-spires-taxis.cloudfunctions.net/spiresSharePublicList";
 
   function escapeHtml(value) {
     return String(value || "")
@@ -34,17 +35,10 @@
     }
   }
 
-  fetch("/api/share-teaser", { headers: { Accept: "application/json" } })
+  fetch(LIST_URL, { headers: { Accept: "application/json" } })
     .then((response) => {
       if (!response.ok) return null;
       return response.json();
-    })
-    .then((meta) => {
-      if (!meta || !meta.enabled || !meta.listUrl) return null;
-      return fetch(meta.listUrl, { headers: { Accept: "application/json" } }).then((response) => {
-        if (!response.ok) return { interestGroups: [] };
-        return response.json();
-      });
     })
     .then((data) => {
       if (!data) {
