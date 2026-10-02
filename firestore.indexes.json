@@ -12,13 +12,6 @@
       "collectionGroup": "spiresShareBookings",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "manageTokenHash", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "spiresShareBookings",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "uid", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]

@@ -65,6 +65,7 @@ type ShareState = {
     proposedSharedDropoffDisplayName?: string;
     sharedDropoffProposalVersion?: number;
     suggestedSharedDropoffHubId?: string;
+    suggestedSharedDropoffReason?: string;
     waitlistOfferOutstanding?: boolean;
     interestGroupId?: string;
   }>;
