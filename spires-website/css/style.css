@@ -120,6 +120,8 @@ summary:focus-visible {
   font-size: 0.88rem;
   border-radius: 999px;
 }
+
+.share-top-banner {
   background: var(--blue);
   color: #fff;
   text-align: center;
