@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Spires Share preview (local only)</title>
+  <link rel="stylesheet" href="./src/index.css">
+  <link rel="stylesheet" href="./src/styles.css">
+  <style>
+    .preview-banner {
+      background: #7c2d12;
+      color: #fff;
+      text-align: center;
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+      padding: 0.4rem 1rem;
+    }
+    .view { display: none; }
+    .view.is-on { display: block; }
+    .journey-row {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-banner">LOCAL PREVIEW ONLY — not public, not live, no real bookings or payments</div>
+  <div class="admin-wrapper">
+    <div class="admin-topbar">
+      <header class="admin-header">
+        <div class="admin-header-accent"></div>
+        <div class="admin-header-content">
+          <div class="admin-header-brand">
+            <div class="admin-header-logo"><span class="admin-header-logo-text">ST</span></div>
+            <div>
+              <h1 class="admin-header-title">Spires Taxis</h1>
+              <p class="admin-header-subtitle">Admin Dashboard · Oxford City Council</p>
+            </div>
+          </div>
+        </div>
+      </header>
+      <nav class="admin-nav" aria-label="Main navigation">
+        <div class="admin-nav-content">
+          <button type="button" class="admin-nav-button"><span>Dashboard</span></button>
+          <button type="button" class="admin-nav-button"><span>Drivers</span></button>
+          <button type="button" class="admin-nav-button"><span>Vehicles</span></button>
+          <button type="button" class="admin-nav-button"><span>Bookings</span></button>
+          <button type="button" class="admin-nav-button"><span>Customers</span></button>
+          <button type="button" class="admin-nav-button"><span>Invoices</span></button>
+          <button type="button" class="admin-nav-button"><span>School invoices</span></button>
+          <button type="button" class="admin-nav-button active" aria-current="page"><span>Spires Share (dev)</span></button>
+          <button type="button" class="admin-nav-button"><span>Link Bookings</span></button>
+        </div>
+      </nav>
+    </div>
+    <main class="admin-main">
+      <div class="space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900">Spires Share (development only)</h2>
+          <p class="text-sm text-gray-600 mt-1">
+            Hidden admin workspace. Public launch is off (`SPIRES_SHARE_ENABLED=false`). No real payments. Do not advertise this service.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-sm btn-primary" data-view="board">Board</button>
+          <button type="button" class="btn btn-sm" data-view="preview">Customer preview</button>
+          <button type="button" class="btn btn-sm" data-view="driver">Driver view</button>
+          <button type="button" class="btn btn-sm" data-view="config">Configuration</button>
+          <button type="button" class="btn btn-sm">Run deadline tick</button>
+        </div>
+        <p class="text-sm" style="color:#166534">Sample data for layout only. Nothing here is a live booking.</p>
+
+        <section id="board" class="view is-on">
+          <div class="card">
+            <h3 class="card-title" style="font-size:1.15rem">Journeys</h3>
+            <ul class="space-y-2">
+              <li class="journey-row">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <strong>SS-20260929-0630</strong> · heathrow 2026-09-29 06:30 · 5/5 · FULL · £175.00 secured (mock) · £175.00 captured (mock)
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-sm">Inspect</button>
+                    <button type="button" class="btn btn-sm">Driver</button>
+                    <button type="button" class="btn btn-sm">Offer 4/5</button>
+                    <button type="button" class="btn btn-primary btn-sm">Confirm</button>
+                    <button type="button" class="btn btn-danger btn-sm">Cancel</button>
+                  </div>
+                </div>
+              </li>
+              <li class="journey-row">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <strong>SS-20260929-1030</strong> · heathrow 2026-09-29 10:30 · 4/5 · FILLING · £140.00 secured (mock) · £0.00 captured (mock)
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-sm">Inspect</button>
+                    <button type="button" class="btn btn-sm">Driver</button>
+                    <button type="button" class="btn btn-sm">Offer 4/5</button>
+                    <button type="button" class="btn btn-primary btn-sm">Confirm</button>
+                    <button type="button" class="btn btn-danger btn-sm">Cancel</button>
+                  </div>
+                </div>
+              </li>
+              <li class="journey-row">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <strong>SS-20260929-1500</strong> · heathrow 2026-09-29 15:00 · 2/5 · PROPOSED · £70.00 secured (mock) · £0.00 captured (mock)
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-sm">Inspect</button>
+                    <button type="button" class="btn btn-sm">Driver</button>
+                    <button type="button" class="btn btn-sm">Offer 4/5</button>
+                    <button type="button" class="btn btn-primary btn-sm">Confirm</button>
+                    <button type="button" class="btn btn-danger btn-sm">Cancel</button>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="preview" class="view">
+          <form class="card" onsubmit="return false">
+            <h3 class="card-title" style="font-size:1.15rem">Customer preview</h3>
+            <p class="text-sm text-gray-600" style="margin-bottom:1rem">
+              This is not a public booking page. It is only visible to signed-in admins. Proposed journeys are not guaranteed.
+            </p>
+            <div class="school-invoice-grid">
+              <label class="form-group"><span class="form-label">Airport</span>
+                <select class="form-select"><option>Heathrow (£35.00)</option><option>Gatwick (£45.00)</option></select>
+              </label>
+              <label class="form-group"><span class="form-label">Travel date</span>
+                <input class="form-input" type="date" value="2026-09-29">
+              </label>
+              <label class="form-group"><span class="form-label">Preferred Thornhill departure</span>
+                <input class="form-input" type="time" value="10:15">
+              </label>
+              <label class="form-group"><span class="form-label">Flexibility</span>
+                <select class="form-select">
+                  <option>Exact</option>
+                  <option selected>+/- 15 minutes</option>
+                  <option>+/- 30 minutes</option>
+                  <option>+/- 60 minutes</option>
+                </select>
+              </label>
+              <label class="form-group"><span class="form-label">Flight departure (optional)</span>
+                <input class="form-input" type="time" value="14:00">
+              </label>
+              <label class="form-group"><span class="form-label">Flight number (optional)</span>
+                <input class="form-input" value="BA123">
+              </label>
+              <label class="form-group"><span class="form-label">Passengers</span>
+                <input class="form-input" type="number" value="1">
+              </label>
+              <label class="form-group"><span class="form-label">Large suitcases</span>
+                <input class="form-input" type="number" value="1">
+              </label>
+              <label class="form-group"><span class="form-label">Cabin bags</span>
+                <input class="form-input" type="number" value="1">
+              </label>
+              <label class="form-group"><span class="form-label">Home postcode (optional)</span>
+                <input class="form-input" value="OX4 1AA">
+              </label>
+              <label class="form-group"><span class="form-label">Name</span>
+                <input class="form-input" value="Alex Taylor">
+              </label>
+              <label class="form-group"><span class="form-label">Mobile</span>
+                <input class="form-input" value="07700 900000">
+              </label>
+              <label class="form-group"><span class="form-label">Email</span>
+                <input class="form-input" type="email" value="alex@example.com">
+              </label>
+            </div>
+            <p class="text-sm text-gray-600">Home collection available</p>
+            <div class="flex flex-wrap gap-2" style="margin-top:1rem">
+              <button type="button" class="btn btn-primary">Search existing journeys</button>
+              <button type="button" class="btn">Propose new journey</button>
+            </div>
+            <ul class="space-y-2" style="margin-top:1rem">
+              <li class="journey-row">
+                <div>10:30 · 3/5 booked · 2 seats remaining · £35.00 per passenger</div>
+                <div class="text-xs text-gray-500">This journey is not yet confirmed. Do not rely on this transfer until you receive confirmation from Spires Share.</div>
+                <button type="button" class="btn btn-sm" style="margin-top:0.5rem">Join this journey</button>
+              </li>
+            </ul>
+          </form>
+        </section>
+
+        <section id="driver" class="view">
+          <div class="card">
+            <h3 class="card-title" style="font-size:1.15rem">Driver view</h3>
+            <p><strong>SS-20260929-1030</strong> · Thornhill → heathrow · 10:30 · 4 passengers</p>
+            <ul class="space-y-2" style="margin-top:0.75rem">
+              <li class="journey-row flex items-center justify-between gap-3">
+                <div>Passenger 1 · Alex · 2 pax · CHECKED_IN</div>
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-sm">CHECKED IN</button>
+                  <button type="button" class="btn btn-sm">BOARDED</button>
+                  <button type="button" class="btn btn-sm">NO SHOW</button>
+                </div>
+              </li>
+              <li class="journey-row flex items-center justify-between gap-3">
+                <div>Passenger 2 · Sam · 1 pax · NOT_CHECKED_IN</div>
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-sm">CHECKED IN</button>
+                  <button type="button" class="btn btn-sm">BOARDED</button>
+                  <button type="button" class="btn btn-sm">NO SHOW</button>
+                </div>
+              </li>
+              <li class="journey-row flex items-center justify-between gap-3">
+                <div>Passenger 3 · Jordan · 1 pax · CHECKED_IN</div>
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-sm">CHECKED IN</button>
+                  <button type="button" class="btn btn-sm">BOARDED</button>
+                  <button type="button" class="btn btn-sm">NO SHOW</button>
+                </div>
+              </li>
+            </ul>
+            <div class="flex gap-2" style="margin-top:1rem">
+              <button type="button" class="btn btn-primary btn-sm">DEPARTED</button>
+              <button type="button" class="btn btn-primary btn-sm">ARRIVED</button>
+              <button type="button" class="btn btn-primary btn-sm">COMPLETED</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="config" class="view">
+          <div class="card">
+            <h3 class="card-title" style="font-size:1.15rem">Configuration (requires approval)</h3>
+            <p class="text-sm text-gray-600">Public enabled stays false until council and payment decisions are made.</p>
+            <div class="school-invoice-grid" style="margin-top:1rem">
+              <label class="form-group"><span class="form-label">Passenger capacity</span><input class="form-input" value="5"></label>
+              <label class="form-group"><span class="form-label">Early departure threshold</span><input class="form-input" value="4"></label>
+              <label class="form-group"><span class="form-label">Max home collections</span><input class="form-input" value="2"></label>
+              <label class="form-group"><span class="form-label">Confirmation deadline (hours before)</span><input class="form-input" value="24"></label>
+            </div>
+            <button type="button" class="btn btn-primary" style="margin-top:1rem">Save configuration</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script>
+    const buttons = document.querySelectorAll("[data-view]");
+    const views = document.querySelectorAll(".view");
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const id = button.getAttribute("data-view");
+        views.forEach((view) => view.classList.toggle("is-on", view.id === id));
+        buttons.forEach((row) => row.classList.toggle("btn-primary", row === button));
+      });
+    });
+  </script>
+</body>
+</html>

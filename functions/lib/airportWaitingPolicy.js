@@ -10,7 +10,7 @@ exports.bookingHasAirportCollection = bookingHasAirportCollection;
 exports.bookingLooksLikeAirportTransfer = bookingLooksLikeAirportTransfer;
 exports.airportWaitingScopeNote = airportWaitingScopeNote;
 exports.isReturnBooking = isReturnBooking;
-/** Central airport collection waiting policy. Change here, not in PDF copy. */
+/** Central airport collection waiting policy. Change here, not in PDF or website copy. */
 exports.AIRPORT_WAITING_POLICY = {
     freeMinutesAfterActualLanding: 50,
     chargeBlockMinutes: 30,
@@ -74,10 +74,10 @@ function bookingLooksLikeAirportTransfer(booking) {
 function airportWaitingScopeNote(booking) {
     if (!bookingHasAirportCollection(booking))
         return "";
-    const outbound = (booking === null || booking === void 0 ? void 0 : booking.airportCollection) === true;
-    const returning = (booking === null || booking === void 0 ? void 0 : booking.returnAirportCollection) === true;
-    const isReturn = (booking === null || booking === void 0 ? void 0 : booking.bookingType) === "return" ||
-        Boolean(((booking === null || booking === void 0 ? void 0 : booking.returnPickupLocation) || "").trim() && ((booking === null || booking === void 0 ? void 0 : booking.returnDestination) || "").trim());
+    const outbound = booking?.airportCollection === true;
+    const returning = booking?.returnAirportCollection === true;
+    const isReturn = booking?.bookingType === "return" ||
+        Boolean((booking?.returnPickupLocation || "").trim() && (booking?.returnDestination || "").trim());
     if (isReturn && returning && !outbound) {
         return "This applies to the return journey (airport collection). It does not apply to the outbound drop off.";
     }

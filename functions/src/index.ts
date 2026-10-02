@@ -92,12 +92,21 @@ export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";
 export {
+  spiresShareSession,
   spiresShareGetState,
   spiresShareSaveConfig,
   spiresShareSearch,
+  spiresShareListDepartures,
   spiresShareProposeOrJoin,
+  spiresShareGetMyBooking,
+  spiresShareGetMyBookings,
+  spiresShareGetPaymentLink,
+  spiresShareCustomerAction,
+  spiresShareExpressInterest,
+  spiresShareAcceptWaitlist,
   spiresShareAdminAction,
   spiresSharePublicAccess,
+  spiresSharePublicList,
   spiresShareRunTick,
   scheduledSpiresShareTick,
 } from "./spiresShare/callables";

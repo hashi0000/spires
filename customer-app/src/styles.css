@@ -768,3 +768,118 @@ input::placeholder {
   color: #6b7280;
   font-weight: 400;
 }
+
+.share-app-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 20px rgba(11, 28, 61, 0.08);
+}
+.share-app-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .share-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.share-app-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+.share-app-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0.85rem 0;
+}
+.share-app-error { color: #b91c1c; }
+.share-app-status { color: #166534; }
+.share-app-note {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+.share-dash-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin: 0.85rem 0;
+  overflow-x: hidden;
+}
+.share-dash-kicker {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin: 0 0 0.25rem;
+}
+.share-dash-grid {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.75rem 0;
+}
+.share-dash-grid div {
+  min-width: 0;
+}
+.share-dash-grid dt {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+.share-dash-grid dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.95rem;
+  word-break: break-word;
+}
+.share-deadline {
+  font-weight: 700;
+  color: #002147;
+  background: #f4e7c3;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+}
+.share-strict {
+  font-size: 0.88rem;
+  color: #002147;
+  font-weight: 600;
+}
+.share-pay-btn {
+  width: 100%;
+}
+.share-pilot-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #0b1c3d;
+  margin: 0 0 0.35rem;
+}
+.share-dash-card--selected {
+  border-color: #0b1c3d;
+}
+.share-offer {
+  background: #f8f5ee;
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin: 0.75rem 0;
+}
+.share-terms {
+  margin: 1rem 0;
+  font-size: 0.88rem;
+}
+.share-terms ul {
+  padding-left: 1.1rem;
+}
+.share-terms-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: 600;
+}
+@media (min-width: 768px) {
+  .share-dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share-pay-btn { width: auto; }
+}

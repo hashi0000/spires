@@ -4,6 +4,7 @@ import { auth, db } from "./firebase";
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import BookingForm from "./components/BookingForm";
+import ShareHeathrow from "./components/ShareHeathrow";
 import Profile from "./components/Profile";
 import { generateBookingPDF } from "./pdfGenerator";
 import {
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showShare, setShowShare] = useState(() => new URLSearchParams(window.location.search).get("share") === "1");
   const [showProfile, setShowProfile] = useState(false);
   const [userName, setUserName] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -306,7 +308,15 @@ export default function Dashboard() {
           >
             + New Booking
           </button>
+          <button
+            onClick={() => setShowShare((open) => !open)}
+            className="btn-profile"
+          >
+            Spires Share
+          </button>
         </div>
+
+        {showShare ? <ShareHeathrow /> : null}
 
         <div className="filter-section">
           <button

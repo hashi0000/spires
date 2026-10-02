@@ -74,6 +74,24 @@ service cloud.firestore {
     match /spiresSharePayments/{docId} {
       allow read, write: if false;
     }
+    match /spiresShareSlots/{docId} {
+      allow read, write: if false;
+    }
+    match /spiresShareIdempotency/{docId} {
+      allow read, write: if false;
+    }
+    match /spiresShareNotifications/{docId} {
+      allow read, write: if false;
+    }
+    match /spiresShareDropoffHubs/{docId} {
+      allow read, write: if false;
+    }
+    match /spiresShareInterestGroups/{docId} {
+      allow read, write: if false;
+    }
+    match /spiresShareInterestEntries/{docId} {
+      allow read, write: if false;
+    }
 
     match /{document=**} {
       allow read, write: if false;

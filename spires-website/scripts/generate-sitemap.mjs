@@ -21,6 +21,8 @@ const SKIP_FILES = new Set([
   '404.html',
   'offer-terms.html',
   'terms-and-conditions.html',
+  'share.html',
+  'share-terms.html',
 ]);
 
 function isRedirectStub(html) {
@@ -68,6 +70,7 @@ for (const file of files) {
     locPath.includes('/login') ||
     locPath === '/share' ||
     locPath.startsWith('/share/') ||
+    locPath === '/share-terms' ||
     locPath.includes('spires-share')
   ) continue;
   entries.push({

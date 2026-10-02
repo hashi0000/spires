@@ -9,7 +9,7 @@ export const navigation = [
   { id: 'customers', name: 'Customers', icon: UserCircle },
   { id: 'invoices', name: 'Invoices', icon: DollarSign },
   { id: 'school-invoices', name: 'School invoices', icon: Receipt },
-  { id: 'spires-share', name: 'Spires Share (dev)', icon: Share2 },
+  { id: 'spires-share', name: 'Spires Share', icon: Share2 },
   { id: 'link-bookings', name: 'Link Bookings', icon: Link2 },
 ];
 

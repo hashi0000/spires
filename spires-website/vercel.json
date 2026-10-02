@@ -50,6 +50,33 @@
           "value": "noindex, follow"
         }
       ]
+    },
+    {
+      "source": "/share",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/api/share-page",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/share-terms",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
     }
   ],
   "redirects": [
@@ -176,16 +203,6 @@
       "statusCode": 301
     },
     {
-      "source": "/share",
-      "destination": "/404.html",
-      "statusCode": 404
-    },
-    {
-      "source": "/share/:path*",
-      "destination": "/404.html",
-      "statusCode": 404
-    },
-    {
       "source": "/spires-share",
       "destination": "/404.html",
       "statusCode": 404
@@ -194,6 +211,16 @@
       "source": "/spires-share/:path*",
       "destination": "/404.html",
       "statusCode": 404
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/share",
+      "destination": "/api/share-page"
+    },
+    {
+      "source": "/share.html",
+      "destination": "/api/share-page"
     }
   ]
 }

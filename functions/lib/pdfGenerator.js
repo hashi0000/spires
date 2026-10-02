@@ -105,6 +105,23 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     if (booking.passengers) {
         writeWrapped("Passengers", String(booking.passengers));
     }
+    if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)) {
+        const scope = (0, airportWaitingPolicy_1.airportWaitingScopeNote)(booking);
+        doc
+            .moveDown(0.6)
+            .fontSize(10)
+            .fillColor("#334155")
+            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerTitle)(), { underline: true })
+            .fontSize(9)
+            .fillColor("#4b5563");
+        if (scope) {
+            doc.text(scope, { width: 500, lineGap: 2 }).moveDown(0.2);
+        }
+        doc
+            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)(airportWaitingPolicy_1.AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
+            .fillColor("black")
+            .fontSize(11);
+    }
     doc.moveDown();
     const fare = typeof booking.actualFare === "number"
         ? booking.actualFare
@@ -174,22 +191,6 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     }
     if (booking.notes) {
         doc.moveDown(0.3).text(`Notes: ${booking.notes}`, { width: 500 });
-    }
-    if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)) {
-        const scope = (0, airportWaitingPolicy_1.airportWaitingScopeNote)(booking);
-        doc
-            .moveDown(0.6)
-            .fontSize(10)
-            .fillColor("#334155")
-            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerTitle)(), { underline: true })
-            .fontSize(9)
-            .fillColor("#4b5563");
-        if (scope) {
-            doc.text(scope, { width: 500, lineGap: 2 }).moveDown(0.2);
-        }
-        doc
-            .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)(airportWaitingPolicy_1.AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
-            .fillColor("black");
     }
     doc
         .moveDown()
