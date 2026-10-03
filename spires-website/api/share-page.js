@@ -11,7 +11,9 @@ module.exports = (req, res) => {
   const html = fs.readFileSync(path.join(process.cwd(), file), "utf8");
   res.statusCode = enabled ? 200 : 404;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  if (!enabled) {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  }
   res.setHeader("Cache-Control", "no-store");
   res.end(html);
 };

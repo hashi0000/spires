@@ -128,6 +128,14 @@ import {
   SHARE_PUBLIC_BOARD_URL,
   verifiedPassengerPlaces,
 } from "./shareProgress";
+import {
+  boardingDisplayStatus,
+  driverManifestFingerprint,
+  driverManifestLines,
+  issueBoardingCodes,
+  shouldSendDriverManifest,
+  verifyBoardingCode,
+} from "./boarding";
 
 function db() {
   return admin.firestore();
@@ -284,6 +292,98 @@ async function queueNotification(
 
 function shareAdminInbox(): string {
   return ADMIN_EMAIL;
+}
+
+type ShareDriverRef = { id: string; name: string; email: string; active: boolean };
+
+async function listShareDrivers(): Promise<ShareDriverRef[]> {
+  const snap = await db().collection("drivers").limit(200).get();
+  return snap.docs.map((doc) => ({
+    id: doc.id,
+    name: String(doc.data().name || "Driver"),
+    email: String(doc.data().email || "").trim(),
+    active: doc.data().active !== false,
+  }));
+}
+
+async function resolveAssignedDriver(journey: ShareJourney): Promise<{ email: string; name: string } | null> {
+  if (String(journey.assignedDriverEmail || "").trim()) {
+    return { email: String(journey.assignedDriverEmail).trim(), name: String(journey.assignedDriverName || "Driver") };
+  }
+  if (!journey.assignedDriverId) return null;
+  const snap = await db().collection("drivers").doc(journey.assignedDriverId).get();
+  if (!snap.exists) return null;
+  const email = String(snap.data()?.email || "").trim();
+  if (!email) return null;
+  return { email, name: String(snap.data()?.name || "Driver") };
+}
+
+async function persistBoardingCodes(journey: ShareJourney, bookings: ShareBooking[], now: string): Promise<ShareBooking[]> {
+  const copies = bookings.map((row) => ({ ...row }));
+  issueBoardingCodes(journey, copies, now);
+  for (const booking of copies) {
+    if (!booking.boardingCode || !booking.boardingCodeHash) continue;
+    const original = bookings.find((row) => row.id === booking.id);
+    if (original?.boardingCode === booking.boardingCode) continue;
+    await db().collection(COLLECTIONS.BOOKINGS).doc(booking.id).set(
+      {
+        boardingCode: booking.boardingCode,
+        boardingCodeHash: booking.boardingCodeHash,
+        boardingCodeCreatedAt: booking.boardingCodeCreatedAt,
+      },
+      { merge: true }
+    );
+  }
+  return copies;
+}
+
+function manifestPassengerCount(bookings: ShareBooking[]): number {
+  return bookings
+    .filter((row) => boardingDisplayStatus(row) !== "CANCELLED")
+    .reduce((sum, row) => sum + (row.passengers || 0), 0);
+}
+
+async function queueDriverManifestEmail(
+  config: ShareConfig,
+  journey: ShareJourney,
+  bookings: ShareBooking[],
+  opts: { forceUpdated?: boolean; manual?: boolean }
+): Promise<{ sent: boolean; updated: boolean; skippedReason?: string }> {
+  const driver = await resolveAssignedDriver(journey);
+  if (!driver) return { sent: false, updated: false, skippedReason: "no-driver-email" };
+  const live: ShareJourney = { ...journey, assignedDriverEmail: driver.email, assignedDriverName: driver.name };
+  const decision = shouldSendDriverManifest(live, bookings);
+  const updated = opts.forceUpdated || decision.updated;
+  if (!opts.manual && !decision.send) return { sent: false, updated: false, skippedReason: "unchanged" };
+  const type = updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST";
+  const fingerprint = driverManifestFingerprint(bookings);
+  await queueNotification(config, type, driver.email, live, {
+    admin: true,
+    journeyDocId: journey.id,
+    origin: journey.originLabel || journey.originCity || "Oxford",
+    destination: journey.destinationLabel || "Heathrow Terminal 3",
+    travelDate: journey.travelDate,
+    pickup: journey.departureLocation || journey.originLabel,
+    sharedDropoff: journey.destinationLabel,
+    boardingPassengers: manifestPassengerCount(bookings),
+    driverManifestLines: driverManifestLines(bookings),
+    assignedDriverName: driver.name,
+    driverBoardingUrl: SHARE_ADMIN_DASHBOARD_URL,
+    deduplicationKey: notificationDedupeKey([opts.manual ? "DRIVER_MANIFEST_MANUAL" : type, journey.id, fingerprint]),
+  });
+  const now = new Date().toISOString();
+  await db().collection(COLLECTIONS.JOURNEYS).doc(journey.id).set(
+    {
+      assignedDriverEmail: driver.email,
+      assignedDriverName: driver.name,
+      driverManifestSentAt: now,
+      driverManifestFingerprint: fingerprint,
+      driverManifestVersion: (journey.driverManifestVersion || 0) + 1,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+  return { sent: true, updated };
 }
 
 function asJourney(id: string, data: FirebaseFirestore.DocumentData): ShareJourney {
@@ -1282,6 +1382,9 @@ export const spiresShareGetState = functions.https.onCall(async (_data, context)
       .map(toPublicInterestGroup),
     audit: auditSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
     notifications: noteSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+    drivers: (await listShareDrivers()).map((row) => ({ id: row.id, name: row.name, email: row.email, active: row.active })),
+    notificationsSend: config.notificationsSend === true,
+    notificationsLive: shareNotificationsEnabled(config),
   };
 });
 
@@ -1422,15 +1525,26 @@ async function confirmHostedJourney(
     return { alreadyConfirmed: false as const };
   });
   if (outcome.alreadyConfirmed) {
+    const now = new Date().toISOString();
+    const coded = await persistBoardingCodes({ ...journey, status: "CONFIRMED" }, bookings, now);
+    await queueDriverManifestEmail(config, { ...journey, status: "CONFIRMED" }, coded.filter(reservationHoldsSeat), {});
     return { ok: true, status: "CONFIRMED", alreadyConfirmed: true, failedBookingIds: [] };
   }
-  for (const booking of bookings.filter(reservationHoldsSeat)) {
+  const now = new Date().toISOString();
+  const coded = await persistBoardingCodes({ ...journey, status: "CONFIRMED" }, bookings, now);
+  for (const booking of coded.filter(reservationHoldsSeat)) {
     await queueNotification(config, "JOURNEY_CONFIRMED", booking.email, { ...journey, status: "CONFIRMED" }, {
       bookingId: booking.id,
       journeyDocId: journey.id,
       pickup: journey.departureLocation || journey.originLabel,
       sharedDropoff: journey.destinationLabel,
+      origin: journey.originLabel || "Oxford",
+      destination: journey.destinationLabel || "Heathrow Terminal 3",
+      travelDate: journey.travelDate,
       amountPence: booking.paidAmountPence || bookingAmountDuePence(booking, journey.farePence),
+      boardingCode: booking.boardingCode,
+      boardingPassengers: booking.passengers,
+      passengerName: booking.name,
       terminalGuideUrl: isHeathrowShare(journey) ? terminalGuideHref(flightTerminalOf(booking)) : undefined,
       terminalGuideLabel: isHeathrowShare(journey) ? terminalGuideLinkText(flightTerminalOf(booking)) : undefined,
       deduplicationKey: notificationDedupeKey(["JOURNEY_CONFIRMED", journey.id, booking.id]),
@@ -1441,6 +1555,7 @@ async function confirmHostedJourney(
     journeyDocId: journey.id,
     deduplicationKey: notificationDedupeKey(["ADMIN_ALL_PAYMENTS_RECEIVED", journey.id]),
   });
+  await queueDriverManifestEmail(config, { ...journey, status: "CONFIRMED" }, coded.filter(reservationHoldsSeat), {});
   return { ok: true, status: "CONFIRMED", failedBookingIds: [] };
 }
 
@@ -3024,12 +3139,27 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
   }
 
   if (action === "assign") {
+    const driverId = String((data as { driverId?: string })?.driverId || "");
+    const now = new Date().toISOString();
+    let assignedDriverEmail = "";
+    let assignedDriverName = "";
+    if (driverId) {
+      const snap = await db().collection("drivers").doc(driverId).get();
+      assignedDriverName = String(snap.data()?.name || "Driver");
+      assignedDriverEmail = String(snap.data()?.email || "").trim();
+    }
     await journeyRef.update({
       assignedVehicleId: String((data as { vehicleId?: string })?.vehicleId || ""),
-      assignedDriverId: String((data as { driverId?: string })?.driverId || ""),
-      updatedAt: new Date().toISOString(),
+      assignedDriverId: driverId,
+      assignedDriverName,
+      assignedDriverEmail,
+      updatedAt: now,
     });
-    return { ok: true };
+    if (journey.status === "CONFIRMED" && assignedDriverEmail) {
+      const coded = await persistBoardingCodes({ ...journey, status: "CONFIRMED", assignedDriverEmail, assignedDriverName }, bookings, now);
+      await queueDriverManifestEmail(config, { ...journey, status: "CONFIRMED", assignedDriverId: driverId, assignedDriverEmail, assignedDriverName }, coded.filter(reservationHoldsSeat), {});
+    }
+    return { ok: true, assignedDriverEmail: assignedDriverEmail || null };
   }
 
   if (action === "move-booking") {
@@ -3082,6 +3212,27 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
   if (action === "driver") {
     const boardAction = String((data as { boardAction?: string })?.boardAction || "");
     const bookingId = String((data as { bookingId?: string })?.bookingId || "");
+    if (boardAction === "VERIFY") {
+      if (!bookingId) throw new functions.https.HttpsError("invalid-argument", "Passenger required.");
+      const bookingSnap = await db().collection(COLLECTIONS.BOOKINGS).doc(bookingId).get();
+      if (!bookingSnap.exists) throw new functions.https.HttpsError("not-found", "Booking not found.");
+      const booking = { id: bookingSnap.id, ...bookingSnap.data() } as ShareBooking;
+      try {
+        const result = verifyBoardingCode(journey, booking, String((data as { boardingCode?: string })?.boardingCode || ""), actor, new Date().toISOString());
+        await db().collection(COLLECTIONS.BOOKINGS).doc(bookingId).set(
+          {
+            boardStatus: booking.boardStatus,
+            boardingVerifiedAt: booking.boardingVerifiedAt,
+            boardingVerifiedBy: booking.boardingVerifiedBy,
+          },
+          { merge: true }
+        );
+        if (!result.alreadyVerified) await writeAudit("BOARDING_VERIFIED", actor, { journeyId, bookingId });
+        return { ok: true, alreadyVerified: Boolean(result.alreadyVerified) };
+      } catch (err) {
+        throw new functions.https.HttpsError("failed-precondition", err instanceof Error ? err.message : "Code does not match.");
+      }
+    }
     if (bookingId) {
       const patch: Record<string, string> = {};
       if (boardAction === "CHECKED_IN") patch.boardStatus = "CHECKED_IN";
@@ -3356,6 +3507,19 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     return { ok: true, interestDeadlineAt: deadlineAt };
   }
 
+  if (action === "resend-driver-manifest") {
+    if (journey.status !== "CONFIRMED") {
+      throw new functions.https.HttpsError("failed-precondition", "Driver manifests are only sent for confirmed journeys.");
+    }
+    const now = new Date().toISOString();
+    const coded = await persistBoardingCodes(journey, bookings, now);
+    const result = await queueDriverManifestEmail(config, journey, coded.filter(reservationHoldsSeat), { manual: true, forceUpdated: true });
+    if (!result.sent) {
+      throw new functions.https.HttpsError("failed-precondition", "No assigned driver email is available. Assign a driver who has an email on file.");
+    }
+    return { ok: true, updated: true };
+  }
+
   throw new functions.https.HttpsError("invalid-argument", "Unknown admin action.");
 });
 
@@ -3594,6 +3758,21 @@ export async function runShareDeadlineTick(): Promise<{ expired: number; waitlis
           });
           reminders += 1;
         }
+      }
+    }
+    if (journey.status === "CONFIRMED" && journey.departureAt && !journey.driverManifestReminderAt) {
+      const reminderAt = subtractHoursIso(journey.departureAt, 3);
+      const driver = await resolveAssignedDriver(journey);
+      if (driver && isPast(reminderAt, now) && !isPast(journey.departureAt, now)) {
+        await doc.ref.set({ driverManifestReminderAt: now }, { merge: true });
+        await queueNotification(config, "DRIVER_MANIFEST_REMINDER", driver.email, journey, {
+          admin: true,
+          journeyDocId: journey.id,
+          travelDate: journey.travelDate,
+          pickup: journey.departureLocation,
+          deduplicationKey: notificationDedupeKey(["DRIVER_MANIFEST_REMINDER", journey.id]),
+        });
+        reminders += 1;
       }
     }
     if (

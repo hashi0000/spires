@@ -280,15 +280,18 @@ describe("pilot booking and payment", () => {
 });
 
 describe("pilot sitemap and email defaults", () => {
-  it("20. Pilot journey cannot accidentally become publicly indexed through sitemap generation", () => {
+  it("20. Public Share pages are sitemap eligible; Share emails stay off by default", () => {
     const websiteRoot = path.resolve(__dirname, "../../../spires-website");
     const generator = fs.readFileSync(path.join(websiteRoot, "scripts/generate-sitemap.mjs"), "utf8");
     const shareHtml = fs.readFileSync(path.join(websiteRoot, "share.html"), "utf8");
     const robots = fs.readFileSync(path.join(websiteRoot, "robots.txt"), "utf8");
-    assert.match(generator, /'share\.html'/);
-    assert.match(generator, /locPath === '\/share'/);
-    assert.match(shareHtml, /noindex/);
-    assert.match(robots, /Disallow: \/share/);
+    assert.doesNotMatch(generator, /locPath === '\/share'/);
+    assert.match(generator, /path\.join\(root, 'share'\)/);
+    assert.match(shareHtml, /<meta name="robots" content="index, follow">/);
+    assert.match(shareHtml, /rel="canonical" href="https:\/\/www\.spires-taxis\.com\/share"/);
+    assert.doesNotMatch(shareHtml, /noindex/);
+    assert.doesNotMatch(robots, /^Disallow:\s*\/share\s*$/m);
+    assert.match(robots, /Disallow: \/share-terms/);
     assert.equal(shareNotificationsEnabled({ ...DEFAULT_SHARE_CONFIG, notificationsSend: false }), false);
     assert.equal(shareNotificationsEnabled({ ...DEFAULT_SHARE_CONFIG, notificationsSend: true }), false);
   });

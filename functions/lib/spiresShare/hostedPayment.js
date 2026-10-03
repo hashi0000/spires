@@ -28,6 +28,7 @@ const logic_1 = require("./logic");
 const routePricing_1 = require("./routePricing");
 const terminalGuide_1 = require("./terminalGuide");
 const shareProgress_1 = require("./shareProgress");
+const boarding_1 = require("./boarding");
 const destinationMatching_1 = require("./destinationMatching");
 function reservationHoldsSeat(booking) {
     return (0, logic_1.bookingHoldsSeat)(booking);
@@ -332,6 +333,11 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
         ownPaymentVerified: reservationStatus === "PAID" && (hostedPaymentStatus === "PAID" || !booking.hostedPaymentStatus),
         confirmationGuardNotice: confirmed ? undefined : shareProgress_1.PAYMENT_GUARANTEE_NOTICE,
         travelPlansNotice: confirmed ? undefined : shareProgress_1.TRAVEL_PLANS_NOTICE,
+        boardingCode: confirmed ? (0, boarding_1.customerBoardingCodeForView)(journey, booking) : undefined,
+        boardingNotice: confirmed && (0, boarding_1.customerBoardingCodeForView)(journey, booking)
+            ? "Tell your driver this code when boarding."
+            : undefined,
+        passengerName: booking.name,
     };
 }
 function adminPaymentSummary(journey, bookings) {
@@ -354,5 +360,8 @@ function stripPaymentSecrets(row) {
     delete out.paymentId;
     delete out.manageTokenHash;
     delete out.idempotencyKey;
+    delete out.boardingCode;
+    delete out.boardingCodeHash;
+    delete out.boardingVerifiedBy;
     return out;
 }

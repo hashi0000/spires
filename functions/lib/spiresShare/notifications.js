@@ -43,7 +43,7 @@ function buildNotification(type, to, journey, extra = {}) {
         },
         JOURNEY_CONFIRMED: {
             subject: "Your Spires Share journey is confirmed",
-            text: `JOURNEY CONFIRMED\n\n${ref} is confirmed. ${types_1.CONFIRMED_NOTICE}\nPickup: ${extra.pickup || "the departure location shown in your dashboard"}\nShared drop off: ${extra.sharedDropoff || "the shared destination shown in your dashboard"}\nAll required payments received.\n\nMeeting point: Thornhill Park & Ride. ${types_1.STRICT_DEPARTURE_NOTICE} ${types_1.FLIGHT_DISCLAIMER}${terminalGuideLine}`,
+            text: `JOURNEY CONFIRMED\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || journey?.destinationLabel || "Heathrow Terminal 3"}\n\nDate:\n${extra.travelDate || journey?.travelDate || ""}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}\n\nYOUR BOARDING CODE\n\n${extra.boardingCode || "See your signed in dashboard"}\n\nPlease give this code to your driver when boarding.\n\n${types_1.CONFIRMED_NOTICE} ${types_1.STRICT_DEPARTURE_NOTICE} ${types_1.FLIGHT_DISCLAIMER}${terminalGuideLine}`,
         },
         PAYMENT_PROBLEM: {
             subject: "Spires Share Pilot: payment still needs to be completed",
@@ -164,6 +164,18 @@ function buildNotification(type, to, journey, extra = {}) {
         PAYMENT_DEADLINE_EXTENDED: {
             subject: "Spires Share: payment deadline updated",
             text: `${ref}. The payment deadline has been updated to ${deadline}. ${shareProgress_1.PAYMENT_GUARANTEE_NOTICE}`,
+        },
+        DRIVER_MANIFEST: {
+            subject: `Spires Share driver manifest — ${journey?.publicNumber || "journey"} — ${extra.travelDate || journey?.travelDate || ""}`.trim(),
+            text: `SPIRES SHARE DRIVER MANIFEST\n\nJourney:\n${journey?.publicNumber || ""}\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || "Heathrow Terminal 3"}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}\n\nPassengers:\n${extra.boardingPassengers || 0} seats\n\n${extra.driverManifestLines || ""}\n\nAsk each passenger for their boarding code before they board.\n${extra.driverBoardingUrl ? `\nOpen driver boarding: ${extra.driverBoardingUrl}` : ""}`,
+        },
+        DRIVER_MANIFEST_UPDATED: {
+            subject: `UPDATED Spires Share driver manifest — ${journey?.publicNumber || "journey"}`,
+            text: `UPDATED PASSENGER LIST\n\nThe confirmed Spires Share passenger list has changed. Use this current list, not an earlier email.\n\nJourney:\n${journey?.publicNumber || ""}\n\n${extra.origin || ""} → ${extra.destination || extra.sharedDropoff || ""}\nDeparture: ${journey?.departureTime || ""}\nPickup: ${extra.pickup || ""}\n\n${extra.driverManifestLines || ""}\n\n${extra.driverBoardingUrl ? `Open driver boarding: ${extra.driverBoardingUrl}` : "The signed in driver boarding view always uses the current passenger list."}`,
+        },
+        DRIVER_MANIFEST_REMINDER: {
+            subject: `Spires Share driver reminder — ${journey?.publicNumber || "journey"}`,
+            text: `Reminder: Spires Share journey ${journey?.publicNumber || ""} departs at ${journey?.departureTime || ""}. Use the current passenger list and boarding codes in your previous manifest email or signed in boarding view.`,
         },
     };
     const row = templates[type];

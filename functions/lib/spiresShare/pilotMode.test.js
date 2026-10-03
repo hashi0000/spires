@@ -231,15 +231,18 @@ async function book(db, opts) {
     });
 });
 (0, node_test_1.describe)("pilot sitemap and email defaults", () => {
-    (0, node_test_1.it)("20. Pilot journey cannot accidentally become publicly indexed through sitemap generation", () => {
+    (0, node_test_1.it)("20. Public Share pages are sitemap eligible; Share emails stay off by default", () => {
         const websiteRoot = node_path_1.default.resolve(__dirname, "../../../spires-website");
         const generator = node_fs_1.default.readFileSync(node_path_1.default.join(websiteRoot, "scripts/generate-sitemap.mjs"), "utf8");
         const shareHtml = node_fs_1.default.readFileSync(node_path_1.default.join(websiteRoot, "share.html"), "utf8");
         const robots = node_fs_1.default.readFileSync(node_path_1.default.join(websiteRoot, "robots.txt"), "utf8");
-        strict_1.default.match(generator, /'share\.html'/);
-        strict_1.default.match(generator, /locPath === '\/share'/);
-        strict_1.default.match(shareHtml, /noindex/);
-        strict_1.default.match(robots, /Disallow: \/share/);
+        strict_1.default.doesNotMatch(generator, /locPath === '\/share'/);
+        strict_1.default.match(generator, /path\.join\(root, 'share'\)/);
+        strict_1.default.match(shareHtml, /<meta name="robots" content="index, follow">/);
+        strict_1.default.match(shareHtml, /rel="canonical" href="https:\/\/www\.spires-taxis\.com\/share"/);
+        strict_1.default.doesNotMatch(shareHtml, /noindex/);
+        strict_1.default.doesNotMatch(robots, /^Disallow:\s*\/share\s*$/m);
+        strict_1.default.match(robots, /Disallow: \/share-terms/);
         strict_1.default.equal((0, notifications_1.shareNotificationsEnabled)({ ...defaults_1.DEFAULT_SHARE_CONFIG, notificationsSend: false }), false);
         strict_1.default.equal((0, notifications_1.shareNotificationsEnabled)({ ...defaults_1.DEFAULT_SHARE_CONFIG, notificationsSend: true }), false);
     });

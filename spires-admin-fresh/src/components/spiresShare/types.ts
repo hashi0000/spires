@@ -1,0 +1,154 @@
+export type ShareView = "needs" | "interest" | "journeys" | "advanced";
+
+export type ShareDriver = { id: string; name: string; email: string; active: boolean };
+
+export type ShareJourney = {
+  id: string;
+  publicNumber: string;
+  airportId: string;
+  travelDate: string;
+  departureTime: string;
+  status: string;
+  capacity: number;
+  occupiedSeats: number;
+  farePence: number;
+  targetRevenuePence: number;
+  waitlistCount: number;
+  homeCollectionCount: number;
+  paymentLinkUrl?: string;
+  paymentStageStatus?: string;
+  paymentDeadlineAt?: string;
+  paymentWindowOpenedAt?: string;
+  supplementPaymentLinkUrl?: string;
+  locked?: boolean;
+  confirmedAt?: string;
+  customerVisible?: boolean;
+  originLabel?: string;
+  departureLocation?: string;
+  destinationLabel?: string;
+  vehicleLabel?: string;
+  minPassengerThreshold?: number;
+  adminNotes?: string;
+  journeyType?: string;
+  originCity?: string;
+  destinationCity?: string;
+  fourPassengerFallbackEnabled?: boolean;
+  destinationMatchingEnabled?: boolean;
+  proposedSharedDropoffHubId?: string;
+  proposedSharedDropoffDisplayName?: string;
+  sharedDropoffProposalVersion?: number;
+  suggestedSharedDropoffHubId?: string;
+  suggestedSharedDropoffReason?: string;
+  waitlistOfferOutstanding?: boolean;
+  interestGroupId?: string;
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverEmail?: string;
+  driverManifestSentAt?: string;
+  driverStage?: string;
+};
+
+export type ShareBooking = {
+  id: string;
+  journeyId: string;
+  passengers: number;
+  name: string;
+  email: string;
+  mobile: string;
+  paymentStatus: string;
+  reservationStatus?: string;
+  hostedPaymentStatus?: string;
+  paidAmountPence?: number;
+  paidAt?: string;
+  fourPassengerAccepted?: boolean;
+  supplementPaidPence?: number;
+  cancellationCategory?: string;
+  refundStatus?: string;
+  amountRefundedPence?: number;
+  amountRetainedPence?: number;
+  adminNotes?: string;
+  boardStatus: string;
+  boardingCode?: string;
+  boardingVerifiedAt?: string;
+  boardingVerifiedBy?: string;
+  earlyDepartureAccepted: boolean;
+  intendedDestinationText?: string;
+  intendedDestinationPostcode?: string;
+  flightNumber?: string;
+  flightDepartureTime?: string;
+  departureTerminal?: string;
+  dropoffTerminal?: string;
+  sharedDropoffAcceptedAt?: string;
+  sharedDropoffDeclinedAt?: string;
+  acceptedDropoffProposalVersion?: number;
+};
+
+export type ShareInterestGroup = {
+  id: string;
+  publicNumber: string;
+  origin: string;
+  destinationRegion: string;
+  travelDate: string;
+  timeWindowStart: string;
+  timeWindowEnd: string;
+  interestedSeatCount: number;
+  minPassengerThreshold?: number;
+  interestDeadlineAt?: string;
+  journeyType?: string;
+  status: string;
+  matchingUncertain?: boolean;
+  destinationSpread?: Array<{ index: number; name: string; intendedDestinationText: string; timeWindowStart: string; timeWindowEnd: string }>;
+  entries?: Array<{ id: string; name: string; email: string; passengers: number; status: string; intendedDestinationText?: string; flightNumber?: string; departureTerminal?: string; flightDepartureTime?: string }>;
+};
+
+export type ShareWaitlist = {
+  id: string;
+  journeyId: string;
+  status: string;
+  passengers: number;
+  name?: string;
+  email?: string;
+  waitlistPosition?: number;
+  joinedWaitlistAt?: string;
+  createdAt?: string;
+  offeredAt?: string;
+  offerExpiresAt?: string;
+  claimedAt?: string;
+  declinedAt?: string;
+};
+
+export type ShareState = {
+  actorEmail: string;
+  config: {
+    publicEnabled: boolean;
+    passengerCapacity: number;
+    earlyDepartureThreshold: number;
+    maxHomeCollectionsPerJourney: number;
+    confirmationDeadlineHoursBeforeDeparture: number;
+    homeCollectionSurchargePence: number;
+    notificationsSend?: boolean;
+    interestRegistrationHours?: number;
+    paymentQuietHoursStart?: string;
+    paymentQuietHoursEnd?: string;
+    luggage: {
+      largeSuitcasesPerPassenger: number;
+      cabinBagsPerPassenger: number;
+      maxLargeSuitcasesPerVehicle: number;
+      maxCabinBagsPerVehicle: number;
+    };
+    meetingPoint: { publicName: string };
+    airports: Array<{ id: string; name: string; dropoffLabel: string; farePence: number; targetRevenuePence: number }>;
+  };
+  journeys: ShareJourney[];
+  bookings: ShareBooking[];
+  hubs?: Array<{ id: string; name: string; city: string; displayName?: string; enabled: boolean; address?: string; postcode?: string }>;
+  waitlist: ShareWaitlist[];
+  interestGroups?: ShareInterestGroup[];
+  audit: Array<{ id: string; type?: string; actorEmail?: string; at?: string; journeyId?: string; bookingId?: string }>;
+  notifications: Array<{ id: string; type?: string; to?: string; recipient?: string; status?: string; dryRun?: boolean; subject?: string; createdAt?: string; journeyId?: string }>;
+  drivers?: ShareDriver[];
+  notificationsLive?: boolean;
+  notificationsSend?: boolean;
+};
+
+export type RunAction = (key: string, fn: () => Promise<void>) => Promise<void>;

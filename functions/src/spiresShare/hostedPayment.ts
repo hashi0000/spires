@@ -36,6 +36,7 @@ import {
   PAYMENT_GUARANTEE_NOTICE,
   TRAVEL_PLANS_NOTICE,
 } from "./shareProgress";
+import { customerBoardingCodeForView } from "./boarding";
 import {
   canPassengerEnterPayment,
   destinationMatchingEnabled,
@@ -373,6 +374,11 @@ export function toCustomerBookingView(
     ownPaymentVerified: reservationStatus === "PAID" && (hostedPaymentStatus === "PAID" || !booking.hostedPaymentStatus),
     confirmationGuardNotice: confirmed ? undefined : PAYMENT_GUARANTEE_NOTICE,
     travelPlansNotice: confirmed ? undefined : TRAVEL_PLANS_NOTICE,
+    boardingCode: confirmed ? customerBoardingCodeForView(journey, booking) : undefined,
+    boardingNotice: confirmed && customerBoardingCodeForView(journey, booking)
+      ? "Tell your driver this code when boarding."
+      : undefined,
+    passengerName: booking.name,
   };
 }
 
@@ -404,5 +410,8 @@ export function stripPaymentSecrets<T extends Record<string, unknown>>(row: T): 
   delete out.paymentId;
   delete out.manageTokenHash;
   delete out.idempotencyKey;
+  delete out.boardingCode;
+  delete out.boardingCodeHash;
+  delete out.boardingVerifiedBy;
   return out;
 }

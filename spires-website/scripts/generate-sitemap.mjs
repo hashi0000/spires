@@ -21,7 +21,6 @@ const SKIP_FILES = new Set([
   '404.html',
   'offer-terms.html',
   'terms-and-conditions.html',
-  'share.html',
   'share-terms.html',
 ]);
 
@@ -55,9 +54,20 @@ function lastmod(filePath) {
   return d.toISOString().slice(0, 10);
 }
 
-const files = fs
-  .readdirSync(root)
-  .filter((f) => f.endsWith('.html') && !SKIP_FILES.has(f));
+function listPublicHtml() {
+  const files = fs
+    .readdirSync(root)
+    .filter((f) => f.endsWith('.html') && !SKIP_FILES.has(f));
+  const shareDir = path.join(root, 'share');
+  if (fs.existsSync(shareDir) && fs.statSync(shareDir).isDirectory()) {
+    for (const f of fs.readdirSync(shareDir)) {
+      if (f.endsWith('.html') && !SKIP_FILES.has(f)) files.push(path.join('share', f));
+    }
+  }
+  return files;
+}
+
+const files = listPublicHtml();
 
 const entries = [];
 for (const file of files) {
@@ -68,8 +78,6 @@ for (const file of files) {
   if (
     locPath.includes('/admin') ||
     locPath.includes('/login') ||
-    locPath === '/share' ||
-    locPath.startsWith('/share/') ||
     locPath === '/share-terms' ||
     locPath.includes('spires-share')
   ) continue;

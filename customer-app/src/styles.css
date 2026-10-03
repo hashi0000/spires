@@ -1019,3 +1019,22 @@ input::placeholder {
   color: #166534;
   margin: 0 0 0.35rem;
 }
+.share-boarding {
+  margin-top: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid #d1e7dd;
+  border-radius: 12px;
+  background: #f0fdf4;
+}
+.share-boarding-kicker {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 0.35rem;
+}
+.share-boarding-code {
+  font-size: 2rem;
+  letter-spacing: 0.35rem;
+  font-weight: 800;
+  margin: 0.35rem 0;
+}

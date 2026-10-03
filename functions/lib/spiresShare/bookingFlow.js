@@ -23,6 +23,8 @@ exports.acceptFourPassenger = acceptFourPassenger;
 exports.saveSupplementLink = saveSupplementLink;
 exports.markSupplementPaid = markSupplementPaid;
 exports.confirmHostedIfEligible = confirmHostedIfEligible;
+exports.recordDriverManifestIfNeeded = recordDriverManifestIfNeeded;
+exports.verifyPassengerBoarding = verifyPassengerBoarding;
 exports.cancelReservation = cancelReservation;
 exports.markNoShow = markNoShow;
 exports.createPilotJourney = createPilotJourney;
@@ -70,6 +72,7 @@ const routePricing_1 = require("./routePricing");
 const shareProgress_1 = require("./shareProgress");
 const paymentDeadline_1 = require("./paymentDeadline");
 const terminalGuide_1 = require("./terminalGuide");
+const boarding_1 = require("./boarding");
 class InMemoryShareDb {
     constructor(config = { ...defaults_1.DEFAULT_SHARE_CONFIG, airports: [...defaults_1.DEFAULT_SHARE_CONFIG.airports] }) {
         this.journeys = new Map();
@@ -754,6 +757,12 @@ function markReservationPaid(db, bookingId, actor, nowIso) {
         deduplicationKey: (0, shareProgress_1.notificationDedupeKey)(["PAYMENT_RECEIVED", booking.id]),
     });
     const confirmed = confirmHostedIfEligible(db, journey.id, now);
+    const live = db.journeys.get(journey.id);
+    if (live && live.status === "CONFIRMED") {
+        const all = [...db.bookings.values()].filter((row) => row.journeyId === journey.id);
+        (0, boarding_1.issueBoardingCodes)(live, all, now);
+        recordDriverManifestIfNeeded(db, live, all.filter(hostedPayment_1.reservationHoldsSeat), now);
+    }
     return { previousStatus, newStatus: "PAID", confirmed: confirmed.ok };
 }
 function undoReservationPaid(db, bookingId, actor, nowIso) {
@@ -953,12 +962,15 @@ function confirmHostedIfEligible(db, journeyId, nowIso) {
     journey.confirmedAt = now;
     journey.confirmationEmailSentAt = now;
     journey.updatedAt = now;
-    for (const booking of bookings.filter(hostedPayment_1.reservationHoldsSeat)) {
+    const holding = bookings.filter(hostedPayment_1.reservationHoldsSeat);
+    (0, boarding_1.issueBoardingCodes)(journey, holding, now);
+    for (const booking of holding) {
         (0, shareProgress_1.recordShareNotification)(db.notifications, {
             type: "JOURNEY_CONFIRMED",
             bookingId: booking.id,
             email: booking.email,
             journeyId,
+            boardingCode: booking.boardingCode,
             deduplicationKey: (0, shareProgress_1.notificationDedupeKey)(["JOURNEY_CONFIRMED", journeyId, booking.id]),
         });
     }
@@ -968,8 +980,41 @@ function confirmHostedIfEligible(db, journeyId, nowIso) {
         email: "admin",
         deduplicationKey: (0, shareProgress_1.notificationDedupeKey)(["ADMIN_ALL_PAYMENTS_RECEIVED", journeyId]),
     });
+    recordDriverManifestIfNeeded(db, journey, holding, now);
     db.audit.push({ type: "JOURNEY_CONFIRMED", journeyId, at: now });
     return { ok: true, status: "CONFIRMED" };
+}
+function recordDriverManifestIfNeeded(db, journey, bookings, nowIso) {
+    const decision = (0, boarding_1.shouldSendDriverManifest)(journey, bookings);
+    if (!decision.send)
+        return { sent: false, updated: false };
+    const type = decision.updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST";
+    (0, shareProgress_1.recordShareNotification)(db.notifications, {
+        type,
+        journeyId: journey.id,
+        email: journey.assignedDriverEmail,
+        deduplicationKey: (0, shareProgress_1.notificationDedupeKey)([type, journey.id, (0, boarding_1.driverManifestFingerprint)(bookings)]),
+        driverManifestLines: (0, boarding_1.driverManifestLines)(bookings),
+    });
+    journey.driverManifestSentAt = nowIso;
+    journey.driverManifestFingerprint = (0, boarding_1.driverManifestFingerprint)(bookings);
+    journey.driverManifestVersion = (journey.driverManifestVersion || 0) + 1;
+    db.audit.push({ type: decision.updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST_SENT", journeyId: journey.id, at: nowIso });
+    return { sent: true, updated: decision.updated };
+}
+function verifyPassengerBoarding(db, bookingId, code, actor, nowIso) {
+    const booking = db.bookings.get(bookingId);
+    if (!booking)
+        throw new Error("Booking not found.");
+    const journey = db.journeys.get(booking.journeyId);
+    if (!journey)
+        throw new Error("Journey not found.");
+    const now = nowIso || new Date().toISOString();
+    const result = (0, boarding_1.verifyBoardingCode)(journey, booking, code, actor, now);
+    if (!result.alreadyVerified) {
+        db.audit.push({ type: "BOARDING_VERIFIED", journeyId: journey.id, bookingId, actor, at: now });
+    }
+    return result;
 }
 function cancelReservation(db, bookingId, nowIso) {
     const booking = db.bookings.get(bookingId);
@@ -1000,6 +1045,10 @@ function cancelReservation(db, bookingId, nowIso) {
     db.notifications.push({ type: "CANCELLATION_CONFIRMED", bookingId, email: booking.email, journeyId: journey.id });
     db.audit.push({ type: "PASSENGER_LEFT", journeyId: journey.id, bookingId, category, at: now });
     void offerWaitlistIfPossible(db, journey.id, now);
+    if (wasConfirmed) {
+        const remainingHold = [...db.bookings.values()].filter((row) => row.journeyId === journey.id && (0, hostedPayment_1.reservationHoldsSeat)(row));
+        recordDriverManifestIfNeeded(db, journey, remainingHold, now);
+    }
     return { category, released: true, journeyStillConfirmed: wasConfirmed };
 }
 function markNoShow(db, bookingId, nowIso) {

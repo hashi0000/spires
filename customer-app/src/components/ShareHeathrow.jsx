@@ -746,7 +746,18 @@ export default function ShareHeathrow() {
                 <div><dt>Fare</dt><dd>{gbp(row.amountDuePence || row.farePence)}</dd></div>
               </dl>
               {row.journeyStatus === "CONFIRMED" ? (
-                <p className="share-app-status">All required payments received. This shared journey is confirmed.</p>
+                <>
+                  <p className="share-app-status">All required payments received. This shared journey is confirmed.</p>
+                  {row.boardingCode ? (
+                    <div className="share-boarding">
+                      <p className="share-boarding-kicker">Boarding</p>
+                      <p>Your verification code</p>
+                      <p className="share-boarding-code">{row.boardingCode}</p>
+                      <p>Tell your driver this code when boarding.</p>
+                      <p>{row.passengerName || "Passenger"} · {row.passengers} seat{row.passengers === 1 ? "" : "s"} · {row.publicNumber}</p>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <p>{row.paymentsReceived || 0} of {row.paymentsRequired || row.capacity} payments received</p>

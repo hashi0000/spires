@@ -134,7 +134,10 @@ export type NotificationType =
   | "INTEREST_EXPIRED"
   | "PAYMENT_RECEIVED"
   | "PAYMENT_WINDOW_EXPIRED_CUSTOMER"
-  | "PAYMENT_DEADLINE_EXTENDED";
+  | "PAYMENT_DEADLINE_EXTENDED"
+  | "DRIVER_MANIFEST"
+  | "DRIVER_MANIFEST_UPDATED"
+  | "DRIVER_MANIFEST_REMINDER";
 
 export type AuditEventType =
   | "JOURNEY_CREATED"
@@ -188,7 +191,11 @@ export type AuditEventType =
   | "WAITLIST_PROMOTED"
   | "INTEREST_DEADLINE_CHANGED"
   | "PAYMENT_DEADLINE_CHANGED"
-  | "INTEREST_EXPIRED";
+  | "INTEREST_EXPIRED"
+  | "BOARDING_CODE_ISSUED"
+  | "BOARDING_VERIFIED"
+  | "DRIVER_MANIFEST_SENT"
+  | "DRIVER_MANIFEST_UPDATED";
 
 export type ShareAirport = {
   id: string;
@@ -336,6 +343,13 @@ export type ShareJourney = {
   interestGroupId?: string;
   assignedVehicleId?: string;
   assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverEmail?: string;
+  driverStage?: string;
+  driverManifestSentAt?: string;
+  driverManifestFingerprint?: string;
+  driverManifestVersion?: number;
+  driverManifestReminderAt?: string;
   paymentLinkUrl?: string;
   paymentLinkAddedAt?: string;
   paymentWindowOpenedAt?: string;
@@ -416,6 +430,11 @@ export type ShareBooking = {
   amountRetainedPence?: number;
   adminNotes?: string;
   boardStatus: PassengerBoardStatus;
+  boardingCode?: string;
+  boardingCodeHash?: string;
+  boardingCodeCreatedAt?: string;
+  boardingVerifiedAt?: string;
+  boardingVerifiedBy?: string;
   earlyDepartureAccepted: boolean;
   manageTokenHash: string;
   idempotencyKey: string;
@@ -702,6 +721,9 @@ export type CustomerBookingView = {
   ownPaymentVerified?: boolean;
   confirmationGuardNotice?: string;
   travelPlansNotice?: string;
+  boardingCode?: string;
+  boardingNotice?: string;
+  passengerName?: string;
 };
 
 export const UNCONFIRMED_WARNING =

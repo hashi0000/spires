@@ -6,9 +6,12 @@ Allow: /images/
 
 Disallow: /login
 Disallow: /admin
-Disallow: /share
 Disallow: /share-terms
 Disallow: /spires-share
+Disallow: /api/
+Disallow: /booking
+Disallow: /email
+Disallow: /thank-you
 Disallow: /node_modules/
 Disallow: /scripts/
 Disallow: /includes/

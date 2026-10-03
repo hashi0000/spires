@@ -101,6 +101,13 @@ import {
 } from "./shareProgress";
 import { computeInterestDeadline, computeJoinerPaymentDeadline, computePaymentDeadline } from "./paymentDeadline";
 import { isHeathrowShare, parseFlightTerminal } from "./terminalGuide";
+import {
+  driverManifestFingerprint,
+  driverManifestLines,
+  issueBoardingCodes,
+  shouldSendDriverManifest,
+  verifyBoardingCode,
+} from "./boarding";
 
 export type ContactInput = {
   name: string;
@@ -951,6 +958,12 @@ export function markReservationPaid(
     deduplicationKey: notificationDedupeKey(["PAYMENT_RECEIVED", booking.id]),
   });
   const confirmed = confirmHostedIfEligible(db, journey.id, now);
+  const live = db.journeys.get(journey.id);
+  if (live && live.status === "CONFIRMED") {
+    const all = [...db.bookings.values()].filter((row) => row.journeyId === journey.id);
+    issueBoardingCodes(live, all, now);
+    recordDriverManifestIfNeeded(db, live, all.filter(reservationHoldsSeat), now);
+  }
   return { previousStatus, newStatus: "PAID", confirmed: confirmed.ok };
 }
 
@@ -1159,12 +1172,15 @@ export function confirmHostedIfEligible(
   journey.confirmedAt = now;
   journey.confirmationEmailSentAt = now;
   journey.updatedAt = now;
-  for (const booking of bookings.filter(reservationHoldsSeat)) {
+  const holding = bookings.filter(reservationHoldsSeat);
+  issueBoardingCodes(journey, holding, now);
+  for (const booking of holding) {
     recordShareNotification(db.notifications, {
       type: "JOURNEY_CONFIRMED",
       bookingId: booking.id,
       email: booking.email,
       journeyId,
+      boardingCode: booking.boardingCode,
       deduplicationKey: notificationDedupeKey(["JOURNEY_CONFIRMED", journeyId, booking.id]),
     });
   }
@@ -1174,8 +1190,51 @@ export function confirmHostedIfEligible(
     email: "admin",
     deduplicationKey: notificationDedupeKey(["ADMIN_ALL_PAYMENTS_RECEIVED", journeyId]),
   });
+  recordDriverManifestIfNeeded(db, journey, holding, now);
   db.audit.push({ type: "JOURNEY_CONFIRMED", journeyId, at: now });
   return { ok: true, status: "CONFIRMED" };
+}
+
+export function recordDriverManifestIfNeeded(
+  db: InMemoryShareDb,
+  journey: ShareJourney,
+  bookings: ShareBooking[],
+  nowIso: string
+): { sent: boolean; updated: boolean } {
+  const decision = shouldSendDriverManifest(journey, bookings);
+  if (!decision.send) return { sent: false, updated: false };
+  const type = decision.updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST";
+  recordShareNotification(db.notifications, {
+    type,
+    journeyId: journey.id,
+    email: journey.assignedDriverEmail,
+    deduplicationKey: notificationDedupeKey([type, journey.id, driverManifestFingerprint(bookings)]),
+    driverManifestLines: driverManifestLines(bookings),
+  });
+  journey.driverManifestSentAt = nowIso;
+  journey.driverManifestFingerprint = driverManifestFingerprint(bookings);
+  journey.driverManifestVersion = (journey.driverManifestVersion || 0) + 1;
+  db.audit.push({ type: decision.updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST_SENT", journeyId: journey.id, at: nowIso });
+  return { sent: true, updated: decision.updated };
+}
+
+export function verifyPassengerBoarding(
+  db: InMemoryShareDb,
+  bookingId: string,
+  code: string,
+  actor: string,
+  nowIso?: string
+): { ok: true; alreadyVerified?: boolean } {
+  const booking = db.bookings.get(bookingId);
+  if (!booking) throw new Error("Booking not found.");
+  const journey = db.journeys.get(booking.journeyId);
+  if (!journey) throw new Error("Journey not found.");
+  const now = nowIso || new Date().toISOString();
+  const result = verifyBoardingCode(journey, booking, code, actor, now);
+  if (!result.alreadyVerified) {
+    db.audit.push({ type: "BOARDING_VERIFIED", journeyId: journey.id, bookingId, actor, at: now });
+  }
+  return result;
 }
 
 export function cancelReservation(
@@ -1215,6 +1274,10 @@ export function cancelReservation(
   db.notifications.push({ type: "CANCELLATION_CONFIRMED", bookingId, email: booking.email, journeyId: journey.id });
   db.audit.push({ type: "PASSENGER_LEFT", journeyId: journey.id, bookingId, category, at: now });
   void offerWaitlistIfPossible(db, journey.id, now);
+  if (wasConfirmed) {
+    const remainingHold = [...db.bookings.values()].filter((row) => row.journeyId === journey.id && reservationHoldsSeat(row));
+    recordDriverManifestIfNeeded(db, journey, remainingHold, now);
+  }
   return { category, released: true, journeyStillConfirmed: wasConfirmed };
 }
 
