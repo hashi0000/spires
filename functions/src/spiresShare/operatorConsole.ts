@@ -72,10 +72,17 @@ export function formatUkDateShort(isoDate: string): string {
   return `${Number(parts[2])} ${months[Number(parts[1]) - 1]}`;
 }
 
-export function routeLabel(row: { originLabel?: string; originCity?: string; origin?: string; destinationLabel?: string; destinationCity?: string; destinationRegion?: string }): string {
+export function routeLabel(row: { originLabel?: string; originCity?: string; origin?: string; destinationLabel?: string; destinationCity?: string; destinationRegion?: string; venueName?: string; journeyType?: string }): string {
   const origin = row.originLabel || row.originCity || row.origin || "Oxford";
-  const destination = row.destinationLabel || row.destinationCity || row.destinationRegion || "Heathrow T3";
+  const destination = row.venueName && row.journeyType === "EVENT"
+    ? row.venueName
+    : row.destinationLabel || row.destinationCity || row.destinationRegion || "Heathrow T3";
   return `${origin} → ${destination}`;
+}
+
+function eventNeedsTitle(row: { journeyType?: string; venueName?: string; eventName?: string; publicNumber?: string }): string {
+  if (row.journeyType === "EVENT") return row.venueName || row.eventName || row.publicNumber || "Event";
+  return "";
 }
 
 export function humanInterestStatus(status: string, enough: boolean): OperatorStage | "Collecting interest" | "Ready to propose" {
@@ -168,16 +175,17 @@ export function buildNeedsAction(input: {
     const progress = seatProgress(group.interestedSeatCount || 0, required);
     const route = routeLabel(group);
     const when = `${formatUkDate(group.travelDate)} · Around ${group.timeWindowStart || ""}`.trim();
+    const title = eventNeedsTitle(group) || route;
     if (progress.enough || group.status === "READY_FOR_REVIEW") {
       items.push({
         id: `propose-${group.id}`,
         kind: "ready_to_propose",
         priority: 60,
-        title: route,
+        title,
         route,
         when,
         detail: `${progress.placesLabel} interested`,
-        extra: "Ready to propose journey",
+        extra: group.journeyType === "EVENT" ? "Ready to propose" : "Ready to propose journey",
         countdownAt: group.interestDeadlineAt,
         primaryLabel: "Review and propose",
         target: { type: "interest", id: group.id },
@@ -185,12 +193,12 @@ export function buildNeedsAction(input: {
       continue;
     }
     const ms = remainingMs(group.interestDeadlineAt, nowIso);
-    if (group.interestDeadlineAt && ms <= 6 * 60 * 60 * 1000) {
+    if (group.journeyType === "EVENT" || (group.interestDeadlineAt && ms <= 6 * 60 * 60 * 1000)) {
       items.push({
         id: `interest-soon-${group.id}`,
         kind: "interest_deadline_soon",
-        priority: 70,
-        title: route,
+        priority: group.journeyType === "EVENT" && ms > 6 * 60 * 60 * 1000 ? 90 : 70,
+        title,
         route,
         when,
         detail: `${progress.placesLabel} interested`,
@@ -199,7 +207,7 @@ export function buildNeedsAction(input: {
         countdownLabel: "Registration closes in",
         primaryLabel: "View",
         target: { type: "interest", id: group.id },
-        urgency: ms <= 60 * 60 * 1000 ? "now" : "soon",
+        urgency: ms <= 60 * 60 * 1000 ? "now" : ms <= 6 * 60 * 60 * 1000 ? "soon" : undefined,
       });
     }
   }
@@ -211,6 +219,7 @@ export function buildNeedsAction(input: {
     const route = routeLabel(journey);
     const when = `${formatUkDate(journey.travelDate)} · ${journey.departureTime}`;
     const pay = paymentProgress(bookings, journey.capacity);
+    const journeyTitle = eventNeedsTitle(journey) || journey.publicNumber;
     const outstandingOffer = (input.waitlist || []).some((row) => row.journeyId === journey.id && row.status === "OFFERED");
 
     if (outstandingOffer) {
@@ -218,7 +227,7 @@ export function buildNeedsAction(input: {
         id: `waitlist-${journey.id}`,
         kind: "waitlist_offer",
         priority: 15,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: "Waitlist offer outstanding",
@@ -235,7 +244,7 @@ export function buildNeedsAction(input: {
         id: `confirm-${journey.id}`,
         kind: "ready_to_confirm",
         priority: 20,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: "All required payments verified",
@@ -252,7 +261,7 @@ export function buildNeedsAction(input: {
         id: `pay-expired-${journey.id}`,
         kind: "payment_expired",
         priority: 10,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: `Payments: ${pay.placesLabel} verified`,
@@ -270,7 +279,7 @@ export function buildNeedsAction(input: {
         id: `pay-${journey.id}`,
         kind: soon ? "payment_deadline_soon" : "collecting_payment",
         priority: soon ? 12 : 80,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: `Payments: ${pay.placesLabel} verified`,
@@ -289,7 +298,7 @@ export function buildNeedsAction(input: {
         id: `open-pay-${journey.id}`,
         kind: "ready_to_open_payment",
         priority: 40,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: "Payment link added",
@@ -305,7 +314,7 @@ export function buildNeedsAction(input: {
         id: `add-link-${journey.id}`,
         kind: "add_payment_link",
         priority: 50,
-        title: journey.publicNumber,
+        title: journeyTitle,
         route,
         when,
         detail: `${journey.occupiedSeats} / ${journey.capacity} interested`,

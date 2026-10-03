@@ -56,6 +56,10 @@ export type NotificationExtra = {
   driverManifestLines?: string;
   assignedDriverName?: string;
   driverBoardingUrl?: string;
+  eventName?: string;
+  venueName?: string;
+  eventDate?: string;
+  eventStartTime?: string;
 };
 
 export function shareNotificationsEnabled(config: ShareConfig): boolean {
@@ -88,6 +92,9 @@ export function buildNotification(
   const terminalGuideLine = extra.terminalGuideUrl
     ? `\n\n${extra.terminalGuideLabel || "Terminal transfer instructions"}: ${extra.terminalGuideUrl}`
     : "";
+  const eventLine = extra.eventName
+    ? `\n\nEvent:\n${extra.eventName}${extra.venueName ? `\nVenue:\n${extra.venueName}` : ""}${extra.eventDate ? `\nEvent date:\n${extra.eventDate}` : ""}${extra.eventStartTime ? `\nEvent start:\n${extra.eventStartTime}` : ""}`
+    : "";
 
   const templates: Record<NotificationType, { subject: string; text: string }> = {
     BOOKING_RECEIVED: {
@@ -100,7 +107,7 @@ export function buildNotification(
     },
     JOURNEY_CONFIRMED: {
       subject: "Your Spires Share journey is confirmed",
-      text: `JOURNEY CONFIRMED\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || journey?.destinationLabel || "Heathrow Terminal 3"}\n\nDate:\n${extra.travelDate || journey?.travelDate || ""}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}\n\nYOUR BOARDING CODE\n\n${extra.boardingCode || "See your signed in dashboard"}\n\nPlease give this code to your driver when boarding.\n\n${CONFIRMED_NOTICE} ${STRICT_DEPARTURE_NOTICE} ${FLIGHT_DISCLAIMER}${terminalGuideLine}`,
+      text: `JOURNEY CONFIRMED\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || journey?.destinationLabel || "Heathrow Terminal 3"}\n\nDate:\n${extra.travelDate || journey?.travelDate || ""}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}${eventLine}\n\nYOUR BOARDING CODE\n\n${extra.boardingCode || "See your signed in dashboard"}\n\nPlease give this code to your driver when boarding.\n\n${CONFIRMED_NOTICE} ${STRICT_DEPARTURE_NOTICE} ${FLIGHT_DISCLAIMER}${terminalGuideLine}`,
     },
     PAYMENT_PROBLEM: {
       subject: "Spires Share Pilot: payment still needs to be completed",
@@ -160,7 +167,7 @@ export function buildNotification(
     },
     INTEREST_RECEIVED: {
       subject: "We've registered your Spires Share interest",
-      text: `Hi ${extra.firstName || "there"},\n\nWe've registered your interest in:\n\n${extra.origin || "your origin"} → ${extra.destination || "your destination"}\n${extra.travelDate || ""}\nAround ${extra.preferredTime || "your preferred time"}\n\nThere are currently ${extra.interestedSeatCount ?? 0} of ${extra.requiredSeats ?? 0} places interested.\n\n${extra.remainingNeeded === 1 ? "1 more passenger is needed before payment can be requested." : extra.remainingNeeded && extra.remainingNeeded > 1 ? `${extra.remainingNeeded} more passengers are needed before payment can be requested.` : "Enough passengers have registered. Payment requests can now be sent."}\n\nRegistration closes: ${extra.interestDeadlineAt ? formatLondonDateTime(extra.interestDeadlineAt) : "the registration deadline"}\n\nYou have not been charged.\n\nWe'll email you if enough passengers register and payment becomes available.\n\nRegistering interest does not confirm the journey.\n\nView my Share journey: ${extra.customerDashboardUrl || SHARE_CUSTOMER_DASHBOARD_URL}`,
+      text: `Hi ${extra.firstName || "there"},\n\nWe've registered your interest in:\n\n${extra.origin || "your origin"} → ${extra.destination || "your destination"}\n${extra.travelDate || ""}\nAround ${extra.preferredTime || "your preferred time"}${eventLine}\n\nThere are currently ${extra.interestedSeatCount ?? 0} of ${extra.requiredSeats ?? 0} places interested.\n\n${extra.remainingNeeded === 1 ? "1 more passenger is needed before payment can be requested." : extra.remainingNeeded && extra.remainingNeeded > 1 ? `${extra.remainingNeeded} more passengers are needed before payment can be requested.` : "Enough passengers have registered. Payment requests can now be sent."}\n\nRegistration closes: ${extra.interestDeadlineAt ? formatLondonDateTime(extra.interestDeadlineAt) : "the registration deadline"}\n\nYou have not been charged.\n\nWe'll email you if enough passengers register and payment becomes available.\n\nRegistering interest does not confirm the journey.\n\nView my Share journey: ${extra.customerDashboardUrl || SHARE_CUSTOMER_DASHBOARD_URL}`,
     },
     INTEREST_GROUP_READY: {
       subject: "Spires Share: Payment threshold reached — action required",
@@ -224,7 +231,7 @@ export function buildNotification(
     },
     DRIVER_MANIFEST: {
       subject: `Spires Share driver manifest — ${journey?.publicNumber || "journey"} — ${extra.travelDate || journey?.travelDate || ""}`.trim(),
-      text: `SPIRES SHARE DRIVER MANIFEST\n\nJourney:\n${journey?.publicNumber || ""}\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || "Heathrow Terminal 3"}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}\n\nPassengers:\n${extra.boardingPassengers || 0} seats\n\n${extra.driverManifestLines || ""}\n\nAsk each passenger for their boarding code before they board.\n${extra.driverBoardingUrl ? `\nOpen driver boarding: ${extra.driverBoardingUrl}` : ""}`,
+      text: `SPIRES SHARE DRIVER MANIFEST\n\nJourney:\n${journey?.publicNumber || ""}\n\n${extra.origin || journey?.originLabel || "Oxford"} → ${extra.destination || extra.sharedDropoff || "Heathrow Terminal 3"}\n\nDeparture:\n${journey?.departureTime || ""}\n\nPickup:\n${extra.pickup || "Thornhill Park and Ride"}${eventLine}\n\nPassengers:\n${extra.boardingPassengers || 0} seats\n\n${extra.driverManifestLines || ""}\n\nAsk each passenger for their boarding code before they board.\n${extra.driverBoardingUrl ? `\nOpen driver boarding: ${extra.driverBoardingUrl}` : ""}`,
     },
     DRIVER_MANIFEST_UPDATED: {
       subject: `UPDATED Spires Share driver manifest — ${journey?.publicNumber || "journey"}`,

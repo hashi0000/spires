@@ -20,6 +20,7 @@ exports.fifoWaitlist = fifoWaitlist;
 exports.waitlistOrder = waitlistOrder;
 exports.derivedWaitlistPosition = derivedWaitlistPosition;
 exports.publicRemainingSeats = publicRemainingSeats;
+const eventJourneys_1 = require("./eventJourneys");
 const shareProgress_1 = require("./shareProgress");
 const logic_1 = require("./logic");
 const REGION_ALIASES = {
@@ -49,12 +50,16 @@ const REGION_ALIASES = {
     o2: "The O2",
     "o2 arena": "The O2",
     "north greenwich": "The O2",
+    "excel": "ExCeL London",
+    "excel london": "ExCeL London",
+    "the excel": "ExCeL London",
+    docklands: "ExCeL London",
     birmingham: "Birmingham",
     "birmingham city": "Birmingham",
     "birmingham airport": "Birmingham Airport",
 };
 const AIRPORT_REGIONS = new Set(["Heathrow", "Gatwick", "Luton", "Stansted", "London City", "Birmingham Airport"]);
-const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2"]);
+const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2", "ExCeL London"]);
 const CITY_REGIONS = new Set(["London", "Birmingham"]);
 function normalizePlace(value) {
     const key = String(value || "")
@@ -148,7 +153,15 @@ function resolveInterestWindow(input) {
 }
 function findCompatibleInterestGroup(groups, request) {
     const open = groups.filter((row) => row.status === "GATHERING_INTEREST" || row.status === "READY_FOR_REVIEW");
-    return (open.find((row) => row.origin === request.origin &&
+    if (request.publicNumber) {
+        return open.find((row) => row.publicNumber === request.publicNumber) || null;
+    }
+    if (request.eventSlug) {
+        return open.find((row) => row.eventSlug === request.eventSlug) || null;
+    }
+    return (open.find((row) => !row.eventPublished &&
+        !row.eventSlug &&
+        row.origin === request.origin &&
         row.destinationRegion === request.destinationRegion &&
         row.travelDate === request.travelDate &&
         windowsOverlap(row.timeWindowStart, row.timeWindowEnd, request.timeWindowStart, request.timeWindowEnd)) || null);
@@ -161,7 +174,7 @@ function interestGroupStatusFromCount(count, threshold, current) {
     return "GATHERING_INTEREST";
 }
 function toPublicInterestGroup(group) {
-    return {
+    const base = {
         publicNumber: group.publicNumber,
         origin: group.origin,
         destinationRegion: group.destinationRegion,
@@ -172,6 +185,10 @@ function toPublicInterestGroup(group) {
         journeyType: group.journeyType,
         ...(0, shareProgress_1.publicInterestSafeFields)(group),
     };
+    if (group.journeyType === "EVENT") {
+        return { ...base, ...(0, eventJourneys_1.eventPublicView)(group, base) };
+    }
+    return base;
 }
 function publicInterestHasPrivateData(value) {
     const json = JSON.stringify(value || {});

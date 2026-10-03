@@ -4,6 +4,9 @@
   const listEl = document.getElementById("share-departure-list");
   const interestStatus = document.getElementById("share-interest-status");
   const interestEl = document.getElementById("share-interest-list");
+  const eventStatus = document.getElementById("share-event-status");
+  const eventEl = document.getElementById("share-event-list");
+  const eventFilters = document.getElementById("share-event-filters");
   const LIST_URL = "https://us-central1-spires-taxis.cloudfunctions.net/spiresSharePublicList";
   const ACCOUNT = "https://customer.spires-taxis.com/dashboard?share=1";
   const DEFAULT_FARE_PENCE = 3500;
@@ -158,9 +161,95 @@
     interestEl.innerHTML = rows.length ? rows.map((row) => interestCardHtml(row)).join("") : "";
   }
 
+  let lastEvents = [];
+  let eventFilter = "all";
+
+  function eventSlugFromPath() {
+    const match = window.location.pathname.match(/\/share\/event\/([^/]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  function eventVenueFilter(row) {
+    const venue = String(row.venueName || row.destinationRegion || "").toLowerCase();
+    if (eventFilter === "all") return true;
+    if (eventFilter === "wembley") return venue.includes("wembley");
+    if (eventFilter === "o2") return venue.includes("o2") || venue.includes("greenwich");
+    if (eventFilter === "excel") return venue.includes("excel") || venue.includes("docklands");
+    return !venue.includes("wembley") && !venue.includes("o2") && !venue.includes("excel");
+  }
+
+  function eventCardHtml(row) {
+    const required = Number(row.requiredSeats || 5);
+    const seats = Number(row.interestedSeatCount || 0);
+    const remaining = Number(row.remainingSeatsNeeded != null ? row.remainingSeatsNeeded : Math.max(0, required - seats));
+    const full = remaining <= 0;
+    const params = new URLSearchParams({
+      share: "1",
+      interest: row.publicNumber || "",
+      event: row.eventSlug || "",
+      origin: row.origin || "Oxford",
+      destination: row.destinationRegion || row.venueName || "",
+      travelDate: row.eventDate || row.travelDate || "",
+    });
+    const waitParams = new URLSearchParams({ share: "1", waitlist: "1", publicNumber: row.publicNumber || "" });
+    const deadline = row.interestDeadlineAt ? formatCountdown(row.interestDeadlineAt) : "";
+    const closed = deadline === "Closed";
+    const needed = full ? "Full" : remaining === 1 ? "1 more passenger needed" : remaining + " more passengers needed";
+    return `<article class="card share-card share-card--event">
+      <p class="share-card__kicker">${escapeHtml(row.venueName || row.destinationRegion || "")}</p>
+      <h3>${escapeHtml(row.eventName || "Event")}</h3>
+      <p>${escapeHtml(formatDate(row.eventDate || row.travelDate))}</p>
+      <p>Oxford → ${escapeHtml(row.venueName || row.destinationRegion || "")}</p>
+      <p class="card__price">From ${gbp(row.outboundFarePence)} per passenger</p>
+      <p>Maximum ${required} passengers</p>
+      ${occupancyBar(seats, required)}
+      <p>${seats} of ${required} interested</p>
+      <p>${escapeHtml(needed)}</p>
+      ${deadline && !closed ? `<p>Registration closes in: ${escapeHtml(deadline)}</p>` : closed ? "<p>Registration closed</p>" : ""}
+      <p class="share-warning">Share the journey with a small group travelling to the same event. Registering interest does not confirm the journey. No payment is taken at this stage.</p>
+      ${full
+        ? `<a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${waitParams.toString()}">Join waitlist</a>`
+        : closed
+          ? `<p class="share-badge">Registration closed</p>`
+          : `<a class="btn btn--primary share-card__cta" href="${ACCOUNT}&${params.toString()}">Register interest</a>`}
+    </article>`;
+  }
+
+  function setEvents(rows, note) {
+    if (!eventStatus || !eventEl) return;
+    lastEvents = rows || [];
+    const slug = eventSlugFromPath();
+    const focused = slug ? lastEvents.filter((row) => row.eventSlug === slug) : lastEvents;
+    const filtered = focused.filter(eventVenueFilter);
+    eventStatus.textContent = note;
+    eventEl.innerHTML = filtered.length ? filtered.map(eventCardHtml).join("") : "";
+    if (eventFilters) {
+      if (lastEvents.length >= 4) {
+        eventFilters.hidden = false;
+        eventFilters.innerHTML = ["all", "wembley", "o2", "excel", "other"].map(function (id) {
+          const label = id === "all" ? "All" : id === "o2" ? "The O2" : id === "excel" ? "ExCeL" : id === "wembley" ? "Wembley" : "Other";
+          return `<button type="button" class="btn btn--ghost${eventFilter === id ? " is-active" : ""}" data-event-filter="${id}">${label}</button>`;
+        }).join("");
+      } else {
+        eventFilters.hidden = true;
+        eventFilters.innerHTML = "";
+      }
+    }
+  }
+
   setInterval(function () {
     if (lastInterest.length) setInterest(lastInterest, lastInterestNote);
+    if (lastEvents.length) setEvents(lastEvents, eventStatus ? eventStatus.textContent : "");
   }, 1000);
+
+  if (eventFilters) {
+    eventFilters.addEventListener("click", function (ev) {
+      const btn = ev.target.closest("[data-event-filter]");
+      if (!btn) return;
+      eventFilter = btn.getAttribute("data-event-filter") || "all";
+      setEvents(lastEvents, eventStatus ? eventStatus.textContent : "");
+    });
+  }
 
   function layoutPreview() {
     return [
@@ -213,6 +302,7 @@
     if (preview) {
       setList(layoutPreview(), "Layout preview only. Live occupancy is not shown.");
       setInterest(interestPreview(), "Layout preview only. Live interest is not shown.");
+      setEvents([], "Layout preview only.");
       return;
     }
     try {
@@ -220,16 +310,19 @@
       if (response.status === 404) {
         setList([], "No published pilot journeys are available at the moment.");
         setInterest([], "No public interest groups are listed at the moment.");
+        setEvents([], "No published event journeys are listed at the moment.");
         return;
       }
       if (!response.ok) {
         setList([], "Live departures could not be loaded. You can still continue in your customer account.");
         setInterest([], "Live interest could not be loaded. Continue in your customer account to request a shared journey.");
+        setEvents([], "Live events could not be loaded.");
         return;
       }
       const data = await response.json();
       const rows = Array.isArray(data.journeys) ? data.journeys : [];
       const interest = Array.isArray(data.interestGroups) ? data.interestGroups : [];
+      const events = Array.isArray(data.events) ? data.events : [];
       if (!rows.length) {
         setList([], "No published pilot journeys are available at the moment. Spires Taxis will share this page when a departure is open.");
       } else {
@@ -240,9 +333,15 @@
       } else {
         setInterest(interest, "You can view this board without signing in. Join or request requires a customer account.");
       }
+      if (!events.length) {
+        setEvents([], "No published event journeys are listed at the moment.");
+      } else {
+        setEvents(events, "Upcoming event Share journeys. Registering interest does not confirm a booking.");
+      }
     } catch (err) {
       setList([], "Live departures could not be loaded. Continue in your customer account to register interest.");
       setInterest([], "Live interest could not be loaded. Continue in your customer account to request a shared journey.");
+      setEvents([], "Live events could not be loaded.");
     }
   }
 

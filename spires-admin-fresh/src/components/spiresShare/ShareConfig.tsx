@@ -34,6 +34,46 @@ export function ShareConfig({
       <h4>Operation</h4>
       <p>Meeting point: {draft.meetingPoint.publicName}</p>
       <p>Luggage: {draft.luggage.largeSuitcasesPerPassenger} large suitcase and {draft.luggage.cabinBagsPerPassenger} cabin bag per passenger.</p>
+      <h4>London Share areas</h4>
+      <p className="share-ops-muted">Internal pricing defaults only. Customers see destination names, not area names. London does not inherit Heathrow pricing.</p>
+      {(draft.londonShareAreas || []).map((area, index) => (
+        <div key={area.id} className="share-ops-inline">
+          <span>{area.name}</span>
+          <input className="form-input" value={((area.defaultShareFarePenceMin || 0) / 100).toFixed(0)} onChange={(e) => {
+            const next = [...(draft.londonShareAreas || [])];
+            next[index] = { ...area, defaultShareFarePenceMin: Math.round(Number(e.target.value || 0) * 100) };
+            set({ londonShareAreas: next });
+          }} />
+          <span>to</span>
+          <input className="form-input" value={((area.defaultShareFarePenceMax || 0) / 100).toFixed(0)} onChange={(e) => {
+            const next = [...(draft.londonShareAreas || [])];
+            next[index] = { ...area, defaultShareFarePenceMax: Math.round(Number(e.target.value || 0) * 100) };
+            set({ londonShareAreas: next });
+          }} />
+        </div>
+      ))}
+      <h4>Venues</h4>
+      <p className="share-ops-muted">Reusable event venue defaults. Override the fare when you create an event.</p>
+      {(draft.shareVenues || []).map((venue, index) => (
+        <div key={venue.id} className="share-ops-card">
+          <p>{venue.name}</p>
+          <label className="form-group"><span className="form-label">Default fare in pounds</span><input className="form-input" value={((venue.defaultFarePence || 0) / 100).toFixed(0)} onChange={(e) => {
+            const next = [...(draft.shareVenues || [])];
+            next[index] = { ...venue, defaultFarePence: Math.round(Number(e.target.value || 0) * 100) };
+            set({ shareVenues: next });
+          }} /></label>
+          <label className="form-group"><span className="form-label">Default return fare in pounds</span><input className="form-input" value={((venue.defaultReturnFarePence || 0) / 100).toFixed(0)} onChange={(e) => {
+            const next = [...(draft.shareVenues || [])];
+            next[index] = { ...venue, defaultReturnFarePence: Math.round(Number(e.target.value || 0) * 100) };
+            set({ shareVenues: next });
+          }} /></label>
+          <label className="form-group"><span className="form-label">Return meeting point</span><input className="form-input" value={venue.returnMeetingPoint || ""} onChange={(e) => {
+            const next = [...(draft.shareVenues || [])];
+            next[index] = { ...venue, returnMeetingPoint: e.target.value };
+            set({ shareVenues: next });
+          }} /></label>
+        </div>
+      ))}
       <button type="submit" className="btn btn-primary" disabled={busy}>Save configuration</button>
     </form>
   );

@@ -117,7 +117,7 @@ export function cityMatchingPublicBlocked(
   cityMatchingPublicEnabled = false
 ): boolean {
   if (journey.destinationMatchingPublicEnabled === true && cityMatchingPublicEnabled) return false;
-  return destinationMatchingEnabled(journey) || journeyTypeOf(journey) === "CITY" || journeyTypeOf(journey) === "EVENT";
+  return destinationMatchingEnabled(journey) || journeyTypeOf(journey) === "CITY";
 }
 
 export function parseOptionalCoordinate(value: unknown): number | undefined {

@@ -195,7 +195,10 @@ export type AuditEventType =
   | "BOARDING_CODE_ISSUED"
   | "BOARDING_VERIFIED"
   | "DRIVER_MANIFEST_SENT"
-  | "DRIVER_MANIFEST_UPDATED";
+  | "DRIVER_MANIFEST_UPDATED"
+  | "EVENT_INTEREST_CREATED"
+  | "EVENT_PUBLISHED"
+  | "EVENT_UNPUBLISHED";
 
 export type ShareAirport = {
   id: string;
@@ -253,6 +256,65 @@ export type ShareConfig = {
   paymentReminderMinutesBeforeDeadline: number;
   paymentFinalReminderMinutesBeforeDeadline: number;
   pilotDefaults: SharePilotDefaults;
+  londonShareAreas?: ShareLondonArea[];
+  shareVenues?: ShareVenue[];
+};
+
+export type LondonShareAreaId = "london_west" | "london_central" | "london_east" | "london_extended";
+
+export type EventStatus = "DRAFT" | "PUBLISHED" | "CLOSED" | "DID_NOT_FILL" | "CANCELLED";
+
+export type EventTripType = "ONE_WAY" | "RETURN";
+
+export type EventReturnBasis = "SPECIFIC_TIME" | "AFTER_EVENT";
+
+export type EventLeg = "OUTBOUND" | "RETURN";
+
+export type ShareLondonArea = {
+  id: LondonShareAreaId;
+  name: string;
+  defaultShareFarePenceMin: number;
+  defaultShareFarePenceMax: number;
+};
+
+export type ShareVenue = {
+  id: string;
+  name: string;
+  venueAddress?: string;
+  londonAreaId?: LondonShareAreaId;
+  defaultFarePence: number;
+  defaultReturnFarePence?: number;
+  defaultPassengerCap: number;
+  defaultPickup: string;
+  venueDropoffPoint?: string;
+  returnMeetingPoint?: string;
+  suggestedDepartureBufferMinutes?: number;
+  eventCategory?: string;
+};
+
+export type EventShareFields = {
+  eventName?: string;
+  venueName?: string;
+  venueAddress?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  expectedFinishTime?: string;
+  eventUrl?: string;
+  eventImageUrl?: string;
+  eventCategory?: string;
+  eventStatus?: EventStatus;
+  eventSlug?: string;
+  eventPublished?: boolean;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  offerReturn?: boolean;
+  returnDepartureBasis?: EventReturnBasis;
+  returnDepartureTime?: string;
+  returnAfterMinutes?: number;
+  venueDropoffPoint?: string;
+  venueReturnMeetingPoint?: string;
+  londonAreaId?: LondonShareAreaId;
+  returnSeatCount?: number;
 };
 
 export type LuggageDeclaration = {
@@ -310,6 +372,15 @@ export type PublicJourneyView = {
   destinationCity?: string;
   destinationMatchingEnabled: boolean;
   proposedSharedDropoffDisplayName?: string;
+  eventName?: string;
+  venueName?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  eventSlug?: string;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  offerReturn?: boolean;
+  eventPublished?: boolean;
 };
 
 export type ShareJourney = {
@@ -382,6 +453,28 @@ export type ShareJourney = {
   sharedDropoffConfirmedAt?: string;
   sharedDropoffConfirmedBy?: string;
   destinationClusterId?: string;
+  eventName?: string;
+  venueName?: string;
+  venueAddress?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  expectedFinishTime?: string;
+  eventUrl?: string;
+  eventImageUrl?: string;
+  eventCategory?: string;
+  eventStatus?: EventStatus;
+  eventSlug?: string;
+  eventPublished?: boolean;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  offerReturn?: boolean;
+  returnDepartureBasis?: EventReturnBasis;
+  returnDepartureTime?: string;
+  returnAfterMinutes?: number;
+  venueDropoffPoint?: string;
+  venueReturnMeetingPoint?: string;
+  londonAreaId?: LondonShareAreaId;
+  returnSeatCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -463,6 +556,13 @@ export type ShareBooking = {
   flexibleMinutes?: number;
   earliestDepartureTime?: string;
   latestDepartureTime?: string;
+  tripType?: EventTripType;
+  outboundBoardStatus?: PassengerBoardStatus;
+  returnBoardStatus?: PassengerBoardStatus;
+  outboundBoardedAt?: string;
+  returnBoardedAt?: string;
+  outboundBoardedBy?: string;
+  returnBoardedBy?: string;
 };
 
 export type SharePayment = {
@@ -526,6 +626,30 @@ export type ShareInterestGroup = {
   proposedFarePence?: number;
   proposedAt?: string;
   proposedBy?: string;
+  eventName?: string;
+  venueName?: string;
+  venueAddress?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  expectedFinishTime?: string;
+  eventUrl?: string;
+  eventImageUrl?: string;
+  eventCategory?: string;
+  eventStatus?: EventStatus;
+  eventSlug?: string;
+  eventPublished?: boolean;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  offerReturn?: boolean;
+  returnDepartureBasis?: EventReturnBasis;
+  returnDepartureTime?: string;
+  returnAfterMinutes?: number;
+  venueDropoffPoint?: string;
+  venueReturnMeetingPoint?: string;
+  londonAreaId?: LondonShareAreaId;
+  returnSeatCount?: number;
+  pickupLocation?: string;
+  suggestedDepartureTime?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -553,6 +677,7 @@ export type ShareInterestEntry = {
   flightDepartureTime?: string;
   departureTerminal?: FlightTerminal;
   dropoffTerminal?: HeathrowTerminal;
+  tripType?: EventTripType;
   createdAt: string;
 };
 
@@ -575,6 +700,22 @@ export type PublicInterestGroupView = {
   neededLabel: string;
   neededHeadline: string;
   preferredDepartureTime?: string;
+  eventName?: string;
+  venueName?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  eventSlug?: string;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  offerReturn?: boolean;
+  returnAfterMinutes?: number;
+  returnDepartureBasis?: EventReturnBasis;
+  pickupLocation?: string;
+  suggestedDepartureTime?: string;
+  publicStatusLabel?: string;
+  eventPublished?: boolean;
+  returnSeatCount?: number;
+  eventShareUrl?: string;
 };
 
 export type ShareWaitlistEntry = {
@@ -651,6 +792,10 @@ export type CustomerInterestView = {
   placesLabel?: string;
   neededLabel?: string;
   paymentNotOpened?: boolean;
+  tripType?: "ONE_WAY" | "RETURN";
+  eventName?: string;
+  venueName?: string;
+  offerReturn?: boolean;
 };
 
 export type CustomerBookingView = {
@@ -724,6 +869,16 @@ export type CustomerBookingView = {
   boardingCode?: string;
   boardingNotice?: string;
   passengerName?: string;
+  eventName?: string;
+  venueName?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  tripType?: EventTripType;
+  offerReturn?: boolean;
+  returnMeetingPoint?: string;
+  returnDepartureCopy?: string;
+  outboundBoarded?: boolean;
+  returnBoarded?: boolean;
 };
 
 export const UNCONFIRMED_WARNING =

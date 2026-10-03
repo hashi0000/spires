@@ -187,6 +187,7 @@ export default function ShareHeathrow() {
   const [step, setStep] = useState(1);
   const [available, setAvailable] = useState([]);
   const [interestGroups, setInterestGroups] = useState([]);
+  const [events, setEvents] = useState([]);
   const [dashboard, setDashboard] = useState([]);
   const [myInterest, setMyInterest] = useState([]);
   const [myWaitlist, setMyWaitlist] = useState([]);
@@ -223,6 +224,8 @@ export default function ShareHeathrow() {
     intendedDestinationText: "",
     intendedDestinationPostcode: "",
     sharedDropoffAcknowledged: false,
+    tripType: params.get("tripType") === "RETURN" ? "RETURN" : "ONE_WAY",
+    eventSlug: params.get("event") || "",
   });
 
   const loadDashboard = async () => {
@@ -238,6 +241,7 @@ export default function ShareHeathrow() {
     const result = await fn({ airportId: "all" });
     setAvailable(result.data?.journeys || []);
     setInterestGroups(result.data?.interestGroups || []);
+    setEvents(result.data?.events || []);
   };
 
   useEffect(() => {
@@ -310,8 +314,10 @@ export default function ShareHeathrow() {
   }
 
   const selected = available.find((row) => row.publicNumber === selectedNumber) || null;
-  const city = isCityDest(form.destinationRegion);
-  const heathrow = isHeathrowDest(form.destinationRegion);
+  const selectedEvent = events.find((row) => row.publicNumber === joinInterestNumber || (form.eventSlug && row.eventSlug === form.eventSlug)) || null;
+  const eventMode = Boolean(selectedEvent || form.eventSlug);
+  const city = !eventMode && isCityDest(form.destinationRegion);
+  const heathrow = !eventMode && isHeathrowDest(form.destinationRegion);
   const airport = isAirportDest(form.destinationRegion);
   const actions = [
     ...dashboard.filter((row) => row.canAcceptSharedDropoff || row.paymentLinkAvailable || row.fourPassengerOffer?.available).map((row) => ({
@@ -387,6 +393,8 @@ export default function ShareHeathrow() {
       flightDepartureTime: form.flightDepartureTime,
       departureTerminal: heathrow ? form.departureTerminal : "",
       dropoffTerminal: heathrow ? "T3" : "",
+      tripType: form.tripType,
+      eventSlug: form.eventSlug || "",
     });
     await loadDashboard();
     await loadJourneys();
@@ -396,7 +404,9 @@ export default function ShareHeathrow() {
     setSkipMatch(false);
     setStatus(data.joinedExisting
       ? `Joined existing interest for ${data.publicNumber}. This is not a confirmed booking and no payment has been taken.`
-      : `Interest registered as ${data.publicNumber}. We'll try to match you with other passengers travelling in the same direction. This is not yet a confirmed booking and no payment has been taken.`);
+      : form.eventSlug || (data.public?.journeyType === "EVENT")
+        ? `Interest registered. We currently have ${data.public?.interestedSeatCount ?? 0} / ${data.public?.requiredSeats ?? 5} passengers interested. This is not yet a confirmed booking. We will contact you if enough passengers register and an exact journey is proposed.`
+        : `Interest registered as ${data.publicNumber}. We'll try to match you with other passengers travelling in the same direction. This is not yet a confirmed booking and no payment has been taken.`);
   };
 
   const termsChecks = (
@@ -447,6 +457,38 @@ export default function ShareHeathrow() {
             <button type="button" className="btn-secondary" onClick={() => setView("explore")}>View available shared journeys</button>
             <button type="button" className="btn-secondary" onClick={() => setView("mine")}>My Share journeys</button>
           </div>
+          {events.length ? (
+            <>
+              <h4>Upcoming events</h4>
+              {events.slice(0, 4).map((row) => (
+                <article key={row.publicNumber} className="share-dash-card">
+                  <p className="share-dash-kicker">{row.venueName || row.destinationRegion}</p>
+                  <h4>{row.eventName || "Event"}</h4>
+                  <p>{formatDate(row.eventDate || row.travelDate)}</p>
+                  <p>Oxford → {row.venueName || row.destinationRegion}</p>
+                  <p>From {gbp(row.outboundFarePence)} per passenger</p>
+                  <p>Maximum {row.requiredSeats || 5} passengers</p>
+                  <ProgressDots filled={row.interestedSeatCount || 0} total={row.requiredSeats || 5} />
+                  <p>{row.interestedSeatCount || 0} of {row.requiredSeats || 5} interested</p>
+                  <p className="share-needed">{row.publicStatusLabel || row.neededLabel}</p>
+                  <button type="button" className="btn-secondary" onClick={() => {
+                    setJoinInterestNumber(row.publicNumber);
+                    setForm({
+                      ...form,
+                      origin: row.origin || "Oxford",
+                      destinationRegion: row.destinationRegion || row.venueName,
+                      travelDate: row.eventDate || row.travelDate,
+                      eventSlug: row.eventSlug || "",
+                      tripType: "ONE_WAY",
+                      preferredDepartureTime: row.suggestedDepartureTime || row.preferredDepartureTime || form.preferredDepartureTime,
+                    });
+                    setView("request");
+                    setStep(7);
+                  }}>Register interest</button>
+                </article>
+              ))}
+            </>
+          ) : null}
         </>
       ) : null}
 
@@ -490,6 +532,27 @@ export default function ShareHeathrow() {
           ) : null}
           {step === 7 ? (
             <div className="share-app-grid">
+              {eventMode ? (
+                <>
+                  <p className="share-dash-kicker">{selectedEvent?.venueName || form.destinationRegion}</p>
+                  <h4>{selectedEvent?.eventName || "Event"}</h4>
+                  <p>{formatDate(selectedEvent?.eventDate || form.travelDate)}</p>
+                  <p>Oxford → {selectedEvent?.venueName || form.destinationRegion}</p>
+                  <p>Fare from {gbp(selectedEvent?.outboundFarePence)} per passenger{selectedEvent?.offerReturn && selectedEvent?.returnFarePence ? ` or ${gbp(selectedEvent.returnFarePence)} return` : ""}</p>
+                  <p className="share-app-note">Share the journey with a small group travelling to the same event. Maximum five passengers. More space and fewer passengers than a coach.</p>
+                  <label>Number of passengers
+                    <input type="number" min="1" max="5" value={form.passengers} onChange={(e) => setForm({ ...form, passengers: Number(e.target.value) || 1 })} />
+                  </label>
+                  {selectedEvent?.offerReturn ? (
+                    <label>Journey
+                      <select value={form.tripType} onChange={(e) => setForm({ ...form, tripType: e.target.value })}>
+                        <option value="ONE_WAY">One way</option>
+                        <option value="RETURN">Return</option>
+                      </select>
+                    </label>
+                  ) : <p>One way</p>}
+                </>
+              ) : null}
               {heathrow ? (
                 <>
                   <p className="share-strict">Shared drop off: Heathrow Terminal 3</p>
@@ -598,6 +661,49 @@ export default function ShareHeathrow() {
 
       {view === "explore" ? (
         <>
+          {events.length ? (
+            <>
+              <h4>Upcoming events</h4>
+              {events.map((row) => {
+                const required = row.requiredSeats || 5;
+                const seats = row.interestedSeatCount || 0;
+                const full = seats >= required;
+                return (
+                  <article key={row.publicNumber} className="share-dash-card">
+                    <p className="share-dash-kicker">{row.venueName || row.destinationRegion}</p>
+                    <h4>{row.eventName || "Event"}</h4>
+                    <p>{formatDate(row.eventDate || row.travelDate)}</p>
+                    <p>Oxford → {row.venueName || row.destinationRegion}</p>
+                    <p>From {gbp(row.outboundFarePence)} per passenger{row.offerReturn && row.returnFarePence ? ` or ${gbp(row.returnFarePence)} return` : ""}</p>
+                    <p>Maximum {required} passengers. Spires Share deliberately limits each journey to five passengers, giving you more room and a more comfortable journey.</p>
+                    <ProgressDots filled={seats} total={required} />
+                    <p>{seats} of {required} interested</p>
+                    <p className="share-needed">{full ? "Full" : row.publicStatusLabel || row.neededLabel}</p>
+                    {row.interestDeadlineAt ? <p className="share-deadline">{new Date(row.interestDeadlineAt).getTime() <= nowMs ? "Registration closed" : `Registration closes in: ${formatCountdown(row.interestDeadlineAt, nowMs)}`}</p> : null}
+                    <p className="share-app-note">Share the journey with a small group travelling to the same event. This is not a coach or bus service.</p>
+                    {full ? (
+                      <p className="share-app-note">This event is full. If a place becomes available after a journey is proposed, you can join the waitlist from the published journey.</p>
+                    ) : (
+                      <button type="button" className="btn-secondary" onClick={() => {
+                        setJoinInterestNumber(row.publicNumber);
+                        setForm({
+                          ...form,
+                          origin: row.origin || "Oxford",
+                          destinationRegion: row.destinationRegion || row.venueName,
+                          travelDate: row.eventDate || row.travelDate,
+                          eventSlug: row.eventSlug || "",
+                          tripType: "ONE_WAY",
+                          preferredDepartureTime: row.suggestedDepartureTime || row.preferredDepartureTime || form.preferredDepartureTime,
+                        });
+                        setView("request");
+                        setStep(7);
+                      }}>Register interest</button>
+                    )}
+                  </article>
+                );
+              })}
+            </>
+          ) : null}
           <h4>Shared journeys people are interested in</h4>
           {interestGroups.length === 0 ? <p className="share-app-note">No open interest groups at the moment.</p> : interestGroups.map((row) => (
             <article key={row.publicNumber} className="share-dash-card">
@@ -755,6 +861,14 @@ export default function ShareHeathrow() {
                       <p className="share-boarding-code">{row.boardingCode}</p>
                       <p>Tell your driver this code when boarding.</p>
                       <p>{row.passengerName || "Passenger"} · {row.passengers} seat{row.passengers === 1 ? "" : "s"} · {row.publicNumber}</p>
+                      {row.eventName ? <p>{row.eventName} · {row.venueName}</p> : null}
+                      {row.tripType === "RETURN" && row.returnDepartureCopy ? (
+                        <div>
+                          <p>Return to Oxford</p>
+                          <p>Meeting point: {row.returnMeetingPoint || row.venueReturnMeetingPoint || "Confirmed before travel"}</p>
+                          <p>{row.returnDepartureCopy}</p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </>
@@ -820,7 +934,8 @@ export default function ShareHeathrow() {
 
           {myInterest.map((row) => (
             <article key={row.interestEntryId} className="share-dash-card">
-              <p className="share-dash-kicker">{row.origin} → {row.destinationRegion}</p>
+              <p className="share-dash-kicker">{row.origin} → {row.venueName || row.destinationRegion}</p>
+              {row.eventName ? <p>EVENT · {row.eventName}</p> : null}
               <h4>{formatDate(row.travelDate)}</h4>
               <p>Status: {interestStatusLabel(row)}</p>
               <p>{row.placesLabel || `${row.interestedSeatCount || 0} / ${row.requiredSeats || 5} interested`}</p>

@@ -235,6 +235,14 @@ function toPublicJourney(journey, config) {
         destinationCity: journey.destinationCity,
         destinationMatchingEnabled: journey.destinationMatchingEnabled === true,
         proposedSharedDropoffDisplayName: journey.destinationMatchingEnabled ? journey.proposedSharedDropoffDisplayName : undefined,
+        eventName: journey.eventName,
+        venueName: journey.venueName,
+        eventDate: journey.eventDate,
+        eventStartTime: journey.eventStartTime,
+        eventSlug: journey.eventSlug,
+        outboundFarePence: journey.outboundFarePence || journey.farePence,
+        returnFarePence: journey.returnFarePence,
+        offerReturn: journey.offerReturn === true,
     };
 }
 function matchJourneys(request, journeys, config, bookingsByJourney) {

@@ -73,7 +73,8 @@ const SpiresShareAdmin: React.FC = () => {
   };
 
   const adminAction = async (data: Record<string, unknown>) => {
-    await adminActionFn(data);
+    const result = await adminActionFn(data);
+    return result.data;
   };
 
   const needs = useMemo(
@@ -240,8 +241,8 @@ const SpiresShareAdmin: React.FC = () => {
               journey={boardingJourney}
               bookings={state.bookings.filter((row) => row.journeyId === boardingJourney.id)}
               busyKey={busyKey}
-              onVerify={(bookingId, code) => run(`verify-${bookingId}`, async () => {
-                await adminAction({ action: "driver", journeyId: boardingJourney.id, bookingId, boardAction: "VERIFY", boardingCode: code });
+              onVerify={(bookingId, code, eventLeg) => run(`verify-${bookingId}`, async () => {
+                await adminAction({ action: "driver", journeyId: boardingJourney.id, bookingId, boardAction: "VERIFY", boardingCode: code, eventLeg: eventLeg || "OUTBOUND" });
               })}
               onNoShow={(bookingId) => run(`noshow-${bookingId}`, async () => {
                 await adminAction({ action: "driver", journeyId: boardingJourney.id, bookingId, boardAction: "NO_SHOW" });

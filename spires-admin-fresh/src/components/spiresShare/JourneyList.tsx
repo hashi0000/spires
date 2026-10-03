@@ -51,7 +51,9 @@ export function JourneyList({
               <li key={row.id} className="share-ops-card share-ops-card--row">
                 <div>
                   <p className="share-ops-kicker">{row.publicNumber}</p>
+                  {row.journeyType === "EVENT" ? <p className="share-ops-chip">EVENT</p> : null}
                   <p>{routeLabel(row)}</p>
+                  {row.eventName ? <p>{row.eventName}</p> : null}
                   <p className="share-ops-muted">{formatUkDateShort(row.travelDate)} · {row.departureTime}</p>
                   <p className="share-ops-chip">{stage}</p>
                   <p>Seats: {row.occupiedSeats} / {row.capacity}</p>

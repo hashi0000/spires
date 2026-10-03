@@ -32,6 +32,11 @@ exports.publishPilotJourney = publishPilotJourney;
 exports.recordPaymentSubmitted = recordPaymentSubmitted;
 exports.recordRefund = recordRefund;
 exports.createCityMatchingJourney = createCityMatchingJourney;
+exports.createEventInterest = createEventInterest;
+exports.publishEventInterest = publishEventInterest;
+exports.unpublishEventInterest = unpublishEventInterest;
+exports.eventAdvertForGroup = eventAdvertForGroup;
+exports.eventRevenueForInput = eventRevenueForInput;
 exports.createDropoffHub = createDropoffHub;
 exports.setDropoffHubEnabled = setDropoffHubEnabled;
 exports.proposeSharedDropoff = proposeSharedDropoff;
@@ -69,6 +74,7 @@ const hostedPayment_1 = require("./hostedPayment");
 const destinationMatching_1 = require("./destinationMatching");
 const interestGroups_1 = require("./interestGroups");
 const routePricing_1 = require("./routePricing");
+const eventJourneys_1 = require("./eventJourneys");
 const shareProgress_1 = require("./shareProgress");
 const paymentDeadline_1 = require("./paymentDeadline");
 const terminalGuide_1 = require("./terminalGuide");
@@ -728,7 +734,7 @@ function markReservationPaid(db, bookingId, actor, nowIso) {
     booking.reservationStatus = "PAID";
     booking.hostedPaymentStatus = "PAID";
     booking.paymentStatus = "HOSTED_PAID";
-    booking.paidAmountPence = (0, hostedPayment_1.bookingAmountDuePence)(booking, journey.farePence);
+    booking.paidAmountPence = (0, hostedPayment_1.bookingAmountDuePence)(booking, journey.farePence, journey.returnFarePence);
     booking.paidAt = now;
     if (booking.paymentId) {
         const payment = db.payments.get(booking.paymentId);
@@ -994,7 +1000,7 @@ function recordDriverManifestIfNeeded(db, journey, bookings, nowIso) {
         journeyId: journey.id,
         email: journey.assignedDriverEmail,
         deduplicationKey: (0, shareProgress_1.notificationDedupeKey)([type, journey.id, (0, boarding_1.driverManifestFingerprint)(bookings)]),
-        driverManifestLines: (0, boarding_1.driverManifestLines)(bookings),
+        driverManifestLines: journey.journeyType === "EVENT" ? (0, eventJourneys_1.eventDriverManifest)(journey, bookings) : (0, boarding_1.driverManifestLines)(bookings),
     });
     journey.driverManifestSentAt = nowIso;
     journey.driverManifestFingerprint = (0, boarding_1.driverManifestFingerprint)(bookings);
@@ -1002,7 +1008,7 @@ function recordDriverManifestIfNeeded(db, journey, bookings, nowIso) {
     db.audit.push({ type: decision.updated ? "DRIVER_MANIFEST_UPDATED" : "DRIVER_MANIFEST_SENT", journeyId: journey.id, at: nowIso });
     return { sent: true, updated: decision.updated };
 }
-function verifyPassengerBoarding(db, bookingId, code, actor, nowIso) {
+function verifyPassengerBoarding(db, bookingId, code, actor, nowIso, eventLeg) {
     const booking = db.bookings.get(bookingId);
     if (!booking)
         throw new Error("Booking not found.");
@@ -1010,7 +1016,7 @@ function verifyPassengerBoarding(db, bookingId, code, actor, nowIso) {
     if (!journey)
         throw new Error("Journey not found.");
     const now = nowIso || new Date().toISOString();
-    const result = (0, boarding_1.verifyBoardingCode)(journey, booking, code, actor, now);
+    const result = (0, boarding_1.verifyBoardingCode)(journey, booking, code, actor, now, eventLeg);
     if (!result.alreadyVerified) {
         db.audit.push({ type: "BOARDING_VERIFIED", journeyId: journey.id, bookingId, actor, at: now });
     }
@@ -1221,6 +1227,104 @@ function createCityMatchingJourney(db, input) {
     db.audit.push({ type: "JOURNEY_CREATED", journeyId, at: now });
     return journey;
 }
+function createEventInterest(db, raw, nowIso) {
+    const input = (0, eventJourneys_1.applyVenueDefaults)(raw, db.config);
+    const eventName = String(input.eventName || "").trim();
+    const venueName = String(input.venueName || "").trim();
+    if (!eventName || !venueName || !input.eventDate || !input.eventStartTime) {
+        throw new Error("Event name, venue, date and start time are required.");
+    }
+    const origin = (0, interestGroups_1.normalizePlace)(input.origin || "Oxford").label || "Oxford";
+    const destination = (0, interestGroups_1.normalizePlace)(input.destination || venueName).label || venueName;
+    const pickup = String(input.pickupLocation || db.config.meetingPoint.publicName || "Thornhill Park and Ride").trim();
+    const suggested = String(input.suggestedDepartureTime || "16:30");
+    const farePence = (0, eventJourneys_1.eventFarePence)(input);
+    const capacity = (0, eventJourneys_1.clampEventPassengerCap)(input.passengerLimit || db.config.passengerCapacity);
+    const now = nowIso || new Date().toISOString();
+    const window = (0, interestGroups_1.resolveInterestWindow)({
+        origin,
+        destinationRegion: destination,
+        travelDate: input.eventDate,
+        preferredDepartureTime: suggested,
+        flexibility: "plus_minus_30",
+        passengers: 1,
+    });
+    const fields = (0, eventJourneys_1.eventFieldsFromInput)({
+        ...input,
+        eventName,
+        venueName,
+        origin,
+        destination,
+        pickupLocation: pickup,
+        suggestedDepartureTime: suggested,
+        passengerLimit: capacity,
+        outboundFarePence: farePence,
+    }, farePence);
+    const groupId = id("ig");
+    const created = {
+        id: groupId,
+        publicNumber: (0, interestGroups_1.interestPublicNumber)(origin, destination, input.eventDate, window.start, window.end),
+        origin,
+        destinationRegion: destination,
+        journeyType: "EVENT",
+        destinationMatchingEnabled: false,
+        travelDate: input.eventDate,
+        preferredDepartureTime: suggested,
+        timeWindowStart: window.start,
+        timeWindowEnd: window.end,
+        interestedSeatCount: 0,
+        minPassengerThreshold: capacity,
+        status: "GATHERING_INTEREST",
+        interestDeadlineAt: input.interestDeadlineAt,
+        pickupLocation: pickup,
+        suggestedDepartureTime: suggested,
+        ...fields,
+        createdAt: now,
+        updatedAt: now,
+    };
+    db.interestGroups.set(groupId, created);
+    db.audit.push({ type: "INTEREST_CREATED", interestGroupId: groupId, at: now, eventName });
+    return created;
+}
+function publishEventInterest(db, interestGroupId, nowIso) {
+    const group = db.interestGroups.get(interestGroupId);
+    if (!group || group.journeyType !== "EVENT")
+        throw new Error("Event interest group not found.");
+    if (!group.outboundFarePence)
+        throw new Error("Set a fare per passenger for this event.");
+    const now = nowIso || new Date().toISOString();
+    group.eventPublished = true;
+    group.eventStatus = "PUBLISHED";
+    if (group.status !== "EXPIRED" && group.status !== "CANCELLED" && group.status !== "CONVERTED_TO_JOURNEY") {
+        group.status = "GATHERING_INTEREST";
+    }
+    group.updatedAt = now;
+    return group;
+}
+function unpublishEventInterest(db, interestGroupId, nowIso) {
+    const group = db.interestGroups.get(interestGroupId);
+    if (!group || group.journeyType !== "EVENT")
+        throw new Error("Event interest group not found.");
+    group.eventPublished = false;
+    group.eventStatus = "DRAFT";
+    group.updatedAt = nowIso || new Date().toISOString();
+    return group;
+}
+function eventAdvertForGroup(db, interestGroupId) {
+    const group = db.interestGroups.get(interestGroupId);
+    if (!group)
+        throw new Error("Event interest group not found.");
+    return (0, eventJourneys_1.eventAdvertText)(group);
+}
+function eventRevenueForInput(input) {
+    const fare = (0, eventJourneys_1.eventFarePence)(input);
+    return (0, eventJourneys_1.eventRevenuePreview)({
+        outboundFarePence: fare,
+        returnFarePence: input.returnFarePence,
+        offerReturn: input.offerReturn,
+        passengerLimit: (0, eventJourneys_1.clampEventPassengerCap)(input.passengerLimit),
+    });
+}
 function createDropoffHub(db, input) {
     const name = String(input.name || "").trim();
     const city = String(input.city || "").trim();
@@ -1376,7 +1480,13 @@ function requireShareAuth(uid) {
 }
 function listPublicInterestGroups(db) {
     return [...db.interestGroups.values()]
-        .filter((row) => row.status === "GATHERING_INTEREST" || row.status === "READY_FOR_REVIEW")
+        .filter((row) => {
+        if (row.status !== "GATHERING_INTEREST" && row.status !== "READY_FOR_REVIEW")
+            return false;
+        if (row.journeyType === "EVENT")
+            return (0, eventJourneys_1.eventPublicListingAllowed)(row);
+        return true;
+    })
         .sort((a, b) => `${a.travelDate}${a.timeWindowStart}`.localeCompare(`${b.travelDate}${b.timeWindowStart}`))
         .map(interestGroups_1.toPublicInterestGroup);
 }
@@ -1387,8 +1497,10 @@ function activeInterestEntries(db, groupId) {
     return [...db.interestEntries.values()].filter((row) => row.interestGroupId === groupId && row.status === "ACTIVE");
 }
 function recountInterestGroup(db, group) {
-    const seats = activeInterestEntries(db, group.id).reduce((sum, row) => sum + row.passengers, 0);
+    const active = activeInterestEntries(db, group.id);
+    const seats = active.reduce((sum, row) => sum + row.passengers, 0);
     group.interestedSeatCount = seats;
+    group.returnSeatCount = (0, eventJourneys_1.returnSeatCountFrom)(active);
     group.status = (0, interestGroups_1.interestGroupStatusFromCount)(seats, group.minPassengerThreshold, group.status);
 }
 function reservationStageForIncomingPassenger(journey, config, now) {
@@ -1466,6 +1578,7 @@ function addIncomingBooking(db, journey, input) {
         createdAt: now,
         waitlistId: input.waitlistId,
         interestEntryId: input.interestEntryId,
+        tripType: input.tripType,
         ...(destination ? (0, destinationMatching_1.destinationFieldsForBooking)(destination, now) : {}),
     };
     const occupied = journey.occupiedSeats + input.passengers;
@@ -1479,7 +1592,7 @@ function addIncomingBooking(db, journey, input) {
         id: paymentId,
         bookingId,
         journeyId: journey.id,
-        amountPence: journey.farePence * input.passengers,
+        amountPence: (0, hostedPayment_1.bookingAmountDuePence)(booking, journey.farePence, journey.returnFarePence),
         currency: "GBP",
         status: (0, hostedPayment_1.paymentStatusFromReservation)(stage.reservationStatus),
         paymentMethodRef: "hosted_payment_link",
@@ -1538,7 +1651,13 @@ function expressInterest(db, input) {
         travelDate: input.travelDate,
         timeWindowStart: window.start,
         timeWindowEnd: window.end,
+        eventSlug: input.eventSlug,
+        publicNumber: input.publicNumber,
     });
+    if (compatible?.journeyType === "EVENT") {
+        (0, eventJourneys_1.assertEventInterestOpen)(compatible, now);
+        (0, eventJourneys_1.assertEventHasCapacity)(compatible, input.passengers);
+    }
     const group = compatible ||
         (() => {
             const groupId = id("ig");
@@ -1586,6 +1705,7 @@ function expressInterest(db, input) {
         flightDepartureTime: input.flightDepartureTime,
         departureTerminal: (0, terminalGuide_1.parseFlightTerminal)(input.departureTerminal),
         dropoffTerminal: (0, logic_1.isHeathrowTerminal)(String(input.dropoffTerminal || ""), ["T2", "T3", "T4", "T5"]) ? input.dropoffTerminal : undefined,
+        tripType: group.journeyType === "EVENT" ? (0, eventJourneys_1.assertEventTripType)(group, input.tripType) : undefined,
         status: "ACTIVE",
         createdAt: now,
     };
@@ -1674,6 +1794,8 @@ function expireInsufficientInterest(db, nowIso) {
             continue;
         group.status = "EXPIRED";
         group.expiryReason = "INSUFFICIENT_INTEREST";
+        if (group.journeyType === "EVENT")
+            group.eventStatus = "DID_NOT_FILL";
         group.updatedAt = now;
         if (!group.expiredNotifiedAt) {
             group.expiredNotifiedAt = now;
@@ -1830,6 +1952,9 @@ function joinInterestGroup(db, publicNumber, input) {
         timeWindowStart: input.timeWindowStart || group.timeWindowStart,
         timeWindowEnd: input.timeWindowEnd || group.timeWindowEnd,
         flexibility: input.flexibility || "plus_minus_30",
+        publicNumber: group.publicNumber,
+        eventSlug: group.eventSlug,
+        tripType: input.tripType,
     });
 }
 function proposeJourneyFromInterest(db, interestGroupId, input) {
@@ -1872,6 +1997,12 @@ function proposeJourneyFromInterest(db, interestGroupId, input) {
         });
     journey.interestGroupId = group.id;
     journey.customerVisible = input.customerVisible ?? group.journeyType === "AIRPORT";
+    if (group.journeyType === "EVENT") {
+        (0, eventJourneys_1.copyEventFieldsToJourney)(group, journey);
+        journey.farePence = (0, routePricing_1.cityJourneyRequiresOwnFare)(input.farePence || group.outboundFarePence);
+        journey.targetRevenuePence = journey.farePence * journey.capacity;
+        journey.departureLocation = input.departureLocation || group.pickupLocation || journey.departureLocation;
+    }
     if (group.journeyType !== "AIRPORT" && input.hubId) {
         proposeSharedDropoff(db, journey.id, input.hubId, input.actor || "admin", now);
     }
@@ -1927,6 +2058,7 @@ function acceptProposedInterestJourney(db, entryId, uid, nowIso) {
         departureTerminal: entry.departureTerminal,
         dropoffTerminal: entry.dropoffTerminal,
         nowIso: now,
+        tripType: entry.tripType,
     });
     entry.status = "CONVERTED";
     entry.convertedBookingId = result.booking.id;
@@ -2056,6 +2188,10 @@ function customerInterestViews(db, uid) {
             ...(0, shareProgress_1.publicInterestSafeFields)(group),
             preferredDepartureTime: row.preferredDepartureTime,
             paymentNotOpened: group.status === "READY_FOR_REVIEW" || group.status === "CONVERTED_TO_JOURNEY",
+            tripType: row.tripType,
+            eventName: group.eventName,
+            venueName: group.venueName,
+            offerReturn: group.offerReturn === true,
         };
     })
         .filter((row) => Boolean(row));

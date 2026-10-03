@@ -66,7 +66,7 @@ function cityRouteKey(originCity, destinationCity) {
 function cityMatchingPublicBlocked(journey, cityMatchingPublicEnabled = false) {
     if (journey.destinationMatchingPublicEnabled === true && cityMatchingPublicEnabled)
         return false;
-    return destinationMatchingEnabled(journey) || journeyTypeOf(journey) === "CITY" || journeyTypeOf(journey) === "EVENT";
+    return destinationMatchingEnabled(journey) || journeyTypeOf(journey) === "CITY";
 }
 function parseOptionalCoordinate(value) {
     if (value == null || value === "")

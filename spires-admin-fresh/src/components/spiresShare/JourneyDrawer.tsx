@@ -57,7 +57,7 @@ export function JourneyDrawer({
   const { paid, verified } = paidVerifiedSeats(bookings);
   const collected = bookings.reduce((sum, row) => sum + (row.paidAmountPence || 0) + (row.supplementPaidPence || 0), 0);
   const remaining = Math.max(0, journey.capacity - verified);
-  const [open, setOpen] = useState({ passengers: true, payment: true, waitlist: false, notes: false });
+  const [open, setOpen] = useState({ passengers: true, payment: true, waitlist: false, notes: false, event: true });
   const holding = bookings.filter((row) => ["PROVISIONAL", "PAYMENT_PENDING", "PAID"].includes(row.reservationStatus || ""));
   const jid = journey.id;
 
@@ -81,6 +81,29 @@ export function JourneyDrawer({
           <button type="button" className="btn btn-danger btn-sm" disabled={busyKey === `cancel-${jid}`} onClick={() => run(`cancel-${jid}`, async () => { await adminAction({ action: "cancel", journeyId: jid }); })}>Cancel journey</button>
         </div>
       </section>
+      {journey.journeyType === "EVENT" ? (
+        <section className="share-ops-section">
+          <button type="button" className="share-ops-fold" onClick={() => setOpen({ ...open, event: !open.event })}>Event</button>
+          {open.event ? (
+            <>
+              <h4>Event</h4>
+              <p>{journey.eventName || "Event"}</p>
+              <p>Venue: {journey.venueName || journey.destinationLabel}</p>
+              <p>Event start: {journey.eventStartTime || "not set"}</p>
+              <p>Expected finish: {journey.expectedFinishTime || "not set"}</p>
+              <p>Outbound departure: {journey.departureTime}</p>
+              {journey.offerReturn ? (
+                <p>
+                  Return: {journey.returnDepartureBasis === "SPECIFIC_TIME" && journey.returnDepartureTime
+                    ? `Departure ${journey.returnDepartureTime}`
+                    : `Approximately ${journey.returnAfterMinutes || 45} minutes after the event finishes`}
+                </p>
+              ) : <p>Outbound only</p>}
+              <p>Venue meeting point: {journey.venueReturnMeetingPoint || journey.venueDropoffPoint || "Confirmed before travel"}</p>
+            </>
+          ) : null}
+        </section>
+      ) : null}
       <section className="share-ops-section">
         <h4>Next action</h4>
         {stage === "Ready to open payment" ? (

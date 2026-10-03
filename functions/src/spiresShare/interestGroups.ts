@@ -1,3 +1,4 @@
+import { eventPublicView } from "./eventJourneys";
 import { publicInterestSafeFields } from "./shareProgress";
 import { flexibilityMinutes, minutesToHm, parseHmToMinutes } from "./logic";
 import {
@@ -27,6 +28,9 @@ export type InterestRequest = {
   flightDepartureTime?: string;
   departureTerminal?: string;
   dropoffTerminal?: string;
+  tripType?: "ONE_WAY" | "RETURN";
+  eventSlug?: string;
+  publicNumber?: string;
 };
 
 const REGION_ALIASES: Record<string, string> = {
@@ -56,13 +60,17 @@ const REGION_ALIASES: Record<string, string> = {
   o2: "The O2",
   "o2 arena": "The O2",
   "north greenwich": "The O2",
+  "excel": "ExCeL London",
+  "excel london": "ExCeL London",
+  "the excel": "ExCeL London",
+  docklands: "ExCeL London",
   birmingham: "Birmingham",
   "birmingham city": "Birmingham",
   "birmingham airport": "Birmingham Airport",
 };
 
 const AIRPORT_REGIONS = new Set(["Heathrow", "Gatwick", "Luton", "Stansted", "London City", "Birmingham Airport"]);
-const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2"]);
+const EVENT_REGIONS = new Set(["Wembley", "Allianz Stadium", "The O2", "ExCeL London"]);
 const CITY_REGIONS = new Set(["London", "Birmingham"]);
 
 export function normalizePlace(value: string): { label: string; known: boolean } {
@@ -157,14 +165,30 @@ export function resolveInterestWindow(input: InterestRequest): { start: string; 
 
 export function findCompatibleInterestGroup(
   groups: ShareInterestGroup[],
-  request: { origin: string; destinationRegion: string; travelDate: string; timeWindowStart: string; timeWindowEnd: string }
+  request: {
+    origin: string;
+    destinationRegion: string;
+    travelDate: string;
+    timeWindowStart: string;
+    timeWindowEnd: string;
+    eventSlug?: string;
+    publicNumber?: string;
+  }
 ): ShareInterestGroup | null {
   const open = groups.filter(
     (row) => row.status === "GATHERING_INTEREST" || row.status === "READY_FOR_REVIEW"
   );
+  if (request.publicNumber) {
+    return open.find((row) => row.publicNumber === request.publicNumber) || null;
+  }
+  if (request.eventSlug) {
+    return open.find((row) => row.eventSlug === request.eventSlug) || null;
+  }
   return (
     open.find(
       (row) =>
+        !row.eventPublished &&
+        !row.eventSlug &&
         row.origin === request.origin &&
         row.destinationRegion === request.destinationRegion &&
         row.travelDate === request.travelDate &&
@@ -180,7 +204,7 @@ export function interestGroupStatusFromCount(count: number, threshold: number, c
 }
 
 export function toPublicInterestGroup(group: ShareInterestGroup): PublicInterestGroupView {
-  return {
+  const base: PublicInterestGroupView = {
     publicNumber: group.publicNumber,
     origin: group.origin,
     destinationRegion: group.destinationRegion,
@@ -191,6 +215,10 @@ export function toPublicInterestGroup(group: ShareInterestGroup): PublicInterest
     journeyType: group.journeyType,
     ...publicInterestSafeFields(group),
   };
+  if (group.journeyType === "EVENT") {
+    return { ...base, ...eventPublicView(group, base) } as PublicInterestGroupView;
+  }
+  return base;
 }
 
 export function publicInterestHasPrivateData(value: unknown): boolean {

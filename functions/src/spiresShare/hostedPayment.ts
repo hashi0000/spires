@@ -37,6 +37,7 @@ import {
   TRAVEL_PLANS_NOTICE,
 } from "./shareProgress";
 import { customerBoardingCodeForView } from "./boarding";
+import { returnDepartureCopy } from "./eventJourneys";
 import {
   canPassengerEnterPayment,
   destinationMatchingEnabled,
@@ -172,7 +173,14 @@ export function fourPassengerConfirmReady(
   };
 }
 
-export function bookingAmountDuePence(booking: Pick<ShareBooking, "passengers">, farePence: number): number {
+export function bookingAmountDuePence(
+  booking: Pick<ShareBooking, "passengers" | "tripType">,
+  farePence: number,
+  returnFarePence?: number
+): number {
+  if (booking.tripType === "RETURN" && returnFarePence && returnFarePence > 0) {
+    return returnFarePence * booking.passengers;
+  }
   return farePence * booking.passengers;
 }
 
@@ -243,7 +251,7 @@ export function hostedPaymentUrlForCustomer(
   return {
     url: journey.paymentLinkUrl,
     kind: "fare",
-    amountPence: bookingAmountDuePence(booking, journey.farePence),
+    amountPence: bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence),
   };
 }
 
@@ -267,7 +275,7 @@ export function toCustomerBookingView(
   const paidPlaces = paidPassengerPlaces(holding);
   const reservationStatus = booking.reservationStatus || "PROVISIONAL";
   const hostedPaymentStatus = booking.hostedPaymentStatus || hostedFromReservation(reservationStatus);
-  const amountDue = bookingAmountDuePence(booking, journey.farePence);
+  const amountDue = bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence);
   const fourAvailable =
     fourPassengerFallbackEnabled(journey) &&
     (journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT");
@@ -379,6 +387,16 @@ export function toCustomerBookingView(
       ? "Tell your driver this code when boarding."
       : undefined,
     passengerName: booking.name,
+    eventName: journey.eventName,
+    venueName: journey.venueName,
+    eventDate: journey.eventDate,
+    eventStartTime: journey.eventStartTime,
+    tripType: booking.tripType,
+    offerReturn: journey.offerReturn === true,
+    returnMeetingPoint: journey.venueReturnMeetingPoint,
+    returnDepartureCopy: journey.offerReturn ? returnDepartureCopy(journey) : undefined,
+    outboundBoarded: booking.boardStatus === "BOARDED",
+    returnBoarded: booking.returnBoardStatus === "BOARDED",
   };
 }
 

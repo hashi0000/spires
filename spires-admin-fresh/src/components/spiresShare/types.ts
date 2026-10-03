@@ -46,6 +46,22 @@ export type ShareJourney = {
   assignedDriverEmail?: string;
   driverManifestSentAt?: string;
   driverStage?: string;
+  eventName?: string;
+  venueName?: string;
+  venueAddress?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  expectedFinishTime?: string;
+  eventSlug?: string;
+  offerReturn?: boolean;
+  returnDepartureBasis?: string;
+  returnDepartureTime?: string;
+  returnAfterMinutes?: number;
+  venueDropoffPoint?: string;
+  venueReturnMeetingPoint?: string;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  londonAreaId?: string;
 };
 
 export type ShareBooking = {
@@ -81,6 +97,11 @@ export type ShareBooking = {
   sharedDropoffAcceptedAt?: string;
   sharedDropoffDeclinedAt?: string;
   acceptedDropoffProposalVersion?: number;
+  tripType?: string;
+  outboundBoardStatus?: string;
+  outboundBoardedAt?: string;
+  returnBoardStatus?: string;
+  returnBoardedAt?: string;
 };
 
 export type ShareInterestGroup = {
@@ -97,8 +118,23 @@ export type ShareInterestGroup = {
   journeyType?: string;
   status: string;
   matchingUncertain?: boolean;
+  eventName?: string;
+  venueName?: string;
+  eventDate?: string;
+  eventStartTime?: string;
+  eventPublished?: boolean;
+  eventStatus?: string;
+  offerReturn?: boolean;
+  outboundFarePence?: number;
+  returnFarePence?: number;
+  pickupLocation?: string;
+  suggestedDepartureTime?: string;
+  eventSlug?: string;
+  returnAfterMinutes?: number;
+  returnDepartureBasis?: string;
+  venueReturnMeetingPoint?: string;
   destinationSpread?: Array<{ index: number; name: string; intendedDestinationText: string; timeWindowStart: string; timeWindowEnd: string }>;
-  entries?: Array<{ id: string; name: string; email: string; passengers: number; status: string; intendedDestinationText?: string; flightNumber?: string; departureTerminal?: string; flightDepartureTime?: string }>;
+  entries?: Array<{ id: string; name: string; email: string; passengers: number; status: string; intendedDestinationText?: string; flightNumber?: string; departureTerminal?: string; flightDepartureTime?: string; tripType?: string }>;
 };
 
 export type ShareWaitlist = {
@@ -138,6 +174,19 @@ export type ShareState = {
     };
     meetingPoint: { publicName: string };
     airports: Array<{ id: string; name: string; dropoffLabel: string; farePence: number; targetRevenuePence: number }>;
+    londonShareAreas?: Array<{ id: string; name: string; defaultShareFarePenceMin: number; defaultShareFarePenceMax: number }>;
+    shareVenues?: Array<{
+      id: string;
+      name: string;
+      londonAreaId?: string;
+      defaultFarePence?: number;
+      defaultReturnFarePence?: number;
+      defaultPassengerCap?: number;
+      defaultPickup?: string;
+      venueDropoffPoint?: string;
+      returnMeetingPoint?: string;
+      eventCategory?: string;
+    }>;
   };
   journeys: ShareJourney[];
   bookings: ShareBooking[];

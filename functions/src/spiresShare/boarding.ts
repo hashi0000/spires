@@ -1,6 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { bookingHoldsSeat } from "./logic";
-import { ShareBooking, ShareJourney } from "./types";
+import { EventLeg, PassengerBoardStatus, ShareBooking, ShareJourney } from "./types";
+import { eventBoardingEnabled, eventDriverManifest, verifyEventLeg } from "./eventJourneys";
 
 export type BoardingDisplayStatus = "WAITING" | "VERIFIED" | "NO_SHOW" | "CANCELLED";
 
@@ -61,7 +62,8 @@ export function verifyBoardingCode(
   booking: ShareBooking,
   code: string,
   actor: string,
-  nowIso: string
+  nowIso: string,
+  eventLeg: EventLeg = "OUTBOUND"
 ): { ok: true; alreadyVerified?: boolean } {
   if (journey.status !== "CONFIRMED") {
     throw new Error("Boarding codes are only used on confirmed journeys.");
@@ -84,10 +86,16 @@ export function verifyBoardingCode(
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     throw new Error("Code does not match.");
   }
+  if (eventBoardingEnabled(journey) && eventLeg === "RETURN") {
+    return verifyEventLeg(journey, booking, actor, nowIso, "RETURN");
+  }
   if (booking.boardStatus === "BOARDED" && booking.boardingVerifiedAt) {
     return { ok: true, alreadyVerified: true };
   }
   booking.boardStatus = "BOARDED";
+  booking.outboundBoardStatus = "BOARDED";
+  booking.outboundBoardedAt = nowIso;
+  booking.outboundBoardedBy = actor;
   booking.boardingVerifiedAt = nowIso;
   booking.boardingVerifiedBy = actor;
   return { ok: true };
@@ -129,7 +137,8 @@ export function shouldSendDriverManifest(
   return { send: false, updated: false };
 }
 
-export function driverManifestLines(bookings: ShareBooking[]): string {
+export function driverManifestLines(bookings: ShareBooking[], journey?: ShareJourney): string {
+  if (journey?.journeyType === "EVENT") return eventDriverManifest(journey, bookings);
   return bookings
     .filter((row) => boardingDisplayStatus(row) !== "CANCELLED")
     .map((row) => `${row.name}\nCode: ${row.boardingCode || "not issued"}\n${row.passengers} passenger${row.passengers === 1 ? "" : "s"}`)

@@ -29,6 +29,7 @@ const routePricing_1 = require("./routePricing");
 const terminalGuide_1 = require("./terminalGuide");
 const shareProgress_1 = require("./shareProgress");
 const boarding_1 = require("./boarding");
+const eventJourneys_1 = require("./eventJourneys");
 const destinationMatching_1 = require("./destinationMatching");
 function reservationHoldsSeat(booking) {
     return (0, logic_1.bookingHoldsSeat)(booking);
@@ -142,7 +143,10 @@ function fourPassengerConfirmReady(bookings, threshold = 4) {
         supplementsPaid,
     };
 }
-function bookingAmountDuePence(booking, farePence) {
+function bookingAmountDuePence(booking, farePence, returnFarePence) {
+    if (booking.tripType === "RETURN" && returnFarePence && returnFarePence > 0) {
+        return returnFarePence * booking.passengers;
+    }
     return farePence * booking.passengers;
 }
 function supplementDuePence(booking) {
@@ -210,7 +214,7 @@ function hostedPaymentUrlForCustomer(journey, booking) {
     return {
         url: journey.paymentLinkUrl,
         kind: "fare",
-        amountPence: bookingAmountDuePence(booking, journey.farePence),
+        amountPence: bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence),
     };
 }
 function canCustomerAccessBooking(booking, actor) {
@@ -226,7 +230,7 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
     const paidPlaces = paidPassengerPlaces(holding);
     const reservationStatus = booking.reservationStatus || "PROVISIONAL";
     const hostedPaymentStatus = booking.hostedPaymentStatus || hostedFromReservation(reservationStatus);
-    const amountDue = bookingAmountDuePence(booking, journey.farePence);
+    const amountDue = bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence);
     const fourAvailable = (0, routePricing_1.fourPassengerFallbackEnabled)(journey) &&
         (journey.status === "FOUR_PASSENGER_OPTION" || journey.status === "SUPPLEMENT_PAYMENT");
     const canPay = Boolean(hostedPaymentUrlForCustomer(journey, booking));
@@ -338,6 +342,16 @@ function toCustomerBookingView(journey, booking, allBookings, config) {
             ? "Tell your driver this code when boarding."
             : undefined,
         passengerName: booking.name,
+        eventName: journey.eventName,
+        venueName: journey.venueName,
+        eventDate: journey.eventDate,
+        eventStartTime: journey.eventStartTime,
+        tripType: booking.tripType,
+        offerReturn: journey.offerReturn === true,
+        returnMeetingPoint: journey.venueReturnMeetingPoint,
+        returnDepartureCopy: journey.offerReturn ? (0, eventJourneys_1.returnDepartureCopy)(journey) : undefined,
+        outboundBoarded: booking.boardStatus === "BOARDED",
+        returnBoarded: booking.returnBoardStatus === "BOARDED",
     };
 }
 function adminPaymentSummary(journey, bookings) {

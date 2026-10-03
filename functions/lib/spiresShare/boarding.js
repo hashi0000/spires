@@ -15,6 +15,7 @@ exports.publicDtoHasBoardingSecrets = publicDtoHasBoardingSecrets;
 exports.customerBoardingCodeForView = customerBoardingCodeForView;
 const crypto_1 = require("crypto");
 const logic_1 = require("./logic");
+const eventJourneys_1 = require("./eventJourneys");
 function hashBoardingCode(journeyId, bookingId, code) {
     return (0, crypto_1.createHash)("sha256").update(`${journeyId}:${bookingId}:${String(code).trim()}`).digest("hex");
 }
@@ -58,7 +59,7 @@ function issueBoardingCodes(journey, bookings, nowIso) {
     }
     return bookings;
 }
-function verifyBoardingCode(journey, booking, code, actor, nowIso) {
+function verifyBoardingCode(journey, booking, code, actor, nowIso, eventLeg = "OUTBOUND") {
     if (journey.status !== "CONFIRMED") {
         throw new Error("Boarding codes are only used on confirmed journeys.");
     }
@@ -80,10 +81,16 @@ function verifyBoardingCode(journey, booking, code, actor, nowIso) {
     if (expected.length !== actual.length || !(0, crypto_1.timingSafeEqual)(expected, actual)) {
         throw new Error("Code does not match.");
     }
+    if ((0, eventJourneys_1.eventBoardingEnabled)(journey) && eventLeg === "RETURN") {
+        return (0, eventJourneys_1.verifyEventLeg)(journey, booking, actor, nowIso, "RETURN");
+    }
     if (booking.boardStatus === "BOARDED" && booking.boardingVerifiedAt) {
         return { ok: true, alreadyVerified: true };
     }
     booking.boardStatus = "BOARDED";
+    booking.outboundBoardStatus = "BOARDED";
+    booking.outboundBoardedAt = nowIso;
+    booking.outboundBoardedBy = actor;
     booking.boardingVerifiedAt = nowIso;
     booking.boardingVerifiedBy = actor;
     return { ok: true };
@@ -124,7 +131,9 @@ function shouldSendDriverManifest(journey, bookings) {
         return { send: true, updated: true };
     return { send: false, updated: false };
 }
-function driverManifestLines(bookings) {
+function driverManifestLines(bookings, journey) {
+    if (journey?.journeyType === "EVENT")
+        return (0, eventJourneys_1.eventDriverManifest)(journey, bookings);
     return bookings
         .filter((row) => boardingDisplayStatus(row) !== "CANCELLED")
         .map((row) => `${row.name}\nCode: ${row.boardingCode || "not issued"}\n${row.passengers} passenger${row.passengers === 1 ? "" : "s"}`)

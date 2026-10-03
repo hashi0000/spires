@@ -14,13 +14,19 @@ export function DriverBoard({
   journey: ShareJourney;
   bookings: ShareBooking[];
   busyKey: string;
-  onVerify: (bookingId: string, code: string) => Promise<void>;
+  onVerify: (bookingId: string, code: string, eventLeg?: "OUTBOUND" | "RETURN") => Promise<void>;
   onNoShow: (bookingId: string) => void;
   onDepart: () => void;
 }) {
+  const eventReturn = journey.journeyType === "EVENT" && journey.offerReturn;
+  const [leg, setLeg] = useState<"OUTBOUND" | "RETURN">("OUTBOUND");
   const active = bookings.filter((row) => !["CANCELLED", "LATE_CANCELLED"].includes(row.reservationStatus || ""));
-  const verifiedSeats = active.filter((row) => boardingLabel(row) === "Verified").reduce((sum, row) => sum + row.passengers, 0);
-  const totalSeats = active.reduce((sum, row) => sum + row.passengers, 0);
+  const legBookings = eventReturn && leg === "RETURN" ? active.filter((row) => row.tripType === "RETURN") : active;
+  const verifiedSeats = legBookings.filter((row) => {
+    if (eventReturn && leg === "RETURN") return Boolean(row.returnBoardedAt) || row.returnBoardStatus === "BOARDED";
+    return boardingLabel(row) === "Verified";
+  }).reduce((sum, row) => sum + row.passengers, 0);
+  const totalSeats = legBookings.reduce((sum, row) => sum + row.passengers, 0);
   const remaining = Math.max(0, totalSeats - verifiedSeats);
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [openId, setOpenId] = useState("");
@@ -32,14 +38,22 @@ export function DriverBoard({
       <h3>{routeLabel(journey)}</h3>
       <p>{journey.departureTime}</p>
       <p>{totalSeats} passengers</p>
-      <h4>Boarding</h4>
+      {eventReturn ? (
+        <div className="share-ops-filters">
+          <button type="button" className={`btn btn-sm${leg === "OUTBOUND" ? " btn-primary" : ""}`} onClick={() => setLeg("OUTBOUND")}>Outbound {active.reduce((sum, row) => sum + row.passengers, 0)}</button>
+          <button type="button" className={`btn btn-sm${leg === "RETURN" ? " btn-primary" : ""}`} onClick={() => setLeg("RETURN")}>Return {active.filter((row) => row.tripType === "RETURN").reduce((sum, row) => sum + row.passengers, 0)}</button>
+        </div>
+      ) : null}
+      {journey.journeyType === "EVENT" && journey.venueReturnMeetingPoint && leg === "RETURN" ? <p>Meeting: {journey.venueReturnMeetingPoint}</p> : null}
       <p>{verifiedSeats} / {totalSeats} seats verified</p>
       <OccupancyDots filled={verifiedSeats} total={totalSeats} />
       <p>{remaining === 0 ? "All passengers verified" : `${remaining} passenger${remaining === 1 ? "" : "s"} remaining`}</p>
       {error ? <p className="share-ops-error">{error}</p> : null}
       <ul className="share-ops-driver-list">
-        {active.map((row) => {
-          const done = boardingLabel(row) === "Verified";
+        {legBookings.map((row) => {
+          const done = eventReturn && leg === "RETURN"
+            ? Boolean(row.returnBoardedAt) || row.returnBoardStatus === "BOARDED"
+            : boardingLabel(row) === "Verified";
           const missing = boardingLabel(row) === "No show";
           return (
             <li key={row.id} className={`share-ops-driver-row${done ? " is-done" : ""}`}>
@@ -57,7 +71,7 @@ export function DriverBoard({
                       e.preventDefault();
                       setError("");
                       try {
-                        await onVerify(row.id, codes[row.id] || "");
+                        await onVerify(row.id, codes[row.id] || "", eventReturn ? leg : "OUTBOUND");
                         setOpenId("");
                       } catch (err) {
                         setError(err instanceof Error ? err.message : "Code does not match.");

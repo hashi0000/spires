@@ -113,6 +113,21 @@ import {
   waitlistOrder,
 } from "./interestGroups";
 import { cityJourneyRequiresOwnFare, fourPassengerFallbackEnabled } from "./routePricing";
+import {
+  applyVenueDefaults,
+  assertEventHasCapacity,
+  assertEventInterestOpen,
+  assertEventTripType,
+  clampEventPassengerCap,
+  eventAdvertText,
+  eventFarePence,
+  eventFieldsFromInput,
+  eventPublicListingAllowed,
+  eventRevenuePreview,
+  EVENT_PASSENGER_CAP,
+  returnSeatCountFrom,
+  type EventOpportunityInput,
+} from "./eventJourneys";
 import { flightTerminalOf, isHeathrowShare, parseFlightTerminal, terminalGuideHref, terminalGuideLinkText, terminalTransferWarning } from "./terminalGuide";
 import {
   confirmationGuard,
@@ -183,6 +198,8 @@ async function loadConfig(): Promise<ShareConfig> {
     homeCollectionCustomerEnabled: false,
     notificationsSend: data.notificationsSend === true,
     cityMatchingPublicEnabled: data.cityMatchingPublicEnabled === true,
+    londonShareAreas: data.londonShareAreas?.length ? data.londonShareAreas : DEFAULT_SHARE_CONFIG.londonShareAreas,
+    shareVenues: data.shareVenues?.length ? data.shareVenues : DEFAULT_SHARE_CONFIG.shareVenues,
     pilotDefaults: { ...DEFAULT_SHARE_CONFIG.pilotDefaults, ...(data.pilotDefaults || {}) },
   };
 }
@@ -366,7 +383,9 @@ async function queueDriverManifestEmail(
     pickup: journey.departureLocation || journey.originLabel,
     sharedDropoff: journey.destinationLabel,
     boardingPassengers: manifestPassengerCount(bookings),
-    driverManifestLines: driverManifestLines(bookings),
+    driverManifestLines: driverManifestLines(bookings, live),
+    eventName: live.eventName,
+    venueName: live.venueName,
     assignedDriverName: driver.name,
     driverBoardingUrl: SHARE_ADMIN_DASHBOARD_URL,
     deduplicationKey: notificationDedupeKey([opts.manual ? "DRIVER_MANIFEST_MANUAL" : type, journey.id, fingerprint]),
@@ -446,6 +465,10 @@ function journeyStubFromInterest(group: ShareInterestGroup): ShareJourney {
     customerVisible: false,
     dropoffMode: group.destinationMatchingEnabled ? "common_dropoff" : "per_passenger_terminal",
     journeyType: group.journeyType,
+    eventName: group.eventName,
+    venueName: group.venueName,
+    eventDate: group.eventDate || group.travelDate,
+    eventStartTime: group.eventStartTime,
     destinationMatchingEnabled: group.destinationMatchingEnabled,
     earlyDepartureOffered: false,
     earlyDepartureAcceptedBookingIds: [],
@@ -484,6 +507,10 @@ function customerInterestView(entry: ShareInterestEntry, group: ShareInterestGro
     ...extras,
     preferredDepartureTime: entry.preferredDepartureTime,
     paymentNotOpened: group.status === "READY_FOR_REVIEW" || group.status === "CONVERTED_TO_JOURNEY",
+    tripType: entry.tripType,
+    eventName: group.eventName,
+    venueName: group.venueName,
+    offerReturn: group.offerReturn === true,
   };
 }
 
@@ -506,14 +533,16 @@ function customerWaitlistView(entry: ShareWaitlistEntry, journey: ShareJourney, 
 
 async function recountInterestGroupDoc(groupRef: FirebaseFirestore.DocumentReference, group: ShareInterestGroup): Promise<void> {
   const entries = await db().collection(COLLECTIONS.INTEREST_ENTRIES).where("interestGroupId", "==", group.id).get();
-  const seats = entries.docs
+  const active = entries.docs
     .map((doc) => ({ id: doc.id, ...doc.data() } as ShareInterestEntry))
-    .filter((row) => row.status === "ACTIVE")
-    .reduce((sum, row) => sum + Number(row.passengers || 0), 0);
+    .filter((row) => row.status === "ACTIVE");
+  const seats = active.reduce((sum, row) => sum + Number(row.passengers || 0), 0);
+  const returnSeats = returnSeatCountFrom(active);
   const now = new Date().toISOString();
   await groupRef.set(
     {
       interestedSeatCount: seats,
+      returnSeatCount: returnSeats,
       status: interestGroupStatusFromCount(seats, group.minPassengerThreshold || 4, group.status),
       updatedAt: now,
     },
@@ -543,6 +572,7 @@ function attachPassengerWrites(
     waitlistId?: string;
     interestEntryId?: string;
     claimingWaitlist?: boolean;
+    tripType?: "ONE_WAY" | "RETURN";
     now: string;
     idempotencyKey?: string;
     idemRef?: FirebaseFirestore.DocumentReference;
@@ -621,6 +651,7 @@ function attachPassengerWrites(
     createdAt: now,
     waitlistId: opts.waitlistId || "",
     interestEntryId: opts.interestEntryId || "",
+    tripType: opts.tripType || "",
     ...(opts.destination ? destinationFieldsForBooking(opts.destination, now) : {}),
   };
   tx.update(journeyRef, {
@@ -634,7 +665,11 @@ function attachPassengerWrites(
     id: paymentId,
     bookingId: bookingRef.id,
     journeyId: journey.id,
-    amountPence: journey.farePence * passengers,
+    amountPence: bookingAmountDuePence(
+      { passengers, tripType: opts.tripType },
+      journey.farePence,
+      journey.returnFarePence
+    ),
     currency: "GBP",
     status: paymentStatusFromReservation(stage.reservationStatus),
     paymentMethodRef: "hosted_payment_link",
@@ -701,6 +736,21 @@ async function expressInterestForCustomer(
     if (!data.timeWindowStart) data.timeWindowStart = group.timeWindowStart;
     if (!data.timeWindowEnd) data.timeWindowEnd = group.timeWindowEnd;
   }
+  const eventSlugLookup = String(data.eventSlug || "");
+  if (!publicNumber && eventSlugLookup) {
+    const found = await db().collection(COLLECTIONS.INTEREST_GROUPS).where("eventSlug", "==", eventSlugLookup).limit(8).get();
+    const group = found.docs
+      .map((doc) => asInterestGroup(doc.id, doc.data() || {}))
+      .find((row) => eventPublicListingAllowed(row));
+    if (!group) throw new functions.https.HttpsError("not-found", "This event is not open for interest.");
+    origin = group.origin;
+    destinationRegion = group.destinationRegion;
+    travelDate = group.travelDate;
+    data.publicNumber = group.publicNumber;
+    if (!data.preferredDepartureTime) data.preferredDepartureTime = group.preferredDepartureTime || group.timeWindowStart;
+    if (!data.timeWindowStart) data.timeWindowStart = group.timeWindowStart;
+    if (!data.timeWindowEnd) data.timeWindowEnd = group.timeWindowEnd;
+  }
   const originPlace = normalizePlace(origin);
   const destinationPlace = normalizePlace(destinationRegion);
   if (!originPlace.label || !destinationPlace.label) {
@@ -749,6 +799,8 @@ async function expressInterestForCustomer(
     if (!groupSnap.exists) continue;
     const group = asInterestGroup(groupSnap.id, groupSnap.data() || {});
     if (
+      !eventSlugLookup &&
+      !publicNumber &&
       (group.status === "GATHERING_INTEREST" || group.status === "READY_FOR_REVIEW") &&
       group.origin === originPlace.label &&
       group.destinationRegion === destinationPlace.label &&
@@ -767,16 +819,27 @@ async function expressInterestForCustomer(
   }
   const openSnap = await db().collection(COLLECTIONS.INTEREST_GROUPS).limit(200).get();
   const openGroups = openSnap.docs.map((doc) => asInterestGroup(doc.id, doc.data() || {}));
+  const joinNumber = publicNumber || String(data.publicNumber || "");
   const compatible =
-    publicNumber
-      ? openGroups.find((row) => row.publicNumber === publicNumber) || null
+    joinNumber
+      ? openGroups.find((row) => row.publicNumber === joinNumber) || null
       : findCompatibleInterestGroup(openGroups, {
           origin: originPlace.label,
           destinationRegion: destinationPlace.label,
           travelDate,
           timeWindowStart: window.start,
           timeWindowEnd: window.end,
+          eventSlug: data.eventSlug ? String(data.eventSlug) : undefined,
+          publicNumber: joinNumber || undefined,
         });
+  if (compatible?.journeyType === "EVENT") {
+    try {
+      assertEventInterestOpen(compatible, now);
+      assertEventHasCapacity(compatible, passengers);
+    } catch (err) {
+      shareFail(err);
+    }
+  }
   let group = compatible;
   let groupRef: FirebaseFirestore.DocumentReference;
   let joinedExisting = Boolean(compatible);
@@ -836,6 +899,7 @@ async function expressInterestForCustomer(
       : destinationPlace.label === "Heathrow"
         ? "T3"
         : undefined,
+    tripType: group.journeyType === "EVENT" ? assertEventTripType(group, data.tripType === "RETURN" ? "RETURN" : "ONE_WAY") : undefined,
     status: "ACTIVE",
     createdAt: now,
   };
@@ -859,6 +923,9 @@ async function expressInterestForCustomer(
     customerDashboardUrl: SHARE_CUSTOMER_DASHBOARD_URL,
     adminDashboardUrl: SHARE_ADMIN_DASHBOARD_URL,
     interestGroupId: live.id,
+    eventName: live.eventName,
+    venueName: live.venueName,
+    eventDate: live.eventDate || live.travelDate,
   };
   await queueNotification(config, "INTEREST_RECEIVED", email, journeyStubFromInterest(live), {
     ...interestExtra,
@@ -1374,6 +1441,7 @@ export const spiresShareGetState = functions.https.onCall(async (_data, context)
           flightNumber: row.flightNumber || "",
           flightDepartureTime: row.flightDepartureTime || "",
           departureTerminal: row.departureTerminal || "",
+          tripType: row.tripType || "ONE_WAY",
         })),
     })),
     interestEntries,
@@ -1400,6 +1468,8 @@ export const spiresShareSaveConfig = functions.https.onCall(async (data, context
     homeCollectionCustomerEnabled: false,
     notificationsSend: incoming.notificationsSend === true,
     cityMatchingPublicEnabled: false,
+    londonShareAreas: incoming.londonShareAreas?.length ? incoming.londonShareAreas : config.londonShareAreas || DEFAULT_SHARE_CONFIG.londonShareAreas,
+    shareVenues: incoming.shareVenues?.length ? incoming.shareVenues : config.shareVenues || DEFAULT_SHARE_CONFIG.shareVenues,
     mvpAirportIds: incoming.mvpAirportIds?.length ? incoming.mvpAirportIds : DEFAULT_SHARE_CONFIG.mvpAirportIds,
     pilotDefaults: { ...DEFAULT_SHARE_CONFIG.pilotDefaults, ...(incoming.pilotDefaults || {}) },
   };
@@ -1482,6 +1552,15 @@ export const spiresShareListDepartures = functions.https.onCall(async (data, con
     .filter((row) => isCustomerListableJourney(row, access.role))
     .sort((a, b) => `${a.travelDate}T${a.departureTime}`.localeCompare(`${b.travelDate}T${b.departureTime}`));
   const defaults = config.pilotDefaults;
+  const groupSnap = await db().collection(COLLECTIONS.INTEREST_GROUPS).limit(200).get();
+  const listed = groupSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as ShareInterestGroup))
+    .filter((row) => {
+      if (row.status !== "GATHERING_INTEREST" && row.status !== "READY_FOR_REVIEW") return false;
+      if (row.journeyType === "EVENT") return eventPublicListingAllowed(row);
+      return true;
+    })
+    .map(toPublicInterestGroup);
   return {
     farePence: defaults.farePence || airportById(config, "heathrow")?.farePence || 3500,
     capacity: defaults.capacity || config.passengerCapacity,
@@ -1492,10 +1571,8 @@ export const spiresShareListDepartures = functions.https.onCall(async (data, con
     interestNotice: INTEREST_NOTICE,
     fillNotice: FILL_NOTICE,
     journeys: journeys.map((row) => toPublicJourney(row, config)),
-    interestGroups: (await db().collection(COLLECTIONS.INTEREST_GROUPS).limit(200).get()).docs
-      .map((doc) => ({ id: doc.id, ...doc.data() } as ShareInterestGroup))
-      .filter((row) => row.status === "GATHERING_INTEREST" || row.status === "READY_FOR_REVIEW")
-      .map(toPublicInterestGroup),
+    interestGroups: listed.filter((row) => row.journeyType !== "EVENT"),
+    events: listed.filter((row) => row.journeyType === "EVENT"),
   };
 });
 
@@ -1541,7 +1618,10 @@ async function confirmHostedJourney(
       origin: journey.originLabel || "Oxford",
       destination: journey.destinationLabel || "Heathrow Terminal 3",
       travelDate: journey.travelDate,
-      amountPence: booking.paidAmountPence || bookingAmountDuePence(booking, journey.farePence),
+      amountPence: booking.paidAmountPence || bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence),
+      eventName: journey.eventName,
+      venueName: journey.venueName,
+      eventDate: journey.eventDate || journey.travelDate,
       boardingCode: booking.boardingCode,
       boardingPassengers: booking.passengers,
       passengerName: booking.name,
@@ -2170,6 +2250,7 @@ export const spiresShareCustomerAction = functions.https.onCall(async (data, con
         departureTerminal: entry.departureTerminal,
         flightNumber: entry.flightNumber,
         flightDepartureTime: entry.flightDepartureTime,
+        tripType: entry.tripType,
         now,
       });
       tx.set(entryRef, { status: "CONVERTED", convertedBookingId: attached.bookingId }, { merge: true });
@@ -2750,14 +2831,14 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     const airport = group.journeyType === "AIRPORT";
     const farePence = airport
       ? Number(payload.farePence) || config.pilotDefaults.farePence
-      : cityJourneyRequiresOwnFare(Number(payload.farePence) || undefined);
+      : cityJourneyRequiresOwnFare(Number(payload.farePence) || group.outboundFarePence || undefined);
     const targetRevenuePence = farePence * capacity;
     const minPassengerThreshold = Number(payload.minPassengerThreshold) || group.minPassengerThreshold || config.pilotDefaults.minPassengerThreshold;
     const deadlineHours = config.pilotDefaults.confirmationDeadlineHoursBeforeDeparture || config.confirmationDeadlineHoursBeforeDeparture;
     const departureAt = londonDateTimeToUtcIso(group.travelDate, departureTime);
     const airportId = airport ? "heathrow" : cityRouteKey(group.origin, group.destinationRegion);
     const customerVisible = payload.customerVisible === true || (payload.customerVisible !== false && airport);
-    if (!airport && customerVisible) {
+    if (group.journeyType === "CITY" && customerVisible) {
       throw new functions.https.HttpsError("failed-precondition", "City destination matching journeys are not publicly enabled.");
     }
     const journeyRefNew = db().collection(COLLECTIONS.JOURNEYS).doc();
@@ -2804,6 +2885,25 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
       paymentStageStatus: "NOT_CREATED",
       fourPassengerFallbackEnabled: airport && group.destinationRegion === "Heathrow",
       fallbackFarePerPassengerPence: airport && group.destinationRegion === "Heathrow" ? 4375 : 0,
+      eventName: group.eventName || "",
+      venueName: group.venueName || "",
+      venueAddress: group.venueAddress || "",
+      eventDate: group.eventDate || group.travelDate,
+      eventStartTime: group.eventStartTime || "",
+      expectedFinishTime: group.expectedFinishTime || "",
+      eventUrl: group.eventUrl || "",
+      eventSlug: group.eventSlug || "",
+      eventPublished: false,
+      outboundFarePence: group.journeyType === "EVENT" ? farePence : 0,
+      returnFarePence: group.returnFarePence || 0,
+      offerReturn: group.offerReturn === true,
+      returnDepartureBasis: group.returnDepartureBasis || "",
+      returnDepartureTime: group.returnDepartureTime || "",
+      returnAfterMinutes: group.returnAfterMinutes || 0,
+      venueDropoffPoint: group.venueDropoffPoint || "",
+      venueReturnMeetingPoint: group.venueReturnMeetingPoint || "",
+      londonAreaId: group.londonAreaId || "",
+      returnSeatCount: group.returnSeatCount || 0,
       createdAt: now,
       updatedAt: now,
     });
@@ -2906,12 +3006,15 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
       await queueNotification(config, "PAYMENT_REQUIRED", booking.email, { ...journey, paymentDeadlineAt: deadline.deadlineAt }, {
         bookingId: booking.id,
         journeyDocId: journey.id,
-        amountPence: bookingAmountDuePence(booking, journey.farePence),
+        amountPence: bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence),
         passengers: booking.passengers,
         paymentDeadlineAt: deadline.deadlineAt,
         paymentUrl: journey.paymentLinkUrl,
         sharedDropoff: journey.destinationLabel,
         pickup: journey.departureLocation || journey.originLabel,
+        eventName: journey.eventName,
+        venueName: journey.venueName,
+        eventDate: journey.eventDate || journey.travelDate,
         deduplicationKey: notificationDedupeKey(["PAYMENT_REQUIRED", booking.id]),
       });
     }
@@ -2953,7 +3056,7 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     }
     const previousStatus = String(booking.reservationStatus || "PROVISIONAL");
     const newStatus = paid ? "PAID" : "PAYMENT_PENDING";
-    const amount = paid ? bookingAmountDuePence(booking, journey.farePence) : 0;
+    const amount = paid ? bookingAmountDuePence(booking, journey.farePence, journey.returnFarePence) : 0;
     await db()
       .collection(COLLECTIONS.BOOKINGS)
       .doc(booking.id)
@@ -3218,12 +3321,25 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
       if (!bookingSnap.exists) throw new functions.https.HttpsError("not-found", "Booking not found.");
       const booking = { id: bookingSnap.id, ...bookingSnap.data() } as ShareBooking;
       try {
-        const result = verifyBoardingCode(journey, booking, String((data as { boardingCode?: string })?.boardingCode || ""), actor, new Date().toISOString());
+        const result = verifyBoardingCode(
+          journey,
+          booking,
+          String((data as { boardingCode?: string })?.boardingCode || ""),
+          actor,
+          new Date().toISOString(),
+          (data as { eventLeg?: "OUTBOUND" | "RETURN" })?.eventLeg === "RETURN" ? "RETURN" : "OUTBOUND"
+        );
         await db().collection(COLLECTIONS.BOOKINGS).doc(bookingId).set(
           {
             boardStatus: booking.boardStatus,
             boardingVerifiedAt: booking.boardingVerifiedAt,
             boardingVerifiedBy: booking.boardingVerifiedBy,
+            outboundBoardStatus: booking.outboundBoardStatus,
+            outboundBoardedAt: booking.outboundBoardedAt,
+            outboundBoardedBy: booking.outboundBoardedBy,
+            returnBoardStatus: booking.returnBoardStatus,
+            returnBoardedAt: booking.returnBoardedAt,
+            returnBoardedBy: booking.returnBoardedBy,
           },
           { merge: true }
         );
@@ -3520,6 +3636,179 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     return { ok: true, updated: true };
   }
 
+  if (action === "create-event-interest") {
+    const raw: EventOpportunityInput = {
+      eventName: String(payload.eventName || ""),
+      venueName: String(payload.venueName || ""),
+      venueAddress: String(payload.venueAddress || ""),
+      eventDate: String(payload.eventDate || payload.travelDate || ""),
+      eventStartTime: String(payload.eventStartTime || ""),
+      expectedFinishTime: String(payload.expectedFinishTime || ""),
+      eventUrl: String(payload.eventUrl || ""),
+      eventImageUrl: String(payload.eventImageUrl || ""),
+      eventCategory: String(payload.eventCategory || ""),
+      origin: String(payload.origin || payload.originLabel || "Oxford"),
+      pickupLocation: String(payload.pickupLocation || payload.departureLocation || ""),
+      destination: String(payload.destination || payload.destinationLabel || payload.venueName || ""),
+      suggestedDepartureTime: String(payload.suggestedDepartureTime || payload.departureTime || "16:30"),
+      outboundFarePence: Number(payload.outboundFarePence || payload.farePence || 0) || undefined,
+      returnFarePence: Number(payload.returnFarePence || 0) || undefined,
+      offerReturn: payload.offerReturn === true,
+      returnDepartureBasis: payload.returnDepartureBasis === "SPECIFIC_TIME" ? "SPECIFIC_TIME" : payload.offerReturn === true ? "AFTER_EVENT" : undefined,
+      returnDepartureTime: String(payload.returnDepartureTime || ""),
+      returnAfterMinutes: Number(payload.returnAfterMinutes || 45) || 45,
+      passengerLimit: Number(payload.passengerLimit || payload.capacity || EVENT_PASSENGER_CAP),
+      interestDeadlineAt: String(payload.interestDeadlineAt || ""),
+      venueDropoffPoint: String(payload.venueDropoffPoint || ""),
+      venueReturnMeetingPoint: String(payload.venueReturnMeetingPoint || ""),
+      londonAreaId: payload.londonAreaId as EventOpportunityInput["londonAreaId"],
+      publish: payload.publish === true,
+      venueId: String(payload.venueId || ""),
+    };
+    const input = applyVenueDefaults(raw, config);
+    const eventName = String(input.eventName || "").trim();
+    const venueName = String(input.venueName || "").trim();
+    if (!eventName || !venueName || !input.eventDate || !input.eventStartTime) {
+      throw new functions.https.HttpsError("invalid-argument", "Event name, venue, date and start time are required.");
+    }
+    const origin = normalizePlace(input.origin || "Oxford").label || "Oxford";
+    const destination = normalizePlace(input.destination || venueName).label || venueName;
+    const pickup = String(input.pickupLocation || config.meetingPoint.publicName || "Thornhill Park and Ride").trim();
+    const suggested = String(input.suggestedDepartureTime || "16:30");
+    let farePence = 0;
+    try {
+      farePence = eventFarePence(input);
+    } catch (err) {
+      shareFail(err);
+    }
+    const capacity = clampEventPassengerCap(input.passengerLimit || config.passengerCapacity);
+    const now = new Date().toISOString();
+    const window = resolveInterestWindow({
+      origin,
+      destinationRegion: destination,
+      travelDate: input.eventDate,
+      preferredDepartureTime: suggested,
+      flexibility: "plus_minus_30",
+      passengers: 1,
+    });
+    const fields = eventFieldsFromInput(
+      {
+        ...input,
+        eventName,
+        venueName,
+        origin,
+        destination,
+        pickupLocation: pickup,
+        suggestedDepartureTime: suggested,
+        passengerLimit: capacity,
+        outboundFarePence: farePence,
+      },
+      farePence
+    );
+    const groupRef = db().collection(COLLECTIONS.INTEREST_GROUPS).doc();
+    const created = omitUndefined({
+      publicNumber: interestPublicNumber(origin, destination, input.eventDate, window.start, window.end),
+      origin,
+      destinationRegion: destination,
+      journeyType: "EVENT",
+      destinationMatchingEnabled: false,
+      travelDate: input.eventDate,
+      preferredDepartureTime: suggested,
+      timeWindowStart: window.start,
+      timeWindowEnd: window.end,
+      interestedSeatCount: 0,
+      minPassengerThreshold: capacity,
+      status: "GATHERING_INTEREST",
+      interestDeadlineAt:
+        input.interestDeadlineAt ||
+        computeInterestDeadline(now, config.interestRegistrationHours || 48, config.paymentQuietHoursStart, config.paymentQuietHoursEnd).deadlineAt,
+      pickupLocation: pickup,
+      suggestedDepartureTime: suggested,
+      ...fields,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await groupRef.set(created);
+    await writeAudit("EVENT_INTEREST_CREATED", actor, { interestGroupId: groupRef.id, eventName, published: fields.eventPublished ? "true" : "false" });
+    const revenue = eventRevenuePreview({
+      outboundFarePence: farePence,
+      returnFarePence: input.returnFarePence,
+      offerReturn: input.offerReturn,
+      passengerLimit: capacity,
+    });
+    return {
+      ok: true,
+      interestGroupId: groupRef.id,
+      publicNumber: created.publicNumber,
+      eventPublished: fields.eventPublished === true,
+      eventSlug: fields.eventSlug,
+      revenue,
+    };
+  }
+
+  if (action === "publish-event-interest") {
+    const interestGroupId = String(payload.interestGroupId || "");
+    if (!interestGroupId) throw new functions.https.HttpsError("invalid-argument", "interestGroupId is required.");
+    const groupRef = db().collection(COLLECTIONS.INTEREST_GROUPS).doc(interestGroupId);
+    const snap = await groupRef.get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Event interest group not found.");
+    const group = asInterestGroup(snap.id, snap.data() || {});
+    if (group.journeyType !== "EVENT") throw new functions.https.HttpsError("failed-precondition", "This is not an event interest group.");
+    if (!group.outboundFarePence) throw new functions.https.HttpsError("failed-precondition", "Set a fare per passenger for this event.");
+    await groupRef.set(
+      {
+        eventPublished: true,
+        eventStatus: "PUBLISHED",
+        status:
+          group.status === "EXPIRED" || group.status === "CANCELLED" || group.status === "CONVERTED_TO_JOURNEY"
+            ? group.status
+            : "GATHERING_INTEREST",
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    await writeAudit("EVENT_PUBLISHED", actor, { interestGroupId });
+    return { ok: true, eventPublished: true };
+  }
+
+  if (action === "unpublish-event-interest") {
+    const interestGroupId = String(payload.interestGroupId || "");
+    if (!interestGroupId) throw new functions.https.HttpsError("invalid-argument", "interestGroupId is required.");
+    const groupRef = db().collection(COLLECTIONS.INTEREST_GROUPS).doc(interestGroupId);
+    const snap = await groupRef.get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Event interest group not found.");
+    const group = asInterestGroup(snap.id, snap.data() || {});
+    if (group.journeyType !== "EVENT") throw new functions.https.HttpsError("failed-precondition", "This is not an event interest group.");
+    await groupRef.set({ eventPublished: false, eventStatus: "DRAFT", updatedAt: new Date().toISOString() }, { merge: true });
+    await writeAudit("EVENT_UNPUBLISHED", actor, { interestGroupId });
+    return { ok: true, eventPublished: false };
+  }
+
+  if (action === "event-advert") {
+    const interestGroupId = String(payload.interestGroupId || "");
+    if (!interestGroupId) throw new functions.https.HttpsError("invalid-argument", "interestGroupId is required.");
+    const snap = await db().collection(COLLECTIONS.INTEREST_GROUPS).doc(interestGroupId).get();
+    if (!snap.exists) throw new functions.https.HttpsError("not-found", "Event interest group not found.");
+    const group = asInterestGroup(snap.id, snap.data() || {});
+    return { ok: true, text: eventAdvertText(group), shareUrl: group.eventSlug ? `https://www.spires-taxis.com/share/event/${group.eventSlug}` : "https://www.spires-taxis.com/share" };
+  }
+
+  if (action === "event-revenue-preview") {
+    const outboundFarePence = Number(payload.outboundFarePence || payload.farePence || 0);
+    const returnFarePence = Number(payload.returnFarePence || 0) || undefined;
+    const passengerLimit = clampEventPassengerCap(Number(payload.passengerLimit || payload.capacity || EVENT_PASSENGER_CAP));
+    if (!outboundFarePence) throw new functions.https.HttpsError("invalid-argument", "Set a fare per passenger.");
+    return {
+      ok: true,
+      ...eventRevenuePreview({
+        outboundFarePence,
+        returnFarePence,
+        offerReturn: payload.offerReturn === true,
+        passengerLimit,
+      }),
+    };
+  }
+
   throw new functions.https.HttpsError("invalid-argument", "Unknown admin action.");
 });
 
@@ -3530,7 +3819,11 @@ function publicShareListPayload(config: ShareConfig, journeys: ShareJourney[], i
     .sort((a, b) => `${a.travelDate}T${a.departureTime}`.localeCompare(`${b.travelDate}T${b.departureTime}`))
     .map((row) => toPublicJourney(row, config));
   const interest = interestGroups
-    .filter((row) => row.status === "GATHERING_INTEREST" || row.status === "READY_FOR_REVIEW")
+    .filter((row) => {
+      if (row.status !== "GATHERING_INTEREST" && row.status !== "READY_FOR_REVIEW") return false;
+      if (row.journeyType === "EVENT") return eventPublicListingAllowed(row);
+      return true;
+    })
     .sort((a, b) => `${a.travelDate}${a.timeWindowStart}`.localeCompare(`${b.travelDate}${b.timeWindowStart}`))
     .map(toPublicInterestGroup);
   return {
@@ -3546,7 +3839,8 @@ function publicShareListPayload(config: ShareConfig, journeys: ShareJourney[], i
     interestNotice: INTEREST_NOTICE,
     fillNotice: FILL_NOTICE,
     journeys: listed,
-    interestGroups: interest,
+    interestGroups: interest.filter((row) => row.journeyType !== "EVENT"),
+    events: interest.filter((row) => row.journeyType === "EVENT"),
   };
 }
 
@@ -3632,7 +3926,13 @@ export async function runShareDeadlineTick(): Promise<{ expired: number; waitlis
     if (!group.interestDeadlineAt || !isPast(group.interestDeadlineAt, now)) continue;
     if (seatProgress(group.interestedSeatCount, requiredSeatsForGroup(group)).enough) continue;
     await doc.ref.set(
-      { status: "EXPIRED", expiryReason: "INSUFFICIENT_INTEREST", expiredNotifiedAt: now, updatedAt: now },
+      {
+        status: "EXPIRED",
+        expiryReason: "INSUFFICIENT_INTEREST",
+        expiredNotifiedAt: now,
+        updatedAt: now,
+        ...(group.journeyType === "EVENT" ? { eventStatus: "DID_NOT_FILL" } : {}),
+      },
       { merge: true }
     );
     if (!group.expiredNotifiedAt) {

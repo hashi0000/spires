@@ -1,4 +1,5 @@
 import React, { FormEvent, useState } from "react";
+import { EventTools } from "./EventTools";
 import { DriverBoard } from "./DriverBoard";
 import { gbp } from "./shareLabels";
 import { RunAction, ShareState } from "./types";
@@ -61,6 +62,7 @@ export function AdvancedPanel({
           ["hubs", "Hubs"],
           ["city", "City matching"],
           ["create", "Create unpublished journey"],
+          ["event", "Event opportunities"],
           ["config", "Configuration"],
           ["audit", "Audit and emails"],
           ["sandbox", "Developer sandbox"],
@@ -102,8 +104,8 @@ export function AdvancedPanel({
               journey={selected}
               bookings={selectedBookings}
               busyKey={busyKey}
-              onVerify={(bookingId, code) => run(`verify-${bookingId}`, async () => {
-                await adminAction({ action: "driver", journeyId: selected.id, bookingId, boardAction: "VERIFY", boardingCode: code });
+              onVerify={(bookingId, code, eventLeg) => run(`verify-${bookingId}`, async () => {
+                await adminAction({ action: "driver", journeyId: selected.id, bookingId, boardAction: "VERIFY", boardingCode: code, eventLeg: eventLeg || "OUTBOUND" });
               })}
               onNoShow={(bookingId) => run(`noshow-${bookingId}`, async () => { await adminAction({ action: "driver", journeyId: selected.id, bookingId, boardAction: "NO_SHOW" }); })}
               onDepart={() => run(`depart-${selected.id}`, async () => { await adminAction({ action: "driver", journeyId: selected.id, boardAction: "DEPARTED" }); })}
@@ -211,12 +213,16 @@ export function AdvancedPanel({
           }}
         >
           <h4>Create unpublished journey</h4>
-          <p className="share-ops-muted">Customers only see this after you publish it.</p>
+          <p className="share-ops-muted">Customers only see this after you publish it. For events use Event opportunities.</p>
           <label className="form-group"><span className="form-label">Date</span><input className="form-input" type="date" required value={createForm.travelDate} onChange={(e) => setCreateForm({ ...createForm, travelDate: e.target.value })} /></label>
           <label className="form-group"><span className="form-label">Departure time</span><input className="form-input" type="time" required value={createForm.departureTime} onChange={(e) => setCreateForm({ ...createForm, departureTime: e.target.value })} /></label>
           <p>Fare {gbp(createForm.farePence)} per passenger.</p>
           <button type="submit" className="btn btn-primary" disabled={busyKey === "create-pilot"}>Create journey</button>
         </form>
+      ) : null}
+
+      {section === "event" ? (
+        <EventTools state={state} run={run} busyKey={busyKey} adminAction={adminAction} />
       ) : null}
 
       {section === "config" ? (

@@ -24,8 +24,10 @@ export function InterestList({
         return (
           <li key={group.id} className="share-ops-card">
             <div>
-              <p className="share-ops-kicker">{group.origin} → {group.destinationRegion}</p>
-              <p>{formatUkDate(group.travelDate)}</p>
+              {group.journeyType === "EVENT" ? <p className="share-ops-chip">EVENT</p> : null}
+              <p className="share-ops-kicker">{group.origin} → {group.venueName || group.destinationRegion}</p>
+              {group.eventName ? <p>{group.eventName}</p> : null}
+              <p>{formatUkDate(group.eventDate || group.travelDate)}</p>
               <p className="share-ops-muted">Around {group.timeWindowStart}{group.timeWindowEnd ? ` to ${group.timeWindowEnd}` : ""}</p>
               <OccupancyDots filled={interested} total={required} />
               <p>{interested} / {required} interested</p>
