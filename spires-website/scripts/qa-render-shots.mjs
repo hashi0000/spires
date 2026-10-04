@@ -35,7 +35,15 @@ const PAGES = [
   '/oxford-to-silverstone-taxi',
   '/cotswolds-tours-from-oxford',
   '/oxford-to-london-city-airport-taxi',
-  '/long-distance-taxis'
+  '/long-distance-taxis',
+  '/witney-airport-transfers',
+  '/wallingford-airport-transfers',
+  '/wantage-airport-transfers',
+  '/carterton-airport-transfers',
+  '/didcot-airport-transfers',
+  '/abingdon-airport-transfers',
+  '/bicester-airport-transfers',
+  '/thame-airport-transfers'
 ];
 
 const VIEWPORTS = [
