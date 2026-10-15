@@ -67,7 +67,9 @@ async function recordUnlockAttempt(ip: string, success: boolean): Promise<void> 
   });
 }
 
-export const unlockFamilyJobs = functions.https.onCall(async (data, context) => {
+export const unlockFamilyJobs = functions
+  .runWith({ secrets: ["FAMILY_JOBS_PIN"] })
+  .https.onCall(async (data, context) => {
   const pin = normalizeFamilyPin(data?.pin);
   const configured = getConfiguredFamilyPin();
   const ip = clientIpFromRequest(context.rawRequest);
