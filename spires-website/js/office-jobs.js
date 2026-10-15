@@ -84,7 +84,7 @@
     const tomorrow = addDays(today, 1);
     if (view === "today") return pickup >= today && pickup < tomorrow;
     if (view === "tomorrow") return pickup >= tomorrow && pickup < addDays(tomorrow, 1);
-    return true;
+    return pickup >= now;
   }
 
   function vehicleLabel(type) {
@@ -153,6 +153,7 @@
   function renderList() {
     const rows = visibleJobs();
     jobList.innerHTML = "";
+    emptyEl.textContent = view === "all" ? "No upcoming jobs." : "No jobs in this view.";
     show(emptyEl, rows.length === 0);
     rows.forEach((booking) => {
       const item = document.createElement("li");
