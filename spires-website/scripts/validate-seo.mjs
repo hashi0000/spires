@@ -8,9 +8,19 @@ const BASE = 'https://www.spires-taxis.com';
 const SKIP = new Set(['nav-snippet.html']);
 const issues = [];
 
-const files = fs
-  .readdirSync(root)
-  .filter((f) => f.endsWith('.html') && !SKIP.has(f));
+function listHtml(dir, prefix = '') {
+  const names = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  for (const name of names) {
+    if (['node_modules', 'scripts', 'includes', 'api'].includes(name.name)) continue;
+    const rel = prefix ? `${prefix}/${name.name}` : name.name;
+    if (name.isDirectory()) files.push(...listHtml(path.join(dir, name.name), rel));
+    else if (name.name.endsWith('.html') && !SKIP.has(name.name) && !SKIP.has(rel)) files.push(rel);
+  }
+  return files;
+}
+
+const files = listHtml(root);
 
 const titles = {};
 const descs = {};
@@ -100,6 +110,50 @@ if (sitemap.includes('<changefreq>') || sitemap.includes('<priority>')) {
   issues.push('sitemap.xml includes invented changefreq/priority');
 }
 if (!sitemap.includes('<lastmod>')) issues.push('sitemap.xml missing lastmod');
+const requiredSitemap = [
+  '/',
+  '/oxford-taxis',
+  '/airport-transfers',
+  '/heathrow-to-oxford-taxi',
+  '/oxford-to-heathrow-taxi',
+  '/oxford-to-luton-taxi',
+  '/oxford-to-gatwick-taxi',
+  '/bicester-taxis',
+  '/corporate-taxis',
+  '/student-taxis',
+  '/reviews',
+  '/long-distance-taxis',
+  '/share',
+  '/ar/heathrow-to-oxford-taxi',
+  '/zh/heathrow-to-oxford-taxi',
+  '/ar/international-student-arrivals',
+  '/zh/international-student-arrivals',
+];
+for (const p of requiredSitemap) {
+  const loc = p === '/' ? `${BASE}/` : `${BASE}${p}`;
+  if (!sitemap.includes(`<loc>${loc}</loc>`)) issues.push(`sitemap missing ${loc}`);
+}
+if (sitemap.includes('/airport-taxis-oxford')) {
+  issues.push('sitemap must not include redirected /airport-taxis-oxford');
+}
+
+const hreflangPages = [
+  ['heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
+  ['ar/heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
+  ['zh/heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
+  ['student-taxis.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
+  ['ar/international-student-arrivals.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
+  ['zh/international-student-arrivals.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
+];
+for (const [file, ...paths] of hreflangPages) {
+  const html = fs.readFileSync(path.join(root, file), 'utf8');
+  if (!/hreflang="en-GB"/.test(html) || !/hreflang="ar"/.test(html) || !/hreflang="zh-Hans"/.test(html) || !/hreflang="x-default"/.test(html)) {
+    issues.push(`${file}: missing hreflang set`);
+  }
+  for (const p of paths) {
+    if (!html.includes(`${BASE}${p}`)) issues.push(`${file}: missing hreflang href ${p}`);
+  }
+}
 
 const robots = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
 if (!robots.includes(`Sitemap: ${BASE}/sitemap.xml`)) {

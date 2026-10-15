@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
  * Build sitemap.xml from public, indexable HTML pages.
- * lastmod comes from each file's mtime (UTC, YYYY-MM-DD).
- * No changefreq or priority — those were being invented.
+ * lastmod comes from the file's last git commit date when available,
+ * otherwise the filesystem mtime. No changefreq or priority.
  */
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ const SKIP_FILES = new Set([
   'offer-terms.html',
   'terms-and-conditions.html',
   'share-terms.html',
+  'office-jobs.html',
 ]);
 
 function isRedirectStub(html) {
@@ -50,24 +52,62 @@ function canonicalPath(html, file) {
 }
 
 function lastmod(filePath) {
-  const d = fs.statSync(filePath).mtime;
-  return d.toISOString().slice(0, 10);
+  try {
+    const dirty = execFileSync('git', ['status', '--porcelain', '--', filePath], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (dirty) return fs.statSync(filePath).mtime.toISOString().slice(0, 10);
+    const date = execFileSync('git', ['log', '-1', '--format=%cs', '--', filePath], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  } catch {
+    /* untracked or git unavailable */
+  }
+  return fs.statSync(filePath).mtime.toISOString().slice(0, 10);
+}
+
+function ownPath(file) {
+  const posix = file.replace(/\\/g, '/');
+  if (posix === 'index.html') return '/';
+  return '/' + posix.replace(/\.html$/, '');
+}
+
+function loadRedirectSources() {
+  try {
+    const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+    return new Set(
+      (vercel.redirects || [])
+        .filter((r) => !String(r.source).includes(':') && r.statusCode !== 404)
+        .map((r) => r.source)
+    );
+  } catch {
+    return new Set();
+  }
 }
 
 function listPublicHtml() {
-  const files = fs
-    .readdirSync(root)
-    .filter((f) => f.endsWith('.html') && !SKIP_FILES.has(f));
-  const shareDir = path.join(root, 'share');
-  if (fs.existsSync(shareDir) && fs.statSync(shareDir).isDirectory()) {
-    for (const f of fs.readdirSync(shareDir)) {
-      if (f.endsWith('.html') && !SKIP_FILES.has(f)) files.push(path.join('share', f));
+  const files = [];
+  function walk(dir, prefix = '') {
+    for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (['node_modules', 'scripts', 'includes', 'api'].includes(name.name)) continue;
+      const rel = prefix ? `${prefix}/${name.name}` : name.name;
+      if (name.isDirectory()) walk(path.join(dir, name.name), rel);
+      else if (name.name.endsWith('.html') && !SKIP_FILES.has(name.name) && !SKIP_FILES.has(rel)) {
+        files.push(rel);
+      }
     }
   }
+  walk(root);
   return files;
 }
 
 const files = listPublicHtml();
+const redirectSources = loadRedirectSources();
 
 const entries = [];
 for (const file of files) {
@@ -75,6 +115,9 @@ for (const file of files) {
   const html = fs.readFileSync(filePath, 'utf8');
   if (!isIndexable(html)) continue;
   const locPath = canonicalPath(html, file);
+  const selfPath = ownPath(file);
+  if (redirectSources.has(selfPath)) continue;
+  if (locPath !== selfPath) continue;
   if (
     locPath.includes('/admin') ||
     locPath.includes('/login') ||
@@ -100,14 +143,43 @@ for (const e of entries) {
   seen.add(e.loc);
 }
 
+const LANG_CLUSTERS = [
+  {
+    'en-GB': '/heathrow-to-oxford-taxi',
+    ar: '/ar/heathrow-to-oxford-taxi',
+    'zh-Hans': '/zh/heathrow-to-oxford-taxi',
+  },
+  {
+    'en-GB': '/student-taxis',
+    ar: '/ar/international-student-arrivals',
+    'zh-Hans': '/zh/international-student-arrivals',
+  },
+];
+
+function clusterFor(locPath) {
+  return LANG_CLUSTERS.find((cluster) => Object.values(cluster).includes(locPath)) || null;
+}
+
+function xhtmlLinks(cluster) {
+  const defaultHref = `${BASE}${cluster['en-GB']}`;
+  return [
+    ...Object.entries(cluster).map(
+      ([lang, p]) => `    <xhtml:link rel="alternate" hreflang="${lang}" href="${BASE}${p}"/>`
+    ),
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${defaultHref}"/>`,
+  ].join('\n');
+}
+
+function urlXml(entry) {
+  const locPath = entry.loc.replace(BASE, '') || '/';
+  const cluster = clusterFor(locPath);
+  const links = cluster ? `\n${xhtmlLinks(cluster)}` : '';
+  return `  <url>\n    <loc>${entry.loc}</loc>\n    <lastmod>${entry.lastmod}</lastmod>${links}\n  </url>`;
+}
+
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${entries
-  .map(
-    (e) =>
-      `  <url>\n    <loc>${e.loc}</loc>\n    <lastmod>${e.lastmod}</lastmod>\n  </url>`
-  )
-  .join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+${entries.map(urlXml).join('\n')}
 </urlset>
 `;
 

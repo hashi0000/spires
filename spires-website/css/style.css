@@ -375,7 +375,7 @@ li + li { margin-top: 0.35rem; }
   .site-header__phone { display: none; }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1040px) {
   .site-nav { display: none; }
   .site-header__phone { display: none; }
   .site-menu-toggle { display: flex; }
@@ -2182,6 +2182,59 @@ header:not(.site-header) .logo-img { height: 44px; width: auto; }
 @media (max-width: 430px) {
   .terminal-guide h1 { font-size: 1.45rem; }
   .terminal-label { font-size: 1.25rem; }
+}
+
+html[dir="rtl"] .site-header,
+html[dir="rtl"] .site-footer,
+html[dir="rtl"] .site-menu,
+html[dir="rtl"] .share-top-banner {
+  direction: ltr;
+  text-align: left;
+}
+
+.lang-switcher {
+  direction: ltr;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  justify-content: flex-end;
+  width: min(100% - 2 * var(--gutter), var(--container));
+  margin: 0 auto;
+  padding: 0.55rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.lang-switcher a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.lang-switcher a:hover,
+.lang-switcher a:focus-visible {
+  text-decoration: underline;
+}
+.lang-switcher a[aria-current="page"] {
+  color: var(--gold);
+  text-decoration: none;
+  pointer-events: none;
+}
+.lang-note {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  max-width: 40rem;
+}
+html[lang="ar"] main {
+  font-family: "Noto Naskh Arabic", "DM Sans", sans-serif;
+}
+html[lang="zh-Hans"] main {
+  font-family: "Noto Sans SC", "DM Sans", sans-serif;
+}
+html[dir="rtl"] main {
+  text-align: right;
+}
+html[dir="rtl"] .price-table th,
+html[dir="rtl"] .price-table td,
+html[dir="rtl"] .booking-form label {
+  text-align: right;
 }
 
 /* Print */
