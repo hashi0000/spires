@@ -88,7 +88,24 @@ input, select, textarea {
   border-radius: 14px;
   padding: 0.9rem 1rem;
 }
+.job-card.is-return { border-left-color: var(--gold); }
+.job-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; }
 .job-when { font-weight: 800; color: var(--navy); }
+.job-charge { font-weight: 800; color: var(--navy); font-size: 1.15rem; white-space: nowrap; }
+.job-charge--paid { color: #166534; }
+.job-charge--tbc { color: var(--muted); font-size: 1rem; }
+.job-leg {
+  display: inline-block;
+  margin: 0.35rem 0 0.1rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #f4ead8;
+  color: #7a5a2b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 .job-route { font-weight: 700; margin: 0.2rem 0; }
 .job-meta { color: var(--muted); font-size: 0.95rem; }
 

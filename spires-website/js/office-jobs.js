@@ -57,6 +57,16 @@
     return toDate(booking.pickupTime || booking.dateTime);
   }
 
+  function money(value) {
+    if (value === undefined || value === null || String(value).trim() === "") return null;
+    const n = typeof value === "number" ? value : parseFloat(String(value));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function formatPounds(n) {
+    return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function textOf(booking, keys) {
     for (let i = 0; i < keys.length; i += 1) {
       const value = booking[keys[i]];
@@ -69,6 +79,53 @@
     return booking.status === "cancelled" || booking.customerStatus === "cancelled";
   }
 
+  function hasReturn(booking) {
+    if (booking.bookingType === "return" || booking.returnTrip === true) return true;
+    if (textOf(booking, ["returnPickupLocation"]) && textOf(booking, ["returnDestination"])) return true;
+    return Boolean(booking.returnPickupTime || booking.returnDateTime);
+  }
+
+  function returnPickupDate(booking) {
+    return toDate(booking.returnPickupTime || booking.returnDateTime);
+  }
+
+  function chargeFor(booking, leg) {
+    if (String(booking.paymentStatus || "").toLowerCase() === "paid") {
+      return { text: "Paid", kind: "paid" };
+    }
+    const due = money(leg === "return" ? booking.dueOnReturn : booking.dueOnOutbound);
+    if (due != null) return { text: "Charge " + formatPounds(due), kind: "due" };
+    if (leg === "return") return { text: "Charge as booked", kind: "tbc" };
+    const fare = money(booking.actualFare);
+    if (fare == null) return { text: "Fare TBC", kind: "tbc" };
+    const deposit = money(booking.depositAmount) || 0;
+    const remaining = String(booking.depositStatus || "") === "paid" ? Math.max(0, fare - deposit) : fare;
+    return { text: "Charge " + formatPounds(remaining), kind: "due" };
+  }
+
+  function expandJobs(booking) {
+    const from = textOf(booking, ["pickupLocation", "pickup"]);
+    const to = textOf(booking, ["destination"]);
+    const jobs = [
+      {
+        booking: booking,
+        leg: "outbound",
+        pickup: pickupDate(booking),
+        pickupLocation: from,
+        destination: to,
+      },
+    ];
+    if (!hasReturn(booking)) return jobs;
+    jobs.push({
+      booking: booking,
+      leg: "return",
+      pickup: returnPickupDate(booking),
+      pickupLocation: textOf(booking, ["returnPickupLocation"]) || to,
+      destination: textOf(booking, ["returnDestination"]) || from,
+    });
+    return jobs;
+  }
+
   function startOfDay(d) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
@@ -77,8 +134,7 @@
     return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
   }
 
-  function inView(booking, now) {
-    const pickup = pickupDate(booking);
+  function inViewPickup(pickup, now) {
     if (!pickup) return view === "all";
     const today = startOfDay(now);
     const tomorrow = addDays(today, 1);
@@ -92,8 +148,7 @@
     return match ? match.label : "Standard car";
   }
 
-  function formatWhen(booking) {
-    const pickup = pickupDate(booking);
+  function formatWhen(pickup) {
     if (!pickup) return "Time TBC";
     return pickup.toLocaleString("en-GB", {
       weekday: "short",
@@ -142,12 +197,10 @@
   function visibleJobs() {
     const now = new Date();
     return bookings
-      .filter((row) => !isCancelled(row) && inView(row, now))
-      .sort((a, b) => {
-        const aTime = pickupDate(a)?.getTime() || 0;
-        const bTime = pickupDate(b)?.getTime() || 0;
-        return aTime - bTime;
-      });
+      .filter((row) => !isCancelled(row))
+      .flatMap(expandJobs)
+      .filter((job) => inViewPickup(job.pickup, now))
+      .sort((a, b) => (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0));
   }
 
   function renderList() {
@@ -155,26 +208,37 @@
     jobList.innerHTML = "";
     emptyEl.textContent = view === "all" ? "No upcoming jobs." : "No jobs in this view.";
     show(emptyEl, rows.length === 0);
-    rows.forEach((booking) => {
+    rows.forEach((job) => {
+      const booking = job.booking;
+      const charge = chargeFor(booking, job.leg);
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "job-card";
+      button.className = "job-card" + (job.leg === "return" ? " is-return" : "");
       button.innerHTML =
+        '<div class="job-head">' +
         '<div class="job-when">' +
-        formatWhen(booking) +
+        escapeHtml(formatWhen(job.pickup)) +
         "</div>" +
+        '<div class="job-charge job-charge--' +
+        charge.kind +
+        '">' +
+        escapeHtml(charge.text) +
+        "</div></div>" +
+        (hasReturn(booking)
+          ? '<div class="job-leg">' + (job.leg === "return" ? "Return journey" : "Outbound") + "</div>"
+          : "") +
         '<div class="job-route">' +
-        escapeHtml(textOf(booking, ["pickupLocation", "pickup"])) +
+        escapeHtml(job.pickupLocation) +
         " to " +
-        escapeHtml(textOf(booking, ["destination"])) +
+        escapeHtml(job.destination) +
         "</div>" +
         '<div class="job-meta">' +
         escapeHtml(textOf(booking, ["hirerName", "name"])) +
         " · " +
         escapeHtml(vehicleLabel(booking.vehicleType)) +
         "</div>";
-      button.addEventListener("click", () => openDetail(booking));
+      button.addEventListener("click", () => openDetail(job));
       item.appendChild(button);
       jobList.appendChild(item);
     });
@@ -210,6 +274,7 @@
       hirerName: "",
       hirerPhone: "",
       vehicleType: "standard",
+      actualFare: "",
     };
   }
 
@@ -220,6 +285,7 @@
       : booking.vehicleType === "multiple"
         ? "multiple"
         : "standard";
+    const fare = money(booking.actualFare);
     return {
       pickupDate: ymd(pickup),
       pickupTime: hm(pickup),
@@ -228,6 +294,7 @@
       hirerName: textOf(booking, ["hirerName", "name"]),
       hirerPhone: textOf(booking, ["hirerPhone", "phone"]),
       vehicleType: type,
+      actualFare: fare == null ? "" : String(fare),
     };
   }
 
@@ -237,18 +304,28 @@
     editingId = null;
   }
 
-  function openDetail(booking) {
+  function openDetail(job) {
+    const booking = job.booking;
+    const charge = chargeFor(booking, job.leg);
     const phone = textOf(booking, ["hirerPhone", "phone"]);
     const call = telHref(phone);
     const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || ""));
     sheetCard.innerHTML =
       "<h2>" +
-      escapeHtml(formatWhen(booking)) +
+      escapeHtml(formatWhen(job.pickup)) +
       "</h2>" +
+      (hasReturn(booking)
+        ? '<p class="job-leg">' + (job.leg === "return" ? "Return journey" : "Outbound") + "</p>"
+        : "") +
       '<p class="job-route">' +
-      escapeHtml(textOf(booking, ["pickupLocation", "pickup"])) +
+      escapeHtml(job.pickupLocation) +
       " to " +
-      escapeHtml(textOf(booking, ["destination"])) +
+      escapeHtml(job.destination) +
+      "</p>" +
+      '<p class="job-charge job-charge--' +
+      charge.kind +
+      '">' +
+      escapeHtml(charge.text) +
       "</p>" +
       "<p>" +
       escapeHtml(textOf(booking, ["hirerName", "name"])) +
@@ -267,10 +344,10 @@
     show(sheet, true);
     document.getElementById("close-detail").onclick = closeSheet;
     document.getElementById("edit-job").onclick = () => openForm(booking);
-    document.getElementById("cancel-job").onclick = () => confirmCancel(booking);
+    document.getElementById("cancel-job").onclick = () => confirmCancel(booking, job);
   }
 
-  function confirmCancel(booking) {
+  function confirmCancel(booking, job) {
     sheetCard.innerHTML =
       "<h2>Cancel this job?</h2>" +
       "<p>It stays on the record and disappears from the live list for everyone.</p>" +
@@ -279,7 +356,7 @@
       '<button type="button" class="btn" id="keep-job">Keep job</button>' +
       "</div>" +
       '<p id="detail-error" class="error" hidden></p>';
-    document.getElementById("keep-job").onclick = () => openDetail(booking);
+    document.getElementById("keep-job").onclick = () => openDetail(job || expandJobs(booking)[0]);
     document.getElementById("confirm-cancel").onclick = async () => {
       try {
         const payload = {
@@ -334,6 +411,9 @@
       '<label>Contact number<input name="hirerPhone" type="tel" inputmode="tel" required value="' +
       escapeHtml(draft.hirerPhone) +
       '" autocomplete="tel"></label>' +
+      '<label>Amount to charge (£)<input name="actualFare" type="number" inputmode="decimal" min="0" step="0.01" value="' +
+      escapeHtml(draft.actualFare || "") +
+      '"></label>' +
       '<fieldset class="vehicle"><legend>Vehicle</legend>' +
       VEHICLES.map(
         (row) =>
@@ -380,6 +460,7 @@
       hirerName: String(data.get("hirerName") || "").trim(),
       hirerPhone: String(data.get("hirerPhone") || "").trim(),
       vehicleType: String(data.get("vehicleType") || "standard"),
+      actualFare: String(data.get("actualFare") || "").trim(),
     };
   }
 
@@ -391,6 +472,8 @@
     }
     const pickupIso = fromDateAndTime(draft.pickupDate, draft.pickupTime);
     const actor = auth.currentUser && auth.currentUser.uid;
+    const fare = money(draft.actualFare);
+    const fareFields = fare == null ? {} : { actualFare: fare };
     try {
       if (existing && existing.id) {
         const nextStatus =
@@ -401,39 +484,49 @@
               : existing.status === "pending"
                 ? "pending"
                 : "confirmed";
-        await db.collection("bookings").doc(existing.id).update({
-          pickupTime: pickupIso,
-          dateTime: pickupIso,
-          pickupLocation: draft.pickupLocation,
-          destination: draft.destination,
-          hirerName: draft.hirerName,
-          hirerPhone: draft.hirerPhone,
-          vehicleType: draft.vehicleType,
-          status: nextStatus,
-          updatedByUid: actor,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
+        await db.collection("bookings").doc(existing.id).update(
+          Object.assign(
+            {
+              pickupTime: pickupIso,
+              dateTime: pickupIso,
+              pickupLocation: draft.pickupLocation,
+              destination: draft.destination,
+              hirerName: draft.hirerName,
+              hirerPhone: draft.hirerPhone,
+              vehicleType: draft.vehicleType,
+              status: nextStatus,
+              updatedByUid: actor,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            },
+            fareFields
+          )
+        );
       } else {
-        await db.collection("bookings").add({
-          bookingNumber: bookingNumber(),
-          dateTime: pickupIso,
-          pickupTime: pickupIso,
-          pickupLocation: draft.pickupLocation,
-          destination: draft.destination,
-          hirerName: draft.hirerName,
-          hirerPhone: draft.hirerPhone,
-          hirerAddress: "",
-          bookingMethod: "telephone",
-          bookingType: "one_way",
-          vehicleType: draft.vehicleType,
-          status: "confirmed",
-          paymentStatus: "pending",
-          source: "family",
-          createdByUid: actor,
-          updatedByUid: actor,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        });
+        await db.collection("bookings").add(
+          Object.assign(
+            {
+              bookingNumber: bookingNumber(),
+              dateTime: pickupIso,
+              pickupTime: pickupIso,
+              pickupLocation: draft.pickupLocation,
+              destination: draft.destination,
+              hirerName: draft.hirerName,
+              hirerPhone: draft.hirerPhone,
+              hirerAddress: "",
+              bookingMethod: "telephone",
+              bookingType: "one_way",
+              vehicleType: draft.vehicleType,
+              status: "confirmed",
+              paymentStatus: "pending",
+              source: "family",
+              createdByUid: actor,
+              updatedByUid: actor,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            },
+            fareFields
+          )
+        );
         sessionStorage.removeItem(DRAFT_KEY);
       }
       statusEl.textContent = existing ? "Job updated." : "Job added.";
