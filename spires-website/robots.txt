@@ -6,6 +6,13 @@ Allow: /images/
 
 Disallow: /login
 Disallow: /admin
+Disallow: /office-jobs
+Disallow: /office-jobs-manifest.json
+Disallow: /office-jobs-sw.js
+Disallow: /js/office-jobs.js
+Disallow: /css/office-jobs.css
+Disallow: /images/office-jobs-192.png
+Disallow: /images/office-jobs-512.png
 Disallow: /share-terms
 Disallow: /spires-share
 Disallow: /api/

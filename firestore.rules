@@ -6,13 +6,31 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Admin dashboard accounts — add staff emails here
+    // Full admin (invoices, school vault access via functions, customer records).
     function isAdmin() {
       return isAuthenticated()
         && request.auth.token.email.lower() in [
           'spirestaxis24@gmail.com',
           'hashim@spires.com'
         ];
+    }
+
+    // Office email accounts (admin app). Keep in sync with FAMILY_STAFF_EMAILS / ADMIN_EMAILS.
+    function isStaff() {
+      return isAuthenticated()
+        && request.auth.token.email.lower() in [
+          'spirestaxis24@gmail.com',
+          'hashim@spires.com'
+        ];
+    }
+
+    // Remembered family phones. UID is minted by unlockFamilyJobs after a server PIN check.
+    function isFamilyDevice() {
+      return isAuthenticated()
+        && request.auth.token.familyJobs == true
+        && exists(/databases/$(database)/documents/familyDevices/$(request.auth.uid))
+        && get(/databases/$(database)/documents/familyDevices/$(request.auth.uid)).data.enabled == true
+        && get(/databases/$(database)/documents/familyDevices/$(request.auth.uid)).data.expiresAt > request.time;
     }
 
     function isOwner(userId) {
@@ -24,9 +42,18 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    match /familyDevices/{deviceId} {
+      allow read: if isAuthenticated() && request.auth.uid == deviceId;
+      allow write: if false;
+    }
+
+    match /familyJobsUnlockAttempts/{docId} {
+      allow read, write: if false;
+    }
+
     match /bookings/{bookingId} {
-      // Admin dashboard — full access
-      allow read, write: if isAdmin();
+      // Office emails and PIN-authorised family devices — shared live calendar
+      allow read, write: if isStaff() || isFamilyDevice();
 
       // Customer app — own bookings only
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;

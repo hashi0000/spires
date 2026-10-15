@@ -42,10 +42,14 @@ export const onBookingWrite = functions.firestore
 
     // Created already confirmed (admin-created) → send confirmation PDF
     if (!before && isConfirmedStatus(after)) {
-      await sendBookingReceipt(after, "confirmation", bookingId);
-      await change.after.ref.update({
-        confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      const familyWithoutEmail =
+        after.source === "family" && !(after.hirerEmail || after.email);
+      if (!familyWithoutEmail) {
+        await sendBookingReceipt(after, "confirmation", bookingId);
+        await change.after.ref.update({
+          confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
       return;
     }
 
@@ -89,6 +93,7 @@ export const scheduledBookingReminderEmails = functions
 // Stripe kept in codebase but unused in customer UI for now
 export { createPaymentIntent, confirmPayment, stripeWebhook };
 export { sendDriverReminderManual } from "./sendDriverReminderManual";
+export { unlockFamilyJobs } from "./familyJobsAuth";
 export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";

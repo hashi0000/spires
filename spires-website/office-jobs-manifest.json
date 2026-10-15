@@ -1,0 +1,24 @@
+{
+  "short_name": "Spires Jobs",
+  "name": "Spires Taxis Family Jobs",
+  "icons": [
+    {
+      "src": "/images/office-jobs-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/office-jobs-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/office-jobs",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#002147",
+  "background_color": "#002147"
+}

@@ -1,0 +1,138 @@
+:root {
+  --navy: #002147;
+  --gold: #c5a572;
+  --text: #1a2332;
+  --muted: #5c6570;
+  --line: #e4e9ef;
+  --bg: #f4f7fa;
+  --warn: #9a3412;
+  --touch: 48px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.screen { max-width: 40rem; margin: 0 auto; padding: 1.25rem 1.1rem 6.5rem; }
+#pin-screen {
+  min-height: 100vh;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(160deg, #002147, #163a5f);
+  color: #fff;
+  padding: 2rem 1.1rem;
+}
+#pin-screen .logo { filter: brightness(0) invert(1); }
+#pin-screen h1, #pin-screen label { color: #fff; }
+#pin-screen .lede { color: #d7e0ea; max-width: 22rem; }
+#pin-form {
+  width: min(24rem, 100%);
+  margin: 1rem auto 0;
+  background: #fff;
+  color: var(--text);
+  border-radius: 20px;
+  padding: 1.25rem;
+  text-align: left;
+}
+#pin-form label { color: var(--navy); }
+.logo { display: block; height: 42px; width: auto; margin: 2.5rem auto 1.25rem; }
+h1 { margin: 0; font-size: 1.7rem; color: var(--navy); }
+.lede, .kicker { color: var(--muted); }
+.kicker { margin: 0; font-weight: 700; letter-spacing: 0.04em; color: var(--gold); text-transform: uppercase; font-size: 0.75rem; }
+.top { margin-bottom: 1rem; }
+
+label { display: flex; flex-direction: column; gap: 0.4rem; font-weight: 700; color: var(--navy); margin: 0.85rem 0; }
+input, select, textarea, button { font: inherit; }
+input, select, textarea {
+  min-height: var(--touch);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  width: 100%;
+  background: #fff;
+}
+
+.btn, .fab, .tabs button {
+  min-height: var(--touch);
+  border: 0;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.8rem 1rem; text-decoration: none; color: var(--navy); background: #fff; border: 1px solid var(--line); }
+.btn-primary { background: var(--navy); color: var(--gold); border: 0; width: 100%; }
+.btn-danger { background: #b91c1c; color: #fff; border: 0; }
+.btn[disabled] { opacity: 0.6; }
+
+.tabs { display: flex; gap: 0.35rem; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem; margin-bottom: 1rem; }
+.tabs button { flex: 1; background: transparent; color: var(--muted); border-radius: 999px; }
+.tabs button.is-active { background: var(--navy); color: #fff; }
+
+.job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+.job-card {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--navy);
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+}
+.job-when { font-weight: 800; color: var(--navy); }
+.job-route { font-weight: 700; margin: 0.2rem 0; }
+.job-meta { color: var(--muted); font-size: 0.95rem; }
+
+.empty, .error, .ok { padding: 0.85rem 0; }
+.empty { background: #fff; border: 1px dashed var(--line); border-radius: 14px; padding: 1.2rem; color: var(--muted); }
+.error { color: #b91c1c; }
+.ok { color: #166534; }
+
+.fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  background: var(--navy);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 0 1.35rem;
+  box-shadow: 0 10px 24px rgba(0, 33, 71, 0.28);
+  z-index: 20;
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 28, 61, 0.4);
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet-card {
+  background: #fff;
+  width: min(40rem, 100%);
+  max-height: 94vh;
+  overflow: auto;
+  border-radius: 20px 20px 0 0;
+  padding: 1.2rem 1.1rem 1.6rem;
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+.vehicle { display: flex; flex-direction: column; gap: 0.4rem; }
+.vehicle label { flex-direction: row; align-items: center; min-height: var(--touch); font-weight: 600; margin: 0; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+
+@media (min-width: 800px) {
+  .sheet { align-items: center; }
+  .sheet-card { border-radius: 20px; }
+}
