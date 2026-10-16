@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeaderScroll();
   initFadeIn();
   initSmoothScroll();
+  initMobileBookBar();
 });
 
 function initNavActive() {
@@ -143,5 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
   legacyOverlay.addEventListener('click', close);
   legacyPanel.querySelectorAll('a').forEach((a) => a.addEventListener('click', close));
 });
+
+function initMobileBookBar() {
+  if (document.querySelector('.mobile-book-bar')) return;
+  const path = window.location.pathname;
+  if (path.indexOf('office-jobs') !== -1) return;
+  const bar = document.createElement('nav');
+  bar.className = 'mobile-book-bar no-print';
+  bar.setAttribute('aria-label', 'Book a journey');
+  bar.innerHTML =
+    '<a class="btn btn--primary" href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">Book online</a>' +
+    '<a class="btn btn--whatsapp" href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" target="_blank" rel="noopener noreferrer">WhatsApp</a>';
+  document.body.appendChild(bar);
+}
 
 window.SpiresTaxis = { showNotification: () => {} };

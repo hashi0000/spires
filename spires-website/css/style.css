@@ -126,8 +126,8 @@ summary:focus-visible {
   background: var(--blue);
   color: #fff;
   text-align: center;
-  font-size: 0.92rem;
-  padding: 0.55rem var(--gutter);
+  font-size: 0.86rem;
+  padding: 0.4rem var(--gutter);
 }
 
 .share-top-banner p {
@@ -180,11 +180,13 @@ li + li { margin-top: 0.35rem; }
   margin-inline: auto;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 900px) and (min-width: 721px) {
   .container {
     padding-right: 4.5rem;
   }
+}
 
+@media (max-width: 900px) {
   main {
     padding-bottom: 5rem;
   }
@@ -553,7 +555,14 @@ a.btn-primary, .btn.btn-primary,
 .hero__inner { max-width: 46rem; }
 
 .hero__label {
-  display: none;
+  display: inline-block;
+  margin-bottom: 0.7rem;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
 }
 
 .hero h1 { margin-bottom: 0.85rem; }
@@ -600,6 +609,26 @@ a.btn-primary, .btn.btn-primary,
 .hero--home .btn-group {
   margin-top: 1.85rem;
   gap: 0.75rem;
+}
+
+.trust-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.35rem 0 0;
+}
+
+.trust-points li {
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--blue);
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 @media (max-width: 600px) {
@@ -727,7 +756,11 @@ a.btn-primary, .btn.btn-primary,
 
 .card:hover {
   box-shadow: var(--shadow);
-  transform: translateY(-2px);
+  border-color: #d3dce6;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover { transform: translateY(-2px); }
 }
 
 .reviews-embed {
@@ -1045,6 +1078,11 @@ h2,
 }
 
 .price-table tr:last-child td { border-bottom: none; }
+
+.price-table tbody tr:nth-child(even) td,
+.price-table tbody tr:nth-child(even) th {
+  background: #f7f9fb;
+}
 
 .airport-fare-table-wrap {
   overflow-x: auto;
@@ -1440,6 +1478,44 @@ h2,
 
 .card.vehicle-card {
   height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.vehicle-specs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0.85rem 0 1rem;
+}
+
+.vehicle-specs div {
+  margin: 0;
+  padding: 0.65rem 0.7rem;
+  background: var(--blue-soft);
+  border-radius: 10px;
+}
+
+.vehicle-specs dt {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.vehicle-specs dd {
+  margin: 0;
+  color: var(--blue);
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+@media (max-width: 520px) {
+  .vehicle-specs { grid-template-columns: 1fr; }
 }
 
 .grid + .vehicle-disclaimer {
@@ -1850,6 +1926,46 @@ h2,
 .footer-col a { color: rgba(255,255,255,0.85); text-decoration: none; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.12); margin-top: 2rem; padding-top: 1rem; font-size: 0.85rem; text-align: center; color: rgba(255,255,255,0.6); }
 
+.share-announce {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.35rem 1.2rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.mobile-book-bar {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .mobile-book-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 95;
+    gap: 0.55rem;
+    padding: 0.65rem 0.85rem calc(0.65rem + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(0, 33, 71, 0.06);
+  }
+
+  .mobile-book-bar .btn {
+    flex: 1;
+    min-height: 46px;
+  }
+
+  main,
+  .site-footer {
+    padding-bottom: 5.5rem;
+  }
+
+  body.is-menu-open .mobile-book-bar { display: none; }
+}
+
 /* —— WhatsApp float —— */
 .whatsapp-float {
   position: fixed;
@@ -1884,6 +2000,10 @@ h2,
     bottom: 0.9rem;
     right: 0.7rem;
   }
+}
+
+@media (max-width: 720px) {
+  .whatsapp-float { display: none; }
 }
 
 body.is-menu-open .whatsapp-float {
@@ -2058,8 +2178,40 @@ header:not(.site-header) .logo-img { height: 44px; width: auto; }
   display: grid;
   gap: 0.75rem;
   margin: 1.25rem 0 1.5rem;
-  padding-left: 1.2rem;
+  padding: 0;
+  list-style: none;
+  counter-reset: sharestep;
 }
+
+.share-steps li {
+  position: relative;
+  margin: 0;
+  padding: 0.95rem 1rem 0.95rem 3.5rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+}
+
+.share-steps li::before {
+  counter-increment: sharestep;
+  content: counter(sharestep);
+  position: absolute;
+  left: 0.85rem;
+  top: 0.85rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  background: var(--blue);
+  color: var(--white);
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-steps li strong { color: var(--blue); }
 .share-grid {
   display: grid;
   gap: 1rem;
