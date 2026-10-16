@@ -19,9 +19,9 @@
   <meta property="og:site_name" content="Spires Taxis">
   <meta property="og:locale" content="en_GB">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Oxford Taxis | Local Journeys from £8 | Spires Taxis">
-  <title>Oxford Taxis | Local Journeys from £8 | Spires Taxis</title>
-  <meta name="description" content="Pre-booked Oxford taxis with fixed prices. Local journeys from £8, stations, hospitals and colleges. Oxford to Heathrow £92 one way. Call or WhatsApp 07776 897772.">
+  <meta name="twitter:title" content="Oxford Taxis | Fixed Price Private Hire | Spires Taxis">
+  <title>Oxford Taxis | Fixed Price Private Hire | Spires Taxis</title>
+  <meta name="description" content="Fixed price Oxford taxis for stations, hospitals, colleges and local journeys. Licensed private hire, booked ahead. Local trips from £8. Call or WhatsApp 07776 897772.">
   <link rel="canonical" href="https://www.spires-taxis.com/oxford-taxis">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
@@ -30,8 +30,8 @@
   <meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
   <meta name="twitter:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
-  <meta property="og:title" content="Oxford Taxis | Local Journeys from £8 | Spires Taxis">
-  <meta property="og:description" content="Fixed price private hire across Oxford. Local trips from £8, airport runs and pre-booked journeys across Oxfordshire.">
+  <meta property="og:title" content="Oxford Taxis | Fixed Price Private Hire | Spires Taxis">
+  <meta property="og:description" content="Fixed price private hire across Oxford. Local trips from £8 for stations, hospitals, colleges and home addresses.">
   <meta property="og:url" content="https://www.spires-taxis.com/oxford-taxis">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,18 +44,34 @@
     "mainEntity": [
       {
         "@type": "Question",
-        "name": "How much is a taxi within Oxford?",
+        "name": "Can I book a taxi for right now?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Guide fares within Oxford start from £8 for a standard pre-booked journey. We confirm the exact price when you book based on your pickup and destination."
+          "text": "We are a pre booked service. WhatsApp or call and we will do our best for short notice jobs, but booking ahead gives you a confirmed car and price."
         }
       },
       {
         "@type": "Question",
-        "name": "Do you cover Oxford colleges and hospitals?",
+        "name": "Do you do street hail pickups?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. We regularly pick up from colleges, the JR and Churchill hospitals, Oxford station, bus station and hotels across the city."
+          "text": "No. We are licensed for private hire, which means journeys must be pre booked. You cannot flag us down on the street like a black cab."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What areas of Oxford do you cover?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "All of Oxford city: Headington, Summertown, Cowley, Botley, Iffley, Jericho and everywhere in between. We also cover villages across Oxfordshire."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I book a local Oxford taxi?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Send the date, pickup time, full pickup address, destination and number of passengers. We confirm a fixed fare before you travel. Local trips within Oxford start from £8."
         }
       }
     ]
@@ -112,7 +128,7 @@
 }
   </script>
 </head>
-<body data-page="local">
+<body data-page="oxford">
 
 
 
@@ -129,6 +145,7 @@
     <nav class="site-nav" aria-label="Main">
       <ul class="site-nav__list">
         <li><a href="/" data-nav="home">Home</a></li>
+        <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
         <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
         <li><a href="/rates" data-nav="rates">Rates</a></li>
         <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
@@ -138,6 +155,14 @@
       </ul>
     </nav>
     <div class="site-header__actions">
+      <div class="lang-menu" data-lang-menu>
+        <button type="button" class="lang-menu__btn" aria-expanded="false" aria-haspopup="listbox" aria-label="Language">
+          <svg class="lang-menu__globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span class="lang-menu__text" data-lang-current>English</span>
+          <svg class="lang-menu__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="lang-menu__panel" role="listbox" hidden></div>
+      </div>
       <a href="tel:+447776897772" class="site-header__phone">07776 897772</a>
       <a href="/share" class="btn btn--share site-header__share">Spires Share</a>
       <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
@@ -155,17 +180,29 @@
   </div>
   <ul class="site-menu__links">
     <li><a href="/" data-nav="home">Home</a></li>
+    <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
     <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
     <li><a href="/how-airport-pickup-works" data-nav="pickup">How airport pickup works</a></li>
-    <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
     <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Oxford to Heathrow</a></li>
+    <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
     <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
-    <li><a href="/rates" data-nav="rates">Rates</a></li>
     <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
+    <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
+    <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
+    <li><a href="/rates" data-nav="rates">Rates</a></li>
     <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
     <li><a href="/about" data-nav="about">About</a></li>
     <li><a href="/contact" data-nav="contact">Contact</a></li>
   </ul>
+  <div class="lang-menu lang-menu--mobile" data-lang-menu>
+    <p class="lang-menu__heading">Language</p>
+    <button type="button" class="lang-menu__btn" aria-expanded="false" aria-haspopup="listbox" aria-label="Language">
+      <svg class="lang-menu__globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+      <span class="lang-menu__text" data-lang-current>English</span>
+      <svg class="lang-menu__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="lang-menu__panel" role="listbox" hidden></div>
+  </div>
   <div class="site-menu__cta">
     <a href="/share" class="btn btn--share btn--block">Spires Share</a>
     <a href="tel:+447776897772" class="btn btn--outline btn--block">Call us</a>
@@ -179,7 +216,7 @@
   <section class="hero hero--compact">
     <div class="container hero__inner fade-in">
       <h1>Oxford taxis with a fixed price</h1>
-      <p class="hero__lead">We're a local private hire firm based in Oxford. Most of our work is airport runs, but we also do everyday journeys around the city: stations, hospitals, colleges, hotels and home addresses. You get a fixed fare when you book. Local trips within Oxford from <strong>£8</strong>.</p>
+      <p class="hero__lead">We're a local private hire firm based in Oxford. This page is for everyday journeys around the city: stations, hospitals, colleges, hotels and home addresses. You get a fixed fare when you book. Local trips within Oxford from <strong>£8</strong>. Airport transfers have their own pages.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="https://wa.me/447776897772?text=Hi%2C%20I%27d%20like%20an%20Oxford%20taxi%20on%20%5Bdate%5D.%20Pickup%3A%20%5Baddress%5D.%20Destination%3A%20%5Baddress%5D" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
@@ -192,7 +229,7 @@
     <div class="container split">
       <div class="prose fade-in">
         <h2>Getting around Oxford</h2>
-        <p>Oxford is a busy city with one way systems, college areas and rush-hour traffic that catches people out. When you pre-book with us, you get a car at a set time and a price agreed before you travel, not a meter ticking in a queue on the High Street.</p>
+        <p>Oxford is a busy city with one way systems, college areas and rush hour traffic that catches people out. When you pre book with us, you get a car at a set time and a price agreed before you travel, not a meter ticking in a queue on the High Street.</p>
         <p>We pick up from home addresses, hotels, Oxford station, the bus station, the JR and Churchill hospitals, and colleges across the city. Tell us exactly where when you book.</p>
         <p>See our full <a href="/rates">rate card</a> for local and regional fares. For cruise terminals, St Pancras, Silverstone and Cotswolds days, see <a href="/long-distance-taxis">long distance taxis</a>.</p>
       </div>
@@ -215,14 +252,14 @@
       <div class="section__header fade-in">
         <p class="section__eyebrow">Airport connections</p>
         <h2>Flying from Oxford?</h2>
-        <p>Most of our work is airport transfers. Return booking prices from Oxford (up to 4 passengers). Nearby towns are quoted separately, and those prices are subject to change.</p>
+        <p>Airport work is booked on the dedicated transfer pages. The figures below are Oxford fares only. Nearby towns are quoted separately, and those prices are subject to change. Customer reviews: <a href="/reviews">reviews</a>.</p>
       </div>
       <div class="grid grid-3 fade-in">
         <a href="/oxford-to-heathrow-taxi" class="card card--link">
           <h3>Oxford to Heathrow</h3>
           <div class="card__price-lines">
-            <p class="card__price">£92 one way</p>
-            <p class="card__price">£180 return</p>
+            <p class="card__price"><span data-spires-price="heathrow.standardCar.oneWay">£92</span> one way</p>
+            <p class="card__price"><span data-spires-price="heathrow.standardCar.return">£180</span> return</p>
           </div>
           <p class="card__meta">Return booking · all terminals</p>
         </a>
@@ -264,19 +301,19 @@
       <div class="faq fade-in">
         <details>
           <summary>Can I book a taxi for right now?</summary>
-          <p>We're a pre-booked service. WhatsApp or call and we'll do our best for short-notice jobs, but booking ahead gives you a confirmed car and price.</p>
+          <p>We are a pre booked service. WhatsApp or call and we will do our best for short notice jobs, but booking ahead gives you a confirmed car and price.</p>
         </details>
         <details>
           <summary>Do you do street hail pickups?</summary>
-          <p>No. We're licensed for private hire, which means journeys must be pre-booked. You can't flag us down on the street like a black cab.</p>
+          <p>No. We are licensed for private hire, which means journeys must be pre booked. You cannot flag us down on the street like a black cab.</p>
         </details>
         <details>
           <summary>What areas of Oxford do you cover?</summary>
           <p>All of Oxford city: Headington, Summertown, Cowley, Botley, Iffley, Jericho and everywhere in between. We also cover villages across Oxfordshire.</p>
         </details>
         <details>
-          <summary>How much is Oxford to Heathrow?</summary>
-          <p>Standard Car £92 one way or £180 return for Oxford, for up to 4 passengers. Nearby towns are quoted separately and those prices are subject to change. See our <a href="/oxford-to-heathrow-taxi">Oxford to Heathrow page</a> or <a href="/rates">full airport prices</a>.</p>
+          <summary>How do I book a local Oxford taxi?</summary>
+          <p>Send the date, pickup time, full pickup address, destination and number of passengers. We confirm a fixed fare before you travel. Local trips within Oxford start from £8. For airports use <a href="/airport-transfers">airport transfers</a>.</p>
         </details>
       </div>
     </div>
@@ -316,21 +353,26 @@
         <li><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a></li>
         <li><a href="/oxford-to-gatwick-taxi">Oxford to Gatwick</a></li>
         <li><a href="/oxford-to-luton-taxi">Oxford to Luton</a></li>
+        <li><a href="/oxford-to-stansted-taxi">Oxford to Stansted</a></li>
+        <li><a href="/oxford-to-birmingham-airport-taxi">Oxford to Birmingham Airport</a></li>
+        <li><a href="/oxford-to-bristol-airport-taxi">Oxford to Bristol Airport</a></li>
         <li><a href="/oxford-to-london-city-airport-taxi">Oxford to London City</a></li>
       </ul>
     </div>
     <div>
       <h2 class="site-footer__heading">Useful links</h2>
       <ul class="site-footer__links">
+        <li><a href="/oxford-taxis">Oxford taxis</a></li>
         <li><a href="/rates">Airport transfer prices</a></li>
         <li><a href="/long-distance-taxis">Long distance from Oxford</a></li>
         <li><a href="/student-taxis">Student taxis</a></li>
+        <li><a href="/corporate-taxis">Corporate taxis</a></li>
         <li><a href="/our-vehicles">Our vehicles</a></li>
         <li><a href="/reviews">Customer reviews</a></li>
         <li><a href="/about">About us</a></li>
         <li><a href="/contact">Contact &amp; booking</a></li>
-        <li><a href="/terms-and-conditions">Terms</a></li>
         <li><a href="/share">Spires Share</a></li>
+        <li><a href="/terms-and-conditions">Terms</a></li>
         <li><a href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">My account</a></li>
       </ul>
     </div>
@@ -348,6 +390,7 @@
 <script src="/js/airport-prices.js" defer></script>
 <script src="/js/share-teaser.js" defer></script>
 <script src="/js/main.js" defer></script>
+<script src="/js/lang-switcher.js" defer></script>
 <!-- /SITE-FOOTER -->
 
 </body>

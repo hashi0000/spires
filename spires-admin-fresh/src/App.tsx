@@ -32,11 +32,17 @@ import './styles.css';
 
 const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
 const UPCOMING_SOON_MS = 48 * 60 * 60 * 1000;
+const LAST_TAB_KEY = 'spires_admin_last_tab';
+
+function initialAdminTab(): string {
+  if (typeof window === 'undefined') return 'dashboard';
+  return sessionStorage.getItem(LAST_TAB_KEY) || 'dashboard';
+}
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(initialAdminTab);
   const [desktopRemindersEnabled, setDesktopRemindersEnabled] = useState(() =>
     typeof window !== 'undefined' && localStorage.getItem(DESKTOP_REMINDERS_KEY) === 'true'
   );
@@ -54,6 +60,10 @@ const App: React.FC = () => {
     const id = window.setInterval(() => setHeaderNow(new Date()), 60 * 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem(LAST_TAB_KEY, activeTab);
+  }, [activeTab]);
 
   const driversHook = useDrivers();
   const vehiclesHook = useVehicles();

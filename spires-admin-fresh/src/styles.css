@@ -1535,3 +1535,328 @@ header.admin-header,
   .share-ops-drawer { width: 100%; }
 }
 
+/* ========= Family Job Manager ========== */
+.family-jobs {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: 6rem;
+}
+.family-jobs-head h2 {
+  margin: 0;
+  color: #002147;
+  font-size: 1.6rem;
+}
+.family-jobs-head p {
+  margin: 0.35rem 0 1rem;
+  color: #4b5563;
+}
+.family-jobs-tabs,
+.family-jobs-filters,
+.family-jobs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.family-jobs-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.family-jobs-tabs {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.25rem;
+  margin-bottom: 0.85rem;
+}
+.family-jobs-tabs button {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+.family-jobs-tabs button.is-active {
+  background: #002147;
+  color: #fff;
+}
+.family-jobs-filters {
+  margin-bottom: 0.85rem;
+}
+.family-jobs-search {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0 0.85rem;
+  min-height: 48px;
+}
+.family-jobs-search input,
+.family-jobs-filters select,
+.family-jobs-form input,
+.family-jobs-form select,
+.family-jobs-form textarea {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  min-height: 44px;
+  background: transparent;
+}
+.family-jobs-filters select {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0 0.75rem;
+}
+.family-jobs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.family-job-card {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 6px solid #002147;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  cursor: pointer;
+}
+.family-job-card.is-unassigned {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+.family-job-when {
+  font-weight: 700;
+  color: #002147;
+}
+.family-job-route {
+  font-weight: 600;
+  margin: 0.2rem 0;
+}
+.family-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.9rem;
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+.family-job-meta .is-warn {
+  color: #9a3412;
+  font-weight: 700;
+}
+.family-job-conflict {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #9a3412;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+.family-jobs-empty,
+.family-jobs-error,
+.family-jobs-ok,
+.family-jobs-muted {
+  padding: 0.85rem 0;
+}
+.family-jobs-empty {
+  background: #fff;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  padding: 1.25rem;
+  color: #6b7280;
+}
+.family-jobs-error { color: #b91c1c; }
+.family-jobs-ok { color: #166534; }
+.family-jobs-muted { color: #6b7280; font-size: 0.9rem; }
+.family-jobs-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.family-jobs-form legend {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.family-jobs-fab {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 56px;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #002147;
+  color: #c5a572;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(0, 33, 71, 0.28);
+  cursor: pointer;
+}
+.family-jobs-sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 28, 61, 0.4);
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.family-jobs-sheet-card {
+  background: #fff;
+  width: min(640px, 100%);
+  max-height: 94vh;
+  overflow: auto;
+  border-radius: 20px 20px 0 0;
+  padding: 1.2rem 1.1rem 1.5rem;
+  position: relative;
+}
+.family-jobs-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  border: 0;
+  background: #f3f4f6;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.family-jobs-kicker {
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: #c5a572;
+  margin: 0 0 0.35rem;
+}
+.family-jobs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.family-jobs-form label,
+.family-jobs-form fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+.family-jobs-form input,
+.family-jobs-form select,
+.family-jobs-form textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  background: #fff;
+  font-weight: 500;
+}
+.family-jobs-radio {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.6rem !important;
+  min-height: 44px;
+  font-weight: 500 !important;
+}
+.family-jobs-more {
+  border: 0;
+  background: none;
+  color: #002147;
+  font-weight: 700;
+  text-align: left;
+  min-height: 44px;
+  cursor: pointer;
+}
+.family-jobs-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.family-jobs-submit {
+  min-height: 52px;
+  width: 100%;
+  justify-content: center;
+}
+.family-jobs-confirm {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.family-jobs-cal {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.family-jobs-cal-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.family-jobs-cal-nav button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: #f3f4f6;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.family-jobs-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+.family-jobs-cal-dow,
+.family-jobs-cal-day {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  font-weight: 600;
+}
+.family-jobs-cal-day {
+  border-radius: 10px;
+  cursor: pointer;
+}
+.family-jobs-cal-day.has-jobs {
+  box-shadow: inset 0 -3px 0 #c5a572;
+}
+.family-jobs-cal-day.is-selected {
+  background: #002147;
+  color: #fff;
+}
+.family-jobs-actions a,
+.family-jobs-actions button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+@media (min-width: 800px) {
+  .family-jobs-sheet {
+    align-items: center;
+  }
+  .family-jobs-sheet-card {
+    border-radius: 20px;
+  }
+}
+

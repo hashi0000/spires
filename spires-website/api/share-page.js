@@ -61,21 +61,37 @@ function injectEventMeta(html, event) {
 
 module.exports = async (req, res) => {
   const enabled = flag("SPIRES_SHARE_ENABLED") && flag("SPIRES_SHARE_PILOT");
-  const file = enabled ? "share.html" : "404.html";
-  let html = fs.readFileSync(path.join(process.cwd(), file), "utf8");
-  if (enabled) {
-    const slug = eventSlugFromUrl(req.url);
-    if (slug) {
-      const events = await fetchEvents();
-      const event = events.find((row) => row.eventSlug === slug);
-      html = injectEventMeta(html, event);
-    }
-  }
-  res.statusCode = enabled ? 200 : 404;
+  const slug = eventSlugFromUrl(req.url);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  if (!enabled) {
-    res.setHeader("X-Robots-Tag", "noindex, nofollow");
-  }
   res.setHeader("Cache-Control", "no-store");
+
+  if (!enabled) {
+    const html = fs.readFileSync(path.join(process.cwd(), "share.html"), "utf8");
+    res.statusCode = 200;
+    res.end(html);
+    return;
+  }
+
+  if (slug) {
+    const events = await fetchEvents();
+    const event = events.find((row) => row.eventSlug === slug);
+    if (!event) {
+      const html = fs.readFileSync(path.join(process.cwd(), "404.html"), "utf8");
+      res.statusCode = 404;
+      res.setHeader("X-Robots-Tag", "noindex, follow");
+      res.end(html);
+      return;
+    }
+    const html = injectEventMeta(
+      fs.readFileSync(path.join(process.cwd(), "share.html"), "utf8"),
+      event
+    );
+    res.statusCode = 200;
+    res.end(html);
+    return;
+  }
+
+  const html = fs.readFileSync(path.join(process.cwd(), "share.html"), "utf8");
+  res.statusCode = 200;
   res.end(html);
 };

@@ -128,6 +128,7 @@ import {
   returnSeatCountFrom,
   type EventOpportunityInput,
 } from "./eventJourneys";
+import { fetchEventWhatsOn } from "./eventWhatsOn";
 import { flightTerminalOf, isHeathrowShare, parseFlightTerminal, terminalGuideHref, terminalGuideLinkText, terminalTransferWarning } from "./terminalGuide";
 import {
   confirmationGuard,
@@ -3791,6 +3792,15 @@ export const spiresShareAdminAction = functions.https.onCall(async (data, contex
     if (!snap.exists) throw new functions.https.HttpsError("not-found", "Event interest group not found.");
     const group = asInterestGroup(snap.id, snap.data() || {});
     return { ok: true, text: eventAdvertText(group), shareUrl: group.eventSlug ? `https://www.spires-taxis.com/share/event/${group.eventSlug}` : "https://www.spires-taxis.com/share" };
+  }
+
+  if (action === "list-event-whats-on") {
+    const groupSnap = await db().collection(COLLECTIONS.INTEREST_GROUPS).limit(200).get();
+    const groups = groupSnap.docs.map((doc) => asInterestGroup(doc.id, doc.data() || {}));
+    return fetchEventWhatsOn({
+      venues: config.shareVenues,
+      groups,
+    });
   }
 
   if (action === "event-revenue-preview") {

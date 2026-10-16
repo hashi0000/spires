@@ -6,7 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "node scripts/generate-sitemap.mjs && node scripts/validate-seo.mjs",
+    "build": "node scripts/sync-published-prices.mjs && node scripts/generate-sitemap.mjs && node scripts/validate-seo.mjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "seo:validate": "node scripts/validate-seo.mjs",
     "indexnow": "node scripts/submit-indexnow.mjs",

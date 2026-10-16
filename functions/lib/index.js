@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -71,10 +71,13 @@ exports.onBookingWrite = functions.firestore
     }
     // Created already confirmed (admin-created) → send confirmation PDF
     if (!before && isConfirmedStatus(after)) {
-        await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "confirmation", bookingId);
-        await change.after.ref.update({
-            confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        const familyWithoutEmail = after.source === "family" && !(after.hirerEmail || after.email);
+        if (!familyWithoutEmail) {
+            await (0, sendBookingReceipt_1.sendBookingReceipt)(after, "confirmation", bookingId);
+            await change.after.ref.update({
+                confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
         return;
     }
     // Pending → confirmed (or customerStatus flipped) → auto-send confirmation PDF once
@@ -110,6 +113,8 @@ exports.scheduledBookingReminderEmails = functions
 });
 var sendDriverReminderManual_1 = require("./sendDriverReminderManual");
 Object.defineProperty(exports, "sendDriverReminderManual", { enumerable: true, get: function () { return sendDriverReminderManual_1.sendDriverReminderManual; } });
+var familyJobsAuth_1 = require("./familyJobsAuth");
+Object.defineProperty(exports, "unlockFamilyJobs", { enumerable: true, get: function () { return familyJobsAuth_1.unlockFamilyJobs; } });
 var sendBookingPdfToCustomer_1 = require("./sendBookingPdfToCustomer");
 Object.defineProperty(exports, "sendBookingPdfToCustomer", { enumerable: true, get: function () { return sendBookingPdfToCustomer_1.sendBookingPdfToCustomer; } });
 var schoolInvoiceVault_1 = require("./schoolInvoiceVault");

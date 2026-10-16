@@ -73,7 +73,12 @@ const home = readFileSync(join(website, "index.html"), "utf8");
 assert(!/SPIRES TAXIS\s*·/i.test(home), "homepage must not have SPIRES TAXIS eyebrow");
 assert(!home.includes("hero__label"), "homepage must not have a hero eyebrow");
 assert(!home.includes("trust-strip"), "homepage must not have the lower trust strip");
-assert(home.includes("Spires Taxis. Book ahead with your price agreed before you travel."), "homepage H1");
+const homeH1 = (home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || "";
+assert(
+  homeH1.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim() ===
+    "Spires Taxis. Book ahead with your price agreed before you travel.",
+  "homepage H1"
+);
 assert(home.includes("Book online"), "homepage primary CTA");
 assert(home.includes("WhatsApp for a quote"), "homepage WhatsApp CTA");
 assert(home.includes("Call now"), "homepage call CTA");

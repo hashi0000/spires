@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'url';
+import { LANG_CLUSTERS } from './lib/i18n-clusters.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
@@ -74,7 +75,9 @@ function lastmod(filePath) {
 function ownPath(file) {
   const posix = file.replace(/\\/g, '/');
   if (posix === 'index.html') return '/';
-  return '/' + posix.replace(/\.html$/, '');
+  const noExt = posix.replace(/\.html$/, '');
+  if (noExt.endsWith('/index')) return '/' + noExt.slice(0, -'/index'.length);
+  return '/' + noExt;
 }
 
 function loadRedirectSources() {
@@ -142,19 +145,6 @@ for (const e of entries) {
   if (seen.has(e.loc)) throw new Error(`Duplicate sitemap URL ${e.loc}`);
   seen.add(e.loc);
 }
-
-const LANG_CLUSTERS = [
-  {
-    'en-GB': '/heathrow-to-oxford-taxi',
-    ar: '/ar/heathrow-to-oxford-taxi',
-    'zh-Hans': '/zh/heathrow-to-oxford-taxi',
-  },
-  {
-    'en-GB': '/student-taxis',
-    ar: '/ar/international-student-arrivals',
-    'zh-Hans': '/zh/international-student-arrivals',
-  },
-];
 
 function clusterFor(locPath) {
   return LANG_CLUSTERS.find((cluster) => Object.values(cluster).includes(locPath)) || null;

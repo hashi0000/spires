@@ -15,7 +15,20 @@ const footer = fs.readFileSync(path.join(root, 'includes', 'footer.html'), 'utf8
 const headerBlock = `<!-- SITE-HEADER -->\n${header}\n<!-- /SITE-HEADER -->`;
 const footerBlock = `<!-- SITE-FOOTER -->\n${footer}\n<!-- /SITE-FOOTER -->`;
 
-const files = fs.readdirSync(root).filter((f) => f.endsWith('.html') && !f.startsWith('nav-'));
+function listHtml(dir, prefix = '') {
+  const names = fs.readdirSync(dir, { withFileTypes: true });
+  const files = [];
+  for (const name of names) {
+    if (name.name.startsWith('nav-') || name.name === 'node_modules' || name.name === 'scripts' || name.name === 'includes') continue;
+    const rel = prefix ? `${prefix}/${name.name}` : name.name;
+    const full = path.join(dir, name.name);
+    if (name.isDirectory()) files.push(...listHtml(full, rel));
+    else if (name.name.endsWith('.html')) files.push(rel);
+  }
+  return files;
+}
+
+const files = listHtml(root);
 
 let updated = 0;
 for (const file of files) {

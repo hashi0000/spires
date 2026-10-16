@@ -9,6 +9,7 @@ export function formatVehicleTypeLabel(type?: string | null): string {
   if (!type) return 'Not specified';
   if (type === '8_seater' || type === '8-seater') return '8 Seater';
   if (type === 'standard') return 'Standard Car';
+  if (type === 'multiple') return 'Multiple vehicles';
   return type.replace(/_/g, ' ');
 }
 

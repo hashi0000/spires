@@ -95,7 +95,7 @@
       stansted: {
         id: "stansted",
         name: "Stansted",
-        slug: null,
+        slug: "/oxford-to-stansted-taxi",
         origin: "oxford",
         published: true,
         standardCar: { oneWay: 150, return: 290 },
@@ -113,7 +113,7 @@
       birmingham: {
         id: "birmingham",
         name: "Birmingham",
-        slug: null,
+        slug: "/oxford-to-birmingham-airport-taxi",
         origin: "oxford",
         published: true,
         standardCar: { oneWay: 110, return: 215 },
@@ -131,7 +131,7 @@
       bristol: {
         id: "bristol",
         name: "Bristol",
-        slug: null,
+        slug: "/oxford-to-bristol-airport-taxi",
         origin: "oxford",
         published: true,
         standardCar: { oneWay: 165, return: 320 },

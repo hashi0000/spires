@@ -1,5 +1,4 @@
 import PDFDocument from "pdfkit";
-import { format } from "date-fns";
 import {
   SPIRES_BANK_DETAILS,
   isBankTransferMethod,
@@ -30,227 +29,635 @@ const documentTitleMap: Record<PDFDocumentType, string> = {
   payment_request: "Payment Request",
 };
 
+const NAVY = "#002147";
+const GOLD = "#C5A572";
+const SLATE = "#0f172a";
+const CREAM = "#f7f4ec";
+const CREAM_PANEL = "#f7f4e9";
+const MUTED = "#666666";
+const BORDER = "#e5e7eb";
+const WHITE = "#ffffff";
+const PAYMENT_REQUEST_BG = "#92400e";
+const GOOGLE_BLUE = "#4285F4";
+
+const PAGE_MARGIN = 20;
+const HEADER_H = 88;
+const BANNER_H = 36;
+const FOOTER_H = 72;
+const BOX_PAD = 10;
+
+function toDate(raw: unknown): Date | null {
+  if (raw == null || raw === "") return null;
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  if (typeof raw === "object" && raw !== null && typeof (raw as { toDate?: () => Date }).toDate === "function") {
+    try {
+      const d = (raw as { toDate: () => Date }).toDate();
+      return Number.isNaN(d.getTime()) ? null : d;
+    } catch {
+      return null;
+    }
+  }
+  const d = new Date(String(raw));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatPdfDate(raw: unknown): string {
+  const d = toDate(raw);
+  if (d) return d.toLocaleDateString("en-GB", { timeZone: "Europe/London" });
+  const s = String(raw || "").trim();
+  const m = s.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+  return m ? m[1] : s;
+}
+
+function formatPdfTime(raw: unknown): string {
+  const d = toDate(raw);
+  if (d) {
+    return d.toLocaleTimeString("en-GB", {
+      timeZone: "Europe/London",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  const s = String(raw || "").trim();
+  const m = s.match(/(\d{1,2}:\d{2})/);
+  return m ? m[1] : "";
+}
+
+function formatPaymentMethod(method?: string): string {
+  if (!method) return "TO BE CONFIRMED";
+  return method.replace(/_/g, " ").toUpperCase();
+}
+
+function paymentCopy(
+  type: PDFDocumentType,
+  booking: any,
+  hasFare: boolean
+): { amount: string; methodLine: string } {
+  const amount =
+    hasFare && typeof booking.actualFare === "number"
+      ? `£${Number(booking.actualFare).toFixed(2)}`
+      : hasFare && Number.isFinite(Number(booking.actualFare))
+        ? `£${Number(booking.actualFare).toFixed(2)}`
+        : "TBC";
+  const method = formatPaymentMethod(booking.paymentMethod);
+  const isPaid = booking.paymentStatus === "paid";
+  const isPartial = booking.paymentStatus === "partial";
+  const isCompleted = booking.status === "completed";
+  const isPaymentReceipt = type === "payment" || type === "payment_receipt";
+  const isPaymentRequest = type === "payment_request";
+
+  let methodLine: string;
+  if (isPaymentRequest && hasFare) {
+    methodLine = `Payment Required - ${method}`;
+  } else if ((isCompleted && isPaid && hasFare) || (isPaymentReceipt && hasFare)) {
+    methodLine = `Paid by ${method}`;
+  } else if (hasFare && isPartial) {
+    methodLine = `Partially paid by ${method}`;
+  } else {
+    methodLine = `To be paid by ${method}`;
+  }
+  return { amount, methodLine };
+}
+
+function pageContentBottom(doc: PDFKit.PDFDocument): number {
+  return doc.page.height - FOOTER_H - 12;
+}
+
+function drawFooter(doc: PDFKit.PDFDocument) {
+  const w = doc.page.width;
+  const y = doc.page.height - FOOTER_H;
+  doc.save();
+  doc.rect(0, y, w, FOOTER_H).fill(NAVY);
+  doc
+    .fillColor(GOLD)
+    .font("Times-Bold")
+    .fontSize(11)
+    .text("SPIRES TAXIS", PAGE_MARGIN, y + 10, { width: w - PAGE_MARGIN * 2, align: "center" });
+  doc
+    .fillColor(WHITE)
+    .font("Helvetica")
+    .fontSize(8)
+    .text("bookings@spires-taxis.com  ·  07776 897772  ·  www.spires-taxis.com", PAGE_MARGIN, y + 28, {
+      width: w - PAGE_MARGIN * 2,
+      align: "center",
+    });
+  doc
+    .fillColor(GOLD)
+    .fontSize(8)
+    .text("We'd love your feedback!", PAGE_MARGIN, y + 44, {
+      width: w - PAGE_MARGIN * 2,
+      align: "center",
+    });
+  doc
+    .fillColor(GOOGLE_BLUE)
+    .fontSize(8)
+    .text("Leave a Review on Google", PAGE_MARGIN, y + 56, {
+      width: w - PAGE_MARGIN * 2,
+      align: "center",
+      link: "https://g.page/r/CWu0N7lUD-YKEAI/review",
+    });
+  doc.restore();
+}
+
+function drawHeader(doc: PDFKit.PDFDocument, bookingNumber: string) {
+  const w = doc.page.width;
+  doc.save();
+  doc.rect(0, 0, w, HEADER_H).fill(NAVY);
+  doc
+    .fillColor(GOLD)
+    .font("Times-Bold")
+    .fontSize(22)
+    .text("SPIRES TAXIS", 0, 22, { width: w, align: "center" });
+  doc
+    .fillColor("#e8eef5")
+    .font("Times-Italic")
+    .fontSize(10)
+    .text("Your Oxford Journey Starts Here", 0, 50, { width: w, align: "center" });
+
+  const label = bookingNumber || "";
+  if (label) {
+    const badgeW = Math.min(160, Math.max(86, label.length * 7.2 + 18));
+    const bx = w - PAGE_MARGIN - badgeW;
+    const by = 18;
+    doc.roundedRect(bx, by, badgeW, 26, 4).lineWidth(1.6).strokeColor(GOLD).stroke();
+    doc
+      .fillColor(WHITE)
+      .font("Times-Bold")
+      .fontSize(9)
+      .text(label, bx, by + 8, { width: badgeW, align: "center" });
+  }
+  doc.restore();
+}
+
+function drawBanner(doc: PDFKit.PDFDocument, title: string) {
+  const w = doc.page.width;
+  const y = HEADER_H;
+  doc.save();
+  doc.rect(0, y, w, BANNER_H).fill(CREAM);
+  doc.moveTo(0, y + BANNER_H).lineTo(w, y + BANNER_H).lineWidth(3).strokeColor(SLATE).stroke();
+  doc
+    .fillColor(SLATE)
+    .font("Helvetica-Bold")
+    .fontSize(11)
+    .text(title.toUpperCase(), 0, y + 12, { width: w, align: "center", characterSpacing: 1.4 });
+  doc.restore();
+}
+
+function ensureSpace(doc: PDFKit.PDFDocument, y: number, needed: number): number {
+  if (y + needed <= pageContentBottom(doc)) return y;
+  drawFooter(doc);
+  doc.addPage({ size: "A4", margin: 0 });
+  drawHeader(doc, "");
+  return HEADER_H + 16;
+}
+
+function boxedSection(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  title: string,
+  drawBody: (innerY: number) => number
+): number {
+  const startY = y;
+  doc
+    .fillColor(NAVY)
+    .font("Times-Bold")
+    .fontSize(11)
+    .text(title, x + BOX_PAD, startY + 8, { width: width - BOX_PAD * 2 });
+  doc
+    .moveTo(x + BOX_PAD, startY + 24)
+    .lineTo(x + width - BOX_PAD, startY + 24)
+    .lineWidth(1.4)
+    .strokeColor(GOLD)
+    .stroke();
+  const innerEnd = drawBody(startY + BOX_PAD + 22);
+  const height = Math.max(52, innerEnd - startY + BOX_PAD);
+  doc.save();
+  doc.roundedRect(x, startY, width, height, 6).lineWidth(1.4).strokeColor(BORDER).stroke();
+  doc.restore();
+  return startY + height;
+}
+
+function detailRow(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  value: string
+): number {
+  const labelW = Math.min(118, width * 0.4);
+  const valueW = width - labelW - 6;
+  const h = Math.max(
+    doc.font("Helvetica").fontSize(8).heightOfString(label || " ", { width: labelW }),
+    doc.font("Helvetica").fontSize(9).heightOfString(value || " ", { width: valueW })
+  );
+  doc.fillColor(MUTED).font("Helvetica").fontSize(8).text(label, x, y, { width: labelW });
+  doc
+    .fillColor(NAVY)
+    .font("Helvetica")
+    .fontSize(9)
+    .text(value || "", x + labelW + 6, y, { width: valueW, align: "right" });
+  return y + h + 5;
+}
+
+function journeyBlock(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  title: string,
+  pickupTime: unknown,
+  pickupLocation: string,
+  destination: string,
+  airportCollection: boolean,
+  flightNumber?: string
+): number {
+  let cy = y;
+  doc
+    .fillColor(NAVY)
+    .font("Times-Bold")
+    .fontSize(9)
+    .text(title.toUpperCase(), x, cy, { width, characterSpacing: 0.4 });
+  cy += 16;
+  cy = detailRow(doc, x, cy, width, "Date", formatPdfDate(pickupTime));
+  cy = detailRow(doc, x, cy, width, "Pickup time", formatPdfTime(pickupTime));
+
+  const panelH = 48;
+  doc.save();
+  doc.roundedRect(x, cy, width, panelH, 5).fill(CREAM_PANEL);
+  doc.rect(x, cy, 3, panelH).fill(GOLD);
+  doc.restore();
+  const innerW = (width - 28) / 2;
+  doc
+    .fillColor(MUTED)
+    .font("Helvetica")
+    .fontSize(8)
+    .text(formatPdfTime(pickupTime), x + 12, cy + 8, { width: innerW, align: "center" });
+  doc
+    .fillColor(NAVY)
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text(pickupLocation || "", x + 12, cy + 22, { width: innerW, align: "center" });
+  doc.fillColor(GOLD).font("Helvetica-Bold").fontSize(14).text(">", x + 12 + innerW, cy + 16, {
+    width: 16,
+    align: "center",
+  });
+  doc
+    .fillColor(NAVY)
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .text(destination || "", x + 12 + innerW + 16, cy + 22, { width: innerW, align: "center" });
+  cy += panelH + 8;
+
+  if (airportCollection) {
+    cy = detailRow(doc, x, cy, width, "Airport collection", "Yes");
+  }
+  if (airportCollection && (flightNumber || "").trim()) {
+    cy = detailRow(doc, x, cy, width, "Flight number", String(flightNumber).trim());
+  }
+  return cy;
+}
+
 export async function generateBookingPDF(
   booking: any,
   type: PDFDocumentType = "booking_confirmation"
-) {
-  const doc = new PDFDocument({ margin: 40 });
+): Promise<Buffer> {
+  const doc = new PDFDocument({ size: "A4", margin: 0, compress: false });
   const buffers: Buffer[] = [];
   doc.on("data", (chunk) => buffers.push(chunk as Buffer));
 
-  // Header
-  doc
-    .fontSize(20)
-    .text("Spires Taxis", { align: "center" })
-    .moveDown(0.3)
-    .fontSize(10)
-    .text("07776 897772 | bookings@spires-taxis.com", { align: "center" })
-    .text("www.spires-taxis.com", { align: "center" })
-    .moveDown();
-
   const docTitle = documentTitleMap[type] || "Booking Confirmation";
+  const bookingNumber = String(booking.bookingNumber || "");
+  const pageW = doc.page.width;
+  const contentW = pageW - PAGE_MARGIN * 2;
+  const colGap = 10;
+  const colW = (contentW - colGap) / 2;
+  const leftX = PAGE_MARGIN;
+  const rightX = PAGE_MARGIN + colW + colGap;
 
-  doc
-    .fontSize(16)
-    .fillColor("#0f172a")
-    .text(docTitle.toUpperCase(), { align: "center", underline: true })
-    .fillColor("black");
+  const outboundTime = booking.dateTime || booking.pickupTime;
+  const returnTime = booking.returnPickupTime || booking.returnDateTime;
+  const isReturn = isReturnBooking(booking);
+  const fareRaw =
+    typeof booking.actualFare === "number" ? booking.actualFare : Number(booking.actualFare);
+  const hasFare = Number.isFinite(fareRaw);
+  const { amount, methodLine } = paymentCopy(type, { ...booking, actualFare: fareRaw }, hasFare);
+  const isPaid = booking.paymentStatus === "paid";
+  const isPaymentRequest = type === "payment_request";
 
-  doc.moveDown();
+  drawHeader(doc, bookingNumber);
+  drawBanner(doc, docTitle);
 
-  let dateLabel = "N/A";
-  try {
-    const raw = booking.dateTime || booking.pickupTime || Date.now();
-    const d =
-      raw && typeof raw === "object" && typeof raw.toDate === "function"
-        ? raw.toDate()
-        : new Date(raw);
-    if (!Number.isNaN(d.getTime())) {
-      dateLabel = format(d, "PPPp");
-    }
-  } catch {
-    /* keep N/A */
+  let y = HEADER_H + BANNER_H + 14;
+
+  const tripRows: Array<[string, string]> = [
+    ["Trip Date", formatPdfDate(outboundTime)],
+    ["Pickup Time", formatPdfTime(outboundTime)],
+    [
+      "Booking Method",
+      booking.bookingMethod
+        ? String(booking.bookingMethod).replace(/_/g, " ").toUpperCase()
+        : "",
+    ],
+  ];
+  if (isReturn) tripRows.push(["Booking type", "Return"]);
+
+  const customerRows: Array<[string, string]> = [
+    ["Name", booking.hirerName || booking.name || "Customer"],
+    ["Phone", booking.hirerPhone || booking.phone || ""],
+  ];
+  if (booking.hirerAddress) customerRows.push(["Address", String(booking.hirerAddress)]);
+  if (booking.hirerEmail || booking.email) {
+    customerRows.push(["Email", String(booking.hirerEmail || booking.email)]);
   }
 
-  const paymentMethodLabel = (booking.paymentMethod || "To be confirmed")
-    .toString()
-    .replace(/_/g, " ");
+  y = ensureSpace(doc, y, 110);
+  const colTop = y;
+  let leftBottom = colTop;
+  let rightBottom = colTop;
+  leftBottom = boxedSection(doc, leftX, colTop, colW, "Trip Information", (innerY) => {
+    let cy = innerY;
+    for (const [label, value] of tripRows) {
+      if (!value) continue;
+      cy = detailRow(doc, leftX + BOX_PAD, cy, colW - BOX_PAD * 2, label, value);
+    }
+    return cy;
+  });
+  rightBottom = boxedSection(doc, rightX, colTop, colW, "Customer Details", (innerY) => {
+    let cy = innerY;
+    for (const [label, value] of customerRows) {
+      if (!value) continue;
+      cy = detailRow(doc, rightX + BOX_PAD, cy, colW - BOX_PAD * 2, label, value);
+    }
+    return cy;
+  });
+  y = Math.max(leftBottom, rightBottom) + 10;
 
-  const writeWrapped = (label: string, value: string) => {
-    doc.fontSize(11).text(`${label}: ${value || ""}`, { width: 500 });
-  };
-
-  writeWrapped("Booking Number", booking.bookingNumber || "N/A");
-  writeWrapped("Customer", booking.hirerName || booking.name || "Customer");
-  writeWrapped("Phone", booking.hirerPhone || booking.phone || "");
-  writeWrapped("Email", booking.hirerEmail || booking.email || "");
-
-  if (isReturnBooking(booking)) {
-    doc.moveDown(0.4).fontSize(12).text("OUTBOUND JOURNEY", { underline: true }).fontSize(11);
-    writeWrapped("Date / pickup time", String(booking.pickupTime || dateLabel));
-    writeWrapped("Pickup", booking.pickupLocation || booking.pickup || "");
-    writeWrapped("Destination", booking.destination || "");
-    writeWrapped("Airport collection", booking.airportCollection ? "Yes" : "No");
-    if (booking.airportCollection && booking.flightNumber) {
-      writeWrapped("Flight", booking.flightNumber);
+  y = ensureSpace(doc, y, 140);
+  y = boxedSection(doc, leftX, y, contentW, "Journey Details", (innerY) => {
+    let cy = innerY;
+    if (isReturn) {
+      cy = journeyBlock(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Outbound Journey",
+        outboundTime,
+        booking.pickupLocation || booking.pickup || "",
+        booking.destination || "",
+        booking.airportCollection === true,
+        booking.flightNumber
+      );
+      cy += 8;
+      cy = journeyBlock(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Return Journey",
+        returnTime,
+        booking.returnPickupLocation || "",
+        booking.returnDestination || "",
+        booking.returnAirportCollection === true,
+        booking.returnFlightNumber
+      );
+    } else {
+      cy = journeyBlock(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Journey",
+        outboundTime,
+        booking.pickupLocation || booking.pickup || "",
+        booking.destination || "",
+        booking.airportCollection === true,
+        booking.flightNumber
+      );
     }
-    doc.moveDown(0.4).fontSize(12).text("RETURN JOURNEY", { underline: true }).fontSize(11);
-    writeWrapped("Date / pickup time", String(booking.returnPickupTime || booking.returnDateTime || ""));
-    writeWrapped("Pickup", booking.returnPickupLocation || "");
-    writeWrapped("Destination", booking.returnDestination || "");
-    writeWrapped("Airport collection", booking.returnAirportCollection ? "Yes" : "No");
-    if (booking.returnAirportCollection && booking.returnFlightNumber) {
-      writeWrapped("Flight", booking.returnFlightNumber);
+    if (booking.vehicleType) {
+      cy = detailRow(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Vehicle Class",
+        formatVehicleTypeLabel(booking.vehicleType)
+      );
+      const examples = vehicleClassExamples(booking.vehicleType);
+      if (examples) {
+        doc.fillColor("#5c6570").font("Helvetica").fontSize(8).text(examples, leftX + BOX_PAD, cy, {
+          width: contentW - BOX_PAD * 2,
+          align: "right",
+        });
+        cy += 14;
+      }
     }
-  } else {
-    writeWrapped("Pickup", booking.pickupLocation || booking.pickup || "");
-    writeWrapped("Destination", booking.destination || "");
-    writeWrapped("Pickup Time", String(booking.pickupTime || dateLabel));
-    if (booking.airportCollection) {
-      writeWrapped("Airport collection", "Yes");
+    if (booking.passengers) {
+      cy = detailRow(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Passengers",
+        String(booking.passengers)
+      );
     }
-    if (booking.flightNumber) {
-      writeWrapped("Flight", booking.flightNumber);
+    if (booking.terminal) {
+      cy = detailRow(
+        doc,
+        leftX + BOX_PAD,
+        cy,
+        contentW - BOX_PAD * 2,
+        "Terminal",
+        String(booking.terminal)
+      );
     }
-    if (booking.returnTrip && booking.returnDateTime) {
-      writeWrapped("Return", String(booking.returnDateTime));
-    }
-  }
-
-  writeWrapped("Status", booking.status || "pending");
-  if (booking.terminal) {
-    writeWrapped("Terminal", booking.terminal);
-  }
-  if (booking.vehicleType) {
-    writeWrapped("Vehicle Class", formatVehicleTypeLabel(booking.vehicleType));
-    const examples = vehicleClassExamples(booking.vehicleType);
-    if (examples) {
-      doc.fontSize(10).fillColor("#555555").text(examples, { width: 500 }).fillColor("black");
-    }
-  }
-  if (booking.passengers) {
-    writeWrapped("Passengers", String(booking.passengers));
-  }
+    return cy;
+  }) + 10;
 
   if (bookingHasAirportCollection(booking)) {
+    const body = airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY);
     const scope = airportWaitingScopeNote(booking);
+    y = ensureSpace(doc, y, 90);
+    const noteX = leftX;
+    const noteW = contentW;
+    const textW = noteW - 20;
+    let textH = 18;
+    if (scope) textH += doc.font("Helvetica").fontSize(8).heightOfString(scope, { width: textW }) + 6;
+    textH += doc.font("Helvetica").fontSize(8).heightOfString(body, { width: textW }) + 16;
+    doc.save();
+    doc.roundedRect(noteX, y, noteW, textH, 6).fill("#fbfaf7").strokeColor("#e8e4da").lineWidth(1).stroke();
+    doc.restore();
+    let ny = y + 8;
     doc
-      .moveDown(0.6)
-      .fontSize(10)
       .fillColor("#334155")
-      .text(airportWaitingDisclaimerTitle(), { underline: true })
-      .fontSize(9)
-      .fillColor("#4b5563");
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .text(airportWaitingDisclaimerTitle(), noteX + 10, ny, { width: textW });
+    ny += 14;
     if (scope) {
-      doc.text(scope, { width: 500, lineGap: 2 }).moveDown(0.2);
+      doc.fillColor("#334155").font("Helvetica-Bold").fontSize(8).text(scope, noteX + 10, ny, { width: textW });
+      ny += doc.heightOfString(scope, { width: textW }) + 6;
     }
-    doc
-      .text(airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY), { width: 500, lineGap: 2 })
-      .fillColor("black")
-      .fontSize(11);
+    doc.fillColor("#4b5563").font("Helvetica").fontSize(8).text(body, noteX + 10, ny, { width: textW, lineGap: 2 });
+    y += textH + 10;
   }
 
-  doc.moveDown();
-
-  const fare =
-    typeof booking.actualFare === "number"
-      ? booking.actualFare
-      : Number(booking.actualFare);
-  const hasFare = Number.isFinite(fare);
-  const isPaid = booking.paymentStatus === "paid";
-
-  doc
-    .text(`Payment Method: ${paymentMethodLabel}`)
-    .text(`Payment Status: ${booking.paymentStatus || "pending"}`);
   const hasSchedule =
     (booking.dueOnOutbound != null && String(booking.dueOnOutbound) !== "") ||
     (booking.dueOnReturn != null && String(booking.dueOnReturn) !== "");
-
-  if (hasFare) {
-    doc.text(`Fare: £${fare.toFixed(2)}`);
-  } else {
-    doc.text("Fare: To be confirmed");
-  }
-  if (bookingLooksLikeAirportTransfer(booking)) {
-    doc.fontSize(10).text("Standard airport charge included").fontSize(11);
-  }
-
   if (hasSchedule) {
-    const deposit = Number(booking.depositAmount);
-    const outbound = Number(booking.dueOnOutbound);
-    const ret = Number(booking.dueOnReturn);
-    doc.moveDown(0.4).fontSize(12).text("Payment Schedule", { underline: true }).fontSize(11);
-    if (Number.isFinite(deposit)) doc.text(`Deposit paid: £${deposit.toFixed(2)}`);
-    if (Number.isFinite(outbound)) doc.text(`Due on outbound journey: £${outbound.toFixed(2)}`);
-    if (Number.isFinite(ret)) doc.text(`Due on return journey: £${ret.toFixed(2)}`);
-  } else if (booking.depositRequired) {
-    const depAmt = Number(booking.depositAmount);
-    const depLabel =
-      booking.depositStatus === "paid"
-        ? `Deposit: Paid${Number.isFinite(depAmt) ? ` (£${depAmt.toFixed(2)})` : ""}`
-        : `Deposit required${Number.isFinite(depAmt) ? `: £${depAmt.toFixed(2)}` : ""}`;
-    doc.text(depLabel);
+    y = ensureSpace(doc, y, 80);
+    y =
+      boxedSection(doc, leftX, y, contentW, "Payment Schedule", (innerY) => {
+        let cy = innerY;
+        const total = Number(booking.actualFare);
+        const deposit = Number(booking.depositAmount);
+        const outbound = Number(booking.dueOnOutbound);
+        const ret = Number(booking.dueOnReturn);
+        if (Number.isFinite(total)) {
+          cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Total fare", `£${total.toFixed(2)}`);
+        }
+        if (Number.isFinite(deposit)) {
+          cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Deposit paid", `£${deposit.toFixed(2)}`);
+        }
+        if (Number.isFinite(outbound)) {
+          cy = detailRow(
+            doc,
+            leftX + BOX_PAD,
+            cy,
+            contentW - BOX_PAD * 2,
+            "Due on outbound journey",
+            `£${outbound.toFixed(2)}`
+          );
+        }
+        if (Number.isFinite(ret)) {
+          cy = detailRow(
+            doc,
+            leftX + BOX_PAD,
+            cy,
+            contentW - BOX_PAD * 2,
+            "Due on return journey",
+            `£${ret.toFixed(2)}`
+          );
+        }
+        return cy;
+      }) + 10;
   }
 
-  if (type === "payment_request" && hasFare) {
+  y = ensureSpace(doc, y, 120);
+  const payBg = isPaymentRequest ? PAYMENT_REQUEST_BG : NAVY;
+  y = boxedSection(doc, leftX, y, contentW, docTitle, (innerY) => {
+    let cy = innerY;
+    const boxH = bookingLooksLikeAirportTransfer(booking) || isPaymentRequest ? 78 : 64;
+    doc.save();
+    doc.roundedRect(leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, boxH, 6).fill(payBg);
+    doc.restore();
     doc
-      .moveDown(0.5)
-      .fontSize(12)
-      .fillColor("red")
-      .text("Payment Required", { align: "center", underline: true })
-      .fillColor("black")
-      .fontSize(10)
-      .text("Please arrange payment for the above fare amount.", {
-        align: "center",
-      })
-      .moveDown();
-  }
-
-  if (isBankTransferMethod(booking.paymentMethod) && !isPaid) {
-    const { accountName, sortCode, accountNumber } = SPIRES_BANK_DETAILS;
+      .fillColor(GOLD)
+      .font("Helvetica-Bold")
+      .fontSize(20)
+      .text(amount, leftX + BOX_PAD, cy + 12, { width: contentW - BOX_PAD * 2, align: "center" });
     doc
-      .moveDown(0.5)
-      .fontSize(11)
-      .fillColor("#002147")
-      .text("Pay by bank transfer", { underline: true })
-      .fillColor("black")
-      .fontSize(10)
-      .text(`Account name: ${accountName}`)
-      .text(`Sort code: ${sortCode}`)
-      .text(`Account number: ${accountNumber}`)
-      .text(
-        `Please use booking number ${booking.bookingNumber || "as shown above"} as the payment reference.`
-      )
-      .moveDown();
-  }
+      .fillColor(WHITE)
+      .font("Helvetica")
+      .fontSize(9)
+      .text(methodLine, leftX + BOX_PAD, cy + 38, { width: contentW - BOX_PAD * 2, align: "center" });
+    let extraY = cy + 52;
+    if (isPaymentRequest && hasFare) {
+      doc
+        .fillColor(WHITE)
+        .fontSize(8)
+        .text("Please arrange payment for this booking using the method above.", leftX + BOX_PAD, extraY, {
+          width: contentW - BOX_PAD * 2,
+          align: "center",
+        });
+      extraY += 12;
+    }
+    if (bookingLooksLikeAirportTransfer(booking)) {
+      doc
+        .fillColor("#e8eef5")
+        .fontSize(8)
+        .text("Standard airport charge included", leftX + BOX_PAD, extraY, {
+          width: contentW - BOX_PAD * 2,
+          align: "center",
+        });
+      extraY += 12;
+    }
+    cy += boxH + 8;
 
-  if (booking.notes) {
-    doc.moveDown(0.3).text(`Notes: ${booking.notes}`, { width: 500 });
-  }
+    if (!hasSchedule && booking.depositRequired) {
+      const depAmt = Number(booking.depositAmount);
+      if (booking.depositStatus === "paid") {
+        cy = detailRow(
+          doc,
+          leftX + BOX_PAD,
+          cy,
+          contentW - BOX_PAD * 2,
+          "Deposit",
+          `Paid${Number.isFinite(depAmt) ? ` (£${depAmt.toFixed(2)})` : ""}`
+        );
+      } else {
+        const depText = Number.isFinite(depAmt)
+          ? `Please pay a deposit of £${depAmt.toFixed(2)} to confirm this booking. Use your booking number as the payment reference.`
+          : "A deposit is required to confirm this booking. Use your booking number as the payment reference.";
+        doc
+          .save()
+          .roundedRect(leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, 42, 5)
+          .fill("#fff8eb")
+          .strokeColor(GOLD)
+          .lineWidth(1)
+          .stroke();
+        doc.restore();
+        doc
+          .fillColor(NAVY)
+          .font("Helvetica-Bold")
+          .fontSize(9)
+          .text("Deposit required", leftX + BOX_PAD + 8, cy + 6, { width: contentW - BOX_PAD * 2 - 16 });
+        doc
+          .fillColor(NAVY)
+          .font("Helvetica")
+          .fontSize(8)
+          .text(depText, leftX + BOX_PAD + 8, cy + 20, { width: contentW - BOX_PAD * 2 - 16 });
+        cy += 50;
+      }
+    }
 
-  doc
-    .moveDown()
-    .fontSize(10)
-    .text("Thank you for choosing Spires Taxis.", { align: "center" })
-    .moveDown(0.5)
-    .text("We'd love your feedback!", { align: "center" })
-    .moveDown(0.3)
-    .fillColor("#4285F4")
-    .text("Leave us a review on Google:", { align: "center" })
-    .text("https://g.page/r/CWu0N7lUD-YKEAI/review", {
-      align: "center",
-      link: "https://g.page/r/CWu0N7lUD-YKEAI/review",
-    })
-    .fillColor("black")
-    .moveDown(0.5)
-    .fillColor("blue")
-    .text("Or leave a review on Trustpilot:", { align: "center" })
-    .text("https://uk.trustpilot.com/evaluate/spires-taxis.com", {
-      align: "center",
-      link: "https://uk.trustpilot.com/evaluate/spires-taxis.com",
-    })
-    .fillColor("black");
+    if (isBankTransferMethod(booking.paymentMethod) && !isPaid) {
+      const { accountName, sortCode, accountNumber } = SPIRES_BANK_DETAILS;
+      doc
+        .fillColor(NAVY)
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("Pay by bank transfer", leftX + BOX_PAD, cy);
+      cy += 14;
+      cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Account name", accountName);
+      cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Sort code", sortCode);
+      cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Account number", accountNumber);
+      doc
+        .fillColor(MUTED)
+        .font("Helvetica")
+        .fontSize(8)
+        .text(
+          `Please use booking number ${bookingNumber || "as shown above"} as the payment reference.`,
+          leftX + BOX_PAD,
+          cy,
+          { width: contentW - BOX_PAD * 2 }
+        );
+      cy += 16;
+    }
 
+    if (booking.notes) {
+      cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Notes", String(booking.notes));
+    }
+    return cy;
+  });
+
+  drawFooter(doc);
   doc.end();
 
   await new Promise<void>((resolve, reject) => {
@@ -260,3 +667,9 @@ export async function generateBookingPDF(
 
   return Buffer.concat(buffers);
 }
+
+export const __pdfTest = {
+  formatPdfDate,
+  formatPdfTime,
+  formatPaymentMethod,
+};

@@ -1,4 +1,5 @@
 import React, { FormEvent, useMemo, useState } from "react";
+import { EventWhatsOn, WhatsOnEvent } from "./EventWhatsOn";
 import { gbp, penceFromPounds, poundsFromPence } from "./shareLabels";
 import { RunAction, ShareState } from "./types";
 
@@ -43,10 +44,10 @@ export function EventTools({
   const [advert, setAdvert] = useState("");
   const events = (state.interestGroups || []).filter((row) => row.journeyType === "EVENT");
 
-  const applyVenue = (venueId: string) => {
+  const applyVenue = (venueId: string, extras: Partial<typeof EMPTY> = {}) => {
     const venue = venues.find((row) => row.id === venueId);
     if (!venue) {
-      setForm({ ...form, venueId });
+      setForm({ ...form, venueId, ...extras });
       return;
     }
     setForm({
@@ -59,6 +60,22 @@ export function EventTools({
       returnPounds: poundsFromPence(venue.defaultReturnFarePence || 7500),
       passengerLimit: venue.defaultPassengerCap || 5,
       venueReturnMeetingPoint: venue.returnMeetingPoint || "",
+      ...extras,
+    });
+  };
+
+  const useListedEvent = (event: WhatsOnEvent) => {
+    applyVenue(event.venueId, {
+      eventName: event.eventName,
+      venueName: event.venueName,
+      destination: event.venueName,
+      eventDate: event.eventDate,
+      eventStartTime: event.eventStartTime,
+      suggestedDepartureTime: event.suggestedDepartureTime,
+      eventUrl: event.eventUrl || "",
+      offerReturn: true,
+      ...(event.outboundFarePence ? { outboundPounds: poundsFromPence(event.outboundFarePence) } : {}),
+      ...(event.returnFarePence ? { returnPounds: poundsFromPence(event.returnFarePence) } : {}),
     });
   };
 
@@ -97,6 +114,7 @@ export function EventTools({
 
   return (
     <div className="share-ops-stack">
+      <EventWhatsOn venues={venues} run={run} busyKey={busyKey} adminAction={adminAction} onUseEvent={useListedEvent} />
       <form
         className="share-ops-form"
         onSubmit={(e: FormEvent) => {

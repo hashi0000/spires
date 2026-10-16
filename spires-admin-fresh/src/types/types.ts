@@ -108,8 +108,19 @@ export interface Booking {
   createdAt?: Date;
   updatedAt?: Date;
   customerId?: string; // Firestore ID of the customer document
+  /** Present on website / customer-app bookings. Family jobs omit this. */
+  uid?: string;
   linkedAt?: Date; // Timestamp when booking was linked to customer
   linkedBy?: string; // Admin email/uid who linked the booking
+  /** family = added from Family Job Manager. Website bookings omit this. */
+  source?: 'family' | 'admin' | 'website' | string;
+  createdByEmail?: string;
+  createdByUid?: string;
+  updatedByEmail?: string;
+  updatedByUid?: string;
+  cancelledAt?: string;
+  cancelledByEmail?: string;
+  cancelledByUid?: string;
 }
 
 // Extended booking interface for form handling

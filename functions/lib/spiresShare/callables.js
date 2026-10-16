@@ -53,6 +53,7 @@ const access_1 = require("./access");
 const interestGroups_1 = require("./interestGroups");
 const routePricing_1 = require("./routePricing");
 const eventJourneys_1 = require("./eventJourneys");
+const eventWhatsOn_1 = require("./eventWhatsOn");
 const terminalGuide_1 = require("./terminalGuide");
 const shareProgress_1 = require("./shareProgress");
 const boarding_1 = require("./boarding");
@@ -3419,6 +3420,14 @@ exports.spiresShareAdminAction = functions.https.onCall(async (data, context) =>
             throw new functions.https.HttpsError("not-found", "Event interest group not found.");
         const group = asInterestGroup(snap.id, snap.data() || {});
         return { ok: true, text: (0, eventJourneys_1.eventAdvertText)(group), shareUrl: group.eventSlug ? `https://www.spires-taxis.com/share/event/${group.eventSlug}` : "https://www.spires-taxis.com/share" };
+    }
+    if (action === "list-event-whats-on") {
+        const groupSnap = await db().collection(defaults_1.COLLECTIONS.INTEREST_GROUPS).limit(200).get();
+        const groups = groupSnap.docs.map((doc) => asInterestGroup(doc.id, doc.data() || {}));
+        return (0, eventWhatsOn_1.fetchEventWhatsOn)({
+            venues: config.shareVenues,
+            groups,
+        });
     }
     if (action === "event-revenue-preview") {
         const outboundFarePence = Number(payload.outboundFarePence || payload.farePence || 0);

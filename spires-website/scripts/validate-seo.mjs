@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { LANG_CLUSTERS, fileFromPath } from './lib/i18n-clusters.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = 'https://www.spires-taxis.com';
@@ -124,10 +125,7 @@ const requiredSitemap = [
   '/reviews',
   '/long-distance-taxis',
   '/share',
-  '/ar/heathrow-to-oxford-taxi',
-  '/zh/heathrow-to-oxford-taxi',
-  '/ar/international-student-arrivals',
-  '/zh/international-student-arrivals',
+  ...new Set(LANG_CLUSTERS.flatMap((cluster) => Object.values(cluster))),
 ];
 for (const p of requiredSitemap) {
   const loc = p === '/' ? `${BASE}/` : `${BASE}${p}`;
@@ -137,21 +135,16 @@ if (sitemap.includes('/airport-taxis-oxford')) {
   issues.push('sitemap must not include redirected /airport-taxis-oxford');
 }
 
-const hreflangPages = [
-  ['heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
-  ['ar/heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
-  ['zh/heathrow-to-oxford-taxi.html', '/heathrow-to-oxford-taxi', '/ar/heathrow-to-oxford-taxi', '/zh/heathrow-to-oxford-taxi'],
-  ['student-taxis.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
-  ['ar/international-student-arrivals.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
-  ['zh/international-student-arrivals.html', '/student-taxis', '/ar/international-student-arrivals', '/zh/international-student-arrivals'],
-];
-for (const [file, ...paths] of hreflangPages) {
-  const html = fs.readFileSync(path.join(root, file), 'utf8');
-  if (!/hreflang="en-GB"/.test(html) || !/hreflang="ar"/.test(html) || !/hreflang="zh-Hans"/.test(html) || !/hreflang="x-default"/.test(html)) {
-    issues.push(`${file}: missing hreflang set`);
-  }
-  for (const p of paths) {
-    if (!html.includes(`${BASE}${p}`)) issues.push(`${file}: missing hreflang href ${p}`);
+for (const cluster of LANG_CLUSTERS) {
+  for (const p of Object.values(cluster)) {
+    const file = fileFromPath(p);
+    const html = fs.readFileSync(path.join(root, file), 'utf8');
+    for (const [hl, href] of Object.entries(cluster)) {
+      if (!html.includes(`hreflang="${hl}"`)) issues.push(`${file}: missing hreflang ${hl}`);
+      const full = href === '/' ? `${BASE}/` : `${BASE}${href}`;
+      if (!html.includes(`href="${full}"`)) issues.push(`${file}: missing hreflang href ${href}`);
+    }
+    if (!/hreflang="x-default"/.test(html)) issues.push(`${file}: missing hreflang x-default`);
   }
 }
 

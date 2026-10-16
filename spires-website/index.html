@@ -19,18 +19,30 @@
   <meta property="og:site_name" content="Spires Taxis">
   <meta property="og:locale" content="en_GB">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Spires Taxis | Oxford Airport Transfers &amp; Private Hire">
-  <title>Spires Taxis | Oxford Airport Transfers &amp; Private Hire</title>
-  <meta name="description" content="Spires Taxis. Oxford private hire with fixed prices. Airport transfers to Heathrow, Gatwick and beyond. Pre-book 24/7. Call or WhatsApp 07776 897772.">
+  <meta name="twitter:title" content="Spires Taxis | Oxford Private Hire">
+  <title>Spires Taxis | Oxford Private Hire</title>
+  <meta name="description" content="Spires Taxis is a licensed Oxford private hire firm. Fixed fares for local journeys, airport transfers and longer runs. Book ahead. Call or WhatsApp 07776 897772.">
   <link rel="canonical" href="https://www.spires-taxis.com/">
+  <link rel="alternate" hreflang="en-GB" href="https://www.spires-taxis.com/">
+  <link rel="alternate" hreflang="ar" href="https://www.spires-taxis.com/ar">
+  <link rel="alternate" hreflang="zh-Hans" href="https://www.spires-taxis.com/zh">
+  <link rel="alternate" hreflang="es" href="https://www.spires-taxis.com/es">
+  <link rel="alternate" hreflang="fr" href="https://www.spires-taxis.com/fr">
+  <link rel="alternate" hreflang="hi" href="https://www.spires-taxis.com/hi">
+  <link rel="alternate" hreflang="pl" href="https://www.spires-taxis.com/pl">
+  <link rel="alternate" hreflang="pt" href="https://www.spires-taxis.com/pt">
+  <link rel="alternate" hreflang="de" href="https://www.spires-taxis.com/de">
+  <link rel="alternate" hreflang="it" href="https://www.spires-taxis.com/it">
+  <link rel="alternate" hreflang="ur" href="https://www.spires-taxis.com/ur">
+  <link rel="alternate" hreflang="x-default" href="https://www.spires-taxis.com/">
   <meta name="robots" content="index, follow">
-  <meta property="og:title" content="Spires Taxis | Oxford Airport Transfers">
-  <meta property="og:description" content="Fixed price airport transfers and private hire from Oxford. Licensed operator, no surge pricing.">
+  <meta property="og:title" content="Spires Taxis | Oxford Private Hire">
+  <meta property="og:description" content="Licensed Oxford private hire with fixed fares. Local journeys, airport transfers and longer runs. Book ahead.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.spires-taxis.com/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Noto+Sans+Arabic:wght@400;600;700&family=Noto+Sans+SC:wght@400;600;700&display=swap" rel="stylesheet">
   <meta property="og:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="512">
@@ -112,6 +124,7 @@
     <nav class="site-nav" aria-label="Main">
       <ul class="site-nav__list">
         <li><a href="/" data-nav="home">Home</a></li>
+        <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
         <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
         <li><a href="/rates" data-nav="rates">Rates</a></li>
         <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
@@ -121,6 +134,14 @@
       </ul>
     </nav>
     <div class="site-header__actions">
+      <div class="lang-menu" data-lang-menu>
+        <button type="button" class="lang-menu__btn" aria-expanded="false" aria-haspopup="listbox" aria-label="Language">
+          <svg class="lang-menu__globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <span class="lang-menu__text" data-lang-current>English</span>
+          <svg class="lang-menu__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="lang-menu__panel" role="listbox" hidden></div>
+      </div>
       <a href="tel:+447776897772" class="site-header__phone">07776 897772</a>
       <a href="/share" class="btn btn--share site-header__share">Spires Share</a>
       <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
@@ -138,17 +159,29 @@
   </div>
   <ul class="site-menu__links">
     <li><a href="/" data-nav="home">Home</a></li>
+    <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
     <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
     <li><a href="/how-airport-pickup-works" data-nav="pickup">How airport pickup works</a></li>
-    <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
     <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Oxford to Heathrow</a></li>
+    <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
     <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
-    <li><a href="/rates" data-nav="rates">Rates</a></li>
     <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
+    <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
+    <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
+    <li><a href="/rates" data-nav="rates">Rates</a></li>
     <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
     <li><a href="/about" data-nav="about">About</a></li>
     <li><a href="/contact" data-nav="contact">Contact</a></li>
   </ul>
+  <div class="lang-menu lang-menu--mobile" data-lang-menu>
+    <p class="lang-menu__heading">Language</p>
+    <button type="button" class="lang-menu__btn" aria-expanded="false" aria-haspopup="listbox" aria-label="Language">
+      <svg class="lang-menu__globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+      <span class="lang-menu__text" data-lang-current>English</span>
+      <svg class="lang-menu__caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="lang-menu__panel" role="listbox" hidden></div>
+  </div>
   <div class="site-menu__cta">
     <a href="/share" class="btn btn--share btn--block">Spires Share</a>
     <a href="tel:+447776897772" class="btn btn--outline btn--block">Call us</a>
@@ -157,6 +190,7 @@
   </div>
 </aside>
 <!-- /SITE-HEADER -->
+
 
 <main id="main-content">
   <section class="hero hero--home">
@@ -214,7 +248,7 @@
           </div>
           <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar · up to 4</p>
         </a>
-        <a href="/airport-transfers" class="card card--link">
+        <a href="/oxford-to-stansted-taxi" class="card card--link">
           <h3>Oxford to Stansted</h3>
           <div class="card__price-lines">
             <p class="card__price"><span data-spires-price="stansted.standardCar.oneWay">£150</span> one way</p>
@@ -223,7 +257,7 @@
           <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar · up to 4</p>
         </a>
       </div>
-      <p class="fade-in" style="margin-top:1.5rem;"><a href="/airport-transfers">All airport transfers</a> · <a href="/how-airport-pickup-works">How pickup works</a> · <a href="/rates">Full rate card</a></p>
+      <p class="fade-in" style="margin-top:1.5rem;"><a href="/airport-transfers">All airport transfers</a> · <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a> · <a href="/oxford-to-luton-taxi">Oxford to Luton</a> · <a href="/how-airport-pickup-works">How pickup works</a> · <a href="/rates">Full rate card</a></p>
       <p class="fade-in" data-spires-origin="outsideOxfordNote" style="margin-top:0.75rem;">Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.</p>
     </div>
   </section>
@@ -238,7 +272,7 @@
       <div class="places-been fade-in">
         <div class="places-been__group">
           <h3 class="places-been__label">Airports</h3>
-          <p class="places-been__list"><a href="/oxford-to-heathrow-taxi">Heathrow</a> · <a href="/oxford-to-gatwick-taxi">Gatwick</a> · <a href="/oxford-to-luton-taxi">Luton</a> · Stansted · Birmingham · Bristol · <a href="/oxford-to-london-city-airport-taxi">London City</a></p>
+          <p class="places-been__list"><a href="/oxford-to-heathrow-taxi">Heathrow</a> · <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a> · <a href="/oxford-to-gatwick-taxi">Gatwick</a> · <a href="/oxford-to-luton-taxi">Luton</a> · <a href="/oxford-to-stansted-taxi">Stansted</a> · <a href="/oxford-to-birmingham-airport-taxi">Birmingham</a> · <a href="/oxford-to-bristol-airport-taxi">Bristol</a> · <a href="/oxford-to-london-city-airport-taxi">London City</a></p>
         </div>
         <div class="places-been__group">
           <h3 class="places-been__label">Oxfordshire</h3>
@@ -278,7 +312,7 @@
         </a>
         <a href="/long-distance-taxis" class="card card--link">
           <h3>Long distance</h3>
-          <p>Cruise terminals, St Pancras, Silverstone, Cotswolds day hire, and other pre-booked runs beyond Oxfordshire.</p>
+          <p>Cruise terminals, St Pancras, Silverstone, Cotswolds day hire, and other pre booked runs beyond Oxfordshire.</p>
         </a>
       </div>
     </div>
@@ -356,21 +390,26 @@
         <li><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a></li>
         <li><a href="/oxford-to-gatwick-taxi">Oxford to Gatwick</a></li>
         <li><a href="/oxford-to-luton-taxi">Oxford to Luton</a></li>
+        <li><a href="/oxford-to-stansted-taxi">Oxford to Stansted</a></li>
+        <li><a href="/oxford-to-birmingham-airport-taxi">Oxford to Birmingham Airport</a></li>
+        <li><a href="/oxford-to-bristol-airport-taxi">Oxford to Bristol Airport</a></li>
         <li><a href="/oxford-to-london-city-airport-taxi">Oxford to London City</a></li>
       </ul>
     </div>
     <div>
       <h2 class="site-footer__heading">Useful links</h2>
       <ul class="site-footer__links">
+        <li><a href="/oxford-taxis">Oxford taxis</a></li>
         <li><a href="/rates">Airport transfer prices</a></li>
         <li><a href="/long-distance-taxis">Long distance from Oxford</a></li>
         <li><a href="/student-taxis">Student taxis</a></li>
+        <li><a href="/corporate-taxis">Corporate taxis</a></li>
         <li><a href="/our-vehicles">Our vehicles</a></li>
         <li><a href="/reviews">Customer reviews</a></li>
         <li><a href="/about">About us</a></li>
         <li><a href="/contact">Contact &amp; booking</a></li>
-        <li><a href="/terms-and-conditions">Terms</a></li>
         <li><a href="/share">Spires Share</a></li>
+        <li><a href="/terms-and-conditions">Terms</a></li>
         <li><a href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">My account</a></li>
       </ul>
     </div>
@@ -388,6 +427,7 @@
 <script src="/js/airport-prices.js" defer></script>
 <script src="/js/share-teaser.js" defer></script>
 <script src="/js/main.js" defer></script>
+<script src="/js/lang-switcher.js" defer></script>
 <!-- /SITE-FOOTER -->
 
 </body>
