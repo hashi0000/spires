@@ -146,8 +146,12 @@ export function buildBookingConfirmationHtml(
   type: AdminPDFType = "booking_confirmation"
 ): string {
   const formatPaymentMethod = (method?: string) => {
-    if (!method) return "TO BE CONFIRMED";
-    return method.replace(/_/g, " ").toUpperCase();
+    const raw = String(method || "").trim();
+    const n = raw.toLowerCase().replace(/_/g, " ");
+    if (!raw) return "TO BE CONFIRMED";
+    if (n === "tbc") return "TBC";
+    if (n === "undecided") return "NOT DECIDED YET";
+    return raw.replace(/_/g, " ").toUpperCase();
   };
 
   // ---------------------------
@@ -183,6 +187,13 @@ export function buildBookingConfirmationHtml(
     )}`;
   } else {
     paymentText = `To be paid by ${formatPaymentMethod(booking.paymentMethod)}`;
+  }
+
+  const methodLabel = formatPaymentMethod(booking.paymentMethod);
+  if (methodLabel === "TBC" || methodLabel === "NOT DECIDED YET") {
+    paymentText = isPaid
+      ? `Paid. Payment method: ${methodLabel}`
+      : `Payment method: ${methodLabel}`;
   }
 
   const bankDetailsBlock = showBankDetails

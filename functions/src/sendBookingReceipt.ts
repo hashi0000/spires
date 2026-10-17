@@ -144,9 +144,14 @@ export async function notifyAdminNewBookingRequest(
   try {
     const n = normalizeBookingForEmail(booking, bookingId);
     const subject = `New booking request · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
-    const pay = n.paymentMethod
-      ? n.paymentMethod.replace(/_/g, " ")
-      : "Not specified";
+    const rawPay = String(n.paymentMethod || "").trim().toLowerCase().replace(/_/g, " ");
+    const pay = !n.paymentMethod
+      ? "Not specified"
+      : rawPay === "tbc"
+        ? "TBC"
+        : rawPay === "undecided"
+          ? "Not decided yet"
+          : String(n.paymentMethod).replace(/_/g, " ");
 
     const html = `
       <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">

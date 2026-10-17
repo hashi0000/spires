@@ -84,8 +84,12 @@ function formatPdfTime(raw: unknown): string {
 }
 
 function formatPaymentMethod(method?: string): string {
-  if (!method) return "TO BE CONFIRMED";
-  return method.replace(/_/g, " ").toUpperCase();
+  const raw = String(method || "").trim();
+  const n = raw.toLowerCase().replace(/_/g, " ");
+  if (!raw) return "TO BE CONFIRMED";
+  if (n === "tbc") return "TBC";
+  if (n === "undecided") return "NOT DECIDED YET";
+  return raw.replace(/_/g, " ").toUpperCase();
 }
 
 function paymentCopy(
@@ -115,6 +119,9 @@ function paymentCopy(
     methodLine = `Partially paid by ${method}`;
   } else {
     methodLine = `To be paid by ${method}`;
+  }
+  if (method === "TBC" || method === "NOT DECIDED YET") {
+    methodLine = isPaid ? `Paid. Payment method: ${method}` : `Payment method: ${method}`;
   }
   return { amount, methodLine };
 }

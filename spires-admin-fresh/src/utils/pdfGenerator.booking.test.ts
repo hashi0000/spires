@@ -18,6 +18,26 @@ const baseBooking: Booking = {
 };
 
 describe("booking confirmation PDF", () => {
+  it("shows TBC on a confirmation without treating it as card payment", () => {
+    const html = buildBookingConfirmationHtml({
+      ...baseBooking,
+      paymentMethod: "tbc",
+      paymentStatus: "pending",
+    });
+    expect(html).toContain("Payment method: TBC");
+    expect(html).not.toContain("Pay by bank transfer");
+    expect(html).not.toContain("card payment");
+  });
+
+  it("shows Not decided yet when the customer has not chosen", () => {
+    const html = buildBookingConfirmationHtml({
+      ...baseBooking,
+      paymentMethod: "undecided",
+      paymentStatus: "pending",
+    });
+    expect(html).toContain("Payment method: NOT DECIDED YET");
+  });
+
   it("keeps a one way booking on a single journey block", () => {
     const html = buildBookingConfirmationHtml(baseBooking);
     expect(html).toContain("Journey Details");

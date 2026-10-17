@@ -87,7 +87,7 @@ export interface Booking {
   notes?: string;
   allocatedTime?: string;
   actualFare?: number;
-  paymentMethod?: 'cash' | 'card' | 'bank transfer' | 'account';
+  paymentMethod?: 'cash' | 'card' | 'bank transfer' | 'account' | 'tbc' | 'undecided';
   paymentStatus?: 'pending' | 'paid' | 'partial' | 'refunded';
   vehicleType?: 'standard' | '8_seater' | string;
   depositRequired?: boolean;

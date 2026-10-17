@@ -2606,3 +2606,55 @@ html[dir="rtl"] .booking-form label {
 @media print {
   .no-print, .whatsapp-float, .site-header, header { display: none !important; }
 }
+
+/* Regional indicative fares */
+.region-crumbs {
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+  color: var(--text-muted);
+}
+.region-crumbs a { color: inherit; text-decoration: none; }
+.region-crumbs a:hover { text-decoration: underline; }
+
+.regional-fare {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.35rem 1.25rem 1.5rem;
+}
+.regional-fare__route {
+  font-size: 1.2rem;
+  margin: 0 0 0.85rem;
+}
+.regional-fare__label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.regional-fare__price {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  line-height: 1.1;
+  color: var(--blue);
+  margin: 0.3rem 0 0.75rem;
+}
+.regional-fare__note {
+  font-size: 0.95rem;
+  margin: 0 0 0.85rem;
+}
+.regional-fare__vito,
+.regional-fare__best {
+  margin: 0 0 0.45rem;
+  font-weight: 700;
+}
+.region-nearby { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.region-nearby li { margin: 0.45rem 0; }
+.wa-label--short { display: none; }
+@media (max-width: 640px) {
+  .wa-label--full { display: none; }
+  .wa-label--short { display: inline; }
+  .regional-fare__price { font-size: 1.85rem; }
+}

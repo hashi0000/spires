@@ -17,6 +17,7 @@ const PAYMENT_OPTIONS = [
   { value: "cash", label: "Cash (pay driver)" },
   { value: "card", label: "Card (pay driver)" },
   { value: "bank transfer", label: "Bank transfer" },
+  { value: "undecided", label: "Not decided yet" },
 ];
 
 function splitLocalDateTime(value) {

@@ -12,10 +12,21 @@ export function isBankTransferMethod(method) {
 }
 
 export function formatPaymentMethodLabel(method) {
-  if (!method) return "To be confirmed";
-  return String(method)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const raw = String(method || "").trim();
+  const n = raw.toLowerCase().replace(/_/g, " ");
+  if (!raw) return "To be confirmed";
+  if (n === "tbc") return "TBC";
+  if (n === "undecided") return "Not decided yet";
+  return raw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function confirmationPaymentLabel(method) {
+  const raw = String(method || "").trim();
+  const n = raw.toLowerCase().replace(/_/g, " ");
+  if (!raw) return "TO BE CONFIRMED";
+  if (n === "tbc") return "TBC";
+  if (n === "undecided") return "NOT DECIDED YET";
+  return raw.replace(/_/g, " ").toUpperCase();
 }
 
 export function bankTransferDetailsHtml(paymentStatus) {

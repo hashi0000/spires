@@ -55,7 +55,7 @@ export interface Booking {
   
   // New fare and payment fields
   actualFare?: number;
-  paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'account';
+  paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'account' | 'tbc' | 'undecided';
   paymentStatus?: 'pending' | 'paid' | 'partial' | 'refunded';
   expenses?: TripExpense[];
   

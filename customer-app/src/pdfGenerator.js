@@ -1,7 +1,7 @@
 // Customer PDF Generator - Professional HTML-based PDF with clickable links
 // Matches admin app style with WhatsApp integration
 
-import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
+import { bankTransferDetailsHtml, confirmationPaymentLabel, isBankTransferMethod } from "./bankDetails";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
   AIRPORT_WAITING_POLICY,
@@ -683,7 +683,11 @@ export const generateBookingPDF = (
                         const isCompleted = booking.status === 'completed';
                         const isPaid = booking.paymentStatus === 'paid';
                         const hasFare = booking.actualFare;
-                        const paymentMethod = (booking.paymentMethod || "TO BE CONFIRMED").replace(/_/g, " ").toUpperCase();
+                        const paymentMethod = confirmationPaymentLabel(booking.paymentMethod);
+                        const openEnded = paymentMethod === "TBC" || paymentMethod === "NOT DECIDED YET";
+                        const methodLine = openEnded
+                          ? (isPaid ? `Paid. Payment method: ${paymentMethod}` : `Payment method: ${paymentMethod}`)
+                          : "";
                         const isPaymentRequest = type === 'payment_request';
                         const isPaymentReceipt = type === 'payment_receipt';
                         const bankBlock = isBankTransferMethod(booking.paymentMethod) && !isPaid
@@ -714,7 +718,7 @@ export const generateBookingPDF = (
                                 <h2 class="section-header">Payment Request</h2>
                                 <div class="payment-summary" style="background: #92400e; border: 2px solid #C5A572;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
-                                    <div class="payment-method">Payment Required - ${paymentMethod}</div>
+                                    <div class="payment-method">${methodLine || `Payment Required - ${paymentMethod}`}</div>
                                     ${airportChargeNote}
                                     <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.95;">
                                         Please arrange payment for this booking using the method above.
@@ -733,7 +737,7 @@ export const generateBookingPDF = (
                                 <h2 class="section-header">Payment</h2>
                                 <div class="payment-summary">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
-                                    <div class="payment-method">Paid by ${paymentMethod}</div>
+                                    <div class="payment-method">${methodLine || `Paid by ${paymentMethod}`}</div>
                                     ${airportChargeNote}
                                 </div>
                             </div>
@@ -747,7 +751,7 @@ export const generateBookingPDF = (
                                 <h2 class="section-header">Payment</h2>
                                 <div class="payment-summary" style="background: #92400e;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
-                                    <div class="payment-method">Payment Pending - ${paymentMethod}</div>
+                                    <div class="payment-method">${methodLine || `Payment Pending - ${paymentMethod}`}</div>
                                     ${airportChargeNote}
                                     ${bankBlock}
                                     ${depositBlock}
@@ -763,7 +767,7 @@ export const generateBookingPDF = (
                                 <h2 class="section-header">Payment</h2>
                                 <div class="payment-summary" style="background: #1d3c74;">
                                     <div class="payment-amount">£${booking.actualFare.toFixed(2)}</div>
-                                    <div class="payment-method">To be paid by ${paymentMethod}</div>
+                                    <div class="payment-method">${methodLine || `To be paid by ${paymentMethod}`}</div>
                                     ${airportChargeNote}
                                     ${bankBlock}
                                     ${depositBlock}
@@ -784,7 +788,7 @@ export const generateBookingPDF = (
                             ${booking.paymentMethod ? `
                             <div class="detail-row">
                                 <span class="detail-label">Payment Method</span>
-                                <span class="detail-value">To be paid by ${paymentMethod}</span>
+                                <span class="detail-value">${methodLine || `To be paid by ${paymentMethod}`}</span>
                             </div>
                             ` : ''}
                             <div class="detail-row">
