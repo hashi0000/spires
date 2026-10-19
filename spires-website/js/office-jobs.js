@@ -135,11 +135,12 @@
   }
 
   function inViewPickup(pickup, now) {
-    if (!pickup) return view === "all";
+    if (!pickup) return view === "upcoming";
     const today = startOfDay(now);
     const tomorrow = addDays(today, 1);
     if (view === "today") return pickup >= today && pickup < tomorrow;
     if (view === "tomorrow") return pickup >= tomorrow && pickup < addDays(tomorrow, 1);
+    if (view === "completed") return pickup < now;
     return pickup >= now;
   }
 
@@ -200,13 +201,17 @@
       .filter((row) => !isCancelled(row))
       .flatMap(expandJobs)
       .filter((job) => inViewPickup(job.pickup, now))
-      .sort((a, b) => (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0));
+      .sort((a, b) => {
+        const diff = (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0);
+        return view === "completed" ? -diff : diff;
+      });
   }
 
   function renderList() {
     const rows = visibleJobs();
     jobList.innerHTML = "";
-    emptyEl.textContent = view === "all" ? "No upcoming jobs." : "No jobs in this view.";
+    emptyEl.textContent =
+      view === "upcoming" ? "No upcoming jobs." : view === "completed" ? "No completed jobs." : "No jobs in this view.";
     show(emptyEl, rows.length === 0);
     rows.forEach((job) => {
       const booking = job.booking;
@@ -214,7 +219,7 @@
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "job-card" + (job.leg === "return" ? " is-return" : "");
+      button.className = "job-card" + (job.leg === "return" ? " is-return" : "") + (view === "completed" ? " is-completed" : "");
       button.innerHTML =
         '<div class="job-head">' +
         '<div class="job-when">' +

@@ -74,8 +74,8 @@ input, select, textarea {
 .btn-danger { background: #b91c1c; color: #fff; border: 0; }
 .btn[disabled] { opacity: 0.6; }
 
-.tabs { display: flex; gap: 0.35rem; background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 0.25rem; margin-bottom: 1rem; }
-.tabs button { flex: 1; background: transparent; color: var(--muted); border-radius: 999px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 0.25rem; margin-bottom: 1rem; }
+.tabs button { background: transparent; color: var(--muted); border-radius: 14px; padding: 0 0.4rem; font-size: 0.92rem; }
 .tabs button.is-active { background: var(--navy); color: #fff; }
 
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
@@ -89,6 +89,7 @@ input, select, textarea {
   padding: 0.9rem 1rem;
 }
 .job-card.is-return { border-left-color: var(--gold); }
+.job-card.is-completed { border-left-color: #94a3b8; }
 .job-head { display: flex; justify-content: space-between; align-items: baseline; gap: 0.6rem; }
 .job-when { font-weight: 800; color: var(--navy); }
 .job-charge { font-weight: 800; color: var(--navy); font-size: 1.15rem; white-space: nowrap; }
@@ -148,6 +149,11 @@ input, select, textarea {
 .vehicle { display: flex; flex-direction: column; gap: 0.4rem; }
 .vehicle label { flex-direction: row; align-items: center; min-height: var(--touch); font-weight: 600; margin: 0; }
 .muted { color: var(--muted); font-size: 0.9rem; }
+
+@media (min-width: 640px) {
+  .tabs { grid-template-columns: repeat(4, 1fr); border-radius: 999px; }
+  .tabs button { border-radius: 999px; font-size: 0.88rem; }
+}
 
 @media (min-width: 800px) {
   .sheet { align-items: center; }

@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="/images/office-jobs-192.png">
   <link rel="manifest" href="/office-jobs-manifest.json">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@0,9..40,400;0,9..40,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/office-jobs.css?v=2">
+  <link rel="stylesheet" href="/css/office-jobs.css?v=3">
 </head>
 <body>
   <div id="pin-screen" class="screen">
@@ -43,7 +43,8 @@
     <div class="tabs" role="tablist" aria-label="Job views">
       <button type="button" class="is-active" data-view="today">Today</button>
       <button type="button" data-view="tomorrow">Tomorrow</button>
-      <button type="button" data-view="all">All jobs</button>
+      <button type="button" data-view="upcoming">Upcoming jobs</button>
+      <button type="button" data-view="completed">Completed jobs</button>
     </div>
 
     <p id="app-status" class="ok" hidden></p>
@@ -62,6 +63,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-functions-compat.js"></script>
-  <script src="/js/office-jobs.js?v=3"></script>
+  <script src="/js/office-jobs.js?v=4"></script>
 </body>
 </html>
