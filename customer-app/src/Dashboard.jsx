@@ -361,10 +361,28 @@ export default function Dashboard() {
             Pending
           </button>
           <button
+            className={`filter-btn ${statusFilter === "awaiting_customer_confirmation" ? "active" : ""}`}
+            onClick={() => setStatusFilter("awaiting_customer_confirmation")}
+          >
+            Awaiting confirmation
+          </button>
+          <button
             className={`filter-btn ${statusFilter === "confirmed" ? "active" : ""}`}
             onClick={() => setStatusFilter("confirmed")}
           >
             Confirmed
+          </button>
+          <button
+            className={`filter-btn ${statusFilter === "allocated" ? "active" : ""}`}
+            onClick={() => setStatusFilter("allocated")}
+          >
+            Allocated
+          </button>
+          <button
+            className={`filter-btn ${statusFilter === "completed" ? "active" : ""}`}
+            onClick={() => setStatusFilter("completed")}
+          >
+            Completed
           </button>
           <button
             className={`filter-btn ${statusFilter === "paid" ? "active" : ""}`}
@@ -398,7 +416,17 @@ export default function Dashboard() {
                     <span className="route-destination">{booking.destination || "N/A"}</span>
                   </div>
                   <span className={`status-badge status-${(booking.status || "pending").toLowerCase()}`}>
-                    {booking.status ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1) : "Pending"}
+                    {booking.quoteAcceptanceSubstatus === "awaiting_payment"
+                      ? "Quote accepted — awaiting payment"
+                      : booking.status === "awaiting_customer_confirmation"
+                        ? "Awaiting customer confirmation"
+                        : booking.status === "allocated"
+                          ? "Allocated"
+                          : booking.status === "completed"
+                            ? "Completed"
+                            : booking.status
+                              ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
+                              : "Pending"}
                   </span>
                 </div>
                 
@@ -483,7 +511,11 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Show price when booking is confirmed or paid */}
+                  {booking.quoteIssuedVersion ? (
+                    <div className="booking-info-row">
+                      <a href={`/quote?booking=${booking.id}`}>View quote</a>
+                    </div>
+                  ) : null}
                   {booking.actualFare && (booking.status === "confirmed" || booking.status === "paid" || booking.paymentStatus === "paid") && (
                     <div className="booking-info-row">
                       <span className="info-label">Fare:</span>

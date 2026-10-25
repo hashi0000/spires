@@ -1,24 +1,35 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import {
-  sendBookingReceipt,
-  notifyAdminNewBookingRequest,
-} from "./sendBookingReceipt";
+import { notifyAdminNewBookingRequest } from "./sendBookingReceipt";
 import { sendWelcomeEmail } from "./sendWelcomeEmail";
 import { processBookingReminders } from "./sendBookingReminderEmails";
 import { createPaymentIntent, confirmPayment, stripeWebhook } from "./payment";
+import {
+  enqueueConfirmationIfNeeded,
+  stampPromotionOnCreate,
+  saveQuoteDraft,
+  issueQuote,
+  savePaymentLink,
+  sendPaymentRequest,
+  recordManualPayment,
+  recordManualAcceptance,
+  acceptQuote,
+  retryEmailJob,
+  resendQuoteEmail,
+  quotePublic,
+  submitWebsiteQuote,
+  processEmailJob,
+} from "./quotes/callables";
+import {
+  createCustomerBooking,
+  recordStaffTermsAcceptance,
+  createTermsAcceptanceLink,
+  acceptTermsPublic,
+} from "./terms/callables";
+import { shouldSendConfirmation } from "./quotes/quoteWorkflow";
 
 admin.initializeApp();
 admin.firestore().settings({ ignoreUndefinedProperties: true });
-
-function isConfirmedStatus(data: admin.firestore.DocumentData | undefined | null): boolean {
-  if (!data) return false;
-  return (
-    data.status === "confirmed" ||
-    data.customerStatus === "confirmed" ||
-    data.adminStatus === "confirmed"
-  );
-}
 
 function isPendingRequest(data: admin.firestore.DocumentData): boolean {
   const status = data.status || "pending";
@@ -34,42 +45,46 @@ export const onBookingWrite = functions.firestore
 
     if (!after) return;
 
-    // New pending customer booking request → email the office
-    if (!before && isPendingRequest(after)) {
-      await notifyAdminNewBookingRequest(after, bookingId);
-      return;
-    }
-
-    // Created already confirmed (admin-created) → send confirmation PDF
-    if (!before && isConfirmedStatus(after)) {
-      const familyWithoutEmail =
-        after.source === "family" && !(after.hirerEmail || after.email);
-      if (!familyWithoutEmail) {
-        await sendBookingReceipt(after, "confirmation", bookingId);
-        await change.after.ref.update({
-          confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+    if (!before) {
+      await stampPromotionOnCreate(change.after);
+      const freshSnap = await change.after.ref.get();
+      const fresh = freshSnap.data() || after;
+      if (isPendingRequest(fresh)) {
+        await notifyAdminNewBookingRequest(fresh, bookingId);
+      }
+      if (shouldSendConfirmation(null, fresh)) {
+        const familyWithoutEmail = fresh.source === "family" && !(fresh.hirerEmail || fresh.email);
+        if (!familyWithoutEmail) await enqueueConfirmationIfNeeded(null, fresh, bookingId);
       }
       return;
     }
 
-    // Pending → confirmed (or customerStatus flipped) → auto-send confirmation PDF once
-    if (
-      before &&
-      !isConfirmedStatus(before) &&
-      isConfirmedStatus(after) &&
-      !after.confirmationEmailSentAt
-    ) {
-      await sendBookingReceipt(after, "confirmation", bookingId);
-      await change.after.ref.update({
-        confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return;
+    if (shouldSendConfirmation(before, after)) {
+      const familyWithoutEmail = after.source === "family" && !(after.hirerEmail || after.email);
+      if (!familyWithoutEmail) await enqueueConfirmationIfNeeded(before, after, bookingId);
     }
 
-    // Payment status changed to paid
-    if (before && before.paymentStatus !== "paid" && after.paymentStatus === "paid") {
-      await sendBookingReceipt(after, "payment", bookingId);
+    if (
+      before &&
+      before.paymentStatus !== "paid" &&
+      after.paymentStatus === "paid" &&
+      !after.paymentReceiptEmailSentAt
+    ) {
+      const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
+      const existingReceipt = await receiptRef.get();
+      if (!existingReceipt.exists) {
+        await receiptRef.set({
+          bookingId,
+          event: "payment_receipt",
+          version: "1",
+          kind: "payment_receipt",
+          to: after.hirerEmail || after.email || "",
+          subject: "Your Spires Taxis payment receipt",
+          html: "",
+          status: "queued",
+          queuedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     }
   });
 
@@ -97,6 +112,26 @@ export { unlockFamilyJobs } from "./familyJobsAuth";
 export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";
+export {
+  saveQuoteDraft,
+  issueQuote,
+  savePaymentLink,
+  sendPaymentRequest,
+  recordManualPayment,
+  recordManualAcceptance,
+  acceptQuote,
+  retryEmailJob,
+  resendQuoteEmail,
+  quotePublic,
+  submitWebsiteQuote,
+  processEmailJob,
+};
+export {
+  createCustomerBooking,
+  recordStaffTermsAcceptance,
+  createTermsAcceptanceLink,
+  acceptTermsPublic,
+};
 export {
   spiresShareSession,
   spiresShareGetState,

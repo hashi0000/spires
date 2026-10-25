@@ -37,6 +37,8 @@ exports.sendBookingPdfToCustomer = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const driverReminderEmail_1 = require("./driverReminderEmail");
+const bookingTerms_1 = require("./terms/bookingTerms");
+const quoteWorkflow_1 = require("./quotes/quoteWorkflow");
 const getSubjectLine = (type, bookingNumber) => {
     switch (type) {
         case "payment":
@@ -88,7 +90,7 @@ function resolveStorageBucket() {
     return project ? `${project}.appspot.com` : "";
 }
 async function sendMailWithPdf(params) {
-    const { pdfBuffer, toEmail, pdfType, bookingNumber, hirerName } = params;
+    const { pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph } = params;
     const subject = getSubjectLine(pdfType, bookingNumber);
     const introCopy = getIntroCopy(pdfType);
     const filenamePrefix = getFilenamePrefix(pdfType);
@@ -96,6 +98,7 @@ async function sendMailWithPdf(params) {
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
         <p>Dear ${hirerName},</p>
         ${introCopy}
+        ${termsParagraph ? `<p>${(0, driverReminderEmail_1.escapeHtml)(termsParagraph)}</p>` : ""}
         <p style="font-size:14px;color:#555;">Attached: ${bookingNumber}</p>
         <p>
           📱 <a href="tel:07776897772">07776 897772</a><br>
@@ -142,6 +145,15 @@ exports.sendBookingPdfToCustomer = functions.https.onCall(async (data, context) 
         ? data.bookingNumber.trim()
         : "Spires";
     const hirerName = typeof data?.hirerName === "string" && data.hirerName.trim() ? data.hirerName.trim() : "Customer";
+    let termsParagraph = "";
+    const bookingId = typeof data?.bookingId === "string" ? data.bookingId.trim() : "";
+    if ((pdfType === "confirmation" || pdfType === "booking_confirmation") &&
+        bookingId &&
+        (0, quoteWorkflow_1.isQuoteAdmin)(String(context.auth.token.email || ""))) {
+        const snap = await admin.firestore().collection("bookings").doc(bookingId).get();
+        if (snap.exists)
+            termsParagraph = (0, bookingTerms_1.confirmationTermsParagraph)(snap.data() || {});
+    }
     const pdfBase64Raw = typeof data?.pdfBase64 === "string" ? data.pdfBase64.trim() : "";
     const comma = pdfBase64Raw.indexOf(",");
     const pdfBase64 = comma >= 0 ? pdfBase64Raw.slice(comma + 1) : pdfBase64Raw;
@@ -160,7 +172,7 @@ exports.sendBookingPdfToCustomer = functions.https.onCall(async (data, context) 
         if (pdfBuffer.length > MAX_INLINE_PDF_BYTES) {
             throw new functions.https.HttpsError("invalid-argument", `PDF is too large to send inline (${Math.round(pdfBuffer.length / 1024)} KB). Use Download, or contact support.`);
         }
-        await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName });
+        await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph });
         functions.logger.info(`Booking PDF emailed (inline) ${bookingNumber} to ${toEmail}`);
         return { success: true, to: toEmail, via: "inline" };
     }
@@ -193,7 +205,7 @@ exports.sendBookingPdfToCustomer = functions.https.onCall(async (data, context) 
         throw new functions.https.HttpsError("internal", "Could not read uploaded PDF from Storage.");
     }
     try {
-        await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName });
+        await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph });
     }
     finally {
         await file.delete().catch((err) => functions.logger.warn("Temp PDF delete failed", err));

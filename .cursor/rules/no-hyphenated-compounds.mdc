@@ -1,0 +1,22 @@
+---
+description: Never use hyphenated compound words in Spires pages or UI copy
+alwaysApply: true
+---
+
+# No hyphenated compounds in pages and UI
+
+Never join words with a hyphen in customer or admin facing copy, labels, buttons, emails, or website pages.
+
+Do not write forms such as `8-seater`, `customer-facing`, `four-passenger`, `pre-booked`, `payment-method`, or `no-show` in UI text.
+
+Write them as separate words: `8 seater`, `customer facing`, `four passenger`, `pre booked`, `payment method`, `no show`.
+
+Code identifiers, URLs, CSS classes, and Firestore field names may keep hyphens or underscores. Visible language must not.
+
+```html
+<!-- BAD -->
+<p>Shared 8-seater transfer. Customer-facing status.</p>
+
+<!-- GOOD -->
+<p>Shared 8 seater transfer. Customer facing status.</p>
+```

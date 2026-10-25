@@ -1,6 +1,6 @@
 import { Booking } from '../types/types';
 
-const ACTIVE_STATUSES: Booking['status'][] = ['pending', 'confirmed', 'allocated'];
+const ACTIVE_STATUSES: Booking['status'][] = ['pending', 'awaiting_customer_confirmation', 'confirmed', 'allocated'];
 
 export interface UpcomingReminder {
   booking: Booking;

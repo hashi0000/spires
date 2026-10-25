@@ -18,6 +18,10 @@ import {
   invoicePaymentTermsLabel,
   invoiceTotals,
   isInvoicePaid,
+  invoiceEmailLabel,
+  invoicePaidOnLabel,
+  invoicePaymentState,
+  londonTodayYmd,
   normaliseInvoicePaymentMethod,
   paymentTermsFromDates,
   sanitiseInvoicePrefix,
@@ -353,7 +357,8 @@ const GeneralInvoices: React.FC = () => {
       createdAt: existing?.createdAt || new Date().toISOString(),
       emailedAt: existing?.emailedAt,
       emailedTo: existing?.emailedTo,
-      paidAt: paid ? existing?.paidAt || new Date().toISOString() : undefined,
+      emailStatus: existing?.emailStatus,
+      paidAt: paid ? existing?.paidAt || new Date().toISOString() : null,
     };
   };
 
@@ -437,7 +442,7 @@ const GeneralInvoices: React.FC = () => {
   ) => {
     const stamped = invoices.map((row) =>
       row.invoiceNumber === invoiceNumber
-        ? { ...row, emailedAt: new Date().toISOString(), emailedTo: to }
+        ? { ...row, emailedAt: new Date().toISOString(), emailedTo: to, emailStatus: "sent" as const, emailError: undefined }
         : row
     );
     await persist({ ...nextVault, supplier, invoices: stamped });
@@ -478,29 +483,53 @@ const GeneralInvoices: React.FC = () => {
           : `Invoice ${record.invoiceNumber} emailed to ${sent.to}.`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not email the invoice.");
+      const message = err instanceof Error ? err.message : "Could not email the invoice.";
+      setError(message);
+      if (editingInvoice && vault) {
+        const failed = history.map((item) =>
+          item.id === editingInvoice.id ? { ...item, emailStatus: "failed" as const, emailError: message } : item
+        );
+        try {
+          await persist({ ...vault, supplier, clients, invoices: failed });
+        } catch {
+          /* the email error is already shown */
+        }
+      }
     } finally {
       setBusy(null);
     }
   };
 
-  const emailSavedInvoice = async (row: GeneratedGeneralInvoice) => {
+  const emailSavedInvoice = async (
+    row: GeneratedGeneralInvoice,
+    invoicesSnapshot?: GeneratedGeneralInvoice[]
+  ) => {
     if (!vault) return;
     const to = askInvoiceRecipient(row.customer.email, isInvoicePaid(row));
     if (!to) return;
     setError("");
     setStatus("");
     setBusy("email");
+    const sourceInvoices = invoicesSnapshot || history;
     try {
       const sent = await emailGeneralInvoicePdf(row, supplier, to);
-      await markEmailed(history, row.invoiceNumber, sent.to, vault);
+      await markEmailed(sourceInvoices, row.invoiceNumber, sent.to, { ...vault, invoices: sourceInvoices });
       setStatus(
         sent.cc
-          ? `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
-          : `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} emailed to ${sent.to}.`
+          ? `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} sent to ${sent.to}, copy to ${sent.cc}.`
+          : `${isInvoicePaid(row) ? "Paid invoice" : "Invoice"} ${row.invoiceNumber} sent to ${sent.to}.`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not email the invoice.");
+      const message = err instanceof Error ? err.message : "Could not email the invoice.";
+      const failed = sourceInvoices.map((item) =>
+        item.invoiceNumber === row.invoiceNumber ? { ...item, emailStatus: "failed" as const, emailError: message } : item
+      );
+      try {
+        await persist({ ...vault, supplier, clients, invoices: failed });
+      } catch {
+        /* keep the original error visible */
+      }
+      setError(message);
     } finally {
       setBusy(null);
     }
@@ -515,7 +544,7 @@ const GeneralInvoices: React.FC = () => {
     try {
       const updated: GeneratedGeneralInvoice = {
         ...row,
-        paidAt: makePaid ? row.paidAt || new Date().toISOString() : undefined,
+        paidAt: makePaid ? row.paidAt || new Date().toISOString() : null,
       };
       const invoices = history.map((item) => (item.id === row.id ? updated : item));
       await persist({ ...vault, supplier, clients, invoices });
@@ -530,7 +559,7 @@ const GeneralInvoices: React.FC = () => {
       );
       if (sendNow) {
         handedOffToEmail = true;
-        await emailSavedInvoice(updated);
+        await emailSavedInvoice(updated, invoices);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update paid status.");
@@ -960,12 +989,18 @@ const GeneralInvoices: React.FC = () => {
                   {invoicePaymentMethodLabel(row.paymentMethod)}
                   {" · "}
                   {formatGbp(invoiceTotals(row.lines).total)}
-                  {isInvoicePaid(row) ? (
-                    <div className="text-xs" style={{ color: "#166534", fontWeight: 600 }}>Paid{row.paidAt ? ` · ${formatUkDate(row.paidAt.slice(0, 10))}` : ""}</div>
-                  ) : null}
-                  {row.emailedTo ? (
-                    <div className="text-xs text-gray-500">Emailed to {row.emailedTo}</div>
-                  ) : null}
+                  {(() => {
+                    const pay = invoicePaymentState(row, londonTodayYmd());
+                    const paidOn = invoicePaidOnLabel(row.paidAt);
+                    const payLabel = pay === "paid" ? `Paid${paidOn ? ` · ${paidOn}` : ""}` : pay === "overdue" ? "Overdue" : "Unpaid";
+                    const payColor = pay === "paid" ? "#166534" : pay === "overdue" ? "#9a3412" : "#374151";
+                    return (
+                      <>
+                        <div className="text-xs" style={{ color: payColor, fontWeight: 600 }}>{payLabel}</div>
+                        <div className="text-xs text-gray-500">{invoiceEmailLabel(row)}</div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex gap-2">
                   <button

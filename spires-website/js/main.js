@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFadeIn();
   initSmoothScroll();
   initMobileBookBar();
+  initBookingTerms();
 });
 
 function initNavActive() {
@@ -156,6 +157,44 @@ function initMobileBookBar() {
     '<a class="btn btn--primary" href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">Book online</a>' +
     '<a class="btn btn--whatsapp" href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" target="_blank" rel="noopener noreferrer">WhatsApp</a>';
   document.body.appendChild(bar);
+}
+
+function initBookingTerms() {
+  document.querySelectorAll("form.booking-form").forEach(function (form) {
+    if (!form.querySelector("[name='termsAccepted']")) {
+      var wrap = document.createElement("div");
+      wrap.className = "terms-agreement";
+      wrap.innerHTML =
+        '<label class="terms-agreement__line">' +
+        '<input type="checkbox" name="termsAccepted" value="yes" required aria-describedby="terms-agreement-error">' +
+        '<span>I agree to the <a href="/terms/2026-10-25" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>' +
+        "</label>" +
+        '<p class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>';
+      var button = form.querySelector("[type='submit']");
+      if (button && button.parentNode) button.parentNode.insertBefore(wrap, button);
+      else form.appendChild(wrap);
+    }
+    form.addEventListener("submit", function (event) {
+      var box = form.querySelector("[name='termsAccepted']");
+      var error = form.querySelector(".terms-agreement__error");
+      if (!box || box.checked) {
+        if (error) error.hidden = true;
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (error) error.hidden = false;
+      box.focus();
+    }, true);
+    var box = form.querySelector("[name='termsAccepted']");
+    if (box) {
+      box.addEventListener("invalid", function (event) {
+        event.preventDefault();
+        var error = form.querySelector(".terms-agreement__error");
+        if (error) error.hidden = false;
+      });
+    }
+  });
 }
 
 window.SpiresTaxis = { showNotification: () => {} };

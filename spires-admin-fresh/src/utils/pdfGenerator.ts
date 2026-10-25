@@ -9,6 +9,7 @@ import {
   airportWaitingScopeNote,
   bookingLooksLikeAirportTransfer,
 } from "./airportWaitingPolicy";
+import { confirmationTermsParagraph } from "./bookingTerms";
 import {
   bookingHasAirportCollection,
   hasPaymentSchedule,
@@ -692,6 +693,8 @@ export function buildBookingConfirmationHtml(
                 </div>
 
             </div>
+
+            ${type === "booking_confirmation" ? `<div class="info-box"><h2 class="section-header">Terms</h2><p>${escapePdfText(confirmationTermsParagraph(booking))}</p></div>` : ""}
 
             <div class="footer">
 

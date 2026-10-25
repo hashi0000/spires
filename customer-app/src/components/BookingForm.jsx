@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { auth, db } from "../firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db, functions } from "../firebase";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from "../bankDetails";
 import {
@@ -19,6 +19,10 @@ const PAYMENT_OPTIONS = [
   { value: "bank transfer", label: "Bank transfer" },
   { value: "undecided", label: "Not decided yet" },
 ];
+
+const TERMS_VERSION = "2026-10-25";
+const TERMS_URL = "https://www.spires-taxis.com/terms/2026-10-25";
+const createCustomerBooking = httpsCallable(functions, "createCustomerBooking");
 
 function splitLocalDateTime(value) {
   const raw = String(value || "").trim();
@@ -63,6 +67,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
   const [selectedPickupAddress, setSelectedPickupAddress] = useState("");
   const [selectedDestinationAddress, setSelectedDestinationAddress] = useState("");
   const [error, setError] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -181,21 +186,23 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       }
     }
 
+    if (!termsAccepted) {
+      setError("Please agree to the Terms and Conditions before submitting.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      await addDoc(collection(db, "bookings"), {
-        uid: user.uid,
+      await createCustomerBooking({
         name: user.displayName || user.email?.split("@")[0] || "Customer",
-        email: user.email,
         phone: formData.phone || "",
         pickup: formData.pickup,
         destination: formData.destination,
         dateTime: formData.dateTime,
         passengers,
-        luggage: parseInt(formData.luggage) || 0,
+        luggage: parseInt(formData.luggage, 10) || 0,
         specialRequirements: formData.specialRequirements || "",
         bookingType: isReturn ? "return" : "one_way",
-        returnTrip: isReturn,
-        returnDateTime: isReturn ? formData.returnPickupTime : "",
         returnPickupTime: isReturn ? formData.returnPickupTime : "",
         returnPickupLocation: isReturn ? String(formData.returnPickupLocation || "").trim() : "",
         returnDestination: isReturn ? String(formData.returnDestination || "").trim() : "",
@@ -207,20 +214,19 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             : "",
         notes: formData.notes || "",
         paymentMethod: formData.paymentMethod,
-        paymentStatus: "pending",
         vehicleType: formData.vehicleType,
-        depositRequired: false,
-        depositStatus: "not_required",
         flightNumber: formData.airportCollection ? formData.flightNumber || "" : "",
         terminal: formData.terminal || "",
-        status: "pending",
-        createdAt: serverTimestamp(),
+        termsAccepted: true,
+        termsVersion: TERMS_VERSION,
       });
 
       onBookingCreated();
     } catch (err) {
       console.error("Error creating booking:", err);
-      setError("Failed to create booking. Please try again.");
+      const serverMessage = err && typeof err.message === "string" ? err.message : "";
+      const fromServer = err && typeof err.code === "string" && err.code.indexOf("functions/") === 0;
+      setError(fromServer && serverMessage ? serverMessage : "Failed to create booking. Please try again.");
       setSubmitting(false);
     }
   };
@@ -667,6 +673,23 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             rows="3"
             className="form-textarea"
           />
+          <div className="terms-agreement">
+            <input
+              id="terms-accepted"
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              aria-describedby="terms-agreement-error"
+              aria-invalid={error && error.indexOf("Terms and Conditions") >= 0 ? "true" : "false"}
+            />
+            <label htmlFor="terms-accepted">
+              I agree to the{" "}
+              <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.
+            </label>
+            <p id="terms-agreement-error" role="alert" hidden={!(error && error.indexOf("Terms and Conditions") >= 0)}>
+              {error && error.indexOf("Terms and Conditions") >= 0 ? error : ""}
+            </p>
+          </div>
           <button
             type="submit"
             className="btn-primary"

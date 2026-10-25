@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agree to the terms | Spires Taxis</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main id="main-content" class="section">
+    <div class="container" style="max-width:40rem;">
+      <p class="section__eyebrow">Spires Taxis</p>
+      <h1>Terms and Conditions</h1>
+      <p id="terms-status">Loading your booking…</p>
+      <article id="terms-card" class="card" hidden></article>
+    </div>
+  </main>
+  <script>
+    var api = "https://us-central1-spires-taxis.cloudfunctions.net/acceptTermsPublic";
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("t") || "";
+    var statusEl = document.getElementById("terms-status");
+    var card = document.getElementById("terms-card");
+
+    function post(action, agreed) {
+      return fetch(api, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: action, token: token, termsAccepted: agreed === true })
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || "Could not open this link.");
+          return body;
+        });
+      });
+    }
+
+    function esc(value) {
+      return String(value || "").replace(/[&<>"']/g, function (ch) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+      });
+    }
+
+    function render(booking) {
+      statusEl.hidden = true;
+      card.hidden = false;
+      var accepted = booking.termsAccepted === true;
+      card.innerHTML =
+        "<p><strong>Booking reference</strong> " + esc(booking.bookingNumber || booking.bookingId) + "</p>" +
+        "<p>" + esc(booking.pickup) + " to " + esc(booking.destination) + "</p>" +
+        (booking.when ? "<p>" + esc(booking.when) + "</p>" : "") +
+        "<p>Please read <a href=\"" + esc(booking.termsUrl) + "\" target=\"_blank\" rel=\"noopener noreferrer\">Terms and Conditions</a> version " + esc(booking.publishedVersion) + ".</p>" +
+        (accepted
+          ? "<p>Your agreement to version " + esc(booking.termsVersion) + " is recorded.</p>"
+          : "<div class=\"terms-agreement\"><label class=\"terms-agreement__line\"><input type=\"checkbox\" id=\"agree-terms\"><span>I agree to the Terms and Conditions.</span></label><p id=\"agree-error\" class=\"terms-agreement__error\" role=\"alert\" hidden>Please agree to the Terms and Conditions before submitting.</p></div><button type=\"button\" class=\"btn btn--primary\" id=\"agree-button\">Agree</button>");
+      var button = document.getElementById("agree-button");
+      if (!button) return;
+      button.addEventListener("click", function () {
+        var box = document.getElementById("agree-terms");
+        var error = document.getElementById("agree-error");
+        if (!box || !box.checked) {
+          if (error) error.hidden = false;
+          if (box) box.focus();
+          return;
+        }
+        button.disabled = true;
+        post("accept", true).then(function (body) {
+          render(body.booking);
+          statusEl.hidden = false;
+          statusEl.textContent = "Your agreement has been recorded.";
+        }).catch(function (err) {
+          button.disabled = false;
+          statusEl.hidden = false;
+          statusEl.textContent = err.message || "Could not record agreement.";
+        });
+      });
+    }
+
+    if (!token) {
+      statusEl.textContent = "This link is not valid.";
+    } else {
+      post("view", false).then(function (body) {
+        render(body.booking);
+      }).catch(function (err) {
+        statusEl.textContent = err.message || "Could not open this link.";
+      });
+    }
+  </script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { APPROVED_RANGES, REGIONAL_PAGES, rangeText } from "./lib/regional-locations.mjs";
+import { SEO_BY_FILE } from "./lib/seo-copy.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = "https://www.spires-taxis.com";
@@ -128,8 +129,10 @@ function jsonLd(page) {
 
 function renderPage(page) {
   const faqs = faqItems(page);
-  const title = `${page.name} Taxi &amp; Airport Transfers | Spires Taxis`;
-  const description = `Pre booked private hire for ${page.name}. Indicative Standard Car fare ${rangeText(page.name)} between Oxford and ${page.name}. 8 Seater quoted separately. Call or WhatsApp ${PHONE_DISPLAY}.`;
+  const seo = SEO_BY_FILE[`${page.slug}.html`];
+  if (!seo) throw new Error(`Missing SEO copy for ${page.slug}`);
+  const title = esc(seo.title);
+  const description = seo.description;
   const canonical = `${BASE}/${page.slug}`;
   const nearbyHtml = page.nearby.length
     ? `<h3>Nearby places</h3>

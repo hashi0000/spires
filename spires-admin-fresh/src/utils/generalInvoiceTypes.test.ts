@@ -1,8 +1,11 @@
 import {
   calendarDaysBetween,
   dueDateFor,
+  invoiceEmailState,
+  invoicePaidOnLabel,
   invoicePaymentInstruction,
   invoicePaymentMethodLabel,
+  invoicePaymentState,
   invoicePaymentTermsLabel,
   normaliseInvoicePaymentMethod,
   paymentDueNotice,
@@ -74,5 +77,23 @@ describe("invoice payment method", () => {
     expect(invoicePaymentInstruction("card")).toContain("pay by card");
     expect(invoicePaymentInstruction("cash")).toContain("pay in cash");
     expect(invoicePaymentInstruction("card")).not.toContain("bank transfer");
+  });
+});
+
+describe("invoice paid and email state", () => {
+  const row = {
+    dueDate: "2026-10-01",
+    lines: [{ description: "Journey", quantity: 1, unitPrice: 40, vatRatePercent: 0 }],
+  };
+
+  test("missing payment data stays unpaid and a real due date can be overdue", () => {
+    expect(invoicePaymentState(row, "2026-10-20")).toBe("overdue");
+    expect(invoicePaymentState({ ...row, paidAt: "2026-10-05T10:00:00.000Z" }, "2026-10-20")).toBe("paid");
+    expect(invoicePaymentState({ ...row, dueDate: "" }, "2026-10-20")).toBe("unpaid");
+    expect(invoicePaidOnLabel("2026-10-05T10:00:00.000Z")).toContain("2026");
+    expect(invoicePaidOnLabel("")).toBe("");
+    expect(invoiceEmailState({})).toBe("not_sent");
+    expect(invoiceEmailState({ emailStatus: "failed", emailedAt: "2026-10-01" })).toBe("failed");
+    expect(invoiceEmailState({ emailedAt: "2026-10-01" })).toBe("sent");
   });
 });

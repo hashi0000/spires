@@ -55,16 +55,46 @@ service cloud.firestore {
       // Office emails and PIN-authorised family devices — shared live calendar
       allow read, write: if isStaff() || isFamilyDevice();
 
-      // Customer app — own bookings only
+      // Customer app — own bookings only. Customers cannot set payment, quote or promotion fields.
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
       allow create: if isAuthenticated()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['createdByFunction', 'promotion', 'issuedQuote', 'quoteIssuedVersion', 'quoteAcceptedVersion', 'paymentLinkUrl', 'amountReceivedPence', 'termsAcceptanceRecordedAt', 'termsAcceptanceRecordedBy', 'termsAcceptanceNote'])
+        && request.resource.data.termsAccepted == true
+        && request.resource.data.termsVersion == '2026-10-25'
+        && request.resource.data.acceptanceMethod == 'customer_portal'
+        && request.resource.data.termsAcceptedAt == request.time
+        && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus == 'pending');
       allow update: if isAuthenticated()
         && resource.data.uid == request.auth.uid
         && resource.data.status == 'pending'
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'phone', 'pickup', 'destination', 'dateTime', 'passengers', 'luggage',
+          'specialRequirements', 'notes', 'flightNumber', 'terminal', 'vehicleType',
+          'bookingType', 'returnTrip', 'returnDateTime', 'returnPickupTime',
+          'returnPickupLocation', 'returnDestination', 'airportCollection',
+          'returnAirportCollection', 'returnFlightNumber', 'paymentMethod', 'updatedAt',
+          'name', 'email'
+        ]);
       allow delete: if false;
+
+      match /audit/{auditId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /emailJobs/{jobId} {
+      allow read, write: if false;
+    }
+
+    match /quoteTokens/{tokenId} {
+      allow read, write: if false;
+    }
+
+    match /termsTokens/{tokenId} {
+      allow read, write: if false;
     }
 
     match /drivers/{driverId} {

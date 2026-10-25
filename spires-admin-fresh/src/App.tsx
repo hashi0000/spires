@@ -289,7 +289,14 @@ const App: React.FC = () => {
       hirerPhone: '',
       dateTime: new Date().toISOString(),
       status: 'pending' as const,
-      paymentStatus: 'pending' as const
+      paymentStatus: 'pending' as const,
+      termsAccepted: undefined,
+      termsVersion: undefined,
+      termsAcceptedAt: undefined,
+      acceptanceMethod: undefined,
+      termsAcceptanceRecordedAt: undefined,
+      termsAcceptanceRecordedBy: undefined,
+      termsAcceptanceNote: undefined,
     };
     setEditingItem(duplicatedBooking);
     setShowBookingModal(true);

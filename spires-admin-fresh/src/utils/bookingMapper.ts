@@ -17,8 +17,8 @@ export interface CustomerBooking {
   time?: string;
   passengers?: number;
   notes?: string;
-  status?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
-  customerStatus?: 'pending' | 'confirmed' | 'paid' | 'cancelled'; // Set by admin when confirming
+  status?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
+  customerStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
   createdAt?: any;
   updatedAt?: any;
   actualFare?: number;
@@ -80,26 +80,20 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     : `CUST${Date.now().toString().slice(-6)}`;
 
   // Map customer status to admin status, but preserve customer status
-  let customerStatus = customerBooking.status || 'pending';
+  let customerStatus = customerBooking.customerStatus || customerBooking.status || 'pending';
+  const direct = (customerBooking as { adminStatus?: string }).adminStatus || customerBooking.status || '';
   let adminStatus: Booking['status'] = 'pending';
-  
-  // If admin has set customerStatus, use that for customer-facing status
-  if (customerBooking.customerStatus) {
-    customerStatus = customerBooking.customerStatus;
-  }
-  
-  // Map customer status to admin internal status
-  // Customer sees: pending → confirmed → paid
-  // Admin sees: pending → confirmed → allocated → completed
-  if (customerStatus === 'pending') {
-    adminStatus = 'pending';
-  } else if (customerStatus === 'confirmed') {
-    // Check if admin has set an internal status (allocated/completed)
-    const internalStatus = (customerBooking as any).adminStatus || (customerBooking as any).status;
-    if (internalStatus === 'allocated' || internalStatus === 'completed') {
-      adminStatus = internalStatus;
-    } else {
-      adminStatus = 'confirmed';
+  if (
+    direct === 'pending' ||
+    direct === 'awaiting_customer_confirmation' ||
+    direct === 'confirmed' ||
+    direct === 'allocated' ||
+    direct === 'completed' ||
+    direct === 'cancelled'
+  ) {
+    adminStatus = direct;
+    if (customerStatus === 'confirmed' && (direct === 'allocated' || direct === 'completed')) {
+      adminStatus = direct;
     }
   } else if (customerStatus === 'paid') {
     adminStatus = 'completed';
@@ -151,8 +145,31 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     returnFlightNumber: (customerBooking as any).returnFlightNumber,
     dueOnOutbound: (customerBooking as any).dueOnOutbound,
     dueOnReturn: (customerBooking as any).dueOnReturn,
-    // Preserve customer status for customer app
     customerStatus: customerStatus,
+    adminStatus,
+    promotion: (customerBooking as any).promotion,
+    issuedQuote: (customerBooking as any).issuedQuote,
+    quoteIssuedVersion: (customerBooking as any).quoteIssuedVersion,
+    quoteAcceptedVersion: (customerBooking as any).quoteAcceptedVersion,
+    quoteAcceptanceSubstatus: (customerBooking as any).quoteAcceptanceSubstatus,
+    paymentLinkUrl: (customerBooking as any).paymentLinkUrl,
+    paymentLinkEmailStatus: (customerBooking as any).paymentLinkEmailStatus,
+    quoteEmailStatus: (customerBooking as any).quoteEmailStatus,
+    amountRequestedPence: (customerBooking as any).amountRequestedPence,
+    amountReceivedPence: (customerBooking as any).amountReceivedPence,
+    paymentRequirement: (customerBooking as any).paymentRequirement,
+    paymentDescription: (customerBooking as any).paymentDescription,
+    normalFarePence: (customerBooking as any).normalFarePence,
+    discountPence: (customerBooking as any).discountPence,
+    finalFarePence: (customerBooking as any).finalFarePence,
+    emailError: (customerBooking as any).emailError,
+    termsAccepted: (customerBooking as any).termsAccepted === true,
+    termsVersion: (customerBooking as any).termsVersion,
+    termsAcceptedAt: (customerBooking as any).termsAcceptedAt,
+    acceptanceMethod: (customerBooking as any).acceptanceMethod,
+    termsAcceptanceRecordedAt: (customerBooking as any).termsAcceptanceRecordedAt,
+    termsAcceptanceRecordedBy: (customerBooking as any).termsAcceptanceRecordedBy,
+    termsAcceptanceNote: (customerBooking as any).termsAcceptanceNote,
   } as Partial<Booking>;
 };
 

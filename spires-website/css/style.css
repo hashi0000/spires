@@ -2658,3 +2658,75 @@ html[dir="rtl"] .booking-form label {
   .wa-label--short { display: inline; }
   .regional-fare__price { font-size: 1.85rem; }
 }
+
+.half-term-banner {
+  margin: 1rem auto 0;
+  max-width: 40rem;
+  background: var(--gold-soft);
+  border: 1px solid #e6d7c3;
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  text-align: center;
+}
+.half-term-banner h2 {
+  color: var(--blue);
+  font-size: 1.35rem;
+  margin-bottom: 0.35rem;
+}
+.half-term-banner p { margin-bottom: 0.75rem; }
+.halloween-decor {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  max-width: 100%;
+}
+.halloween-decor svg { position: absolute; pointer-events: none; }
+.halloween-decor .cobweb-left { top: 92px; left: 0; width: 140px; height: 140px; opacity: 0.45; }
+.halloween-decor .cobweb-right { top: 92px; right: 0; width: 120px; height: 120px; opacity: 0.35; }
+.halloween-decor .pumpkin-left { bottom: 12px; left: 8px; width: 72px; height: 64px; }
+.halloween-decor .pumpkin-right { bottom: 18px; right: 10px; width: 64px; height: 56px; }
+.halloween-decor .bat { width: 36px; height: 22px; opacity: 0.7; }
+.halloween-decor .bat-a { top: 18%; left: 6%; }
+.halloween-decor .bat-b { top: 28%; right: 8%; }
+.halloween-decor .leaf { width: 28px; height: 28px; opacity: 0.8; }
+.halloween-decor .leaf-a { top: 42%; left: 2%; }
+.halloween-decor .leaf-b { top: 55%; right: 3%; }
+.halloween-decor .leaf-c { bottom: 22%; left: 18%; }
+@media (max-width: 760px) {
+  .halloween-decor .bat,
+  .halloween-decor .leaf,
+  .halloween-decor .pumpkin-right,
+  .halloween-decor .cobweb-right { display: none; }
+  .halloween-decor .pumpkin-left { width: 48px; height: 42px; }
+  .halloween-decor .cobweb-left { width: 84px; height: 84px; opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .halloween-decor svg { animation: none; }
+}
+.terms-agreement {
+  margin: 1rem 0 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border, #e4e9ef);
+  border-radius: 12px;
+  background: #fff;
+}
+.terms-agreement label,
+.terms-agreement .terms-agreement__line {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.terms-agreement input {
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+}
+.terms-agreement__error {
+  margin: 0.6rem 0 0;
+  color: #9b1c1c;
+}

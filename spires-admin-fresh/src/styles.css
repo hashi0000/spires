@@ -633,6 +633,11 @@ header.admin-header,
   color: #065f46;
 }
 
+.badge-awaiting {
+  background-color: #f5efe6;
+  color: #7c5b32;
+}
+
 .badge-cancelled {
   background-color: #fee2e2;
   color: #991b1b;

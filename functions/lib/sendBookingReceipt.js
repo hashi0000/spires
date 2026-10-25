@@ -41,6 +41,7 @@ const driverReminderEmail_1 = require("./driverReminderEmail");
 const bankDetails_1 = require("./bankDetails");
 const vehicleTypes_1 = require("./vehicleTypes");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
+const bookingTerms_1 = require("./terms/bookingTerms");
 const getSubjectLine = (type, bookingNumber) => {
     switch (type) {
         case "payment":
@@ -71,7 +72,7 @@ const getIntroCopy = (type, booking) => {
             const collectionNote = (0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)
                 ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)())}</p>`
                 : "";
-            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}`;
+            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}<p>${(0, driverReminderEmail_1.escapeHtml)((0, bookingTerms_1.confirmationTermsParagraph)(booking))}</p>`;
         }
     }
 };
@@ -86,13 +87,19 @@ const getFilenamePrefix = (type) => {
             return "Booking_Confirmation";
     }
 };
-async function sendBookingReceipt(booking, type = "booking_confirmation", bookingId) {
+async function sendBookingReceipt(booking, type = "booking_confirmation", bookingId, options) {
     try {
         const normalized = (0, bankDetails_1.normalizeBookingForEmail)(booking, bookingId);
         const to = normalized.hirerEmail || normalized.email;
         if (!to) {
-            functions.logger.warn(`No customer email for booking ${normalized.bookingNumber}; skipping receipt`);
+            const message = `No customer email for booking ${normalized.bookingNumber}; skipping receipt`;
+            if (options?.throwOnError)
+                throw new Error(message);
+            functions.logger.warn(message);
             return;
+        }
+        if (options?.throwOnError && !(0, driverReminderEmail_1.reminderConfigOk)()) {
+            throw new Error("Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions.");
         }
         const pdfBuffer = await (0, pdfGenerator_1.generateBookingPDF)(normalized, type);
         const subject = getSubjectLine(type, normalized.bookingNumber);
@@ -122,10 +129,12 @@ async function sendBookingReceipt(booking, type = "booking_confirmation", bookin
                 },
             ],
         });
-        functions.logger.info(`Email sent (${type}) for booking ${normalized.bookingNumber} to ${to}`);
+        functions.logger.info(`Email accepted by provider (${type}) for booking ${normalized.bookingNumber} to ${to}`);
     }
     catch (err) {
         functions.logger.error("Failed to send booking email", err);
+        if (options?.throwOnError)
+            throw err;
     }
 }
 /** Notify office when a new pending customer booking arrives */
@@ -133,9 +142,14 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
     try {
         const n = (0, bankDetails_1.normalizeBookingForEmail)(booking, bookingId);
         const subject = `New booking request · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
-        const pay = n.paymentMethod
-            ? n.paymentMethod.replace(/_/g, " ")
-            : "Not specified";
+        const rawPay = String(n.paymentMethod || "").trim().toLowerCase().replace(/_/g, " ");
+        const pay = !n.paymentMethod
+            ? "Not specified"
+            : rawPay === "tbc"
+                ? "TBC"
+                : rawPay === "undecided"
+                    ? "Not decided yet"
+                    : String(n.paymentMethod).replace(/_/g, " ");
         const html = `
       <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">
         <h2 style="color:#002147;margin:0 0 12px;">New customer booking request</h2>

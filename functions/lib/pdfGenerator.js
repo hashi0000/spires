@@ -9,6 +9,7 @@ const pdfkit_1 = __importDefault(require("pdfkit"));
 const bankDetails_1 = require("./bankDetails");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const vehicleTypes_1 = require("./vehicleTypes");
+const bookingTerms_1 = require("./terms/bookingTerms");
 const documentTitleMap = {
     confirmation: "Booking Confirmation",
     booking_confirmation: "Booking Confirmation",
@@ -70,9 +71,15 @@ function formatPdfTime(raw) {
     return m ? m[1] : "";
 }
 function formatPaymentMethod(method) {
-    if (!method)
+    const raw = String(method || "").trim();
+    const n = raw.toLowerCase().replace(/_/g, " ");
+    if (!raw)
         return "TO BE CONFIRMED";
-    return method.replace(/_/g, " ").toUpperCase();
+    if (n === "tbc")
+        return "TBC";
+    if (n === "undecided")
+        return "NOT DECIDED YET";
+    return raw.replace(/_/g, " ").toUpperCase();
 }
 function paymentCopy(type, booking, hasFare) {
     const amount = hasFare && typeof booking.actualFare === "number"
@@ -98,6 +105,9 @@ function paymentCopy(type, booking, hasFare) {
     }
     else {
         methodLine = `To be paid by ${method}`;
+    }
+    if (method === "TBC" || method === "NOT DECIDED YET") {
+        methodLine = isPaid ? `Paid. Payment method: ${method}` : `Payment method: ${method}`;
     }
     return { amount, methodLine };
 }
@@ -502,6 +512,22 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
                 .fontSize(8)
                 .text(`Please use booking number ${bookingNumber || "as shown above"} as the payment reference.`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
             cy += 16;
+        }
+        const termsLine = type === "confirmation" || type === "booking_confirmation" ? (0, bookingTerms_1.confirmationTermsParagraph)(booking) : "";
+        if (termsLine) {
+            doc
+                .fillColor(NAVY)
+                .font("Helvetica-Bold")
+                .fontSize(10)
+                .text("Terms", leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+            cy += 14;
+            const termsHeight = doc.heightOfString(termsLine, { width: contentW - BOX_PAD * 2 });
+            doc
+                .fillColor(SLATE)
+                .font("Helvetica")
+                .fontSize(8)
+                .text(termsLine, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+            cy += termsHeight + 8;
         }
         if (booking.notes) {
             cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Notes", String(booking.notes));

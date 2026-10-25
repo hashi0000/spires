@@ -19,9 +19,9 @@
   <meta property="og:site_name" content="Spires Taxis">
   <meta property="og:locale" content="en_GB">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Contact Spires Taxis Oxford | Book a Taxi">
-  <title>Contact Spires Taxis Oxford | Book a Taxi</title>
-  <meta name="description" content="Contact Spires Taxis Oxford by phone, WhatsApp or email. Book pre-booked private hire journeys in Oxford and across Oxfordshire.">
+  <meta name="twitter:title" content="Book a Taxi in Oxford | Contact Spires Taxis">
+  <title>Book a Taxi in Oxford | Contact Spires Taxis</title>
+  <meta name="description" content="Contact Spires Taxis by phone, WhatsApp or email to book an Oxford taxi. Send your addresses, date and flight number and we will confirm the fare before you travel.">
   <link rel="canonical" href="https://www.spires-taxis.com/contact">
   <link rel="alternate" hreflang="en-GB" href="https://www.spires-taxis.com/contact">
   <link rel="alternate" hreflang="ar" href="https://www.spires-taxis.com/ar/contact">
@@ -41,8 +41,8 @@
   <meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
   <meta name="twitter:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
-  <meta property="og:title" content="Contact Spires Taxis Oxford | Book a Taxi">
-  <meta property="og:description" content="Book by phone, WhatsApp or email for Oxford and Oxfordshire private hire journeys.">
+  <meta property="og:title" content="Book a Taxi in Oxford | Contact Spires Taxis">
+  <meta property="og:description" content="Contact Spires Taxis by phone, WhatsApp or email to book an Oxford taxi. Send your addresses, date and flight number and we will confirm the fare before you travel.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.spires-taxis.com/contact">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -232,9 +232,9 @@
         </div>
       </div>
 
-      <div class="card fade-in">
+      <div class="card fade-in" id="booking">
         <h2>Booking form</h2>
-        <form action="https://formspree.io/f/meozaolo" method="POST" class="booking-form">
+        <form action="https://formspree.io/f/meozaolo" method="POST" class="booking-form" id="booking-form">
           <input type="hidden" name="_next" value="https://www.spires-taxis.com/thank-you">
           <input type="hidden" name="_subject" value="New Taxi Booking Request">
           <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -289,6 +289,42 @@
           </div>
 
           <div class="form-field">
+            <label for="journey">Journey</label>
+            <select id="journey" name="bookingType">
+              <option value="one_way">One way</option>
+              <option value="return">Return, both journeys together</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="vehicle">Vehicle</label>
+            <select id="vehicle" name="vehicleType">
+              <option value="">Select a vehicle</option>
+              <option value="standard">Standard Car</option>
+              <option value="8_seater">8 Seater</option>
+            </select>
+          </div>
+
+          <div id="return-fields" hidden>
+            <div class="form-field">
+              <label for="return-date">Return date</label>
+              <input type="date" id="return-date" name="returnDate">
+            </div>
+            <div class="form-field">
+              <label for="return-time">Return time</label>
+              <input type="time" id="return-time" name="returnTime">
+            </div>
+            <div class="form-field">
+              <label for="return-pickup">Return pickup</label>
+              <input type="text" id="return-pickup" name="returnPickupLocation">
+            </div>
+            <div class="form-field">
+              <label for="return-destination">Return destination</label>
+              <input type="text" id="return-destination" name="returnDestination">
+            </div>
+          </div>
+
+          <div class="form-field">
             <label for="passengers">Number of Passengers</label>
             <select id="passengers" name="passengers">
               <option value="">Select number</option>
@@ -303,6 +339,15 @@
           <div class="form-field">
             <label for="message">Additional Information</label>
             <textarea id="message" name="message" rows="4" placeholder="Any special requirements..."></textarea>
+          </div>
+
+          <div class="terms-agreement">
+            <label class="terms-agreement__line" for="terms-accepted">
+              <input type="checkbox" id="terms-accepted" name="termsAccepted" value="yes" required aria-describedby="terms-agreement-error">
+              <span>I agree to the <a href="/terms/2026-10-25" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>
+            </label>
+            <input type="hidden" name="termsVersion" value="2026-10-25">
+            <p id="terms-agreement-error" class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>
           </div>
 
           <div class="btn-group">
@@ -394,6 +439,7 @@
 </a>
 <script src="/js/airport-prices.js" defer></script>
 <script src="/js/share-teaser.js" defer></script>
+<script src="/js/quote-form.js" defer></script>
 <script src="/js/main.js" defer></script>
 <script src="/js/lang-switcher.js" defer></script>
 <!-- /SITE-FOOTER -->

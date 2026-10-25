@@ -171,11 +171,11 @@ const pages = [
   {
     file: 'oxford-to-stansted-taxi.html',
     path: '/oxford-to-stansted-taxi',
-    title: 'Oxford to Stansted Taxi | Fixed Price Airport Transfer | Spires Taxis',
+    title: 'Oxford to Stansted Airport Taxi £150 | Spires Taxis',
     description:
-      'Oxford to Stansted Airport taxi. Standard Car £150 one way or £290 return. Fixed fare, flight monitoring on collections. WhatsApp 07776 897772.',
-    ogTitle: 'Oxford to Stansted Taxi | Fixed Price Airport Transfer',
-    ogDescription: 'Oxford to Stansted £150 one way or £290 return. Fixed fare agreed before travel.',
+      'Oxford to Stansted Airport taxi. Standard Car £150 one way or £290 return, 8 Seater £185. Fixed fare, with flight monitoring on return collections. Book ahead.',
+    ogTitle: 'Oxford to Stansted Airport Taxi £150 | Spires Taxis',
+    ogDescription: 'Oxford to Stansted Airport taxi. Standard Car £150 one way or £290 return, 8 Seater £185. Fixed fare, with flight monitoring on return collections. Book ahead.',
     crumb: 'Oxford to Stansted',
     serviceName: 'Oxford to Stansted taxi',
     oneWay: '150',
@@ -225,11 +225,11 @@ const pages = [
   {
     file: 'oxford-to-birmingham-airport-taxi.html',
     path: '/oxford-to-birmingham-airport-taxi',
-    title: 'Oxford to Birmingham Airport Taxi | Fixed Price | Spires Taxis',
+    title: 'Oxford to Birmingham Airport Taxi £110 | Spires Taxis',
     description:
-      'Oxford to Birmingham Airport taxi. Standard Car £110 one way or £215 return. Northbound M40 route, fixed fare. WhatsApp 07776 897772.',
-    ogTitle: 'Oxford to Birmingham Airport Taxi | Fixed Price',
-    ogDescription: 'Oxford to Birmingham Airport £110 one way or £215 return. Fixed fare agreed before travel.',
+      'Oxford to Birmingham Airport taxi on the M40. Standard Car £110 one way or £215 return, 8 Seater £145. Fixed fare, with airport charges included. Book ahead.',
+    ogTitle: 'Oxford to Birmingham Airport Taxi £110 | Spires Taxis',
+    ogDescription: 'Oxford to Birmingham Airport taxi on the M40. Standard Car £110 one way or £215 return, 8 Seater £145. Fixed fare, with airport charges included. Book ahead.',
     crumb: 'Oxford to Birmingham Airport',
     serviceName: 'Oxford to Birmingham Airport taxi',
     oneWay: '110',
@@ -279,11 +279,11 @@ const pages = [
   {
     file: 'oxford-to-bristol-airport-taxi.html',
     path: '/oxford-to-bristol-airport-taxi',
-    title: 'Oxford to Bristol Airport Taxi | Fixed Price | Spires Taxis',
+    title: 'Oxford to Bristol Airport Taxi £165 | Spires Taxis',
     description:
-      'Oxford to Bristol Airport taxi. Standard Car £165 one way or £320 return. Westbound private hire, fixed fare. WhatsApp 07776 897772.',
-    ogTitle: 'Oxford to Bristol Airport Taxi | Fixed Price',
-    ogDescription: 'Oxford to Bristol Airport £165 one way or £320 return. Fixed fare agreed before travel.',
+      'Oxford to Bristol Airport taxi, travelling west from Oxford. Standard Car £165 one way or £320 return, 8 Seater £205. Fixed fare, airport charges included. Book ahead.',
+    ogTitle: 'Oxford to Bristol Airport Taxi £165 | Spires Taxis',
+    ogDescription: 'Oxford to Bristol Airport taxi, travelling west from Oxford. Standard Car £165 one way or £320 return, 8 Seater £205. Fixed fare, airport charges included. Book ahead.',
     crumb: 'Oxford to Bristol Airport',
     serviceName: 'Oxford to Bristol Airport taxi',
     oneWay: '165',

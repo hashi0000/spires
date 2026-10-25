@@ -5,6 +5,7 @@ import {
   getTransporter,
   mailFrom,
   escapeHtml,
+  reminderConfigOk,
 } from "./driverReminderEmail";
 import {
   bankTransferDetailsPlainText,
@@ -16,6 +17,7 @@ import {
   airportWaitingDisclaimerBody,
   bookingHasAirportCollection,
 } from "./airportWaitingPolicy";
+import { confirmationTermsParagraph } from "./terms/bookingTerms";
 
 type EmailDocType =
   | "confirmation"
@@ -65,7 +67,7 @@ const getIntroCopy = (type: EmailDocType, booking: any) => {
             airportWaitingDisclaimerBody()
           )}</p>`
         : "";
-      return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}`;
+      return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}<p>${escapeHtml(confirmationTermsParagraph(booking))}</p>`;
     }
   }
 };
@@ -85,16 +87,22 @@ const getFilenamePrefix = (type: EmailDocType) => {
 export async function sendBookingReceipt(
   booking: any,
   type: EmailDocType = "booking_confirmation",
-  bookingId?: string
+  bookingId?: string,
+  options?: { throwOnError?: boolean }
 ) {
   try {
     const normalized = normalizeBookingForEmail(booking, bookingId);
     const to = normalized.hirerEmail || normalized.email;
     if (!to) {
-      functions.logger.warn(
-        `No customer email for booking ${normalized.bookingNumber}; skipping receipt`
-      );
+      const message = `No customer email for booking ${normalized.bookingNumber}; skipping receipt`;
+      if (options?.throwOnError) throw new Error(message);
+      functions.logger.warn(message);
       return;
+    }
+    if (options?.throwOnError && !reminderConfigOk()) {
+      throw new Error(
+        "Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions."
+      );
     }
 
     const pdfBuffer = await generateBookingPDF(normalized, type);
@@ -129,10 +137,11 @@ export async function sendBookingReceipt(
     });
 
     functions.logger.info(
-      `Email sent (${type}) for booking ${normalized.bookingNumber} to ${to}`
+      `Email accepted by provider (${type}) for booking ${normalized.bookingNumber} to ${to}`
     );
   } catch (err) {
     functions.logger.error("Failed to send booking email", err);
+    if (options?.throwOnError) throw err;
   }
 }
 

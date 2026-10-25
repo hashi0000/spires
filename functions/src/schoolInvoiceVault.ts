@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto";
+import { mergeInvoiceRecords, InvoiceLike } from "./quotes/invoiceVault";
 
 const VAULT_COLLECTION = "schoolInvoiceVault";
 const ALLOWED_DOCS = new Set(["workspace", "general"]);
@@ -113,15 +114,33 @@ export const saveSchoolInvoiceVault = functions
   if (!incoming || typeof incoming !== "object") {
     throw new functions.https.HttpsError("invalid-argument", "payload is required.");
   }
+  const docRef = admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data));
+  const previous = await docRef.get();
+  let existingInvoices: InvoiceLike[] = [];
+  if (previous.exists) {
+    const row = previous.data() || {};
+    if (row.data && row.iv && row.tag) {
+      try {
+        existingInvoices = decryptJson(String(row.iv), String(row.tag), String(row.data)).invoices as InvoiceLike[];
+      } catch (err) {
+        if (err instanceof functions.https.HttpsError) throw err;
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Could not read the existing invoice vault, so the paid status was not overwritten."
+        );
+      }
+    }
+  }
+  const incomingInvoices = Array.isArray(incoming.invoices) ? (incoming.invoices as InvoiceLike[]) : [];
   const payload: VaultPayload = {
     version: 1,
     supplier: incoming.supplier ?? null,
     routes: Array.isArray(incoming.routes) ? incoming.routes : [],
-    invoices: Array.isArray(incoming.invoices) ? incoming.invoices.slice(0, 100) : [],
+    invoices: mergeInvoiceRecords(existingInvoices, incomingInvoices).slice(0, 100),
     seq: incoming.seq && typeof incoming.seq === "object" ? incoming.seq : {},
   };
   const sealed = encryptJson(payload);
-  await admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data)).set({
+  await docRef.set({
     alg: ALG,
     v: 1,
     iv: sealed.iv,

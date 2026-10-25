@@ -107,11 +107,68 @@ export type GeneratedGeneralInvoice = {
   createdAt: string;
   emailedAt?: string;
   emailedTo?: string;
-  paidAt?: string;
+  paidAt?: string | null;
+  emailStatus?: "not_sent" | "queued" | "sent" | "failed";
+  emailError?: string;
 };
 
 export function isInvoicePaid(row?: { paidAt?: string | null } | null): boolean {
   return Boolean(row?.paidAt);
+}
+
+export function invoiceEmailState(row?: {
+  emailStatus?: string | null;
+  emailedAt?: string | null;
+} | null): "not_sent" | "queued" | "sent" | "failed" {
+  if (row?.emailStatus === "failed") return "failed";
+  if (row?.emailStatus === "queued") return "queued";
+  if (row?.emailStatus === "sent" || row?.emailedAt) return "sent";
+  return "not_sent";
+}
+
+export function invoiceEmailLabel(row?: {
+  emailStatus?: string | null;
+  emailedAt?: string | null;
+  emailedTo?: string | null;
+} | null): string {
+  const state = invoiceEmailState(row);
+  if (state === "failed") return "Failed";
+  if (state === "queued") return "Queued";
+  if (state === "sent") return row?.emailedTo ? `Sent to ${row.emailedTo}` : "Sent";
+  return "Not sent";
+}
+
+/** Overdue only when a real due date is before today and money is still outstanding. */
+export function invoicePaymentState(
+  row: { paidAt?: string | null; dueDate?: string | null; lines?: GeneralInvoiceLine[] } | null | undefined,
+  todayYmd: string
+): "paid" | "unpaid" | "overdue" {
+  if (isInvoicePaid(row)) return "paid";
+  const due = String(row?.dueDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return "unpaid";
+  const total = invoiceTotals(row?.lines || []).total;
+  if (!(total > 0)) return "unpaid";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(todayYmd) && todayYmd > due) return "overdue";
+  return "unpaid";
+}
+
+export function invoicePaidOnLabel(paidAt?: string | null): string {
+  if (!paidAt) return "";
+  const day = String(paidAt).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+  const label = formatUkDate(day);
+  return label && !label.toLowerCase().includes("invalid") ? label : "";
+}
+
+export function londonTodayYmd(now = new Date()): string {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(now).map((row) => [row.type, row.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 export const DEFAULT_GENERAL_SUPPLIER: InvoiceSupplierDetails = {

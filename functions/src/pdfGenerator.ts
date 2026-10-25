@@ -13,6 +13,7 @@ import {
   isReturnBooking,
 } from "./airportWaitingPolicy";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
+import { confirmationTermsParagraph } from "./terms/bookingTerms";
 
 type PDFDocumentType =
   | "confirmation"
@@ -656,6 +657,24 @@ export async function generateBookingPDF(
           { width: contentW - BOX_PAD * 2 }
         );
       cy += 16;
+    }
+
+    const termsLine =
+      type === "confirmation" || type === "booking_confirmation" ? confirmationTermsParagraph(booking) : "";
+    if (termsLine) {
+      doc
+        .fillColor(NAVY)
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("Terms", leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+      cy += 14;
+      const termsHeight = doc.heightOfString(termsLine, { width: contentW - BOX_PAD * 2 });
+      doc
+        .fillColor(SLATE)
+        .font("Helvetica")
+        .fontSize(8)
+        .text(termsLine, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+      cy += termsHeight + 8;
     }
 
     if (booking.notes) {

@@ -42,7 +42,7 @@ export type GeneralInvoicePdfInput = {
   supplier: InvoiceSupplierDetails;
   paymentMethod?: InvoicePaymentMethod;
   paid?: boolean;
-  paidAt?: string;
+  paidAt?: string | null;
 };
 
 /** A4 at 96dpi — same iframe width as booking confirmation PDFs. */

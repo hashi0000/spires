@@ -21,6 +21,8 @@ import {
 import { db } from '../utils/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { CustomerProfile } from '../utils/customerSuggestions';
+import QuoteEditor from './QuoteEditor';
+import TermsAcceptance from './TermsAcceptance';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -152,6 +154,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
         // Map customer app fields to admin fields
         hirerName: editingBooking.hirerName || (editingBooking as any).name || '',
         hirerPhone: editingBooking.hirerPhone || (editingBooking as any).phone || '',
+        status: (editingBooking as any).adminStatus || editingBooking.status || 'pending',
         hirerAddress: editingBooking.hirerAddress || '',
         pickupLocation: editingBooking.pickupLocation || (editingBooking as any).pickup || '',
         destination: editingBooking.destination || '',
@@ -409,43 +412,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
           id: bookingId,
         };
 
-        // Handle customer booking status mapping
+        // Keep the workflow status the customer should see. Payment stays on paymentStatus.
         if (isCustomerBooking) {
-          // Map admin status to customer-facing status
-          // Admin workflow: pending → confirmed → allocated → completed
-          // Customer sees: pending → confirmed → paid
-          
-          if (bookingData.status === 'confirmed') {
-            // Admin confirms booking - customer sees "confirmed"
-            updateData.status = 'confirmed'; // Customer app reads this
-            updateData.customerStatus = 'confirmed';
-          } else if (bookingData.status === 'allocated') {
-            // Admin allocates driver - customer still sees "confirmed" but admin sees "allocated"
-            updateData.status = 'confirmed'; // Customer app reads this
-            updateData.customerStatus = 'confirmed';
-            // Keep admin status as allocated for internal tracking
-            updateData.adminStatus = 'allocated';
-          } else if (bookingData.status === 'completed') {
-            // Admin marks as completed - check payment status
-            if (bookingData.paymentStatus === 'paid') {
-              // Payment received - customer sees "paid"
-              updateData.status = 'paid'; // Customer app reads this
-              updateData.customerStatus = 'paid';
-            } else {
-              // Trip completed but not paid yet - customer still sees confirmed
-              updateData.status = 'confirmed';
-              updateData.customerStatus = 'confirmed';
-            }
-            // Keep admin status as completed
-            updateData.adminStatus = 'completed';
-          } else if (bookingData.status === 'cancelled') {
-            updateData.status = 'cancelled';
-            updateData.customerStatus = 'cancelled';
-          } else if (bookingData.status === 'pending') {
-            // Keep as pending
-            updateData.status = 'pending';
-            updateData.customerStatus = 'pending';
-          }
+          const workflow = bookingData.status;
+          updateData.status = workflow;
+          updateData.customerStatus = workflow;
+          updateData.adminStatus = workflow;
         }
 
         // Clean up updateData - remove undefined values but keep empty strings for optional fields
@@ -890,8 +862,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   className="form-input"
                 >
                   <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed (Customer Notified)</option>
-                  <option value="allocated">Allocated (Driver Assigned)</option>
+                  <option value="awaiting_customer_confirmation">Awaiting customer confirmation</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="allocated">Allocated</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
@@ -1170,6 +1143,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
               />
             </div>
           </div>
+
+          <TermsAcceptance booking={editingBooking || {}} />
+
+          {editingBooking?.id ? (
+            <QuoteEditor
+              bookingId={editingBooking.id}
+              booking={editingBooking}
+              onWorkflowStatus={(status) => setFormData((prev) => ({ ...prev, status: status as ExtendedBooking['status'] }))}
+            />
+          ) : null}
 
           <div className="modal-footer">
             {formError ? (

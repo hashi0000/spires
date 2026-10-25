@@ -83,7 +83,10 @@ export interface Booking {
   driverId?: string;
   vehicleId?: string;
   subContract?: string;
-  status: 'pending' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  status: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  /** Workflow status shown to staff when it differs from the stored customer status. */
+  adminStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  quoteAcceptanceSubstatus?: '' | 'awaiting_payment';
   notes?: string;
   allocatedTime?: string;
   actualFare?: number;
@@ -121,6 +124,13 @@ export interface Booking {
   cancelledAt?: string;
   cancelledByEmail?: string;
   cancelledByUid?: string;
+  termsAccepted?: boolean;
+  termsVersion?: string;
+  termsAcceptedAt?: Date | string | { toDate?: () => Date; seconds?: number };
+  acceptanceMethod?: string;
+  termsAcceptanceRecordedAt?: Date | string | { toDate?: () => Date; seconds?: number };
+  termsAcceptanceRecordedBy?: string;
+  termsAcceptanceNote?: string;
 }
 
 // Extended booking interface for form handling
@@ -132,7 +142,7 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   /** When set (e.g. admin-entered), used for emailing PDFs alongside `email`. */
   hirerEmail?: string;
   passengers?: number;
-  customerStatus?: 'pending' | 'confirmed' | 'paid' | 'cancelled';
+  customerStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
   returnTrip?: boolean;
   returnDateTime?: string;
   flightNumber?: string;

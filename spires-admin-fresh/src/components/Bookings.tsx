@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
+import { bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
 import { isCustomerBooking } from '../utils/bookingMapper';
 import { functions } from '../utils/firebase';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
@@ -75,7 +76,7 @@ const Bookings: React.FC<BookingsProps> = ({
       });
     }
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(b => b.status === statusFilter);
+      filtered = filtered.filter(b => bookingMatchesStatusFilter(b, statusFilter));
     }
     if (paymentFilter !== 'all') {
       filtered = filtered.filter(b => b.paymentStatus === paymentFilter);
@@ -377,6 +378,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         pdfType,
         bookingNumber: booking.bookingNumber,
         hirerName: booking.hirerName,
+        bookingId: booking.id,
       });
       const data = result.data as { success?: boolean; to?: string };
       if (data?.success) {
@@ -474,7 +476,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Select Month</label><input type="month" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setDateFrom(''); setDateTo(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Date From</label><input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setSelectedMonth(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Date To</label><input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setSelectedMonth(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Status</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="allocated">Allocated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Status</option><option value="pending">Pending</option><option value="awaiting_customer_confirmation">Awaiting customer confirmation</option><option value="confirmed">Confirmed</option><option value="allocated">Allocated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label><select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Payments</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="partial">Partial</option></select></div>
             <div className="col-span-full md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Booking source</label>
@@ -564,7 +566,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                             {booking.bookingNumber}
                           </h3>
                           {isPendingCustomer && <span className="badge badge-new-customer">NEW CUSTOMER</span>}
-                          <span className={`badge badge-${booking.status}`}>{booking.status}</span>
+                          <span className={`badge ${workflowBadgeClass(booking.adminStatus || booking.status)}`}>{workflowStatusLabel(booking.adminStatus || booking.status)}</span>
+                          {(booking as { quoteAcceptanceSubstatus?: string }).quoteAcceptanceSubstatus === 'awaiting_payment' && (
+                            <div className="text-xs" style={{ color: '#92400e' }}>Quote accepted — awaiting payment</div>
+                          )}
                           {booking.paymentStatus && (
                             <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
                               {booking.paymentStatus}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your quote | Spires Taxis</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main id="main-content" class="section">
+    <div class="container" style="max-width:40rem;">
+      <p class="section__eyebrow">Spires Taxis</p>
+      <h1>Your quote</h1>
+      <p id="quote-status">Loading quote…</p>
+      <article id="quote-card" class="card" hidden></article>
+    </div>
+  </main>
+  <script>
+    var api = "https://us-central1-spires-taxis.cloudfunctions.net/quotePublic";
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("t") || "";
+    var statusEl = document.getElementById("quote-status");
+    var card = document.getElementById("quote-card");
+
+    function post(action) {
+      return fetch(api, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: action, token: token })
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || "Could not open this quote.");
+          return body;
+        });
+      });
+    }
+
+    function esc(value) {
+      return String(value || "").replace(/[&<>"']/g, function (ch) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+      });
+    }
+    function render(quote) {
+      statusEl.hidden = true;
+      card.hidden = false;
+      var vehicle = String(quote.vehicle || "").indexOf("8") >= 0 ? "8 Seater" : "Standard Car";
+      var pay = quote.paymentUrl && String(quote.paymentUrl).indexOf("https://") === 0
+        ? '<p><a class="btn btn--primary" href="' + esc(quote.paymentUrl) + '" target="_blank" rel="noopener noreferrer">Pay securely</a></p>'
+        : (quote.paymentLinkPending ? "<p>The payment link will follow.</p>" : "");
+      var waiting = quote.substatus === "awaiting_payment"
+        ? "<p><strong>Quote accepted — awaiting payment.</strong> Your booking will be confirmed once payment has been received.</p>"
+        : "";
+      card.innerHTML =
+        "<p><strong>Booking reference</strong> " + esc(quote.bookingNumber) + "</p>" +
+        "<p>This is a quote, not a confirmed booking, until we confirm it.</p>" +
+        "<p>" + esc(quote.pickup) + " to " + esc(quote.destination) + "</p>" +
+        (quote.bookingType === "return" ? "<p>Return: " + esc(quote.returnPickupLocation) + " to " + esc(quote.returnDestination) + "</p>" : "") +
+        "<p>Vehicle: " + esc(vehicle) + "</p>" +
+        "<p>Normal fare " + esc(quote.normalFare) + "</p>" +
+        "<p>Promotion discount " + esc(quote.discount) + "</p>" +
+        "<p><strong>Final total " + esc(quote.finalFare) + "</strong></p>" +
+        "<p>" + esc(quote.paymentRequirement === "advance" ? quote.paymentDescription + " of " + quote.amountRequested + " is required in advance." : "Payment can be made later.") + "</p>" +
+        waiting +
+        "<p>" + esc(quote.terms) + "</p>" +
+        pay +
+        '<button type="button" class="btn btn--primary" id="accept-quote"' + (quote.accepted ? " disabled" : "") + ">" + (quote.accepted ? "Quote accepted" : "Accept quote") + "</button>";
+      var button = document.getElementById("accept-quote");
+      if (button && !quote.accepted) {
+        button.addEventListener("click", function () {
+          button.disabled = true;
+          post("accept").then(function (body) {
+            render(body.quote);
+            statusEl.hidden = false;
+            statusEl.textContent = body.substatus === "awaiting_payment"
+              ? "Quote accepted — awaiting payment. Your booking will be confirmed once payment has been received."
+              : "Your booking is confirmed.";
+          }).catch(function (err) {
+            button.disabled = false;
+            statusEl.hidden = false;
+            statusEl.textContent = err.message;
+          });
+        });
+      }
+    }
+
+    if (!token) {
+      statusEl.textContent = "Open the quote from the link in your email.";
+    } else {
+      post("view").then(function (body) { render(body.quote); }).catch(function (err) {
+        statusEl.textContent = err.message;
+      });
+    }
+  </script>
+</body>
+</html>
