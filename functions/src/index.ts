@@ -26,6 +26,7 @@ import {
   createTermsAcceptanceLink,
   acceptTermsPublic,
 } from "./terms/callables";
+import { submitBusinessAccountEnquiry } from "./businessAccounts/callables";
 import { shouldSendConfirmation } from "./quotes/quoteWorkflow";
 
 admin.initializeApp();
@@ -132,6 +133,7 @@ export {
   createTermsAcceptanceLink,
   acceptTermsPublic,
 };
+export { submitBusinessAccountEnquiry };
 export {
   spiresShareSession,
   spiresShareGetState,

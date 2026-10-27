@@ -215,7 +215,7 @@ li + li { margin-top: 0.35rem; }
   justify-content: space-between;
   gap: 1.25rem;
   min-height: var(--header-h);
-  width: min(100% - 2.5rem, 1440px);
+  width: min(100% - 2.5rem, 1600px);
   margin-inline: auto;
 }
 
@@ -394,7 +394,7 @@ li + li { margin-top: 0.35rem; }
   padding-bottom: 0.55rem;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1580px) {
   .site-nav { display: none; }
   .site-menu-toggle { display: flex; }
   .site-header__actions a.site-header__share { display: none; }
@@ -934,6 +934,7 @@ h2,
 
 @media (min-width: 1100px) {
   .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .steps.steps--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .split .steps {
@@ -1406,6 +1407,24 @@ h2,
 @media (max-width: 600px) {
   .form-row { grid-template-columns: 1fr; }
 }
+
+.form-privacy {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.form-status {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: #fdecec;
+  color: #7f1d1d;
+}
+.form-status--ok {
+  background: #eef6f0;
+  color: #14532d;
+}
+.form-status[hidden] { display: none; }
 
 /* Legacy contact form */
 .contact-form .form-group { margin-bottom: 1rem; }

@@ -121,6 +121,7 @@ const requiredSitemap = [
   '/oxford-to-gatwick-taxi',
   '/bicester-taxis',
   '/corporate-taxis',
+  '/business-accounts',
   '/student-taxis',
   '/reviews',
   '/long-distance-taxis',

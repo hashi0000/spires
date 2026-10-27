@@ -48,7 +48,7 @@ function initMobileMenu() {
   close?.addEventListener('click', shut);
   overlay.addEventListener('click', shut);
   menu.querySelectorAll('a').forEach((a) => a.addEventListener('click', shut));
-  window.addEventListener('resize', () => { if (window.innerWidth > 900) shut(); });
+  window.addEventListener('resize', () => { if (window.innerWidth > 1580) shut(); });
 }
 
 function initHeaderScroll() {
@@ -161,6 +161,7 @@ function initMobileBookBar() {
 
 function initBookingTerms() {
   document.querySelectorAll("form.booking-form").forEach(function (form) {
+    if (form.id === "business-account-form") return;
     if (!form.querySelector("[name='termsAccepted']")) {
       var wrap = document.createElement("div");
       wrap.className = "terms-agreement";
