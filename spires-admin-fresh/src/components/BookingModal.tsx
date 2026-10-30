@@ -1,5 +1,5 @@
 // components/BookingModal.tsx - FIXED CLEAN VERSION
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Minus, Calculator, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
@@ -20,7 +20,13 @@ import {
 } from '../utils/bookingJourney';
 import { db } from '../utils/firebase';
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { CustomerProfile } from '../utils/customerSuggestions';
+import {
+  accountLinkForBooking,
+  customerSuggestionLabel,
+  matchCustomerSuggestion,
+  normaliseCustomerEmail,
+  type CustomerProfile,
+} from '../utils/customerSuggestions';
 import QuoteEditor from './QuoteEditor';
 import TermsAcceptance from './TermsAcceptance';
 
@@ -79,24 +85,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
   customerSuggestions = [],
   initialDraft = null
 }) => {
-  const customerByNormalizedName = useMemo(() => {
-    const m = new Map<string, CustomerProfile>();
-    for (const c of customerSuggestions) {
-      m.set(c.displayName.toLowerCase().trim(), c);
-    }
-    return m;
-  }, [customerSuggestions]);
-
   const applyKnownCustomer = (rawName: string) => {
-    const key = rawName.trim().toLowerCase();
-    if (!key) return;
-    const match = customerByNormalizedName.get(key);
+    const match = matchCustomerSuggestion(rawName, customerSuggestions);
     if (!match) return;
     setFormData((prev) => ({
       ...prev,
       hirerName: match.displayName,
       hirerPhone: match.phone || prev.hirerPhone,
-      hirerAddress: match.address || prev.hirerAddress
+      hirerAddress: match.address || prev.hirerAddress,
+      email: match.email || '',
+      hirerEmail: match.email || '',
+      uid: match.uid || '',
     }));
   };
   const [formError, setFormError] = useState('');
@@ -191,6 +190,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
           editingBooking.dueOnReturn !== undefined && editingBooking.dueOnReturn !== null
             ? String(editingBooking.dueOnReturn)
             : '',
+        email: (editingBooking as any).email || (editingBooking as any).hirerEmail || '',
+        hirerEmail: (editingBooking as any).hirerEmail || (editingBooking as any).email || '',
       };
       setFormError('');
       setFormData(mappedBooking);
@@ -345,7 +346,22 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setFormError('Return bookings need a return date, pickup time, pickup address and destination.');
       return;
     }
+    const typedEmail = String(formData.email || formData.hirerEmail || '').trim();
+    if (typedEmail && !normaliseCustomerEmail(typedEmail)) {
+      setFormError('Enter a valid customer email, or leave it blank.');
+      return;
+    }
     setFormError('');
+
+    const picked = matchCustomerSuggestion(String(formData.hirerName || ''), customerSuggestions);
+    const hirerName = picked?.displayName || String(formData.hirerName || '').trim();
+    const link = accountLinkForBooking({
+      typedEmail,
+      picked,
+      existingUid: editingBooking?.uid,
+      existingEmail: editingBooking?.email || editingBooking?.hirerEmail,
+      suggestions: customerSuggestions,
+    });
 
     const bookingData: any = {
       ...formData,
@@ -388,11 +404,29 @@ const BookingModal: React.FC<BookingModalProps> = ({
       returnDateTime: isReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
       dueOnOutbound: isReturn && dueOnOutbound != null ? dueOnOutbound : '',
       dueOnReturn: isReturn && dueOnReturn != null ? dueOnReturn : '',
+      hirerName,
     };
+    if (link.email) {
+      bookingData.email = link.email;
+      bookingData.hirerEmail = link.email;
+    } else {
+      delete bookingData.email;
+      delete bookingData.hirerEmail;
+    }
+    if (link.uid) {
+      bookingData.uid = link.uid;
+      bookingData.name = hirerName;
+      bookingData.phone = bookingData.hirerPhone;
+      bookingData.pickup = bookingData.pickupLocation;
+      bookingData.customerStatus = bookingData.status || 'pending';
+    } else {
+      delete bookingData.uid;
+    }
 
     // Only add createdAt for new bookings
     if (!editingBooking) {
       bookingData.createdAt = serverTimestamp();
+      if (!bookingData.source) bookingData.source = 'admin';
     }
 
     try {
@@ -571,7 +605,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {customerSuggestions.length > 0 && (
               <datalist id="booking-past-customers">
                 {customerSuggestions.map((c) => (
-                  <option key={c.displayName} value={c.displayName} />
+                  <option key={`${c.uid || c.email || c.phone}-${c.displayName}`} value={customerSuggestionLabel(c)} />
                 ))}
               </datalist>
             )}
@@ -591,7 +625,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   className="form-input"
                 />
                 {customerSuggestions.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">Matching a saved name fills phone and address from their last booking.</p>
+                  <p className="text-xs text-gray-500 mt-1">Choose the customer row that shows their email. That fills the phone, address and email, and puts the job on their account when they have one.</p>
                 )}
               </div>
               <div>
@@ -605,6 +639,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   autoComplete="tel"
                 />
               </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer email</label>
+              <input
+                type="email"
+                value={formData.email || ''}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value, hirerEmail: e.target.value })}
+                className="form-input"
+                autoComplete="email"
+                placeholder="name@example.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">The job is added to this email. If it matches an existing account, they will see it when they sign in. A confirmation is emailed here when the job is confirmed.</p>
             </div>
 
             <div className="mb-6">
