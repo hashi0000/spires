@@ -1,3 +1,4 @@
+import { effectiveWorkflowStatus } from './bookingWorkflow';
 // bookingMapper.ts - Maps between customer app and admin app booking formats
 import { Booking } from '../types/types';
 
@@ -81,7 +82,7 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
 
   // Map customer status to admin status, but preserve customer status
   let customerStatus = customerBooking.customerStatus || customerBooking.status || 'pending';
-  const direct = (customerBooking as { adminStatus?: string }).adminStatus || customerBooking.status || '';
+  const direct = effectiveWorkflowStatus(customerBooking);
   let adminStatus: Booking['status'] = 'pending';
   if (
     direct === 'pending' ||
@@ -163,6 +164,13 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     discountPence: (customerBooking as any).discountPence,
     finalFarePence: (customerBooking as any).finalFarePence,
     emailError: (customerBooking as any).emailError,
+    quoteDraft: (customerBooking as any).quoteDraft,
+    quoteEmailSentAt: (customerBooking as any).quoteEmailSentAt,
+    paymentLinkSentAt: (customerBooking as any).paymentLinkSentAt,
+    confirmationEmailStatus: (customerBooking as any).confirmationEmailStatus,
+    confirmationEmailSentAt: (customerBooking as any).confirmationEmailSentAt,
+    paymentReceiptEmailStatus: (customerBooking as any).paymentReceiptEmailStatus,
+    outstandingPence: (customerBooking as any).outstandingPence,
     termsAccepted: (customerBooking as any).termsAccepted === true,
     termsVersion: (customerBooking as any).termsVersion,
     termsAcceptedAt: (customerBooking as any).termsAcceptedAt,

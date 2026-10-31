@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
-import { bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
+import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
 import { isCustomerBooking } from '../utils/bookingMapper';
 import { functions } from '../utils/firebase';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
@@ -48,6 +48,7 @@ const Bookings: React.FC<BookingsProps> = ({
   const [sendingDriverReminderId, setSendingDriverReminderId] = useState<string | null>(null);
   const [sendingCustomerPdfId, setSendingCustomerPdfId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -58,6 +59,12 @@ const Bookings: React.FC<BookingsProps> = ({
 
   const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
+    const query = search.trim().toLowerCase();
+    if (query) filtered = filtered.filter(b => {
+      const row = b as ExtendedBooking;
+      return [b.bookingNumber, b.hirerName, b.hirerPhone, row.hirerEmail, row.email, b.pickupLocation, b.destination]
+        .some(value => String(value || '').toLowerCase().includes(query));
+    });
     if (dateFrom) {
       const fromDate = new Date(dateFrom);
       fromDate.setHours(0, 0, 0, 0);
@@ -70,7 +77,7 @@ const Bookings: React.FC<BookingsProps> = ({
     }
     if (selectedMonth) {
       const [year, month] = selectedMonth.split('-');
-      filtered = bookings.filter(b => {
+      filtered = filtered.filter(b => {
         const bookingDate = new Date(b.pickupTime);
         return bookingDate.getFullYear() === parseInt(year) && bookingDate.getMonth() === parseInt(month) - 1;
       });
@@ -87,7 +94,7 @@ const Bookings: React.FC<BookingsProps> = ({
       filtered = filtered.filter(b => !isCustomerBooking(b));
     }
     return filtered;
-  }, [bookings, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter, audienceFilter]);
+  }, [bookings, search, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter, audienceFilter]);
 
   const groupedBookings = useMemo(() => {
     // Sort bookings: pending customer bookings first, then by pickup time
@@ -187,10 +194,14 @@ const Bookings: React.FC<BookingsProps> = ({
       return sum + bookingExpenses;
     }, 0);
     const netProfit = totalRevenue - totalExpenses;
-    const paidBookings = completed.filter(b => b.paymentStatus === 'paid');
-    const unpaidBookings = completed.filter(b => b.paymentStatus === 'pending' || !b.paymentStatus);
-    const paidAmount = paidBookings.reduce((sum, b) => sum + (b.actualFare || 0), 0);
-    const unpaidAmount = unpaidBookings.reduce((sum, b) => sum + (b.actualFare || 0), 0);
+    const receivedFor = (b: Booking) => b.amountReceivedPence != null
+      ? Math.max(0, Number(b.amountReceivedPence) / 100)
+      : b.paymentStatus === 'paid' ? b.actualFare || 0 : 0;
+    const outstandingFor = (b: Booking) => Math.max(0, (b.actualFare || 0) - receivedFor(b));
+    const paidBookings = completed.filter(b => outstandingFor(b) === 0);
+    const unpaidBookings = completed.filter(b => outstandingFor(b) > 0);
+    const paidAmount = completed.reduce((sum, b) => sum + receivedFor(b), 0);
+    const unpaidAmount = completed.reduce((sum, b) => sum + outstandingFor(b), 0);
     const driverRevenue = drivers.map(driver => {
       const driverBookings = completed.filter(b => b.driverId === driver.id);
       const revenue = driverBookings.reduce((sum, b) => sum + (b.actualFare || 0), 0);
@@ -329,6 +340,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
   };
 
   const clearFilters = () => {
+    setSearch('');
     setDateFrom('');
     setDateTo('');
     setSelectedMonth('');
@@ -465,6 +477,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             </button>
           </div>
         </div>
+        <div style={{ padding: '0 1.25rem 1rem' }}>
+          <input aria-label="Search bookings" className="form-input" placeholder="Search customer, booking reference, phone or journey" value={search} onChange={e => setSearch(e.target.value)} />
+          <p className="text-sm text-gray-500" style={{ margin: '0.5rem 0 0' }}>{filteredBookings.length} bookings shown</p>
+        </div>
         {showFilters && (
         <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
           <div className="flex justify-between items-center mb-4">
@@ -554,6 +570,12 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   const totalExpenses = booking.expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
                   const isPendingCustomer = isCustomerBooking(booking) && booking.status === 'pending';
                   const ext = booking as ExtendedBooking;
+                  const receivedPence = Number(booking.amountReceivedPence || 0);
+                  const balancePence = Math.max(0, Math.round((booking.actualFare || 0) * 100) - receivedPence);
+                  const workflow = effectiveWorkflowStatus(booking);
+                  const nextAction = workflow === 'pending' ? 'Prepare quote'
+                    : workflow === 'awaiting_customer_confirmation' ? (booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Record deposit or payment' : 'Review quote and acceptance')
+                    : workflow === 'confirmed' && !booking.driverId ? 'Assign driver' : 'Open booking';
                   const customerEmail = [ext.hirerEmail, ext.email].map((e) => (typeof e === 'string' ? e.trim() : '')).find(Boolean) || '';
                   return (
                     <div 
@@ -566,13 +588,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                             {booking.bookingNumber}
                           </h3>
                           {isPendingCustomer && <span className="badge badge-new-customer">NEW CUSTOMER</span>}
-                          <span className={`badge ${workflowBadgeClass(booking.adminStatus || booking.status)}`}>{workflowStatusLabel(booking.adminStatus || booking.status)}</span>
-                          {(booking as { quoteAcceptanceSubstatus?: string }).quoteAcceptanceSubstatus === 'awaiting_payment' && (
-                            <div className="text-xs" style={{ color: '#92400e' }}>Quote accepted — awaiting payment</div>
-                          )}
+                          <span className={`badge ${workflowBadgeClass(effectiveWorkflowStatus(booking))}`}>{booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Awaiting payment' : workflowStatusLabel(effectiveWorkflowStatus(booking))}</span>
                           {booking.paymentStatus && (
                             <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
-                              {booking.paymentStatus}
+                              {booking.paymentStatus === 'pending' ? 'Unpaid' : booking.paymentStatus === 'partial' ? 'Part paid' : booking.paymentStatus === 'paid' ? 'Paid' : 'Refunded'}
                             </span>
                           )}
                           {booking.actualFare && (
@@ -604,7 +623,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                             </p>
                           ) : null}
                           <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                            <strong>Method:</strong> {booking.bookingMethod.replace('_', ' ')}
+                            <strong>Method:</strong> {String(booking.bookingMethod || 'Not recorded').replace('_', ' ')}
                           </p>
                         </div>
                         <div>
@@ -633,7 +652,15 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                       <div style={{ marginTop: '0.75rem', fontSize: '0.875rem', color: '#4b5563' }}>
                         <strong>Driver:</strong> {driver?.name || 'Not assigned'} | <strong>Vehicle:</strong> {vehicle?.registration || 'Not assigned'}
                       </div>
+                      {receivedPence > 0 && booking.paymentStatus !== 'paid' && (
+                        <p className="text-sm" style={{ color: '#0b1c3d', marginTop: '0.5rem' }}>Received £{(receivedPence / 100).toFixed(2)} · Remaining £{(balancePence / 100).toFixed(2)}</p>
+                      )}
+                      {booking.quoteEmailStatus === 'failed' && <p role="status" className="text-sm" style={{ color: '#b91c1c' }}>Quote email failed. Open booking to retry.</p>}
                       <div className="booking-card-actions">
+                        <button type="button" onClick={() => onEditBooking(booking)} className="btn btn-primary btn-sm"><Edit3 className="h-4 w-4" />{nextAction}</button>
+                        <details className="booking-more-actions">
+                          <summary className="btn btn-secondary btn-sm">More actions</summary>
+                          <div className="booking-actions-menu">
                         <button
                           type="button"
                           onClick={() => handleSendDriverReminder(booking)}
@@ -652,13 +679,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           title="Add return journey to this booking"
                           aria-label="Add return journey to this booking"
                         >
-                          <ArrowLeftRight className="h-4 w-4" />
+                          <ArrowLeftRight className="h-4 w-4" /> Add return
                         </button>
                         <button onClick={() => onDuplicateBooking(booking)} className="btn btn-secondary btn-sm" title="Duplicate Booking">
-                          <Copy className="h-4 w-4" />
+                          <Copy className="h-4 w-4" /> Duplicate
                         </button>
                         <button onClick={() => onGeneratePDF(booking)} className="btn btn-success btn-sm" title="Download PDF">
-                          <Download className="h-4 w-4" />
+                          <Download className="h-4 w-4" /> Download PDF
                         </button>
                         <button
                           type="button"
@@ -668,14 +695,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           disabled={sendingCustomerPdfId === booking.id}
                         >
                           <Send className="h-4 w-4" style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
-                          {sendingCustomerPdfId === booking.id ? 'Sending…' : 'Email PDF'}
-                        </button>
-                        <button onClick={() => onEditBooking(booking)} className="btn btn-primary btn-sm" title="Edit Booking">
-                          <Edit3 className="h-4 w-4" />
+                          {sendingCustomerPdfId === booking.id ? 'Sending…' : booking.paymentStatus === 'paid' ? 'Email receipt' : booking.status === 'completed' ? 'Email payment request' : 'Email confirmation'}
                         </button>
                         <button onClick={() => onDeleteBooking(booking.id!, booking.bookingNumber)} className="btn btn-danger btn-sm" title="Delete Booking">
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" /> Delete
                         </button>
+                          </div>
+                        </details>
                       </div>
                     </div>
                   );

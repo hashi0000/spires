@@ -7,6 +7,7 @@ exports.decideAcceptance = decideAcceptance;
 exports.canIssueQuote = canIssueQuote;
 exports.paymentBuckets = paymentBuckets;
 exports.shouldMoveToConfirmedAfterPayment = shouldMoveToConfirmedAfterPayment;
+exports.effectiveWorkflowStatus = effectiveWorkflowStatus;
 exports.isWorkflowConfirmed = isWorkflowConfirmed;
 exports.shouldSendConfirmation = shouldSendConfirmation;
 exports.bookingMatchesStatusFilter = bookingMatchesStatusFilter;
@@ -33,7 +34,7 @@ function canCustomerAccept(input) {
 function decideAcceptance(input) {
     if (!input.authorised)
         return { ok: false, code: "forbidden" };
-    if (input.status === "cancelled" || input.customerStatus === "cancelled")
+    if ((input.status || input.customerStatus) === "cancelled")
         return { ok: false, code: "cancelled" };
     if (!input.quoteIssuedVersion)
         return { ok: false, code: "not_issued" };
@@ -43,7 +44,7 @@ function decideAcceptance(input) {
         return { ok: false, code: "expired" };
     const locked = input.status === "confirmed" || input.status === "allocated" || input.status === "completed";
     if (input.quoteAcceptedVersion === input.quoteIssuedVersion) {
-        if (locked || input.paymentRequirement !== "advance") {
+        if (locked || input.paymentRequirement !== "advance" || input.advancePaymentSatisfied === true) {
             return { ok: true, already: true, nextStatus: "confirmed", substatus: "" };
         }
         return {
@@ -55,7 +56,7 @@ function decideAcceptance(input) {
     }
     if (locked)
         return { ok: false, code: "stale" };
-    if (input.paymentRequirement === "advance") {
+    if (input.paymentRequirement === "advance" && input.advancePaymentSatisfied !== true) {
         return { ok: true, already: false, nextStatus: "awaiting_customer_confirmation", substatus: "awaiting_payment" };
     }
     return { ok: true, already: false, nextStatus: "confirmed", substatus: "" };
@@ -95,42 +96,30 @@ function shouldMoveToConfirmedAfterPayment(input) {
         return false;
     return input.status === "awaiting_customer_confirmation" || input.status === "pending";
 }
+/** Main status wins. Preserve the historical confirmed/admin-allocated representation. */
+function effectiveWorkflowStatus(data) {
+    const primary = data.status || data.adminStatus || data.customerStatus || "pending";
+    if (primary === "paid")
+        return "completed";
+    if (primary === "confirmed" && ["allocated", "completed"].includes(data.adminStatus || "")) {
+        return data.adminStatus;
+    }
+    return primary;
+}
 function isWorkflowConfirmed(data) {
-    const values = [data.adminStatus, data.status, data.customerStatus];
-    return values.some((value) => value === "confirmed" || value === "allocated" || value === "completed" || value === "paid");
+    return ["confirmed", "allocated", "completed"].includes(effectiveWorkflowStatus(data));
 }
 function shouldSendConfirmation(before, after) {
-    if (after.confirmationEmailSentAt)
+    if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after))
         return false;
-    if (!isWorkflowConfirmed(after))
-        return false;
-    if (before && isWorkflowConfirmed(before))
-        return false;
-    return true;
-}
-/** Admin list filters. Legacy customer rows stored allocated work on adminStatus and paid completion on status "paid". */
-function bookingMatchesStatusFilter(booking, filter) {
-    if (!filter || filter === "all")
+    if (!before || !isWorkflowConfirmed(before))
         return true;
-    const status = booking.status || "";
-    const admin = booking.adminStatus || "";
-    const customer = booking.customerStatus || "";
-    if (filter === "allocated")
-        return status === "allocated" || admin === "allocated";
-    if (filter === "completed") {
-        return status === "completed" || admin === "completed" || status === "paid" || customer === "paid";
-    }
-    if (filter === "confirmed") {
-        const allocated = status === "allocated" || admin === "allocated";
-        const completed = status === "completed" || admin === "completed" || status === "paid" || customer === "paid";
-        if (allocated || completed)
-            return false;
-        return status === "confirmed" || admin === "confirmed";
-    }
-    if (filter === "awaiting_customer_confirmation") {
-        return status === "awaiting_customer_confirmation" || admin === "awaiting_customer_confirmation";
-    }
-    return status === filter || admin === filter || customer === filter;
+    // A confirmed booking that previously had no recipient can now receive its first confirmation.
+    const recipient = (row) => String(row.hirerEmail || row.email || "").trim();
+    return !recipient(before) && Boolean(recipient(after));
+}
+function bookingMatchesStatusFilter(booking, filter) {
+    return !filter || filter === "all" || effectiveWorkflowStatus(booking) === filter;
 }
 function workflowStatusLabel(status) {
     switch (status) {

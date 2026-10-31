@@ -2,10 +2,10 @@
  * Hosted payment links are pasted by an admin. Clicking one must never mark a booking paid.
  *
  * Default hosts are Stripe Checkout and Payment Link hosts already used by this project's
- * Stripe dependency. Shift4 hostnames are not guessed. Add verified hosts with
+ * Stripe dependency, plus the Shift4 host used by Spires. Add other verified hosts with
  * PAYMENT_LINK_HOST_ALLOWLIST or functions config payments.hosts (comma separated exact hosts).
  */
-const DEFAULT_HOSTS = ["checkout.stripe.com", "buy.stripe.com", "pay.stripe.com", "payments.stripe.com"];
+const DEFAULT_HOSTS = ["checkout.stripe.com", "buy.stripe.com", "pay.stripe.com", "payments.stripe.com", "pay.shift4.com"];
 
 export function paymentLinkAllowlist(extraRaw = ""): string[] {
   const extras = String(extraRaw || "")

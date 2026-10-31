@@ -50,7 +50,7 @@ export default function Dashboard() {
 
     // Listen for all user's bookings in Firestore (not just pending)
     // Note: We filter by status, but customer app uses "pending"/"confirmed"/"paid"
-    // Admin sets customerStatus when confirming, otherwise we use status field
+    // The main workflow status is authoritative; customerStatus is a legacy fallback.
     let q;
     if (statusFilter === "all") {
       q = query(
@@ -73,8 +73,8 @@ export default function Dashboard() {
       async (snapshot) => {
         const bookingList = snapshot.docs.map((doc) => {
           const data = doc.data();
-          // Use customerStatus if set by admin, otherwise use status
-          const customerStatus = data.customerStatus || data.status || "pending";
+          // Keep the customer view aligned with the admin workflow.
+          const customerStatus = data.status || data.adminStatus || data.customerStatus || "pending";
           return {
             id: doc.id,
             ...data,

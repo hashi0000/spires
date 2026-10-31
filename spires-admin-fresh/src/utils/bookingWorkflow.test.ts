@@ -9,3 +9,8 @@ describe("booking status filters", () => {
     expect(bookingMatchesStatusFilter({ status: "pending" }, "all")).toBe(true);
   });
 });
+
+test("stale secondary statuses do not put a pending or cancelled booking into the confirmed filter", () => {
+  expect(bookingMatchesStatusFilter({ status: "pending", adminStatus: "confirmed" }, "confirmed")).toBe(false);
+  expect(bookingMatchesStatusFilter({ status: "cancelled", customerStatus: "confirmed" }, "confirmed")).toBe(false);
+});

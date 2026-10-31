@@ -223,3 +223,38 @@ const airportReturn = {
         strict_1.default.equal((0, invoiceVault_1.invoicePaidDateLabel)(""), "");
     });
 });
+(0, node_test_1.describe)("booking reliability regressions", () => {
+    (0, node_test_1.it)("confirms when a sufficient deposit was recorded before acceptance", () => {
+        const result = (0, quoteWorkflow_1.decideAcceptance)({ status: "awaiting_customer_confirmation", quoteIssuedVersion: 3,
+            requestedVersion: 3, nowMs: Date.now(), authorised: true, paymentRequirement: "advance", advancePaymentSatisfied: true });
+        strict_1.default.equal(result.ok && result.nextStatus, "confirmed");
+        strict_1.default.equal(result.ok && result.substatus, "");
+        const insufficient = (0, quoteWorkflow_1.decideAcceptance)({ status: "awaiting_customer_confirmation", quoteIssuedVersion: 3,
+            requestedVersion: 3, nowMs: Date.now(), authorised: true, paymentRequirement: "advance", advancePaymentSatisfied: false });
+        strict_1.default.equal(insufficient.ok && insufficient.substatus, "awaiting_payment");
+    });
+    (0, node_test_1.it)("does not confirm a pending or cancelled job from stale legacy fields", () => {
+        for (const status of ["pending", "awaiting_customer_confirmation", "cancelled"]) {
+            strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)(null, { status, adminStatus: "confirmed", customerStatus: "confirmed" }), false);
+            strict_1.default.equal((0, quoteWorkflow_1.effectiveWorkflowStatus)({ status, adminStatus: "confirmed" }), status);
+            strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status, customerStatus: "confirmed" }, "confirmed"), false);
+        }
+    });
+    (0, node_test_1.it)("sends the first confirmation when a recipient is added later, but never resends a sent confirmation", () => {
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), true);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
+    });
+    (0, node_test_1.it)("allows the actual Shift4 payment host and rejects lookalikes", () => {
+        const hosts = (0, paymentLink_1.paymentLinkAllowlist)();
+        strict_1.default.equal((0, paymentLink_1.validatePaymentLinkUrl)("https://pay.shift4.com/link_example", hosts), "https://pay.shift4.com/link_example");
+        strict_1.default.throws(() => (0, paymentLink_1.validatePaymentLinkUrl)("https://pay.shift4.com.evil.test/link_example", hosts));
+        strict_1.default.throws(() => (0, paymentLink_1.validatePaymentLinkUrl)("https://pay-shift4.com/link_example", hosts));
+    });
+    (0, node_test_1.it)("keeps a 12.50 deposit against a 42.50 fare part paid with 30 outstanding", () => {
+        strict_1.default.deepEqual((0, quoteWorkflow_1.paymentBuckets)({ finalFarePence: 4250, amountReceivedPence: 1250 }), {
+            stored: "partial", label: "Part paid", outstandingPence: 3000,
+        });
+        strict_1.default.equal((0, quoteWorkflow_1.shouldMoveToConfirmedAfterPayment)({ acceptedVersion: 2, issuedVersion: 3, paymentVerified: true, status: "pending" }), false);
+    });
+});

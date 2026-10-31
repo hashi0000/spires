@@ -1,27 +1,19 @@
 /** Keep in step with functions/src/quotes/quoteWorkflow.ts */
 
-export function bookingMatchesStatusFilter(
-  booking: { status?: string | null; adminStatus?: string | null; customerStatus?: string | null },
-  filter: string
-): boolean {
-  if (!filter || filter === "all") return true;
-  const status = booking.status || "";
-  const admin = booking.adminStatus || "";
-  const customer = booking.customerStatus || "";
-  if (filter === "allocated") return status === "allocated" || admin === "allocated";
-  if (filter === "completed") {
-    return status === "completed" || admin === "completed" || status === "paid" || customer === "paid";
+type BookingWorkflow = { status?: string | null; adminStatus?: string | null; customerStatus?: string | null };
+
+/** Main status wins. Preserve the historical confirmed/admin-allocated representation. */
+export function effectiveWorkflowStatus(data: BookingWorkflow): string {
+  const primary = data.status || data.adminStatus || data.customerStatus || "pending";
+  if (primary === "paid") return "completed";
+  if (primary === "confirmed" && ["allocated", "completed"].includes(data.adminStatus || "")) {
+    return data.adminStatus!;
   }
-  if (filter === "confirmed") {
-    const allocated = status === "allocated" || admin === "allocated";
-    const completed = status === "completed" || admin === "completed" || status === "paid" || customer === "paid";
-    if (allocated || completed) return false;
-    return status === "confirmed" || admin === "confirmed";
-  }
-  if (filter === "awaiting_customer_confirmation") {
-    return status === "awaiting_customer_confirmation" || admin === "awaiting_customer_confirmation";
-  }
-  return status === filter || admin === filter || customer === filter;
+  return primary;
+}
+
+export function bookingMatchesStatusFilter(booking: BookingWorkflow, filter: string): boolean {
+  return !filter || filter === "all" || effectiveWorkflowStatus(booking) === filter;
 }
 
 export function workflowStatusLabel(status: string | null | undefined): string {

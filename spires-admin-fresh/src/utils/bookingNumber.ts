@@ -1,5 +1,4 @@
-/** Same pattern as useBookings.generateBookingNumber — SP + last 6 digits of timestamp */
+/** Display reference only; Firestore allocates the independent document identity. */
 export function generateSpiresBookingNumber(): string {
-  const timestamp = Date.now().toString().slice(-6);
-  return `SP${timestamp}`;
+  return `SP${Date.now().toString(36).toUpperCase()}${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
