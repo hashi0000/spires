@@ -91,6 +91,12 @@ export interface Booking {
   allocatedTime?: string;
   actualFare?: number;
   paymentMethod?: 'cash' | 'card' | 'bank transfer' | 'account' | 'tbc' | 'undecided';
+  amountReceivedPence?: number;
+  amountRequestedPence?: number;
+  outstandingPence?: number;
+  quoteEmailStatus?: string;
+  paymentLinkEmailStatus?: string;
+  quoteIssuedVersion?: number;
   paymentStatus?: 'pending' | 'paid' | 'partial' | 'refunded';
   vehicleType?: 'standard' | '8_seater' | string;
   depositRequired?: boolean;

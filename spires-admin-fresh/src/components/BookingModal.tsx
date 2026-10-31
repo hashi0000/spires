@@ -9,6 +9,7 @@ import {
   airportWaitingWebsiteBody,
   calculateAirportWaitingCharge,
 } from '../utils/airportWaitingPolicy';
+import { effectiveWorkflowStatus } from '../utils/bookingWorkflow';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import {
@@ -19,7 +20,7 @@ import {
   splitLocalDateTime,
 } from '../utils/bookingJourney';
 import { db } from '../utils/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import {
   accountLinkForBooking,
   customerSuggestionLabel,
@@ -153,7 +154,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
         // Map customer app fields to admin fields
         hirerName: editingBooking.hirerName || (editingBooking as any).name || '',
         hirerPhone: editingBooking.hirerPhone || (editingBooking as any).phone || '',
-        status: (editingBooking as any).adminStatus || editingBooking.status || 'pending',
+        status: effectiveWorkflowStatus(editingBooking),
         hirerAddress: editingBooking.hirerAddress || '',
         pickupLocation: editingBooking.pickupLocation || (editingBooking as any).pickup || '',
         destination: editingBooking.destination || '',
@@ -318,7 +319,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
       editingBooking && formData.bookingNumber
         ? formData.bookingNumber
         : generateSpiresBookingNumber();
-    const bookingId = editingBooking?.id || newBookingNumber;
+    const bookingId = editingBooking?.id || doc(collection(db, 'bookings')).id;
 
     const pickupIso = fromDatetimeLocalValue(
       String(formData.pickupTime || formData.dateTime || '')
@@ -470,6 +471,27 @@ const BookingModal: React.FC<BookingModalProps> = ({
           throw new Error('Booking ID is required for update');
         }
 
+        // Quote/payment functions own these fields. A stale open form must never write them back.
+        for (const key of Object.keys(cleanedUpdateData)) {
+          if (/^(quote|issuedQuote|quotes$|paymentLink|amountReceived|amountRequested|outstanding|paymentVerified|paymentRecorded|paymentReceipt|confirmationEmail|normalFarePence|discountPence|finalFarePence|paidAt$|terms)/.test(key)) {
+            delete cleanedUpdateData[key];
+          }
+        }
+        const originalStatus = effectiveWorkflowStatus(editingBooking);
+        if (bookingData.status === originalStatus) {
+          delete cleanedUpdateData.status;
+          delete cleanedUpdateData.adminStatus;
+          delete cleanedUpdateData.customerStatus;
+        } else {
+          cleanedUpdateData.adminStatus = bookingData.status;
+          cleanedUpdateData.customerStatus = bookingData.status;
+        }
+        if (String(formData.actualFare || '') === String(editingBooking.actualFare || '')) delete cleanedUpdateData.actualFare;
+        if (formData.paymentStatus === editingBooking.paymentStatus || editingBooking.quoteIssuedVersion) delete cleanedUpdateData.paymentStatus;
+        if (formData.paymentMethod === editingBooking.paymentMethod) delete cleanedUpdateData.paymentMethod;
+        cleanedUpdateData.name = hirerName;
+        cleanedUpdateData.phone = bookingData.hirerPhone;
+        cleanedUpdateData.pickup = bookingData.pickupLocation;
         // Remove id from updateData as it's not a Firestore field
         delete cleanedUpdateData.id;
 
@@ -500,7 +522,29 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         console.log('📝 Updating booking:', bookingId);
         console.log('📝 Update data:', cleanedUpdateData);
-        await updateDoc(doc(db, 'bookings', bookingId), cleanedUpdateData);
+        await runTransaction(db, async transaction => {
+          const ref = doc(db, 'bookings', bookingId);
+          const latest = await transaction.get(ref);
+          if (!latest.exists()) throw new Error('This booking no longer exists.');
+          const current = latest.data();
+          const safeUpdate = { ...cleanedUpdateData };
+          if (current.quoteIssuedVersion) {
+            for (const key of ['depositRequired', 'depositAmount', 'depositStatus', 'paymentStatus', 'paymentMethod']) delete safeUpdate[key];
+            if (safeUpdate.actualFare !== undefined && Number(safeUpdate.actualFare) !== Number(current.actualFare)) {
+              throw new Error('This booking has an issued quote. Change its fare through Quote and payment so the customer receives the correct price.');
+            }
+            delete safeUpdate.actualFare;
+            if (safeUpdate.status === 'confirmed') {
+              const accepted = current.quoteAcceptedVersion === current.quoteIssuedVersion;
+              const required = Number(current.issuedQuote?.amountRequestedPence || current.amountRequestedPence || 0);
+              const advance = (current.issuedQuote?.paymentRequirement || current.paymentRequirement) === 'advance';
+              if (!accepted || (advance && (required <= 0 || Number(current.amountReceivedPence || 0) < required))) {
+                throw new Error('Record customer acceptance and the required payment in Quote and payment before confirming.');
+              }
+            }
+          }
+          transaction.update(ref, safeUpdate);
+        });
         console.log('✅ Booking updated successfully:', bookingId);
       } else {
         const createPayload: Record<string, unknown> = {};

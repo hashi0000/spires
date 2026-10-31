@@ -1,3 +1,5 @@
+> Implementation update: see `ADMIN_OVERHAUL_NOTES.md` for the current local changes and validation limits. The original architecture description below predates that cleanup.
+
 # Spires Taxis admin bookings system
 
 This note is for a reviewer. It describes how the live admin bookings system is wired, as the code stands in this repository. It is not a wish list. Where the code and the screen disagree, the code is what is described.

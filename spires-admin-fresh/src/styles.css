@@ -1865,3 +1865,13 @@ header.admin-header,
   }
 }
 
+
+/* Keep daily actions visible and occasional actions out of the booking summary. */
+.booking-more-actions { position: relative; }
+.booking-more-actions > summary { list-style: none; cursor: pointer; }
+.booking-more-actions > summary::-webkit-details-marker { display: none; }
+.booking-actions-menu { display: flex; flex-wrap: wrap; gap: .5rem; padding: .75rem; margin-top: .5rem; background: #f8fafc; border: 1px solid #e4e9ef; border-radius: .5rem; }
+.booking-card-body { overflow-wrap: anywhere; }
+.quote-section { border-top: 1px solid #e4e9ef; margin-top: 1rem; padding-top: 1rem; }
+.quote-section > summary { cursor: pointer; color: #0b1c3d; font-weight: 600; margin-bottom: .75rem; }
+.quote-money-summary { display: flex; flex-wrap: wrap; gap: 1.25rem; padding: .85rem; background: #f1f5f9; border-radius: .5rem; margin-bottom: 1rem; }

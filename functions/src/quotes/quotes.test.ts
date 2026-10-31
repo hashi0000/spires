@@ -15,6 +15,7 @@ import {
   bookingMatchesStatusFilter,
   canCustomerAccept,
   decideAcceptance,
+  effectiveWorkflowStatus,
   emailEnqueueDecision,
   emailJobDocId,
   isQuoteAdmin,
@@ -266,5 +267,45 @@ describe("invoice paid state", () => {
     assert.equal(invoiceEmailState({ emailStatus: "failed", emailedAt: "2026-10-01" }), "failed");
     assert.equal(invoicePaidDateLabel("2026-10-20T12:00:00.000Z"), "2026-10-20");
     assert.equal(invoicePaidDateLabel(""), "");
+  });
+});
+
+describe("booking reliability regressions", () => {
+  it("confirms when a sufficient deposit was recorded before acceptance", () => {
+    const result = decideAcceptance({ status: "awaiting_customer_confirmation", quoteIssuedVersion: 3,
+      requestedVersion: 3, nowMs: Date.now(), authorised: true, paymentRequirement: "advance", advancePaymentSatisfied: true });
+    assert.equal(result.ok && result.nextStatus, "confirmed");
+    assert.equal(result.ok && result.substatus, "");
+    const insufficient = decideAcceptance({ status: "awaiting_customer_confirmation", quoteIssuedVersion: 3,
+      requestedVersion: 3, nowMs: Date.now(), authorised: true, paymentRequirement: "advance", advancePaymentSatisfied: false });
+    assert.equal(insufficient.ok && insufficient.substatus, "awaiting_payment");
+  });
+
+  it("does not confirm a pending or cancelled job from stale legacy fields", () => {
+    for (const status of ["pending", "awaiting_customer_confirmation", "cancelled"]) {
+      assert.equal(shouldSendConfirmation(null, { status, adminStatus: "confirmed", customerStatus: "confirmed" }), false);
+      assert.equal(effectiveWorkflowStatus({ status, adminStatus: "confirmed" }), status);
+      assert.equal(bookingMatchesStatusFilter({ status, customerStatus: "confirmed" }, "confirmed"), false);
+    }
+  });
+
+  it("sends the first confirmation when a recipient is added later, but never resends a sent confirmation", () => {
+    assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), true);
+    assert.equal(shouldSendConfirmation({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
+    assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
+  });
+
+  it("allows the actual Shift4 payment host and rejects lookalikes", () => {
+    const hosts = paymentLinkAllowlist();
+    assert.equal(validatePaymentLinkUrl("https://pay.shift4.com/link_example", hosts), "https://pay.shift4.com/link_example");
+    assert.throws(() => validatePaymentLinkUrl("https://pay.shift4.com.evil.test/link_example", hosts));
+    assert.throws(() => validatePaymentLinkUrl("https://pay-shift4.com/link_example", hosts));
+  });
+
+  it("keeps a 12.50 deposit against a 42.50 fare part paid with 30 outstanding", () => {
+    assert.deepEqual(paymentBuckets({ finalFarePence: 4250, amountReceivedPence: 1250 }), {
+      stored: "partial", label: "Part paid", outstandingPence: 3000,
+    });
+    assert.equal(shouldMoveToConfirmedAfterPayment({ acceptedVersion: 2, issuedVersion: 3, paymentVerified: true, status: "pending" }), false);
   });
 });
