@@ -101,6 +101,23 @@ export default function QuoteEditor({ bookingId, booking, onWorkflowStatus }: Pr
     ]
   );
 
+  function fareToSend(): string {
+    const typed = normalFare.trim();
+    if (typed) return typed;
+    const stored = booking?.actualFare;
+    return stored != null && String(stored).trim() ? String(stored).trim() : "";
+  }
+
+  function requireFare(): string {
+    const fare = fareToSend().replace(/£/g, "").replace(/,/g, "").trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(fare)) {
+      setError("Enter the normal quoted total in pounds and pence, for example 85.00.");
+      document.getElementById("quote-normal-fare")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return "";
+    }
+    return fare;
+  }
+
   async function run(label: string, fn: () => Promise<unknown>) {
     setBusy(label);
     setError("");
@@ -128,7 +145,7 @@ export default function QuoteEditor({ bookingId, booking, onWorkflowStatus }: Pr
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <label className="text-sm">Normal quoted total (£)
-          <input className="form-input" value={normalFare} onChange={(e) => setNormalFare(e.target.value)} />
+          <input id="quote-normal-fare" className="form-input" value={normalFare} onChange={(e) => setNormalFare(e.target.value)} placeholder="For example 85.00" />
         </label>
         <label className="text-sm">Vehicle
           <select className="form-input" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
@@ -205,17 +222,21 @@ export default function QuoteEditor({ bookingId, booking, onWorkflowStatus }: Pr
       {message ? <p className="text-sm" style={{ color: "#166534" }}>{message}</p> : null}
       <div className="flex flex-wrap gap-2" style={{ marginTop: "0.75rem" }}>
         <button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => run("draft", async () => {
-          const res = await saveQuoteDraftFn(payload);
+          const fare = requireFare();
+          if (!fare) return;
+          const res = await saveQuoteDraftFn({ ...payload, normalFarePounds: fare });
           const data = res.data as { formatted?: { normal: string; discount: string; final: string } };
           if (data.formatted) setPreview(data.formatted);
           setMessage("Draft saved. The customer was not emailed.");
         })}>{busy === "draft" ? "Saving…" : "Save draft"}</button>
         <button type="button" className="btn btn-primary" disabled={Boolean(busy)} onClick={() => run("send", async () => {
-          const res = await issueQuoteFn(payload);
+          const fare = requireFare();
+          if (!fare) return;
+          const res = await issueQuoteFn({ ...payload, normalFarePounds: fare });
           const data = res.data as { formatted?: { normal: string; discount: string; final: string }; emailState?: string; version?: number };
           if (data.formatted) setPreview(data.formatted);
           onWorkflowStatus?.("awaiting_customer_confirmation");
-          setMessage(`Quote version ${data.version} saved. Email ${data.emailState || "queued"}. This is not marked paid.`);
+          setMessage(`Quote version ${data.version} saved. It is being emailed to the customer, with a copy to you and bookings@spires-taxis.com. This is not marked paid.`);
         })}>{busy === "send" ? "Sending…" : "Send quote"}</button>
         <button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => run("link", async () => {
           await savePaymentLinkFn({
@@ -235,7 +256,7 @@ export default function QuoteEditor({ bookingId, booking, onWorkflowStatus }: Pr
         <button type="button" className="btn btn-secondary" disabled={Boolean(busy) || !booking?.quoteIssuedVersion} onClick={() => run("resend", async () => {
           const res = await resendQuoteEmailFn({ bookingId });
           const data = res.data as { emailState?: string };
-          setMessage(`Quote resent (${data.emailState || "queued"}) without a new price.`);
+          setMessage(`Quote resent (${data.emailState || "queued"}) without a new price. A copy is sent to you and bookings@spires-taxis.com.`);
         })}>Resend quote</button>
         <button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => run("accept", async () => {
           if (!window.confirm("Record that the customer accepted this quote by phone?")) return;

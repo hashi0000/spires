@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
+import { ADMIN_EMAIL, escapeHtml } from "../driverReminderEmail";
 import { sendBookingReceipt } from "../sendBookingReceipt";
 import {
   acceptanceAdminHtml,
@@ -69,6 +70,17 @@ function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Office copies, not a hidden copy to the sending mailbox. */
+function quoteCopyRecipients(actor: string, customerTo: string): string[] {
+  const customer = customerTo.trim().toLowerCase();
+  const recipients = new Set<string>();
+  const actorEmail = actor.trim().toLowerCase();
+  if (actorEmail.includes("@") && actorEmail !== customer) recipients.add(actorEmail);
+  const office = ADMIN_EMAIL.toLowerCase();
+  if (office !== customer) recipients.add(office);
+  return Array.from(recipients);
+}
+
 function journeyFrom(data: FirebaseFirestore.DocumentData): JourneyShape {
   return {
     source: str(data.source),
@@ -112,6 +124,7 @@ async function enqueueJob(input: {
   subject: string;
   html: string;
   kind: string;
+  copyTo?: string[];
 }): Promise<{ jobId: string; state: "queued" | "skipped" | "requeued" }> {
   const mode = input.mode || "auto";
   const jobId = emailJobDocId(input.bookingId, input.event, input.version, input.resend || 0);
@@ -127,6 +140,7 @@ async function enqueueJob(input: {
     to: input.to,
     subject: input.subject,
     html: input.html,
+    copyTo: input.copyTo || [],
     status: "queued",
     queuedAt: admin.firestore.FieldValue.serverTimestamp(),
     error: admin.firestore.FieldValue.delete(),
@@ -168,12 +182,31 @@ export const processEmailJob = functions.firestore.document("emailJobs/{jobId}")
       await bookingSnap.ref.set(stamp, { merge: true });
       return;
     }
+    const copyTo = Array.isArray(after.copyTo)
+      ? after.copyTo.map((item: unknown) => String(item || "").trim()).filter(Boolean)
+      : [];
     const info = await sendHtmlEmail({
       to: String(after.to || ""),
       subject: String(after.subject || "Spires Taxis"),
       html: String(after.html || ""),
-      bccAdmin: after.kind !== "acceptance_admin",
+      bccAdmin: after.kind !== "acceptance_admin" && copyTo.length === 0,
     });
+    if (after.kind === "quote") {
+      const note = `<p style="font-family:Georgia,serif;color:#1a2332;">This copy confirms the quote was sent to ${escapeHtml(String(after.to || ""))}.</p>`;
+      for (const copy of copyTo) {
+        try {
+          await sendHtmlEmail({
+            to: copy,
+            subject: `Copy: ${String(after.subject || "Spires Taxis quote")} sent to ${String(after.to || "")}`,
+            html: note + String(after.html || ""),
+            bccAdmin: false,
+          });
+        } catch (copyErr) {
+          const copyMessage = copyErr instanceof Error ? copyErr.message : "Quote copy failed";
+          functions.logger.error("quote copy failed", { to: copy, message: copyMessage });
+        }
+      }
+    }
     await ref.set(
       {
         status: "sent",
@@ -331,6 +364,12 @@ function journeyPatch(input: ReturnType<typeof readQuoteInput>, raw: Record<stri
   };
 }
 
+function quoteInputError(err: unknown): never {
+  if (err instanceof functions.https.HttpsError) throw err;
+  const message = err instanceof Error && err.message ? err.message : "Could not save the quote.";
+  throw httpsError("invalid-argument", message);
+}
+
 async function saveDraftOrIssue(data: Record<string, unknown>, context: functions.https.CallableContext, issue: boolean) {
   const actor = requireAdmin(context);
   const bookingId = str(data.bookingId);
@@ -339,7 +378,13 @@ async function saveDraftOrIssue(data: Record<string, unknown>, context: function
   const snap = await ref.get();
   if (!snap.exists) throw httpsError("not-found", "Booking not found.");
   const booking = snap.data() || {};
-  const parsed = readQuoteInput(data, booking);
+  let parsed: ReturnType<typeof readQuoteInput>;
+  try {
+    const fare = str(data.normalFarePounds) || String(booking.actualFare ?? "").trim();
+    parsed = readQuoteInput({ ...data, normalFarePounds: fare }, booking);
+  } catch (err) {
+    quoteInputError(err);
+  }
   const patch = journeyPatch(parsed, data);
   const draft = {
     ...parsed.totals,
@@ -425,6 +470,7 @@ async function saveDraftOrIssue(data: Record<string, unknown>, context: function
         subject: `Your Spires Taxis quote ${model.bookingNumber}`,
         html: quoteEmailHtml(model),
         kind: "quote",
+        copyTo: quoteCopyRecipients(actor, to),
       });
       emailState = queued.state === "skipped" ? "skipped" : "queued";
     } catch (err) {
@@ -777,6 +823,7 @@ export const resendQuoteEmail = functions.https.onCall(async (data, context) => 
     subject: `Your Spires Taxis quote ${model.bookingNumber}`,
     html: quoteEmailHtml(model),
     kind: "quote",
+    copyTo: quoteCopyRecipients(actor, to),
   });
   await snap.ref.set({ quoteResendCount: resend, quoteEmailStatus: "queued" }, { merge: true });
   await audit(bookingId, "quote_resent", actor, { version, resend });
