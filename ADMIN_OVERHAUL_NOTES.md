@@ -48,3 +48,23 @@ Use a non-production Firebase environment and a controlled test mailbox to verif
 Existing architecture still has direct client booking writes, legacy aliases, customer grouping/linking, and once-only payment receipts. Those remain follow-up work; this patch does not claim to finish every process in the wider system. No production data migration is included.
 
 Deploy Cloud Functions with the admin build so booking-based email retry and the updated payment rules are available together. Deploy the customer app through its existing hosting setup. Do not deploy the marketing site as the Firebase admin hosting build.
+
+## Firestore emulator integration validation
+
+Seven additional scenarios now pass against an actual local Firestore emulator through the callable implementations:
+
+1. Deposit before customer acceptance confirms with £30 outstanding on a £42.50 fare.
+2. Acceptance before payment waits for enough deposit; repeating a cumulative payment is a no-op; final payment marks paid.
+3. Pay later acceptance confirms without marking paid.
+4. Reissued quotes reject the old public acceptance token.
+5. Unauthorised customer acceptance and deposits greater than the fare are rejected.
+6. Adding a missing recipient queues one first confirmation, including simultaneous enqueue attempts.
+7. Booking-based retry requeues the failed message.
+
+Run from the repository root after building Functions:
+
+```sh
+firebase emulators:exec --only firestore --project demo-spires-admin --config tools/firebase.admin-test.json 'node tools/test-admin-emulator.cjs'
+```
+
+`tools/test-admin-emulator.cjs` refuses non-local Firestore hosts and fixes the project to `demo-spires-admin`. The emulator configuration enables only Firestore. It invokes the callables directly with test authentication contexts, so it tests Firestore transactions and email queue records, not deployed callable authentication, security rules, automatic trigger delivery or SMTP. No real customer data, email delivery or Shift4 payment is involved. Actual mail delivery and authenticated browser validation are still outstanding.
