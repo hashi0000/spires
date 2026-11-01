@@ -2791,6 +2791,22 @@ html[dir="rtl"] .booking-form label {
   .halloween-decor .leaf-a { top: 4px; left: 52px; }
   .halloween-decor .leaf-b { top: auto; bottom: 8px; right: 52px; }
 }
+.crumbs {
+  font-size: 0.92rem;
+  margin-bottom: 0.85rem;
+  color: var(--text-muted);
+}
+.crumbs a { color: var(--blue-mid); }
+.guide-meta {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: 0.75rem;
+}
+.card h3 a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.card h3 a:hover { color: var(--gold); }
 .terms-agreement {
   margin: 1rem 0 1.25rem;
   padding: 0.9rem 1rem;

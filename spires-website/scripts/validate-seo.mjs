@@ -126,6 +126,9 @@ const requiredSitemap = [
   '/reviews',
   '/long-distance-taxis',
   '/share',
+  '/guides',
+  '/guides/what-time-to-leave-oxford-for-heathrow',
+  '/guides/oxford-to-heathrow-taxi-or-coach',
   ...new Set(LANG_CLUSTERS.flatMap((cluster) => Object.values(cluster))),
 ];
 for (const p of requiredSitemap) {
