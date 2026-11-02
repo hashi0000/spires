@@ -130,65 +130,86 @@
     </a>
     <nav class="site-nav" aria-label="Main">
       <ul class="site-nav__list">
-        <li><a href="/" data-nav="home">Home</a></li>
-        <li class="site-nav__item site-nav__item--drop">
+        <li><a href="/" data-nav="home"><span class="site-nav__label">Home</span></a></li>
+        <li class="site-nav__item">
           <details class="site-nav__details">
-            <summary class="site-nav__trigger" data-nav-group="services">Services</summary>
-            <div class="site-nav__panel">
-              <ul>
-                <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
-                <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
-                <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
-                <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
-                <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
-                <li><a href="/rates" data-nav="rates">Rates</a></li>
-                <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
-                <li><a href="/share" data-nav="share">Spires Share</a></li>
-              </ul>
+            <summary class="site-nav__trigger" data-nav-group="services">
+              <span class="site-nav__label">Services</span>
+              <svg class="site-nav__chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="site-nav__panel site-nav__panel--split">
+              <div class="site-nav__sheet">
+                <p class="site-nav__kicker">Services</p>
+                <p class="site-nav__lead">Private hire from Oxford, with the fare agreed before you travel.</p>
+                <ul class="site-nav__links">
+                  <li><a href="/oxford-taxis" data-nav="oxford"><span class="site-nav__name">Oxford taxis</span><span class="site-nav__hint">Journeys in the city</span></a></li>
+                  <li><a href="/rates" data-nav="rates"><span class="site-nav__name">Rates</span><span class="site-nav__hint">Published airport prices</span></a></li>
+                  <li><a href="/business-accounts" data-nav="business"><span class="site-nav__name">Business accounts</span><span class="site-nav__hint">Invoices for regular travel</span></a></li>
+                  <li><a href="/share" data-nav="share"><span class="site-nav__name">Spires Share</span><span class="site-nav__hint">Share a journey and split the cost</span></a></li>
+                </ul>
+              </div>
             </div>
           </details>
         </li>
-        <li class="site-nav__item site-nav__item--drop">
+        <li class="site-nav__item">
           <details class="site-nav__details">
-            <summary class="site-nav__trigger" data-nav-group="airport">Airport transfers</summary>
-            <div class="site-nav__panel">
-              <ul>
-                <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Heathrow</a></li>
-                <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
-                <li><a href="/oxford-to-gatwick-taxi" data-nav="gatwick">Gatwick</a></li>
-                <li><a href="/oxford-to-stansted-taxi" data-nav="stansted">Stansted</a></li>
-                <li><a href="/oxford-to-luton-taxi" data-nav="luton">Luton</a></li>
-                <li><a href="/oxford-to-birmingham-airport-taxi" data-nav="birmingham">Birmingham</a></li>
-                <li><a href="/oxford-to-london-city-airport-taxi" data-nav="london-city">London City</a></li>
-                <li><a href="/oxford-to-bristol-airport-taxi" data-nav="bristol">Bristol</a></li>
-                <li><a href="/how-airport-pickup-works" data-nav="pickup">How pickup works</a></li>
-                <li><a href="/airport-transfers" data-nav="airport">All airport transfers</a></li>
-              </ul>
+            <summary class="site-nav__trigger" data-nav-group="airport">
+              <span class="site-nav__label">Airport transfers</span>
+              <svg class="site-nav__chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="site-nav__panel site-nav__panel--wide">
+              <div class="site-nav__sheet">
+                <p class="site-nav__kicker">Airport transfers</p>
+                <p class="site-nav__lead">Pre booked cars from Oxford. The advertised fare includes the airport charge.</p>
+                <ul class="site-nav__links">
+                  <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow"><span class="site-nav__name">Heathrow</span></a></li>
+                  <li><a href="/oxford-to-gatwick-taxi" data-nav="gatwick"><span class="site-nav__name">Gatwick</span></a></li>
+                  <li><a href="/oxford-to-stansted-taxi" data-nav="stansted"><span class="site-nav__name">Stansted</span></a></li>
+                  <li><a href="/oxford-to-luton-taxi" data-nav="luton"><span class="site-nav__name">Luton</span></a></li>
+                  <li><a href="/oxford-to-birmingham-airport-taxi" data-nav="birmingham"><span class="site-nav__name">Birmingham</span></a></li>
+                  <li><a href="/oxford-to-london-city-airport-taxi" data-nav="london-city"><span class="site-nav__name">London City</span></a></li>
+                  <li><a href="/oxford-to-bristol-airport-taxi" data-nav="bristol"><span class="site-nav__name">Bristol</span></a></li>
+                  <li><a href="/airport-transfers" data-nav="airport"><span class="site-nav__name">All airports</span><span class="site-nav__hint">Every published route</span></a></li>
+                </ul>
+              </div>
             </div>
           </details>
         </li>
-        <li class="site-nav__item site-nav__item--drop">
+        <li class="site-nav__item">
           <details class="site-nav__details">
-            <summary class="site-nav__trigger" data-nav-group="events">Events</summary>
+            <summary class="site-nav__trigger" data-nav-group="events">
+              <span class="site-nav__label">Events</span>
+              <svg class="site-nav__chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
             <div class="site-nav__panel">
-              <ul>
-                <li><a href="/events" data-nav="events">All events</a></li>
-                <li><a href="/oxford-to-twickenham-taxi" data-nav="twickenham">Twickenham rugby</a></li>
-                <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone">Silverstone</a></li>
-              </ul>
+              <div class="site-nav__sheet">
+                <p class="site-nav__kicker">Events</p>
+                <p class="site-nav__lead">Match days and race days, booked as a whole vehicle.</p>
+                <ul class="site-nav__links">
+                  <li><a href="/events" data-nav="events"><span class="site-nav__name">All events</span><span class="site-nav__hint">Rugby, motorsport and other venues</span></a></li>
+                  <li><a href="/oxford-to-twickenham-taxi" data-nav="twickenham"><span class="site-nav__name">Twickenham rugby</span><span class="site-nav__hint">Published return fares</span></a></li>
+                  <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone"><span class="site-nav__name">Silverstone</span><span class="site-nav__hint">Quoted for the date</span></a></li>
+                </ul>
+              </div>
             </div>
           </details>
         </li>
-        <li><a href="/guides" data-nav="guides">Guides</a></li>
-        <li class="site-nav__item site-nav__item--drop">
+        <li><a href="/guides" data-nav="guides"><span class="site-nav__label">Guides</span></a></li>
+        <li class="site-nav__item">
           <details class="site-nav__details">
-            <summary class="site-nav__trigger" data-nav-group="about">About</summary>
-            <div class="site-nav__panel">
-              <ul>
-                <li><a href="/about" data-nav="about">About us</a></li>
-                <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
-                <li><a href="/contact" data-nav="contact">Contact</a></li>
-              </ul>
+            <summary class="site-nav__trigger" data-nav-group="about">
+              <span class="site-nav__label">About</span>
+              <svg class="site-nav__chevron" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </summary>
+            <div class="site-nav__panel site-nav__panel--end">
+              <div class="site-nav__sheet">
+                <p class="site-nav__kicker">About</p>
+                <ul class="site-nav__links">
+                  <li><a href="/about" data-nav="about"><span class="site-nav__name">About us</span><span class="site-nav__hint">The company</span></a></li>
+                  <li><a href="/reviews" data-nav="reviews"><span class="site-nav__name">Reviews</span><span class="site-nav__hint">What customers have written</span></a></li>
+                  <li><a href="/contact" data-nav="contact"><span class="site-nav__name">Contact</span><span class="site-nav__hint">Request a quote</span></a></li>
+                </ul>
+              </div>
             </div>
           </details>
         </li>
@@ -224,10 +245,6 @@
         <summary>Services</summary>
         <ul>
           <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
-          <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
-          <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
-          <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
-          <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
           <li><a href="/rates" data-nav="rates">Rates</a></li>
           <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
           <li><a href="/share" data-nav="share">Spires Share</a></li>
@@ -239,15 +256,13 @@
         <summary>Airport transfers</summary>
         <ul>
           <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Heathrow</a></li>
-          <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
           <li><a href="/oxford-to-gatwick-taxi" data-nav="gatwick">Gatwick</a></li>
           <li><a href="/oxford-to-stansted-taxi" data-nav="stansted">Stansted</a></li>
           <li><a href="/oxford-to-luton-taxi" data-nav="luton">Luton</a></li>
           <li><a href="/oxford-to-birmingham-airport-taxi" data-nav="birmingham">Birmingham</a></li>
           <li><a href="/oxford-to-london-city-airport-taxi" data-nav="london-city">London City</a></li>
           <li><a href="/oxford-to-bristol-airport-taxi" data-nav="bristol">Bristol</a></li>
-          <li><a href="/how-airport-pickup-works" data-nav="pickup">How pickup works</a></li>
-          <li><a href="/airport-transfers" data-nav="airport">All airport transfers</a></li>
+          <li><a href="/airport-transfers" data-nav="airport">All airports</a></li>
         </ul>
       </details>
     </li>
