@@ -457,6 +457,87 @@ const venues = [
   }
 ];
 
+const photos = {
+  'oxford-to-lords-cricket-ground': {
+    file: 'lords-cricket-ground.jpg', width: 1788, height: 1073, position: 'center 42%',
+    alt: "The pavilion at Lord's Cricket Ground, photographed in August 2017.",
+    by: 'Yorkspotter', when: 'Taken in August 2017.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Lords-Cricket-Ground-Pavilion-06-08-2017.jpg',
+    licence: 'CC BY-SA 4.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/4.0/'
+  },
+  'oxford-to-the-oval': {
+    file: 'the-oval.jpg', width: 1920, height: 1440, position: 'center 45%',
+    alt: 'The Oval in Kennington, photographed in January 2020.',
+    by: 'Marathon', when: 'Taken in January 2020.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Oval_Cricket_Ground_-_geograph.org.uk_-_6374861.jpg',
+    licence: 'CC BY-SA 2.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/2.0/'
+  },
+  'oxford-to-edgbaston-cricket-ground': {
+    file: 'edgbaston-cricket-ground.jpg', width: 1920, height: 1446, position: 'center',
+    alt: 'The exterior of Edgbaston Cricket Ground, photographed in August 2023.',
+    by: 'Asheiou', when: 'Taken in August 2023.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Edgbaston_Stadium_August_2023.jpg',
+    licence: 'CC BY-SA 4.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/4.0/'
+  },
+  'oxford-to-trent-bridge': {
+    file: 'trent-bridge.jpg', width: 1024, height: 752, position: 'center',
+    alt: 'Trent Bridge cricket ground, photographed in April 2011.',
+    by: 'John Sutton', when: 'Taken in April 2011.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Trent_Bridge_Cricket_Ground_-_geograph.org.uk_-_2363388.jpg',
+    licence: 'CC BY-SA 2.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/2.0/'
+  },
+  'oxford-to-utilita-bowl': {
+    file: 'utilita-bowl.jpg', width: 1920, height: 1440, position: 'center 40%',
+    alt: 'The Hampshire cricket ground at West End, photographed in June 2010, when it was known as the Rose Bowl.',
+    by: 'AssociateAffiliate', when: 'Taken in June 2010.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Pavilion_stands.JPG',
+    licence: 'CC BY-SA 3.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/3.0/'
+  },
+  'oxford-to-wembley-stadium': {
+    file: 'wembley-stadium.jpg', width: 1920, height: 1440, position: 'center 18%',
+    alt: 'Wembley Stadium and the steps up to the entrance, photographed in October 2025.',
+    by: 'Stephen McKay', when: 'Taken in October 2025.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Wembley_Stadium_-_geograph.org.uk_-_8166249.jpg',
+    licence: 'CC BY-SA 2.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/2.0/'
+  },
+  'oxford-to-cheltenham-racecourse': {
+    file: 'cheltenham-racecourse.jpg', width: 1600, height: 1064, position: 'center',
+    alt: 'The stand at Cheltenham Racecourse, photographed in October 2017.',
+    by: 'John M', when: 'Taken in October 2017.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Cheltenham_Racecourse_-_Stand_-_geograph.org.uk_-_5567619.jpg',
+    licence: 'CC BY-SA 2.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/2.0/'
+  },
+  'oxford-to-ascot-racecourse': {
+    file: 'ascot-racecourse.jpg', width: 1920, height: 1395, position: 'center 35%',
+    alt: 'The grandstand at Ascot Racecourse, photographed in June 2013.',
+    by: 'Anthony Parkes', when: 'Taken in June 2013.',
+    commons: 'https://commons.wikimedia.org/wiki/File:The_Grandstand_at_Ascot_Racecourse_-_geograph.org.uk_-_3530641.jpg',
+    licence: 'CC BY-SA 2.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/2.0/'
+  },
+  'oxford-to-alexandra-palace': {
+    file: 'alexandra-palace.jpg', width: 1920, height: 1440, position: 'center',
+    alt: 'Alexandra Palace in Muswell Hill, photographed in September 2016.',
+    by: 'Philafrenzy', when: 'Taken in September 2016.',
+    commons: 'https://commons.wikimedia.org/wiki/File:Alexandra_Palace_Sept._2016_05.jpg',
+    licence: 'CC BY-SA 4.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/4.0/'
+  },
+  'oxford-to-the-o2-arena': {
+    file: 'the-o2.jpg', width: 1920, height: 1277, position: 'center 40%',
+    alt: 'The O2 on the Greenwich Peninsula, photographed in May 2014.',
+    by: 'Lewis Hulbert', when: 'Taken in May 2014.',
+    commons: 'https://commons.wikimedia.org/wiki/File:The_O2,_Greenwich,_London.jpg',
+    licence: 'CC BY-SA 3.0', licenceUrl: 'https://creativecommons.org/licenses/by-sa/3.0/'
+  }
+};
+
+function photoFigure(slug) {
+  const photo = photos[slug];
+  return `<figure class="venue-photo">
+    <img src="/images/${photo.file}" width="${photo.width}" height="${photo.height}" alt="${escAttr(photo.alt)}" style="object-position:${photo.position}" fetchpriority="high" decoding="async">
+    <figcaption>Photograph by ${escText(photo.by)}, <a href="${escAttr(photo.commons)}">Wikimedia Commons</a>, <a href="${escAttr(photo.licenceUrl)}">${escText(photo.licence)}</a>. ${escText(photo.when)}</figcaption>
+  </figure>`;
+}
+
 function relatedHtml(items) {
   return items.map(([href, title, text]) =>
     `<a class="card card--link" href="${escAttr(href)}"><h3>${escText(title)}</h3><p>${escText(text)}</p></a>`
@@ -667,7 +748,7 @@ function page(v) {
   <meta name="theme-color" content="#002147">
   <meta property="og:site_name" content="Spires Taxis">
   <meta property="og:locale" content="en_GB">
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escAttr(v.title)}">
   <title>${escText(v.title)}</title>
   <meta name="description" content="${escAttr(v.description)}">
@@ -677,11 +758,11 @@ function page(v) {
   <meta property="og:title" content="${escAttr(v.title)}">
   <meta property="og:description" content="${escAttr(v.description)}">
   <meta property="og:url" content="${url}">
-  <meta property="og:image" content="${origin}/android-chrome-512x512.png">
-  <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="512">
-  <meta property="og:image:height" content="512">
-  <meta name="twitter:image" content="${origin}/android-chrome-512x512.png">
+  <meta property="og:image" content="${origin}/images/${photos[v.slug].file}">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="${photos[v.slug].width}">
+  <meta property="og:image:height" content="${photos[v.slug].height}">
+  <meta name="twitter:image" content="${origin}/images/${photos[v.slug].file}">
   <meta name="twitter:description" content="${escAttr(v.description)}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -707,6 +788,7 @@ function page(v) {
       </div>
     </div>
   </section>
+  ${photoFigure(v.slug)}
   ${sections}
   <section class="section section--soft">
     <div class="container">
@@ -759,8 +841,8 @@ const problems = [];
 for (const venue of venues) {
   const html = page(venue);
   const visible = strip(html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' '));
-  const hits = visible.match(hyphen);
-  if (hits) problems.push(`${venue.slug}: ${[...new Set(hits)].join(', ')}`);
+  const hits = (visible.match(hyphen) || []).filter((word) => word.toUpperCase() !== 'BY-SA');
+  if (hits.length) problems.push(`${venue.slug}: ${[...new Set(hits)].join(', ')}`);
   const h1s = html.match(/<h1[\s>]/g) || [];
   if (h1s.length !== 1) problems.push(`${venue.slug}: ${h1s.length} h1 tags`);
   fs.writeFileSync(path.join(root, `${venue.slug}.html`), html);

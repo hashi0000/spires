@@ -15,7 +15,7 @@ function initNavActive() {
   document.querySelectorAll(`[data-nav="${page}"]`).forEach((el) => el.classList.add('is-active'));
   const groups = {
     services: ['oxford', 'rates', 'business', 'share', 'vehicles', 'student', 'corporate', 'long-distance', 'local'],
-    airport: ['airport', 'heathrow', 'heathrow-in', 'pickup', 'gatwick', 'stansted', 'luton', 'birmingham', 'london-city', 'bristol'],
+    airport: ['airport', 'heathrow', 'heathrow-in', 'heathrow-oxon', 'pickup', 'gatwick', 'stansted', 'luton', 'birmingham', 'london-city', 'bristol'],
     events: ['events', 'twickenham', 'silverstone', 'lords', 'oval', 'edgbaston', 'trent-bridge', 'utilita-bowl', 'wembley', 'cheltenham-races', 'ascot', 'alexandra-palace', 'o2'],
     about: ['about', 'reviews', 'contact']
   };
