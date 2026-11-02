@@ -262,13 +262,21 @@
   <aside class="tw-home-promo" aria-label="Twickenham rugby transfers">
     <div class="container tw-home-promo__inner">
       <div>
-        <p class="tw-home-promo__kicker">November rugby</p>
-        <h2>Oxford to Twickenham, with the return fare agreed in advance</h2>
-        <p>Standard Car £230 return. 8 Seater £295 return. For the Nations Championship matches at Allianz Stadium, subject to availability.</p>
+        <p class="tw-home-promo__kicker">November 2026</p>
+        <h2>England Rugby at Twickenham — November 2026</h2>
+        <p>Travelling from Oxford to Twickenham? Book your rugby match day return transfer with Spires Taxis. Standard cars from £230 return and 8 seaters from £295 return.</p>
       </div>
-      <a class="btn btn--gold" href="/oxford-to-twickenham-taxi">View match dates</a>
+      <a class="btn btn--gold" href="/oxford-to-twickenham-taxi">View Rugby Transfers</a>
     </div>
   </aside>
+  <script>
+    (function () {
+      if (Date.now() >= Date.parse("2026-11-30T00:00:00Z")) {
+        var promo = document.querySelector(".tw-home-promo");
+        if (promo) promo.remove();
+      }
+    })();
+  </script>
 
   <section class="section" id="popular-airport-routes">
     <div class="container">

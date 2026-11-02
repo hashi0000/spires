@@ -100,55 +100,209 @@
     if (Number(passengers.value) > max) passengers.value = String(max);
   }
 
+  function track(name, params) {
+    if (typeof window.gtag === "function") window.gtag("event", name, params || {});
+  }
+
+  function londonKickoff(date, hm) {
+    var utc = Date.parse(date + "T" + hm + ":00Z");
+    var parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).formatToParts(new Date(utc));
+    var map = {};
+    parts.forEach(function (part) { if (part.type !== "literal") map[part.type] = part.value; });
+    var shown = map.year + "-" + map.month + "-" + map.day + "T" + map.hour + ":" + map.minute;
+    return shown === date + "T" + hm ? utc : utc - 60 * 60 * 1000;
+  }
+
+  function isPast(fixture) {
+    return londonKickoff(fixture.date, fixture.kickoff) <= Date.now();
+  }
+
   function whatsappText() {
     var fixture = selectedFixture();
-    var lines = ["Hi, I would like an Oxford to Twickenham rugby taxi."];
-    if (fixture) {
-      lines.push(fixture.title + ", " + fixture.dayLabel + ", kick off " + fixture.kickoff + ".");
-      if (attendanceValue() === "both") lines.push("I want to attend both matches that day.");
+    var lines = ["Hello Spires Taxis, I would like to enquire about an Oxford to Twickenham rugby return transfer.", ""];
+    if (fixture && !isPast(fixture)) {
+      lines.push("Match: " + fixture.title);
+      lines.push("Date: " + fixture.dayLabel + " 2026, kick off " + fixture.kickoff);
+      if (attendanceValue() === "both") lines.push("Attending both matches that day.");
     }
-    var vehicle = vehicleLabel(selectedVehicle());
-    if (vehicle) lines.push("Vehicle: " + vehicle + ".");
+    var postcode = field("tw-postcode");
+    if (postcode) lines.push("Pickup postcode: " + postcode);
     var passengers = field("tw-passengers");
-    if (passengers) lines.push("Passengers: " + passengers + ".");
-    var pickup = [field("tw-pickup"), field("tw-postcode")].filter(Boolean).join(", ");
-    if (pickup) lines.push("Pickup: " + pickup + ".");
-    if (field("tw-arrival")) lines.push("Preferred arrival: " + field("tw-arrival") + ".");
-    if (field("tw-collect")) lines.push("Preferred collection: " + field("tw-collect") + ".");
-    if (field("tw-return")) lines.push("Preferred return: " + field("tw-return") + ".");
-    return lines.join(" ");
+    if (passengers) lines.push("Passengers: " + passengers);
+    var vehicle = vehicleLabel(selectedVehicle());
+    if (vehicle) lines.push("Vehicle preference: " + vehicle);
+    lines.push("", "Please confirm availability.");
+    return lines.join("\n");
   }
 
   function syncWhatsapp() {
-    if (!whatsapp) return;
-    whatsapp.href = "https://wa.me/447776897772?text=" + encodeURIComponent(whatsappText());
+    var href = "https://wa.me/447776897772?text=" + encodeURIComponent(whatsappText());
+    if (whatsapp) whatsapp.href = href;
+    var barLink = document.getElementById("tw-whatsapp-bar");
+    if (barLink) barLink.href = href;
+  }
+
+  function syncDateLine() {
+    var line = document.getElementById("tw-journey-date");
+    var fixture = selectedFixture();
+    if (!line) return;
+    line.textContent = fixture ? "Journey date: " + fixture.dayLabel + " 2026." : "Choose a match to fill the journey date.";
+  }
+
+  function markSelected(id) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tw-fixture"), function (card) {
+      var link = card.querySelector("[data-request]");
+      var on = link && link.getAttribute("data-request") === id && !card.classList.contains("tw-fixture--past");
+      card.classList.toggle("is-selected", on);
+      if (link && !card.classList.contains("tw-fixture--past")) link.setAttribute("aria-pressed", on ? "true" : "false");
+    });
   }
 
   function chooseFixture(id) {
-    if (!fixtureField || !byId(id)) return;
+    var fixture = byId(id);
+    if (!fixtureField || !fixture || isPast(fixture)) return;
     fixtureField.value = id;
+    markSelected(id);
     syncAttendance();
+    syncDateLine();
     syncWhatsapp();
+    track("twickenham_match_select", { fixture_id: id });
     var target = document.getElementById("request");
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     var pickup = document.getElementById("tw-pickup");
     if (pickup) pickup.focus();
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll("[data-request]"), function (link) {
-    link.addEventListener("click", function (event) {
+  function markPastCards() {
+    Array.prototype.forEach.call(document.querySelectorAll(".tw-fixture"), function (card) {
+      if (card.classList.contains("tw-fixture--past")) return;
+      var link = card.querySelector("[data-request]");
+      if (!link) return;
+      var fixture = byId(link.getAttribute("data-request"));
+      if (!fixture || !isPast(fixture)) return;
+      card.classList.add("tw-fixture--past");
+      card.classList.remove("is-selected");
+      card.removeAttribute("tabindex");
+      var done = document.createElement("p");
+      done.className = "tw-fixture__done";
+      done.textContent = "This match has kicked off.";
+      link.replaceWith(done);
+      var option = fixtureField && fixtureField.querySelector('option[value="' + fixture.id + '"]');
+      if (option) option.disabled = true;
+      if (fixtureField && fixtureField.value === fixture.id) fixtureField.value = "";
+    });
+  }
+
+  function paintCountdown() {
+    markPastCards();
+    var upcoming = null;
+    for (var i = 0; i < fixtures.length; i += 1) {
+      if (!isPast(fixtures[i])) { upcoming = fixtures[i]; break; }
+    }
+    var title = document.getElementById("tw-next-title");
+    var detail = document.getElementById("tw-next-detail");
+    var book = document.getElementById("tw-next-book");
+    var days = document.getElementById("tw-count-days");
+    var hours = document.getElementById("tw-count-hours");
+    var minutes = document.getElementById("tw-count-minutes");
+    if (!upcoming) {
+      if (title) title.textContent = "November fixtures have kicked off";
+      if (detail) detail.textContent = "The listed November 2026 matches are no longer open for a new request on this page.";
+      if (book) book.hidden = true;
+      return;
+    }
+    if (title) title.textContent = "Next England match at Twickenham";
+    if (detail) detail.textContent = upcoming.title + ", " + upcoming.dayLabel + ", kick off " + upcoming.kickoff + ", London time.";
+    if (book) {
+      book.hidden = false;
+      book.setAttribute("data-request", upcoming.id);
+    }
+    var remain = Math.max(0, londonKickoff(upcoming.date, upcoming.kickoff) - Date.now());
+    var totalMinutes = Math.floor(remain / 60000);
+    if (days) days.textContent = String(Math.floor(totalMinutes / 1440));
+    if (hours) hours.textContent = String(Math.floor((totalMinutes % 1440) / 60));
+    if (minutes) minutes.textContent = String(totalMinutes % 60);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".tw-fixture"), function (card) {
+    var link = card.querySelector("[data-request]");
+    if (!link) return;
+    card.tabIndex = 0;
+    function open(event) {
+      if (card.classList.contains("tw-fixture--past")) return;
       event.preventDefault();
       chooseFixture(link.getAttribute("data-request"));
+    }
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", function (event) {
+      if (event.target !== card) return;
+      if (event.key === "Enter" || event.key === " ") open(event);
     });
   });
 
-  if (fixtureField) fixtureField.addEventListener("change", function () { syncAttendance(); syncWhatsapp(); });
+  var nextBook = document.getElementById("tw-next-book");
+  if (nextBook) {
+    nextBook.addEventListener("click", function (event) {
+      var id = nextBook.getAttribute("data-request");
+      if (!id) return;
+      event.preventDefault();
+      chooseFixture(id);
+    });
+  }
+  paintCountdown();
+  setInterval(paintCountdown, 30000);
+  document.addEventListener("visibilitychange", paintCountdown);
+
+  document.addEventListener("click", function (event) {
+    var tracked = event.target.closest ? event.target.closest("[data-track]") : null;
+    if (!tracked) return;
+    track("twickenham_" + tracked.getAttribute("data-track"), { link_text: (tracked.textContent || "").trim() });
+  });
+
+  var formStarted = false;
+  form.addEventListener("focusin", function () {
+    if (formStarted) return;
+    formStarted = true;
+    track("twickenham_form_start");
+  });
+
+  var requestSection = document.getElementById("request");
+  var mobileBar = document.querySelector(".tw-mobile-cta");
+  if (requestSection && mobileBar && "IntersectionObserver" in window) {
+    var watcher = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { mobileBar.hidden = entry.isIntersecting; });
+    }, { threshold: 0 });
+    watcher.observe(requestSection);
+  }
+
+  if (fixtureField) fixtureField.addEventListener("change", function () {
+    var fixture = selectedFixture();
+    if (fixture && isPast(fixture)) {
+      fixtureField.value = "";
+      setStatus("That match has already kicked off. Choose a later fixture.");
+      return;
+    }
+    markSelected(fixtureField.value);
+    syncAttendance();
+    syncDateLine();
+    syncWhatsapp();
+    if (fixture) track("twickenham_match_select", { fixture_id: fixture.id });
+  });
   Array.prototype.forEach.call(form.querySelectorAll("input, select, textarea"), function (input) {
     input.addEventListener("input", function () { syncPassengers(); syncWhatsapp(); });
     input.addEventListener("change", function () { syncPassengers(); syncWhatsapp(); });
   });
   syncAttendance();
   syncPassengers();
+  syncDateLine();
   syncWhatsapp();
 
   function successHtml(body) {
@@ -196,8 +350,8 @@
     var luggage = field("tw-luggage") || "0";
     var agreed = form.querySelector("[name='termsAccepted']");
 
-    if (!fixture) {
-      setStatus("Choose the match you are going to.");
+    if (!fixture || isPast(fixture)) {
+      setStatus("Choose a match that has not kicked off yet.");
       if (fixtureField) fixtureField.focus();
       return;
     }
@@ -317,6 +471,7 @@
         if (!response.ok || !response.body.ok || !response.body.bookingNumber) {
           throw new Error((response.body && response.body.error) || "We could not save your request.");
         }
+        track("twickenham_quote_success", { contact_by: response.body.contactBy || "" });
         form.hidden = true;
         if (result) {
           result.hidden = false;

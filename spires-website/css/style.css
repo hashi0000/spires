@@ -2954,7 +2954,16 @@ html[dir="rtl"] .booking-form label {
   font-size: 0.78rem;
   margin-bottom: 0.55rem;
 }
+.tw-hero__sub {
+  color: #f3e6d0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.7rem);
+  margin: 0.45rem 0 0;
+  max-width: 22ch;
+}
 .tw-hero__lead { color: rgba(255, 255, 255, 0.94); font-size: 1.08rem; margin: 0.9rem 0 0; }
+.tw-hero__primary { min-height: 3.1rem; padding-inline: 1.4rem; }
+.tw-price__group { color: var(--blue); font-weight: 600; margin-top: 0.55rem; }
 .tw-hero .crumbs,
 .tw-hero .crumbs a { color: rgba(255, 255, 255, 0.92); }
 .tw-hero__note,
@@ -3002,7 +3011,55 @@ html[dir="rtl"] .booking-form label {
   align-items: flex-start;
   gap: 0.55rem;
   box-shadow: var(--shadow-sm);
+  cursor: pointer;
 }
+.tw-fixture:focus-visible,
+.tw-fixture.is-selected {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+  border-color: var(--gold);
+}
+.tw-fixture--past { cursor: default; opacity: 0.72; }
+.tw-fixture__done { margin: 0; font-weight: 700; color: var(--blue); }
+.tw-announce {
+  background: var(--blue);
+  color: #fff;
+  border-top: 4px solid var(--gold);
+}
+.tw-announce__inner {
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.4rem 0;
+}
+.tw-announce__icon { width: 3rem; height: 3rem; color: var(--gold); }
+.tw-announce h2 { color: #fff; margin-bottom: 0.35rem; }
+.tw-announce p { color: rgba(255, 255, 255, 0.92); max-width: 46rem; }
+.tw-announce__note { color: #f3e6d0; font-weight: 700; }
+.tw-count { margin: 1rem 0; }
+.tw-count__lead { font-weight: 600; color: var(--blue); }
+.tw-count__grid { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+.tw-count__grid p {
+  margin: 0;
+  min-width: 5.5rem;
+  padding: 0.7rem 0.8rem;
+  background: #fff;
+  border-top: 3px solid var(--gold);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.tw-count__grid span {
+  display: block;
+  color: var(--blue);
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.tw-date-line { margin: 0; color: var(--blue); font-weight: 700; }
+.mobile-book-bar[hidden] { display: none !important; }
+#tw-next-book[hidden] { display: none !important; }
 .tw-fixture__teams {
   display: flex;
   flex-wrap: wrap;
@@ -3076,10 +3133,12 @@ html[dir="rtl"] .booking-form label {
 .tw-home-promo h2 { color: #fff; font-size: clamp(1.35rem, 1rem + 1vw, 1.8rem); margin-bottom: 0.35rem; }
 .tw-home-promo p { color: rgba(255, 255, 255, 0.9); max-width: 40rem; }
 @media (min-width: 720px) {
+  .tw-announce__inner { grid-template-columns: auto 1fr auto; }
   .tw-prices,
   .tw-day__grid,
   .tw-form__grid { grid-template-columns: 1fr 1fr; }
   .tw-form__grid label:first-child,
+  #tw-journey-date,
   #tw-attendance,
   .tw-form > label,
   .tw-form .terms-agreement,
