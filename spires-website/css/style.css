@@ -334,6 +334,10 @@ li + li { margin-top: 0.35rem; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes nav-panel-in-center {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 .site-nav__sheet {
   min-width: 16.5rem;
@@ -377,6 +381,49 @@ li + li { margin-top: 0.35rem; }
 
 .site-nav__panel--wide .site-nav__sheet { min-width: min(34rem, calc(100vw - 3rem)); }
 .site-nav__panel--wide .site-nav__links { grid-template-columns: 1fr 1fr; column-gap: 0.35rem; }
+
+.site-nav__panel--events {
+  left: 50%;
+  width: min(44rem, calc(100vw - 2.5rem));
+  transform: translate(-50%, 8px);
+}
+.site-nav__details[open] > .site-nav__panel--events {
+  transform: translate(-50%, 0);
+  animation-name: nav-panel-in-center;
+}
+.site-nav__details[open] > .site-nav__panel--events.is-leaving {
+  transform: translate(-50%, 8px);
+}
+.site-nav__panel--events .site-nav__sheet { min-width: 0; }
+.site-nav__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.35rem 1rem;
+}
+.site-nav__group {
+  margin: 0 0.55rem 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+.site-nav__cols .site-nav__links { display: block; }
+.site-nav__cols .site-nav__group + .site-nav__links { margin-bottom: 0.55rem; }
+@media (max-width: 1400px) {
+  .site-nav__panel--events { width: min(36rem, calc(100vw - 2rem)); }
+  .site-nav__cols { grid-template-columns: 1fr 1fr; }
+}
+.event-jumps { display: flex; flex-wrap: wrap; gap: 0.45rem 1rem; margin: 1rem 0 0; }
+.event-jumps a { font-weight: 600; }
+.event-category, #quote { scroll-margin-top: 6.5rem; }
+form.event-quote:has(select[name="bookingType"] option[value="return"]:checked) [data-return-fields] {
+  display: block !important;
+}
+.site-menu__label {
+  padding: 0.65rem 0.15rem 0.1rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gold);
+}
 
 .site-nav__links a {
   display: grid;

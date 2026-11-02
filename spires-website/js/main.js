@@ -16,7 +16,7 @@ function initNavActive() {
   const groups = {
     services: ['oxford', 'rates', 'business', 'share', 'vehicles', 'student', 'corporate', 'long-distance', 'local'],
     airport: ['airport', 'heathrow', 'heathrow-in', 'pickup', 'gatwick', 'stansted', 'luton', 'birmingham', 'london-city', 'bristol'],
-    events: ['events', 'twickenham', 'silverstone'],
+    events: ['events', 'twickenham', 'silverstone', 'lords', 'oval', 'edgbaston', 'trent-bridge', 'utilita-bowl', 'wembley', 'cheltenham-races', 'ascot', 'alexandra-palace', 'o2'],
     about: ['about', 'reviews', 'contact']
   };
   document.querySelectorAll('[data-nav-group]').forEach((el) => {
