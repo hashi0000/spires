@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { claimGuestBooking, previewGuestClaim, readableAuthError } from "./guestClaim";
 import "./styles.css";
 
 export default function Signup() {
@@ -18,8 +19,34 @@ export default function Signup() {
   const [addressCounty, setAddressCounty] = useState("");
   const [addressNickname, setAddressNickname] = useState("");
   const [error, setError] = useState("");
+  const [claimEmail, setClaimEmail] = useState("");
+  const [claimReference, setClaimReference] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
+  const claimToken = params.get("t") || "";
+
+  useEffect(() => {
+    if (!claimToken) return undefined;
+    let cancelled = false;
+    previewGuestClaim(claimToken)
+      .then((preview) => {
+        if (cancelled || !preview) return;
+        const parts = String(preview.name || "").trim().split(/\s+/);
+        setFirstName(parts[0] || "");
+        setLastName(parts.slice(1).join(" "));
+        setEmail(preview.email || "");
+        setClaimEmail(preview.email || "");
+        setPhone(preview.phone || "");
+        setClaimReference(preview.bookingNumber || "");
+      })
+      .catch((err) => {
+        if (!cancelled) setError(readableAuthError(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [claimToken]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -30,12 +57,12 @@ export default function Signup() {
       return;
     }
     
-    if (!lastName.trim()) {
+    if (!lastName.trim() && !claimToken) {
       setError("Last name is required.");
       return;
     }
     
-    if (!phone.trim()) {
+    if (!phone.trim() && !claimToken) {
       setError("Phone number is required.");
       return;
     }
@@ -97,11 +124,20 @@ export default function Signup() {
         addresses: addresses,
         createdAt: new Date(),
       });
+
+      if (claimToken) {
+        try {
+          await claimGuestBooking(claimToken);
+        } catch (claimErr) {
+          setError(`${readableAuthError(claimErr)} Your account is ready and the request${claimReference ? ` ${claimReference}` : ""} is still saved. Call 07776 897772 if you need help.`);
+          return;
+        }
+      }
       
       const from = location.state?.from;
       navigate(typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard");
     } catch (err) {
-      setError(err.message || "Could not create account.");
+      setError(readableAuthError(err));
     }
   };
 
@@ -134,13 +170,14 @@ export default function Signup() {
             placeholder="Last Name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            required
+            required={!claimToken}
           />
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            readOnly={Boolean(claimEmail)}
             required
           />
           <input
@@ -148,7 +185,7 @@ export default function Signup() {
             placeholder="Phone Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            required
+            required={!claimToken}
           />
           <input
             type="date"
@@ -226,7 +263,7 @@ export default function Signup() {
 
         <p className="switch-text">
           Already have an account?{" "}
-          <Link to="/" state={location.state} className="link">Log in</Link>
+          <Link to={`/${location.search || ""}`} state={location.state} className="link">Sign in</Link>
         </p>
       </div>
     </div>

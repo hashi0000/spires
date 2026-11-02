@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.guestClaimPreview = exports.claimGuestBooking = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -63,6 +63,9 @@ Object.defineProperty(exports, "createTermsAcceptanceLink", { enumerable: true, 
 Object.defineProperty(exports, "acceptTermsPublic", { enumerable: true, get: function () { return callables_2.acceptTermsPublic; } });
 const callables_3 = require("./businessAccounts/callables");
 Object.defineProperty(exports, "submitBusinessAccountEnquiry", { enumerable: true, get: function () { return callables_3.submitBusinessAccountEnquiry; } });
+const guestHandlers_1 = require("./bookings/guestHandlers");
+Object.defineProperty(exports, "claimGuestBooking", { enumerable: true, get: function () { return guestHandlers_1.claimGuestBooking; } });
+Object.defineProperty(exports, "guestClaimPreview", { enumerable: true, get: function () { return guestHandlers_1.guestClaimPreview; } });
 const quoteWorkflow_1 = require("./quotes/quoteWorkflow");
 admin.initializeApp();
 admin.firestore().settings({ ignoreUndefinedProperties: true });
@@ -100,7 +103,8 @@ exports.onBookingWrite = functions.firestore
     if (before &&
         before.paymentStatus !== "paid" &&
         after.paymentStatus === "paid" &&
-        !after.paymentReceiptEmailSentAt) {
+        !after.paymentReceiptEmailSentAt &&
+        (after.hirerEmail || after.email)) {
         const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
         const existingReceipt = await receiptRef.get();
         if (!existingReceipt.exists) {

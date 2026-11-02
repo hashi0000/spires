@@ -188,6 +188,15 @@ export const isCustomerBooking = (booking: any): boolean => {
   return !!(booking.uid || (!booking.bookingNumber && booking.pickup && !booking.pickupLocation));
 };
 
+export const isWebsiteGuestRequest = (booking: any): boolean => {
+  return booking?.guestRequest === true || booking?.source === "website";
+};
+
+/** Portal bookings and website guest requests that still need a quote. */
+export const isPendingIncomingRequest = (booking: any): boolean => {
+  return booking?.status === "pending" && (isCustomerBooking(booking) || isWebsiteGuestRequest(booking));
+};
+
 /**
  * Normalizes a booking to admin format (handles both customer and admin formats)
  */

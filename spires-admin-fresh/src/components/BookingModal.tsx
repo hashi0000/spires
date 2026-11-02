@@ -352,16 +352,22 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setFormError('Enter a valid customer email, or leave it blank.');
       return;
     }
+    const guestUnclaimed = (editingBooking as { guestRequest?: boolean } | null)?.guestRequest === true && !editingBooking?.uid;
+    if (guestUnclaimed && !String(formData.hirerPhone || '').trim() && !normaliseCustomerEmail(typedEmail)) {
+      setFormError('Add a phone number or email address before saving this guest request.');
+      return;
+    }
     setFormError('');
 
     const picked = matchCustomerSuggestion(String(formData.hirerName || ''), customerSuggestions);
     const hirerName = picked?.displayName || String(formData.hirerName || '').trim();
     const link = accountLinkForBooking({
       typedEmail,
-      picked,
+      picked: guestUnclaimed ? null : picked,
       existingUid: editingBooking?.uid,
       existingEmail: editingBooking?.email || editingBooking?.hirerEmail,
       suggestions: customerSuggestions,
+      skipAutomaticEmailMatch: guestUnclaimed,
     });
 
     const bookingData: any = {
@@ -422,6 +428,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
       bookingData.customerStatus = bookingData.status || 'pending';
     } else {
       delete bookingData.uid;
+    }
+    if ((editingBooking as { guestRequest?: boolean } | null)?.guestRequest) {
+      bookingData.guestRequest = true;
+      bookingData.name = hirerName;
+      bookingData.phone = bookingData.hirerPhone || '';
+      bookingData.pickup = bookingData.pickupLocation;
     }
 
     // Only add createdAt for new bookings
@@ -678,7 +690,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   type="tel"
                   value={formData.hirerPhone}
                   onChange={(e) => setFormData({ ...formData, hirerPhone: e.target.value })}
-                  required
+                  required={!(editingBooking as { guestRequest?: boolean } | null)?.guestRequest}
                   className="form-input"
                   autoComplete="tel"
                 />
@@ -695,7 +707,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 autoComplete="email"
                 placeholder="name@example.com"
               />
-              <p className="text-xs text-gray-500 mt-1">The job is added to this email. If it matches an existing account, they will see it when they sign in. A confirmation is emailed here when the job is confirmed.</p>
+              {(editingBooking as { guestRequest?: boolean } | null)?.guestRequest && !editingBooking?.uid ? (
+                <p className="text-xs text-gray-500 mt-1">This is a guest website request. Saving it does not add it to a customer account. The customer can claim this request after creating an account with this email. You can quote and confirm it without an account. Leave the email blank if they only gave a phone number.</p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">The job is added to this email. If it matches an existing account, they will see it when they sign in. A confirmation is emailed here when the job is confirmed.</p>
+              )}
             </div>
 
             <div className="mb-6">

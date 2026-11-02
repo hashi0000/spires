@@ -42,6 +42,7 @@ const driverReminderEmail_1 = require("../driverReminderEmail");
 const sendBookingReceipt_1 = require("../sendBookingReceipt");
 const emails_1 = require("./emails");
 const halfTerm_1 = require("./halfTerm");
+const guestHandlers_1 = require("../bookings/guestHandlers");
 const bookingTerms_1 = require("../terms/bookingTerms");
 const paymentLink_1 = require("./paymentLink");
 const quoteWorkflow_1 = require("./quoteWorkflow");
@@ -166,6 +167,11 @@ exports.processEmailJob = functions.firestore.document("emailJobs/{jobId}").onWr
         const staleConfirmation = after.kind === "booking_confirmed" && !["confirmed", "allocated", "completed", "paid"].includes(current.status || current.adminStatus || current.customerStatus);
         if (!currentSnap.exists || (current.status === "cancelled" && after.kind !== "payment_receipt") || staleQuote || staleWaiting || staleConfirmation) {
             await ref.set({ status: "skipped", skipReason: "Booking removed, cancelled or quote replaced." }, { merge: true });
+            return;
+        }
+        const recipient = String(after.to || current.hirerEmail || current.email || "").trim();
+        if (!recipient) {
+            await ref.set({ status: "skipped", skipReason: "No customer email." }, { merge: true });
             return;
         }
         if (after.kind === "booking_confirmed" || after.kind === "payment_receipt") {
@@ -464,8 +470,8 @@ async function saveDraftOrIssue(data, context, issue) {
     const to = customerEmail(booking);
     let emailState = "skipped";
     if (!to) {
-        emailState = "failed";
-        await ref.set({ quoteEmailStatus: "failed", emailError: "No customer email on the booking." }, { merge: true });
+        emailState = "skipped";
+        await ref.set({ quoteEmailStatus: "skipped", emailError: "No customer email. Contact the customer by phone." }, { merge: true });
     }
     else {
         try {
@@ -559,7 +565,7 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
     }
     const to = customerEmail(booking);
     if (!to)
-        throw httpsError("failed-precondition", "This booking has no customer email.");
+        throw httpsError("failed-precondition", "This booking has no email address. Call the customer on the phone number saved on the booking.");
     const amount = Number(booking.amountRequestedPence) || finalFarePence(booking);
     const description = str(booking.paymentDescription) === "deposit" ? "Deposit" : "Full payment";
     const confirmed = str(booking.status) === "confirmed" || str(booking.adminStatus) === "confirmed";
@@ -839,7 +845,7 @@ exports.resendQuoteEmail = functions.https.onCall(async (data, context) => {
         throw httpsError("failed-precondition", "Send the quote before resending it.");
     const to = customerEmail(booking);
     if (!to)
-        throw httpsError("failed-precondition", "This booking has no customer email.");
+        throw httpsError("failed-precondition", "This booking has no email address. Call the customer on the phone number saved on the booking.");
     const token = (0, emails_1.newQuoteToken)();
     const expires = str(booking.issuedQuote?.validUntil);
     await db().collection("quoteTokens").doc(token.hash).set({
@@ -962,114 +968,7 @@ exports.quotePublic = functions.https.onRequest(async (req, res) => {
         res.status(400).json({ error: message });
     }
 });
-exports.submitWebsiteQuote = functions.https.onRequest(async (req, res) => {
-    setCors(res);
-    if (req.method === "OPTIONS") {
-        res.status(204).send("");
-        return;
-    }
-    if (req.method !== "POST") {
-        res.status(405).json({ error: "Use POST." });
-        return;
-    }
-    try {
-        const body = req.body || {};
-        if (str(body._gotcha)) {
-            res.json({ ok: true });
-            return;
-        }
-        const name = str(body.name);
-        const email = str(body.email);
-        const phone = str(body.phone);
-        const pickup = str(body.pickup);
-        const destination = str(body.destination);
-        const date = str(body.date);
-        const time = str(body.time);
-        if (!name || !email || !phone || !pickup || !destination || !date || !time) {
-            res.status(400).json({ error: "Name, email, phone, pickup, destination, date and time are required." });
-            return;
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            res.status(400).json({ error: "Enter a valid email address." });
-            return;
-        }
-        const terms = (0, bookingTerms_1.onlineTermsAcceptance)({
-            termsAccepted: body.termsAccepted === true,
-            termsVersion: str(body.termsVersion),
-            channel: "website",
-        });
-        if (!terms.ok) {
-            res.status(400).json({ error: terms.error });
-            return;
-        }
-        const bookingType = str(body.bookingType) === "return" ? "return" : "one_way";
-        const vehicleType = str(body.vehicleType) === "8_seater" ? "8_seater" : str(body.vehicleType) === "standard" ? "standard" : "";
-        const now = Date.now();
-        const journey = {
-            source: "website",
-            bookingType,
-            returnTrip: bookingType === "return",
-            pickup,
-            pickupLocation: pickup,
-            destination,
-            returnPickupLocation: str(body.returnPickupLocation),
-            returnDestination: str(body.returnDestination),
-            vehicleType,
-            airportCollection: body.airportCollection === true || str(body.service).includes("airport"),
-            returnAirportCollection: body.returnAirportCollection === true,
-            service: str(body.service),
-            otherOfferCode: "",
-        };
-        const promotion = (0, halfTerm_1.decideHalfTermPromotion)(journey, now);
-        const bookingNumber = `SP${String(now).slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
-        const ref = db().collection("bookings").doc();
-        await ref.set({
-            source: "website",
-            createdByFunction: true,
-            bookingNumber,
-            bookingMethod: "internet",
-            name,
-            hirerName: name,
-            email,
-            hirerEmail: email,
-            phone,
-            hirerPhone: phone,
-            pickup,
-            pickupLocation: pickup,
-            destination,
-            dateTime: `${date}T${time}`,
-            pickupTime: `${date}T${time}`,
-            bookingType,
-            returnTrip: bookingType === "return",
-            returnPickupLocation: bookingType === "return" ? str(body.returnPickupLocation) : "",
-            returnDestination: bookingType === "return" ? str(body.returnDestination) : "",
-            returnPickupTime: bookingType === "return" ? str(body.returnDateTime) : "",
-            returnDateTime: bookingType === "return" ? str(body.returnDateTime) : "",
-            vehicleType,
-            passengers: Number(body.passengers) || 1,
-            service: str(body.service),
-            notes: str(body.message).slice(0, 2000),
-            flightNumber: str(body.flightNumber),
-            status: "pending",
-            customerStatus: "pending",
-            adminStatus: "pending",
-            paymentStatus: "pending",
-            promotion,
-            termsAccepted: true,
-            termsVersion: terms.version,
-            termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-            acceptanceMethod: "website",
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        functions.logger.info("website quote stored", { bookingId: ref.id, eligible: promotion.eligible });
-        await audit(ref.id, "terms_accepted", email, { termsVersion: terms.version, acceptanceMethod: "website" });
-        res.json({ ok: true, bookingNumber, promotion: promotion.eligible ? promotion.code : "" });
-    }
-    catch (err) {
-        functions.logger.error("website quote failed", err);
-        res.status(500).json({ error: "We could not save your quote request. Please call or WhatsApp us." });
-    }
-});
+exports.submitWebsiteQuote = functions.https.onRequest((req, res) => (0, guestHandlers_1.handleGuestBookingHttp)(req, res));
 async function stampPromotionOnCreate(snap) {
     const data = snap.data() || {};
     const source = str(data.source) || (data.uid ? "customer_app" : "");

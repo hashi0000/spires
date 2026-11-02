@@ -27,6 +27,7 @@ import {
   acceptTermsPublic,
 } from "./terms/callables";
 import { submitBusinessAccountEnquiry } from "./businessAccounts/callables";
+import { claimGuestBooking, guestClaimPreview } from "./bookings/guestHandlers";
 import { shouldSendConfirmation } from "./quotes/quoteWorkflow";
 
 admin.initializeApp();
@@ -69,7 +70,8 @@ export const onBookingWrite = functions.firestore
       before &&
       before.paymentStatus !== "paid" &&
       after.paymentStatus === "paid" &&
-      !after.paymentReceiptEmailSentAt
+      !after.paymentReceiptEmailSentAt &&
+      (after.hirerEmail || after.email)
     ) {
       const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
       const existingReceipt = await receiptRef.get();
@@ -134,6 +136,7 @@ export {
   acceptTermsPublic,
 };
 export { submitBusinessAccountEnquiry };
+export { claimGuestBooking, guestClaimPreview };
 export {
   spiresShareSession,
   spiresShareGetState,

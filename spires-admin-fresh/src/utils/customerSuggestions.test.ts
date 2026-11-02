@@ -69,6 +69,19 @@ describe('customer suggestions for manual jobs', () => {
     ).toEqual({ email: 'alex@example.com', uid: 'user-1' });
   });
 
+  it('does not attach a guest request just because the email matches an account', () => {
+    const profiles = buildCustomerSuggestionsFromBookings([account]);
+    const picked = matchCustomerSuggestion('Alex Stone', profiles);
+    expect(
+      accountLinkForBooking({
+        typedEmail: 'alex@example.com',
+        picked,
+        suggestions: profiles,
+        skipAutomaticEmailMatch: true,
+      }).uid
+    ).toBe('');
+  });
+
   it('does not keep an account when the email is changed to someone else', () => {
     const other = booking({
       id: 'other',

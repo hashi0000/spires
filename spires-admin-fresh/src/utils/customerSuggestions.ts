@@ -79,15 +79,16 @@ export function accountLinkForBooking(input: {
   existingUid?: string;
   existingEmail?: string;
   suggestions: CustomerProfile[];
+  skipAutomaticEmailMatch?: boolean;
 }): { email: string; uid: string } {
   const email = normaliseCustomerEmail(input.typedEmail);
   const accounts = email
     ? input.suggestions.filter((profile) => profile.uid && profile.email === email)
     : [];
   const accountIds = Array.from(new Set(accounts.map((profile) => profile.uid)));
-  if (accountIds.length === 1) return { email, uid: accountIds[0] };
+  if (!input.skipAutomaticEmailMatch && accountIds.length === 1) return { email, uid: accountIds[0] };
 
-  if (input.picked?.uid && email && (!input.picked.email || input.picked.email === email)) {
+  if (!input.skipAutomaticEmailMatch && input.picked?.uid && email && (!input.picked.email || input.picked.email === email)) {
     return { email, uid: input.picked.uid };
   }
 

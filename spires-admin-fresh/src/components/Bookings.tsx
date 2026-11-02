@@ -3,7 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
-import { isCustomerBooking } from '../utils/bookingMapper';
+import { isCustomerBooking, isPendingIncomingRequest, isWebsiteGuestRequest } from '../utils/bookingMapper';
 import { functions } from '../utils/firebase';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
@@ -99,8 +99,8 @@ const Bookings: React.FC<BookingsProps> = ({
   const groupedBookings = useMemo(() => {
     // Sort bookings: pending customer bookings first, then by pickup time
     const sorted = [...filteredBookings].sort((a, b) => {
-      const aIsPendingCustomer = isCustomerBooking(a) && a.status === 'pending';
-      const bIsPendingCustomer = isCustomerBooking(b) && b.status === 'pending';
+      const aIsPendingCustomer = isPendingIncomingRequest(a);
+      const bIsPendingCustomer = isPendingIncomingRequest(b);
       
       // If one is pending customer and the other isn't, prioritize pending customer
       if (aIsPendingCustomer && !bIsPendingCustomer) return -1;
@@ -143,7 +143,7 @@ const Bookings: React.FC<BookingsProps> = ({
     const otherDates: string[] = [];
     
     Object.keys(grouped).forEach(dateKey => {
-      const hasPendingCustomer = grouped[dateKey].some(b => isCustomerBooking(b) && b.status === 'pending');
+      const hasPendingCustomer = grouped[dateKey].some(b => isPendingIncomingRequest(b));
       if (hasPendingCustomer) {
         datesWithPendingCustomers.push(dateKey);
       } else {
@@ -153,8 +153,8 @@ const Bookings: React.FC<BookingsProps> = ({
     
     // Sort dates with pending customers by most recent pending booking
     datesWithPendingCustomers.sort((a, b) => {
-      const aPending = grouped[a].find(b => isCustomerBooking(b) && b.status === 'pending');
-      const bPending = grouped[b].find(b => isCustomerBooking(b) && b.status === 'pending');
+      const aPending = grouped[a].find(b => isPendingIncomingRequest(b));
+      const bPending = grouped[b].find(b => isPendingIncomingRequest(b));
       const aTime = aPending?.createdAt ? new Date(aPending.createdAt).getTime() : 0;
       const bTime = bPending?.createdAt ? new Date(bPending.createdAt).getTime() : 0;
       return bTime - aTime;
@@ -165,8 +165,8 @@ const Bookings: React.FC<BookingsProps> = ({
     datesWithPendingCustomers.forEach(date => {
       const dateBookings = grouped[date];
       const sortedDateBookings = [...dateBookings].sort((a, b) => {
-        const aIsPendingCustomer = isCustomerBooking(a) && a.status === 'pending';
-        const bIsPendingCustomer = isCustomerBooking(b) && b.status === 'pending';
+        const aIsPendingCustomer = isPendingIncomingRequest(a);
+        const bIsPendingCustomer = isPendingIncomingRequest(b);
         if (aIsPendingCustomer && !bIsPendingCustomer) return -1;
         if (!aIsPendingCustomer && bIsPendingCustomer) return 1;
         // If both are pending customer, newest first
@@ -433,12 +433,12 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
 
   return (
     <div>
-      {bookings.filter(b => isCustomerBooking(b) && b.status === 'pending').length > 0 && (
+      {bookings.filter(b => isPendingIncomingRequest(b)).length > 0 && (
         <div className="alert alert-warning">
           <AlertCircle className="h-5 w-5" />
           <div>
             <h3 style={{ margin: 0, marginBottom: '0.25rem', fontSize: '0.875rem', fontWeight: 600 }}>
-              {bookings.filter(b => isCustomerBooking(b) && b.status === 'pending').length} New Customer {bookings.filter(b => isCustomerBooking(b) && b.status === 'pending').length === 1 ? 'Booking' : 'Bookings'} Pending Review
+              {bookings.filter(b => isPendingIncomingRequest(b)).length} {bookings.filter(b => isPendingIncomingRequest(b)).length === 1 ? 'request' : 'requests'} pending review
             </h3>
             <p style={{ margin: 0, fontSize: '0.875rem' }}>
               Customer bookings are highlighted in orange. Please review and confirm with pricing.
@@ -568,7 +568,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   const driver = drivers.find(d => d.id === booking.driverId);
                   const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                   const totalExpenses = booking.expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
-                  const isPendingCustomer = isCustomerBooking(booking) && booking.status === 'pending';
+                  const isPendingCustomer = isPendingIncomingRequest(booking);
                   const ext = booking as ExtendedBooking;
                   const receivedPence = Number(booking.amountReceivedPence || 0);
                   const balancePence = Math.max(0, Math.round((booking.actualFare || 0) * 100) - receivedPence);
@@ -587,7 +587,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           <h3 style={{ fontSize: '1.125rem', fontWeight: 500, margin: 0, color: '#0b1c3d' }}>
                             {booking.bookingNumber}
                           </h3>
-                          {isPendingCustomer && <span className="badge badge-new-customer">NEW CUSTOMER</span>}
+                          {isPendingCustomer && !isWebsiteGuestRequest(booking) && <span className="badge badge-new-customer">NEW CUSTOMER</span>}
+                          {(booking as { guestRequest?: boolean }).guestRequest && !booking.uid && <span className="badge badge-guest">Guest request</span>}
                           <span className={`badge ${workflowBadgeClass(effectiveWorkflowStatus(booking))}`}>{booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Awaiting payment' : workflowStatusLabel(effectiveWorkflowStatus(booking))}</span>
                           {booking.paymentStatus && (
                             <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
@@ -615,12 +616,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                             <strong>Customer:</strong> {booking.hirerName}
                           </p>
                           <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
-                            <strong>Phone:</strong> {booking.hirerPhone}
+                            <strong>Phone:</strong> {booking.hirerPhone || 'Not supplied'}
                           </p>
-                          {customerEmail ? (
-                            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
-                              <strong>Email:</strong> {customerEmail}
-                            </p>
+                          <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>
+                            <strong>Email:</strong> {customerEmail || 'Not supplied'}
+                          </p>
+                          {isWebsiteGuestRequest(booking) && !customerEmail ? (
+                            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem' }}>No email address. Quote emails will not be sent. Use the phone number.</p>
                           ) : null}
                           <p style={{ margin: 0, fontSize: '0.875rem' }}>
                             <strong>Method:</strong> {String(booking.bookingMethod || 'Not recorded').replace('_', ' ')}

@@ -165,7 +165,11 @@ export async function notifyAdminNewBookingRequest(
     const html = `
       <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">
         <h2 style="color:#002147;margin:0 0 12px;">New customer booking request</h2>
-        <p>A new booking was submitted via the customer portal and needs a fare / confirmation.</p>
+        <p>${
+          booking.source === "website" || booking.guestRequest === true
+            ? "A guest sent this request from the website without creating an account. It is not confirmed until you quote it and the customer accepts. Use the phone number when there is no email address."
+            : "A new booking was submitted via the customer portal and needs a fare and confirmation."
+        }</p>
         <table style="border-collapse:collapse;width:100%;max-width:560px;">
           <tr><td style="padding:4px 8px;font-weight:600;">Customer</td><td style="padding:4px 8px;">${escapeHtml(n.hirerName)}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Phone</td><td style="padding:4px 8px;">${escapeHtml(n.hirerPhone || "—")}</td></tr>

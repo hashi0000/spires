@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Booking } from '../types/types';
-import { isCustomerBooking } from '../utils/bookingMapper';
+import { isPendingIncomingRequest } from '../utils/bookingMapper';
 
 function sessionKey(bookingId: string): string {
   return `spires_pending_alert_${bookingId}`;
@@ -39,7 +39,7 @@ export function usePendingBookingAlerts(
     if (!enabled || typeof window === 'undefined') return;
 
     const pending = bookings.filter(
-      (b) => isCustomerBooking(b) && b.status === 'pending' && b.id
+      (b) => isPendingIncomingRequest(b) && b.id
     );
     const pendingIds = new Set(pending.map((b) => b.id as string));
 

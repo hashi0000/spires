@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Search, User, Mail, Phone, MapPin, Calendar, Edit3, GitMerge, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { Booking } from '../types/types';
-import { isCustomerBooking } from '../utils/bookingMapper';
+import { isPendingIncomingRequest } from '../utils/bookingMapper';
 import {
   deriveCustomerProfilesFromBookings,
   CustomerProfileFromBookings,
@@ -180,7 +180,7 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
   }, []);
 
   const pendingAppBookings = useMemo(
-    () => bookings.filter((b) => isCustomerBooking(b) && b.status === 'pending'),
+    () => bookings.filter((b) => isPendingIncomingRequest(b)),
     [bookings]
   );
 
@@ -275,7 +275,7 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
           <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>
             <Calendar className="h-5 w-5" />
             <div>
-              <strong style={{ fontSize: '0.875rem' }}>{pendingAppBookings.length} pending app booking(s)</strong>
+              <strong style={{ fontSize: '0.875rem' }}>{pendingAppBookings.length} pending request(s)</strong>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem' }}>
                 Confirm these in Bookings. They appear here once saved.
               </p>

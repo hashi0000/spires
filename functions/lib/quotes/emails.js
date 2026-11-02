@@ -7,6 +7,7 @@ exports.hashQuoteToken = hashQuoteToken;
 exports.quoteEmailHtml = quoteEmailHtml;
 exports.paymentRequestHtml = paymentRequestHtml;
 exports.acceptanceCustomerHtml = acceptanceCustomerHtml;
+exports.guestRequestEmailHtml = guestRequestEmailHtml;
 exports.acceptanceAdminHtml = acceptanceAdminHtml;
 exports.sendHtmlEmail = sendHtmlEmail;
 exports.vehicleLabel = vehicleLabel;
@@ -86,6 +87,22 @@ function acceptanceCustomerHtml(input) {
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">${input.confirmed ? "Booking confirmed" : "Quote accepted"}</h1>
     <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(input.customerName || "Customer")},</p>
     <p>${body}</p>
+  `);
+}
+function guestRequestEmailHtml(input) {
+    const claim = input.claimUrl
+        ? `<p>If you would like to track this request, you can create an account with this email address. This is optional.</p>${button(input.claimUrl, "Create an account")}`
+        : "";
+    const contact = input.hasPhone
+        ? "<p>We also have your phone number, and our team can call you.</p>"
+        : "<p>We will use this email address to reply. We do not send a text message for this request.</p>";
+    return shell(`
+    <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">Your booking request has been received</h1>
+    <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(input.name || "Customer")},</p>
+    <p>Your booking request has been received. The reference is <strong>${(0, driverReminderEmail_1.escapeHtml)(input.bookingNumber)}</strong>.</p>
+    <p><strong>This is not a confirmed booking yet.</strong> We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>
+    ${contact}
+    ${claim}
   `);
 }
 function acceptanceAdminHtml(input) {

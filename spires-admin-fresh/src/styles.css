@@ -659,6 +659,12 @@ header.admin-header,
   border: 1px solid #fb923c;
 }
 
+.badge-guest {
+  background-color: #e8eef6;
+  color: #002147;
+  border: 1px solid #c5a572;
+}
+
 /* ========= Booking Cards ========== */
 .booking-card {
   background: white;

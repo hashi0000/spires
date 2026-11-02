@@ -236,112 +236,148 @@
       </div>
 
       <div class="card fade-in" id="booking">
-        <h2>Booking form</h2>
-        <form action="https://formspree.io/f/meozaolo" method="POST" class="booking-form" id="booking-form">
-          <input type="hidden" name="_next" value="https://www.spires-taxis.com/thank-you">
-          <input type="hidden" name="_subject" value="New Taxi Booking Request">
-          <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <h2>Request a taxi</h2>
+        <p class="form-privacy">Tell us the journey and we will prepare a quote. You do not need an account. Sending this form does not confirm the booking.</p>
+        <div id="booking-result" hidden></div>
+        <form class="booking-form" id="booking-form" novalidate>
+          <input type="text" name="_gotcha" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
 
           <div class="form-field">
-            <label for="name">Full Name *</label>
-            <input type="text" id="name" name="name" required>
+            <label for="name">Full name</label>
+            <input type="text" id="name" name="name" autocomplete="name" required>
           </div>
 
-          <div class="form-field">
-            <label for="email">Email Address *</label>
-            <input type="email" id="email" name="email" required>
+          <p class="form-help" id="contact-help">Please provide a phone number or email address so we can respond to your request.</p>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="phone">Phone number</label>
+              <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="tel" aria-describedby="contact-help">
+            </div>
+            <div class="form-field">
+              <label for="email">Email address</label>
+              <input type="email" id="email" name="email" autocomplete="email" aria-describedby="contact-help">
+            </div>
           </div>
+          <p id="contact-error" class="form-status" role="alert" hidden></p>
 
-          <div class="form-field">
-            <label for="phone">Phone Number *</label>
-            <input type="tel" id="phone" name="phone" required>
-          </div>
-
-          <div class="form-field">
-            <label for="service">Service Required</label>
-            <select id="service" name="service">
-              <option value="">Select a service</option>
-              <option value="airport-transfer">Airport Transfer</option>
-              <option value="local-oxford">Local Oxford Journey</option>
-              <option value="student-service">Student Service</option>
-              <option value="corporate-travel">Corporate Travel</option>
-              <option value="day-hire">Day Hire</option>
-              <option value="quote-request">Quote Request</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <div class="form-field">
-            <label for="pickup">Pickup Location *</label>
-            <input type="text" id="pickup" name="pickup" required>
-          </div>
-
-          <div class="form-field">
-            <label for="destination">Destination *</label>
-            <input type="text" id="destination" name="destination" required>
-          </div>
-
-          <div class="form-field">
-            <label for="date">Travel Date *</label>
-            <input type="date" id="date" name="date" required>
-          </div>
-
-          <div class="form-field">
-            <label for="time">Travel Time *</label>
-            <input type="time" id="time" name="time" required>
-          </div>
-
-          <div class="form-field">
-            <label for="journey">Journey</label>
-            <select id="journey" name="bookingType">
-              <option value="one_way">One way</option>
-              <option value="return">Return, both journeys together</option>
-            </select>
-          </div>
-
-          <div class="form-field">
-            <label for="vehicle">Vehicle</label>
-            <select id="vehicle" name="vehicleType">
-              <option value="">Select a vehicle</option>
-              <option value="standard">Standard Car</option>
-              <option value="8_seater">8 Seater</option>
-            </select>
-          </div>
+          <fieldset class="journey-box">
+            <legend>Journey</legend>
+            <div class="form-field">
+              <label for="journey">Journey type</label>
+              <select id="journey" name="bookingType">
+                <option value="one_way">One way</option>
+                <option value="return">Return, both journeys together</option>
+              </select>
+              <p class="form-help">A return stays on this same request. It does not create a second booking.</p>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label for="date">Date</label>
+                <input type="date" id="date" name="date" required>
+              </div>
+              <div class="form-field">
+                <label for="time">Pickup time</label>
+                <input type="time" id="time" name="time" required>
+              </div>
+            </div>
+            <div class="form-field">
+              <label for="pickup">Pickup</label>
+              <input type="text" id="pickup" name="pickup" autocomplete="street-address" required placeholder="Street and postcode">
+            </div>
+            <div class="form-field">
+              <label for="destination">Destination</label>
+              <input type="text" id="destination" name="destination" required placeholder="Street, postcode or airport">
+            </div>
+            <label class="check-line" for="airport-collection">
+              <input type="checkbox" id="airport-collection" name="airportCollection" value="yes">
+              <span>Airport collection</span>
+            </label>
+            <div id="flight-fields" class="form-row" hidden>
+              <div class="form-field">
+                <label for="flight-number">Flight number</label>
+                <input type="text" id="flight-number" name="flightNumber" placeholder="For example BA123">
+              </div>
+              <div class="form-field">
+                <label for="terminal">Terminal</label>
+                <input type="text" id="terminal" name="terminal" placeholder="For example T5">
+              </div>
+            </div>
+          </fieldset>
 
           <div id="return-fields" hidden>
+            <fieldset class="journey-box">
+              <legend>Return journey</legend>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="return-date">Return date</label>
+                  <input type="date" id="return-date" name="returnDate">
+                </div>
+                <div class="form-field">
+                  <label for="return-time">Return pickup time</label>
+                  <input type="time" id="return-time" name="returnTime">
+                </div>
+              </div>
+              <div class="form-field">
+                <label for="return-pickup">Return pickup</label>
+                <input type="text" id="return-pickup" name="returnPickupLocation">
+              </div>
+              <div class="form-field">
+                <label for="return-destination">Return destination</label>
+                <input type="text" id="return-destination" name="returnDestination">
+              </div>
+              <label class="check-line" for="return-airport">
+                <input type="checkbox" id="return-airport" name="returnAirportCollection" value="yes">
+                <span>Airport collection on the return</span>
+              </label>
+              <div class="form-field" id="return-flight-field" hidden>
+                <label for="return-flight">Return flight number</label>
+                <input type="text" id="return-flight" name="returnFlightNumber">
+              </div>
+            </fieldset>
+          </div>
+
+          <div id="airport-note" class="form-help" hidden>
+            <p>We monitor your flight and allow 50 minutes from the actual landing time for you to clear immigration, collect your luggage and let us know you are ready. Your driver will then make their way to the airport pickup point.</p>
+            <p>If you are not ready within 50 minutes of landing, waiting time is charged at £10 per additional 30 minutes or part thereof. The standard airport pickup charge is included in the fare.</p>
+          </div>
+
+          <div class="form-row">
             <div class="form-field">
-              <label for="return-date">Return date</label>
-              <input type="date" id="return-date" name="returnDate">
+              <label for="passengers">Passengers</label>
+              <input type="number" id="passengers" name="passengers" min="1" max="4" value="1" required>
             </div>
             <div class="form-field">
-              <label for="return-time">Return time</label>
-              <input type="time" id="return-time" name="returnTime">
-            </div>
-            <div class="form-field">
-              <label for="return-pickup">Return pickup</label>
-              <input type="text" id="return-pickup" name="returnPickupLocation">
-            </div>
-            <div class="form-field">
-              <label for="return-destination">Return destination</label>
-              <input type="text" id="return-destination" name="returnDestination">
+              <label for="luggage">Luggage pieces</label>
+              <input type="number" id="luggage" name="luggage" min="0" max="10" value="0">
             </div>
           </div>
 
+          <fieldset class="vehicle-choice">
+            <legend>Vehicle</legend>
+            <label class="choice-card">
+              <input type="radio" name="vehicleType" value="standard" required>
+              <span><strong>Standard Car</strong><br>Up to 4 passengers. Toyota RAV4 or Corolla, or a similar car.</span>
+            </label>
+            <label class="choice-card">
+              <input type="radio" name="vehicleType" value="8_seater">
+              <span><strong>8 Seater</strong><br>Up to 8 passengers. Mercedes Vito, or a similar vehicle.</span>
+            </label>
+            <p class="form-help">The vehicle may vary. Luggage space depends on how many people are travelling and the size of the bags.</p>
+          </fieldset>
+
           <div class="form-field">
-            <label for="passengers">Number of Passengers</label>
-            <select id="passengers" name="passengers">
-              <option value="">Select number</option>
-              <option value="1">1 passenger</option>
-              <option value="2">2 passengers</option>
-              <option value="3">3 passengers</option>
-              <option value="4">4 passengers</option>
-              <option value="5+">5+ passengers</option>
+            <label for="payment">How would you like to pay</label>
+            <select id="payment" name="paymentMethod">
+              <option value="undecided">Not decided yet</option>
+              <option value="cash">Cash, pay the driver</option>
+              <option value="card">Card, pay the driver</option>
+              <option value="bank transfer">Bank transfer</option>
             </select>
           </div>
 
           <div class="form-field">
-            <label for="message">Additional Information</label>
-            <textarea id="message" name="message" rows="4" placeholder="Any special requirements..."></textarea>
+            <label for="message">Additional requirements</label>
+            <textarea id="message" name="message" rows="4" placeholder="Child seats, extra luggage, or anything else we should know"></textarea>
           </div>
 
           <div class="terms-agreement">
@@ -353,8 +389,9 @@
             <p id="terms-agreement-error" class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>
           </div>
 
+          <p id="booking-status" class="form-status" role="alert" hidden></p>
           <div class="btn-group">
-            <button type="submit" class="btn btn--primary">Send booking request</button>
+            <button type="submit" class="btn btn--primary" id="booking-submit">Send booking request</button>
           </div>
         </form>
       </div>
@@ -384,6 +421,7 @@
   </section>
 </main>
 
+<script src="/js/guest-booking.js" defer></script>
 <!-- SITE-FOOTER -->
 <footer class="site-footer no-print">
   <div class="container site-footer__grid">

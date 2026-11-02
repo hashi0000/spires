@@ -7,7 +7,7 @@ import { useDrivers, useVehicles, useBookings, useDriverLimitCheck } from './hoo
 import { useBookingDesktopReminders } from './hooks/useBookingDesktopReminders';
 import { usePendingBookingAlerts } from './hooks/usePendingBookingAlerts';
 import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
-import { isCustomerBooking } from './utils/bookingMapper';
+import { isPendingIncomingRequest } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
 import type { ExtendedBooking } from './types/types';
@@ -121,7 +121,7 @@ const App: React.FC = () => {
   
   // Count pending customer bookings that need review
   const pendingCustomerBookings = bookingsHook.bookings.filter(
-    booking => isCustomerBooking(booking) && booking.status === 'pending'
+    booking => isPendingIncomingRequest(booking)
   );
   const pendingCustomerBookingsCount = pendingCustomerBookings.length;
 

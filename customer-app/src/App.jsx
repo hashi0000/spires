@@ -4,6 +4,7 @@ import Login from "./Login";
 import Signup from "./Signup";
 import Dashboard from "./Dashboard";
 import QuotePage from "./QuotePage";
+import ClaimBooking from "./ClaimBooking";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles.css";
 
@@ -13,6 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/quote" element={<QuotePage />} />
+        <Route path="/claim" element={<ClaimBooking />} />
         <Route path="/signup" element={<Signup />} />
         <Route
           path="/dashboard"

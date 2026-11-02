@@ -10,6 +10,8 @@ function afterLoginPath(location) {
     return from;
   }
   const params = new URLSearchParams(location.search || "");
+  const claim = params.get("t");
+  if (claim) return `/claim?t=${encodeURIComponent(claim)}`;
   if (params.get("share") === "1" || params.get("request") === "1") {
     return `/dashboard${location.search || ""}`;
   }
@@ -63,7 +65,7 @@ export default function Login() {
 
         <p className="switch-text">
           Don’t have an account?{" "}
-          <Link to="/signup" state={location.state} className="link">Sign up</Link>
+          <Link to={`/signup${location.search || ""}`} state={location.state} className="link">Sign up</Link>
         </p>
       </div>
     </div>
