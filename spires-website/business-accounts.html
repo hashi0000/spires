@@ -117,6 +117,7 @@
 <body data-page="business">
 
 <!-- SITE-HEADER -->
+<script>document.documentElement.classList.add("js");</script>
 <a href="#main-content" class="skip-link">Skip to content</a>
 <header class="site-header no-print" id="top">
   <div class="share-top-banner">
@@ -129,14 +130,67 @@
     <nav class="site-nav" aria-label="Main">
       <ul class="site-nav__list">
         <li><a href="/" data-nav="home">Home</a></li>
-        <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
-        <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
-        <li><a href="/rates" data-nav="rates">Rates</a></li>
-        <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
-        <li><a href="/about" data-nav="about">About</a></li>
-        <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
-        <li><a href="/contact" data-nav="contact">Contact</a></li>
-        <li><a href="/share" class="site-nav__promo" data-nav="share">Spires Share</a></li>
+        <li class="site-nav__item site-nav__item--drop">
+          <details class="site-nav__details">
+            <summary class="site-nav__trigger" data-nav-group="services">Services</summary>
+            <div class="site-nav__panel">
+              <ul>
+                <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
+                <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
+                <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
+                <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
+                <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
+                <li><a href="/rates" data-nav="rates">Rates</a></li>
+                <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
+                <li><a href="/share" data-nav="share">Spires Share</a></li>
+              </ul>
+            </div>
+          </details>
+        </li>
+        <li class="site-nav__item site-nav__item--drop">
+          <details class="site-nav__details">
+            <summary class="site-nav__trigger" data-nav-group="airport">Airport transfers</summary>
+            <div class="site-nav__panel">
+              <ul>
+                <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Heathrow</a></li>
+                <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
+                <li><a href="/oxford-to-gatwick-taxi" data-nav="gatwick">Gatwick</a></li>
+                <li><a href="/oxford-to-stansted-taxi" data-nav="stansted">Stansted</a></li>
+                <li><a href="/oxford-to-luton-taxi" data-nav="luton">Luton</a></li>
+                <li><a href="/oxford-to-birmingham-airport-taxi" data-nav="birmingham">Birmingham</a></li>
+                <li><a href="/oxford-to-london-city-airport-taxi" data-nav="london-city">London City</a></li>
+                <li><a href="/oxford-to-bristol-airport-taxi" data-nav="bristol">Bristol</a></li>
+                <li><a href="/how-airport-pickup-works" data-nav="pickup">How pickup works</a></li>
+                <li><a href="/airport-transfers" data-nav="airport">All airport transfers</a></li>
+              </ul>
+            </div>
+          </details>
+        </li>
+        <li class="site-nav__item site-nav__item--drop">
+          <details class="site-nav__details">
+            <summary class="site-nav__trigger" data-nav-group="events">Events</summary>
+            <div class="site-nav__panel">
+              <ul>
+                <li><a href="/events" data-nav="events">All events</a></li>
+                <li><a href="/oxford-to-twickenham-taxi" data-nav="twickenham">Twickenham rugby</a></li>
+                <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone">Silverstone</a></li>
+              </ul>
+            </div>
+          </details>
+        </li>
+        <li><a href="/guides" data-nav="guides">Guides</a></li>
+        <li class="site-nav__item site-nav__item--drop">
+          <details class="site-nav__details">
+            <summary class="site-nav__trigger" data-nav-group="about">About</summary>
+            <div class="site-nav__panel">
+              <ul>
+                <li><a href="/about" data-nav="about">About us</a></li>
+                <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
+                <li><a href="/contact" data-nav="contact">Contact</a></li>
+              </ul>
+            </div>
+          </details>
+        </li>
       </ul>
     </nav>
     <div class="site-header__actions">
@@ -149,7 +203,6 @@
         <div class="lang-menu__panel" role="listbox" hidden></div>
       </div>
       <a href="tel:+447776897772" class="site-header__phone">07776 897772</a>
-      <a href="/share" class="btn btn--share site-header__share">Spires Share</a>
       <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
       <button type="button" class="site-menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
         <span></span><span></span><span></span>
@@ -165,21 +218,59 @@
   </div>
   <ul class="site-menu__links">
     <li><a href="/" data-nav="home">Home</a></li>
-    <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
-    <li><a href="/airport-transfers" data-nav="airport">Airport transfers</a></li>
-        <li><a href="/how-airport-pickup-works" data-nav="pickup">How airport pickup works</a></li>
-        <li><a href="/guides" data-nav="guides">Guides</a></li>
-    <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Oxford to Heathrow</a></li>
-    <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
-    <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
-    <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
-    <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
-    <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
-    <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
-    <li><a href="/rates" data-nav="rates">Rates</a></li>
-    <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
-    <li><a href="/about" data-nav="about">About</a></li>
-    <li><a href="/contact" data-nav="contact">Contact</a></li>
+    <li>
+      <details class="site-menu__group">
+        <summary>Services</summary>
+        <ul>
+          <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
+          <li><a href="/long-distance-taxis" data-nav="long-distance">Long distance</a></li>
+          <li><a href="/our-vehicles" data-nav="vehicles">Our vehicles</a></li>
+          <li><a href="/student-taxis" data-nav="student">Student taxis</a></li>
+          <li><a href="/corporate-taxis" data-nav="corporate">Corporate taxis</a></li>
+          <li><a href="/rates" data-nav="rates">Rates</a></li>
+          <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
+          <li><a href="/share" data-nav="share">Spires Share</a></li>
+        </ul>
+      </details>
+    </li>
+    <li>
+      <details class="site-menu__group">
+        <summary>Airport transfers</summary>
+        <ul>
+          <li><a href="/oxford-to-heathrow-taxi" data-nav="heathrow">Heathrow</a></li>
+          <li><a href="/heathrow-to-oxford-taxi" data-nav="heathrow-in">Heathrow to Oxford</a></li>
+          <li><a href="/oxford-to-gatwick-taxi" data-nav="gatwick">Gatwick</a></li>
+          <li><a href="/oxford-to-stansted-taxi" data-nav="stansted">Stansted</a></li>
+          <li><a href="/oxford-to-luton-taxi" data-nav="luton">Luton</a></li>
+          <li><a href="/oxford-to-birmingham-airport-taxi" data-nav="birmingham">Birmingham</a></li>
+          <li><a href="/oxford-to-london-city-airport-taxi" data-nav="london-city">London City</a></li>
+          <li><a href="/oxford-to-bristol-airport-taxi" data-nav="bristol">Bristol</a></li>
+          <li><a href="/how-airport-pickup-works" data-nav="pickup">How pickup works</a></li>
+          <li><a href="/airport-transfers" data-nav="airport">All airport transfers</a></li>
+        </ul>
+      </details>
+    </li>
+    <li>
+      <details class="site-menu__group">
+        <summary>Events</summary>
+        <ul>
+          <li><a href="/events" data-nav="events">All events</a></li>
+          <li><a href="/oxford-to-twickenham-taxi" data-nav="twickenham">Twickenham rugby</a></li>
+          <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone">Silverstone</a></li>
+        </ul>
+      </details>
+    </li>
+    <li><a href="/guides" data-nav="guides">Guides</a></li>
+    <li>
+      <details class="site-menu__group">
+        <summary>About</summary>
+        <ul>
+          <li><a href="/about" data-nav="about">About us</a></li>
+          <li><a href="/reviews" data-nav="reviews">Reviews</a></li>
+          <li><a href="/contact" data-nav="contact">Contact</a></li>
+        </ul>
+      </details>
+    </li>
   </ul>
   <div class="lang-menu lang-menu--mobile" data-lang-menu>
     <p class="lang-menu__heading">Language</p>
@@ -396,6 +487,7 @@
         <li><a href="/oxford-taxis">Oxford taxis</a></li>
         <li><a href="/rates">Airport transfer prices</a></li>
         <li><a href="/guides">Guides</a></li>
+        <li><a href="/events">Events</a></li>
         <li><a href="/long-distance-taxis">Long distance from Oxford</a></li>
         <li><a href="/student-taxis">Student taxis</a></li>
         <li><a href="/corporate-taxis">Corporate taxis</a></li>

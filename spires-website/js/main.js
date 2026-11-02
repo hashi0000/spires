@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   initNavActive();
+  initDesktopNav();
   initMobileMenu();
   initHeaderScroll();
   initFadeIn();
@@ -12,6 +13,71 @@ function initNavActive() {
   const page = document.body.dataset.page;
   if (!page) return;
   document.querySelectorAll(`[data-nav="${page}"]`).forEach((el) => el.classList.add('is-active'));
+  const groups = {
+    services: ['oxford', 'rates', 'business', 'share', 'vehicles', 'student', 'corporate', 'long-distance', 'local'],
+    airport: ['airport', 'heathrow', 'heathrow-in', 'pickup', 'gatwick', 'stansted', 'luton', 'birmingham', 'london-city', 'bristol'],
+    events: ['events', 'twickenham', 'silverstone'],
+    about: ['about', 'reviews', 'contact']
+  };
+  document.querySelectorAll('[data-nav-group]').forEach((el) => {
+    const names = groups[el.getAttribute('data-nav-group')] || [];
+    if (names.indexOf(page) !== -1) el.classList.add('is-active');
+  });
+}
+
+function initDesktopNav() {
+  const items = Array.prototype.slice.call(document.querySelectorAll('.site-nav__details'));
+  if (!items.length) return;
+  const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+
+  const closeAll = (except) => {
+    items.forEach((item) => {
+      if (item !== except) item.open = false;
+    });
+  };
+
+  items.forEach((item) => {
+    const summary = item.querySelector('summary');
+    const panel = item.querySelector('.site-nav__panel');
+    let timer = 0;
+    item.addEventListener('toggle', () => {
+      if (item.open) closeAll(item);
+    });
+    item.addEventListener('mouseenter', () => {
+      if (!fine.matches || window.innerWidth < 1180) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        closeAll(item);
+        item.open = true;
+      }, 70);
+    });
+    item.addEventListener('mouseleave', () => {
+      if (!fine.matches || window.innerWidth < 1180) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => { item.open = false; }, 180);
+    });
+    if (summary) {
+      summary.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowDown' && panel) {
+          event.preventDefault();
+          closeAll(item);
+          item.open = true;
+          const first = panel.querySelector('a');
+          if (first) first.focus();
+        }
+      });
+    }
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        item.open = false;
+        if (summary) summary.focus();
+      }
+    });
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.site-nav__details')) closeAll();
+  });
 }
 
 function initMobileMenu() {
@@ -48,7 +114,7 @@ function initMobileMenu() {
   close?.addEventListener('click', shut);
   overlay.addEventListener('click', shut);
   menu.querySelectorAll('a').forEach((a) => a.addEventListener('click', shut));
-  window.addEventListener('resize', () => { if (window.innerWidth > 1580) shut(); });
+  window.addEventListener('resize', () => { if (window.innerWidth >= 1180) shut(); });
 }
 
 function initHeaderScroll() {
