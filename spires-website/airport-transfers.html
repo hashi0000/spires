@@ -429,75 +429,79 @@
     <div class="container">
       <div class="section__header fade-in">
         <h2>Airports we cover from Oxford</h2>
-        <p>Fixed fares for airport transfers to or from Oxford (Standard Car, up to 4 passengers). Airport charges are included. See the <a href="/rates">rates page</a> for all airports and 8 Seater prices. Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change.</p>
+        <p>Fares are fixed per vehicle and include the standard airport charge. The table uses the same columns as the <a href="/rates">rates page</a>. Travelling from outside Oxford? Do not assume these Oxford prices apply. Abingdon, Didcot, Bicester and Witney have their own fixed fares. Other towns are quoted separately and are subject to change.</p>
       </div>
-      <div class="grid grid-2 fade-in">
-        <a href="/oxford-to-heathrow-taxi" class="card card--link">
-          <h3>Oxford to Heathrow taxi</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="heathrow.standardCar.oneWay">£92</span> one way</p>
-            <p class="card__price"><span data-spires-price="heathrow.standardCar.return">£180</span> return</p>
-          </div>
-          <p class="price-save" data-spires-save="heathrow.standardCar">Save £4 when booking both journeys together.</p>
-          <p class="card__meta">Outbound from Oxford · terminals 2, 3, 4 and 5</p>
-        </a>
-        <!-- Launch only: do not add a public Spires Share CTA on this card until explicit approval. -->
-        <a href="/heathrow-to-oxford-taxi" class="card card--link">
-          <h3>Heathrow to Oxford</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="heathrow.standardCar.oneWay">£92</span> one way</p>
-            <p class="card__price"><span data-spires-price="heathrow.standardCar.return">£180</span> return</p>
-          </div>
-          <p class="card__meta">Arrivals pickup · flight monitoring included</p>
-        </a>
-        <a href="/oxford-to-gatwick-taxi" class="card card--link">
-          <h3>Oxford to Gatwick</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="gatwick.standardCar.oneWay">£140</span> one way</p>
-            <p class="card__price"><span data-spires-price="gatwick.standardCar.return">£270</span> return</p>
-          </div>
-          <p class="card__meta">Standard Car · North and South terminals</p>
-        </a>
-        <a href="/oxford-to-stansted-taxi" class="card card--link">
-          <h3>Oxford to Stansted</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="stansted.standardCar.oneWay">£150</span> one way</p>
-            <p class="card__price"><span data-spires-price="stansted.standardCar.return">£290</span> return</p>
-          </div>
-          <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar</p>
-        </a>
-        <a href="/oxford-to-luton-taxi" class="card card--link">
-          <h3>Oxford to Luton</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="luton.standardCar.oneWay">£105</span> one way</p>
-            <p class="card__price"><span data-spires-price="luton.standardCar.return">£205</span> return</p>
-          </div>
-          <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar</p>
-        </a>
-        <a href="/oxford-to-birmingham-airport-taxi" class="card card--link">
-          <h3>Oxford to Birmingham Airport</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="birmingham.standardCar.oneWay">£110</span> one way</p>
-            <p class="card__price"><span data-spires-price="birmingham.standardCar.return">£215</span> return</p>
-          </div>
-          <p class="card__meta">Northbound M40 · Standard Car</p>
-        </a>
-        <a href="/oxford-to-london-city-airport-taxi" class="card card--link">
-          <h3>Oxford to London City</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="londonCity.standardCar.oneWay">£150</span> one way</p>
-            <p class="card__price"><span data-spires-price="londonCity.standardCar.return">£290</span> return</p>
-          </div>
-          <p class="card__meta">Standard Car · one terminal, Royal Docks</p>
-        </a>
-        <a href="/oxford-to-bristol-airport-taxi" class="card card--link">
-          <h3>Oxford to Bristol Airport</h3>
-          <div class="card__price-lines">
-            <p class="card__price"><span data-spires-price="bristol.standardCar.oneWay">£165</span> one way</p>
-            <p class="card__price"><span data-spires-price="bristol.standardCar.return">£320</span> return</p>
-          </div>
-          <p class="card__meta">Westbound · Standard Car</p>
-        </a>
+      <!-- Launch only: do not add a public Spires Share CTA on this card until explicit approval. -->
+      <div class="price-block fade-in" data-spires-fare-table="oxford">
+        <div class="price-block__head">
+          <h2>Airport prices from Oxford</h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row"><a href="/oxford-to-heathrow-taxi">Heathrow</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£92</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£180</span><span class="fare-save" data-one-way="92" data-return="180">Save £4 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£120</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£235</span><span class="fare-save" data-one-way="120" data-return="235">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-gatwick-taxi">Gatwick</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£140</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£270</span><span class="fare-save" data-one-way="140" data-return="270">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£175</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£340</span><span class="fare-save" data-one-way="175" data-return="340">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-stansted-taxi">Stansted</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£150</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="150" data-return="290">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£185</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£360</span><span class="fare-save" data-one-way="185" data-return="360">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-luton-taxi">Luton</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£105</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£205</span><span class="fare-save" data-one-way="105" data-return="205">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£130</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£255</span><span class="fare-save" data-one-way="130" data-return="255">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-birmingham-airport-taxi">Birmingham</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£215</span><span class="fare-save" data-one-way="110" data-return="215">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£145</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£280</span><span class="fare-save" data-one-way="145" data-return="280">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-london-city-airport-taxi">London City</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£150</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="150" data-return="290">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£190</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£370</span><span class="fare-save" data-one-way="190" data-return="370">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><a href="/oxford-to-bristol-airport-taxi">Bristol</a></th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£165</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£320</span><span class="fare-save" data-one-way="165" data-return="320">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£205</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£400</span><span class="fare-save" data-one-way="205" data-return="400">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a> uses this Heathrow fare. <a href="/rates#oxfordshire-airport-fares">Fixed fares from Abingdon, Didcot, Bicester and Witney</a>.</p>
       </div>
     </div>
   </section>
@@ -506,24 +510,24 @@
     <div class="container">
       <div class="section__header fade-in">
         <h2>Areas we serve</h2>
-        <p>Published airport fares on this page are for Oxford. We also collect from towns across Oxfordshire. Those journeys are quoted from your pickup address. Do not assume the Oxford rate card applies. Heathrow from those towns is set out on <a href="/oxfordshire-to-heathrow-airport-transfers">Oxfordshire to Heathrow airport transfers</a>.</p>
+        <p>Published airport fares on this page are for Oxford. Abingdon, Didcot, Bicester and Witney have their own fixed fares. Other towns are quoted from your pickup address. Do not assume the Oxford rate card applies. Heathrow from the wider county is also set out on <a href="/oxfordshire-to-heathrow-airport-transfers">Oxfordshire to Heathrow airport transfers</a>.</p>
       </div>
       <div class="grid grid-3 fade-in">
         <a href="/witney-airport-transfers" class="card card--link">
           <h3>Witney</h3>
-          <p class="card__meta">West Oxfordshire. Quote from your address</p>
+          <p class="card__meta">West Oxfordshire. Fixed airport fares</p>
         </a>
         <a href="/abingdon-airport-transfers" class="card card--link">
           <h3>Abingdon</h3>
-          <p class="card__meta">A34 corridor. Quote from your address</p>
+          <p class="card__meta">A34 corridor. Fixed airport fares</p>
         </a>
         <a href="/didcot-airport-transfers" class="card card--link">
           <h3>Didcot</h3>
-          <p class="card__meta">Station and town. Quote from your address</p>
+          <p class="card__meta">Station and town. Fixed airport fares</p>
         </a>
         <a href="/bicester-airport-transfers" class="card card--link">
           <h3>Bicester</h3>
-          <p class="card__meta">M40. Quote from your address</p>
+          <p class="card__meta">M40. Fixed airport fares</p>
         </a>
         <a href="/wallingford-airport-transfers" class="card card--link">
           <h3>Wallingford</h3>

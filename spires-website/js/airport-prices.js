@@ -13,6 +13,10 @@
  *   return  advertised return TOTAL when both Oxford legs are booked together
  *
  * Return saving is (oneWay × 2) − return. Do not hard-code a single saving.
+ * Wording: "Save £X compared with two one way bookings."
+ *
+ * Regional fares (Abingdon, Didcot, Bicester, Witney) live in REGIONAL.
+ * They must not be copied onto Oxford routes or data-spires-price tokens.
  */
 (function () {
   var VEHICLE_CLASSES = {
@@ -56,7 +60,7 @@
       id: "oxford",
       name: "Oxford",
       fareScope: "journeys to or from Oxford",
-      tableIntro: "Fixed fares for airport transfers to or from Oxford. Airport charges are included.",
+      tableIntro: "Fares are fixed per vehicle and include the standard airport charge.",
       outsideOxfordNote: "Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.",
     },
     waitingPolicy: {
@@ -148,6 +152,57 @@
     },
   };
 
+  var FARE_NOTE = "Fares are fixed per vehicle and include the standard airport charge.";
+
+  var REGIONAL_ORDER = ["heathrow", "gatwick", "stansted", "luton"];
+
+  var REGIONAL = {
+    abingdon: {
+      id: "abingdon",
+      name: "Abingdon",
+      page: "/abingdon-airport-transfers#airport-fares",
+      routes: {
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 105, return: 205 }, vito: { oneWay: 138, return: 270 } },
+        gatwick: { name: "Gatwick", standardCar: { oneWay: 150, return: 295 }, vito: { oneWay: 190, return: 375 } },
+        stansted: { name: "Stansted", standardCar: { oneWay: 160, return: 315 }, vito: { oneWay: 195, return: 380 } },
+        luton: { name: "Luton", standardCar: { oneWay: 115, return: 225 }, vito: { oneWay: 150, return: 290 } },
+      },
+    },
+    didcot: {
+      id: "didcot",
+      name: "Didcot",
+      page: "/didcot-airport-transfers#airport-fares",
+      routes: {
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 216 }, vito: { oneWay: 140, return: 275 } },
+        gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 310 }, vito: { oneWay: 205, return: 400 } },
+        stansted: { name: "Stansted", standardCar: { oneWay: 175, return: 340 }, vito: { oneWay: 215, return: 420 } },
+        luton: { name: "Luton", standardCar: { oneWay: 130, return: 255 }, vito: { oneWay: 160, return: 310 } },
+      },
+    },
+    bicester: {
+      id: "bicester",
+      name: "Bicester",
+      page: "/bicester-airport-transfers#airport-fares",
+      routes: {
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 205 }, vito: { oneWay: 140, return: 275 } },
+        gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 310 }, vito: { oneWay: 200, return: 290 } },
+        stansted: { name: "Stansted", standardCar: { oneWay: 165, return: 320 }, vito: { oneWay: 210, return: 410 } },
+        luton: { name: "Luton", standardCar: { oneWay: 110, return: 215 }, vito: { oneWay: 142, return: 280 } },
+      },
+    },
+    witney: {
+      id: "witney",
+      name: "Witney",
+      page: "/witney-airport-transfers#airport-fares",
+      routes: {
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 108, return: 212 }, vito: { oneWay: 140, return: 275 } },
+        gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 315 }, vito: { oneWay: 205, return: 395 } },
+        stansted: { name: "Stansted", standardCar: { oneWay: 172, return: 334 }, vito: { oneWay: 210, return: 410 } },
+        luton: { name: "Luton", standardCar: { oneWay: 125, return: 240 }, vito: { oneWay: 155, return: 300 } },
+      },
+    },
+  };
+
   function isFiniteNumber(value) {
     return typeof value === "number" && isFinite(value);
   }
@@ -155,6 +210,10 @@
   function formatMoney(amount) {
     if (!isFiniteNumber(Number(amount))) return "";
     return DATA.currencySymbol + Number(amount).toFixed(0);
+  }
+
+  function saveSentence(amount) {
+    return "Save " + formatMoney(amount) + " compared with two one way bookings.";
   }
 
   function getRoute(id) {
@@ -248,7 +307,7 @@
         continue;
       }
       el.hidden = false;
-      el.textContent = "Save " + formatMoney(save) + " when booking both journeys together.";
+      el.textContent = saveSentence(save);
     }
   }
 
@@ -273,50 +332,52 @@
     return route.name;
   }
 
-  function fareStackHtml(prices) {
-    if (prices && isFiniteNumber(prices.oneWay) && isFiniteNumber(prices.return)) {
-      return (
-        '<div class="fare-stack">' +
-        '<span class="fare-stack__line">' +
-        formatMoney(prices.oneWay) +
-        " one way</span>" +
-        '<span class="fare-stack__line fare-stack__line--return">' +
-        formatMoney(prices.return) +
-        " return</span>" +
-        "</div>"
-      );
+  function fareOneWayHtml(prices) {
+    if (!prices || !isFiniteNumber(prices.oneWay)) {
+      return '<td data-label="One way"><span class="fare-amount">Quote on request</span></td>';
+    }
+    return '<td data-label="' + (prices._label || "") + '"><span class="fare-amount">' + formatMoney(prices.oneWay) + "</span></td>";
+  }
+
+  function fareReturnHtml(prices) {
+    if (!prices || !isFiniteNumber(prices.return)) {
+      return '<td data-label="Return"><span class="fare-amount">Quote on request</span></td>';
+    }
+    var save = returnSaving(prices);
+    var note = "";
+    if (save) {
+      note =
+        '<span class="fare-save" data-one-way="' +
+        prices.oneWay +
+        '" data-return="' +
+        prices.return +
+        '">' +
+        saveSentence(save) +
+        "</span>";
     }
     return (
-      '<div class="fare-stack"><span class="fare-stack__line">' +
-      formatClassPrice(prices) +
-      "</span></div>"
+      '<td data-label="' +
+      (prices._returnLabel || "") +
+      '"><span class="fare-amount">' +
+      formatMoney(prices.return) +
+      "</span>" +
+      note +
+      "</td>"
     );
+  }
+
+  function labelledPrices(prices, oneWayLabel, returnLabel) {
+    return {
+      oneWay: prices ? prices.oneWay : null,
+      return: prices ? prices.return : null,
+      _label: oneWayLabel,
+      _returnLabel: returnLabel,
+    };
   }
 
   function fillSavingNote() {
     var el = document.getElementById("airport-return-saving-note");
     if (!el) return;
-    var amounts = [];
-    for (var i = 0; i < PUBLISHED_ORDER.length; i++) {
-      var route = DATA.routes[PUBLISHED_ORDER[i]];
-      if (!route || route.published === false) continue;
-      var standardSave = returnSaving(route.standardCar);
-      var eightSave = returnSaving(route.vito);
-      if (standardSave && amounts.indexOf(standardSave) === -1) amounts.push(standardSave);
-      if (eightSave && amounts.indexOf(eightSave) === -1) amounts.push(eightSave);
-    }
-    if (amounts.length === 1) {
-      el.textContent =
-        "Save " + formatMoney(amounts[0]) + " when booking both journeys together.";
-      el.hidden = false;
-      return;
-    }
-    if (amounts.length > 1) {
-      el.textContent = "Book both journeys together and save on the return fare.";
-      el.hidden = false;
-      return;
-    }
-    el.textContent = "";
     el.hidden = true;
   }
 
@@ -342,75 +403,118 @@
     }
   }
 
-  function fillRatesTable() {
-    var tbody = document.getElementById("airport-price-tbody");
-    var cards = document.getElementById("airport-price-cards");
-    var rows = [];
-    var cardHtml = [];
+  function routesForOrigin(originId, onlyId) {
+    var list = [];
+    if (originId === "oxford") {
+      for (var i = 0; i < PUBLISHED_ORDER.length; i++) {
+        var oxfordRoute = DATA.routes[PUBLISHED_ORDER[i]];
+        if (!oxfordRoute || oxfordRoute.published === false) continue;
+        list.push(oxfordRoute);
+      }
+    } else if (REGIONAL[originId]) {
+      var origin = REGIONAL[originId];
+      for (var j = 0; j < REGIONAL_ORDER.length; j++) {
+        var id = REGIONAL_ORDER[j];
+        var regionalRoute = origin.routes[id];
+        if (!regionalRoute) continue;
+        list.push({
+          id: id,
+          name: regionalRoute.name,
+          slug: null,
+          featured: id === "heathrow",
+          published: true,
+          standardCar: regionalRoute.standardCar,
+          vito: regionalRoute.vito,
+        });
+      }
+    }
+    if (!onlyId) return list;
+    var filtered = [];
+    for (var k = 0; k < list.length; k++) {
+      if (list[k].id === onlyId) filtered.push(list[k]);
+    }
+    return filtered;
+  }
 
-    for (var i = 0; i < PUBLISHED_ORDER.length; i++) {
-      var id = PUBLISHED_ORDER[i];
-      var route = DATA.routes[id];
-      if (!route || route.published === false) continue;
-      var name = airportNameHtml(route);
-      var cardFeatured = route.featured ? " airport-fare-card--featured" : "";
+  function fareHeadRow() {
+    return (
+      "<tr>" +
+      '<th scope="col">Airport</th>' +
+      '<th scope="col">Standard Car one way<span class="th-sub">' +
+      VEHICLE_CLASSES.standardCar.tableExamples +
+      "</span></th>" +
+      '<th scope="col">Standard Car return</th>' +
+      '<th scope="col">8 Seater one way<span class="th-sub">' +
+      VEHICLE_CLASSES.vito.tableExamples +
+      "</span></th>" +
+      '<th scope="col">8 Seater return</th>' +
+      "</tr>"
+    );
+  }
+
+  function renderFareBlock(originId, onlyId) {
+    var routes = routesForOrigin(originId, onlyId);
+    var rows = [];
+    for (var i = 0; i < routes.length; i++) {
+      var route = routes[i];
+      var standard = labelledPrices(route.standardCar, "Standard Car one way", "Standard Car return");
+      var eight = labelledPrices(route.vito, "8 Seater one way", "8 Seater return");
       rows.push(
         "<tr" +
           (route.featured ? ' class="airport-fare-table__row--featured"' : "") +
           ">" +
           '<th scope="row">' +
-          name +
+          airportNameHtml(route) +
           "</th>" +
-          "<td>" +
-          fareStackHtml(route.standardCar) +
-          "</td>" +
-          "<td>" +
-          fareStackHtml(route.vito) +
-          "</td>" +
+          fareOneWayHtml(standard) +
+          fareReturnHtml(standard) +
+          fareOneWayHtml(eight) +
+          fareReturnHtml(eight) +
           "</tr>"
       );
-
-      cardHtml.push(
-        '<article class="airport-fare-card' +
-          cardFeatured +
-          '">' +
-          '<h3 class="airport-fare-card__name">' +
-          name +
-          "</h3>" +
-          '<div class="airport-fare-card__grid">' +
-          '<div class="airport-fare-card__col">' +
-          '<p class="airport-fare-card__class">' +
-          VEHICLE_CLASSES.standardCar.name +
-          "</p>" +
-          '<p class="airport-fare-card__examples">' +
-          VEHICLE_CLASSES.standardCar.tableExamples +
-          "</p>" +
-          fareStackHtml(route.standardCar) +
-          "</div>" +
-          '<div class="airport-fare-card__col">' +
-          '<p class="airport-fare-card__class">' +
-          VEHICLE_CLASSES.vito.name +
-          "</p>" +
-          '<p class="airport-fare-card__examples">' +
-          VEHICLE_CLASSES.vito.tableExamples +
-          "</p>" +
-          fareStackHtml(route.vito) +
-          "</div>" +
-          "</div>" +
-          '<p class="airport-fare-card__included">Airport charges included</p>' +
-          "</article>"
-      );
     }
+    return { headRow: fareHeadRow(), rows: rows.join("") };
+  }
 
-    if (tbody) tbody.innerHTML = rows.join("");
-    if (cards) cards.innerHTML = cardHtml.join("");
+  function fillFareTables() {
+    var mounts = document.querySelectorAll("[data-spires-fare-table]");
+    for (var i = 0; i < mounts.length; i++) {
+      var el = mounts[i];
+      var rendered = renderFareBlock(
+        el.getAttribute("data-spires-fare-table"),
+        el.getAttribute("data-spires-fare-route")
+      );
+      var head = el.querySelector("[data-spires-fare-head]");
+      var body = el.querySelector("[data-spires-fare-body]");
+      if (head) head.innerHTML = rendered.headRow;
+      if (body) body.innerHTML = rendered.rows;
+    }
+  }
+
+  function fillCalculatedSavings() {
+    var nodes = document.querySelectorAll("[data-one-way][data-return]");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var save = returnSaving({
+        oneWay: Number(el.getAttribute("data-one-way")),
+        return: Number(el.getAttribute("data-return")),
+      });
+      if (!save) {
+        el.hidden = true;
+        el.textContent = "";
+        continue;
+      }
+      el.hidden = false;
+      el.textContent = saveSentence(save);
+    }
   }
 
   function applyPublishedPrices() {
     fillTokens();
     fillSaveBadges();
     fillDisclaimers();
-    fillRatesTable();
+    fillFareTables();
+    fillCalculatedSavings();
     fillSavingNote();
     fillIncludedList();
     fillOriginCopy();
@@ -419,11 +523,15 @@
   window.SPIRES_VEHICLE_CLASSES = VEHICLE_CLASSES;
   window.SPIRES_VEHICLE_DISCLAIMER = VEHICLE_DISCLAIMER;
   window.SPIRES_AIRPORT_PRICES = DATA;
+  window.SPIRES_REGIONAL_FARES = REGIONAL;
+  window.SPIRES_FARE_NOTE = FARE_NOTE;
   window.SPIRES_formatMoney = formatMoney;
+  window.SPIRES_saveSentence = saveSentence;
   window.SPIRES_getRoute = getRoute;
   window.SPIRES_classPrices = classPrices;
   window.SPIRES_returnSaving = returnSaving;
   window.SPIRES_formatClassPrice = formatClassPrice;
+  window.SPIRES_renderFareBlock = renderFareBlock;
   window.SPIRES_applyPublishedPrices = applyPublishedPrices;
 
   if (document.readyState === "loading") {

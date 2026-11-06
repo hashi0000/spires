@@ -1368,6 +1368,13 @@ h2,
 
 .price-block__head h2 { font-size: 1.35rem; margin-bottom: 0.25rem; }
 
+.price-block__head h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.price-block__head h2 a:hover { text-decoration: underline; }
+
 .price-block__note {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -1411,16 +1418,23 @@ h2,
 }
 
 .airport-fare-table-wrap {
+  position: relative;
+  max-width: 100%;
   overflow-x: auto;
 }
 
 .airport-fare-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.airport-fare-table th:first-child {
+  width: 16%;
 }
 
 .airport-fare-table thead th {
-  padding: 0.95rem 1.35rem 0.85rem;
+  padding: 0.85rem 0.7rem 0.75rem;
   text-align: left;
   vertical-align: top;
   font-size: 0.78rem;
@@ -1444,7 +1458,7 @@ h2,
 
 .airport-fare-table tbody th,
 .airport-fare-table tbody td {
-  padding: 0.95rem 1.35rem;
+  padding: 0.85rem 0.7rem;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--border);
@@ -1496,6 +1510,26 @@ h2,
   margin: 0.7rem 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.fare-amount {
+  display: block;
+  font-weight: 600;
+  color: var(--blue);
+  white-space: nowrap;
+  font-size: 0.98rem;
+}
+
+.fare-save {
+  display: block;
+  margin: 0.28rem 0 0;
+  max-width: 14rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: 0;
+  white-space: normal;
 }
 
 .fare-stack__line {
@@ -1596,23 +1630,79 @@ h2,
   line-height: 1.35;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 959px) {
   .airport-fare-table-wrap {
-    display: none;
+    overflow: visible;
   }
 
-  .airport-fare-cards {
+  .airport-fare-table {
+    table-layout: auto;
+  }
+
+  .airport-fare-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    border: 0;
+  }
+
+  .airport-fare-table,
+  .airport-fare-table tbody,
+  .airport-fare-table tr,
+  .airport-fare-table tbody th,
+  .airport-fare-table tbody td {
+    display: block;
+    width: auto;
+  }
+
+  .airport-fare-table tr {
+    padding: 0.95rem 1.05rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .airport-fare-table tbody th,
+  .airport-fare-table tbody td {
+    padding: 0.4rem 0;
+    border-bottom: 0;
+  }
+
+  .airport-fare-table tbody th {
+    padding-top: 0;
+    font-size: 1.15rem;
+  }
+
+  .airport-fare-table tbody td {
     display: grid;
-    gap: 0.85rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.1rem 0.75rem;
+    align-items: baseline;
   }
 
-  .price-block__head,
-  .price-block__save-note,
-  .price-block__quote,
-  .airport-included,
-  .vehicle-disclaimer {
-    padding-left: 0;
-    padding-right: 0;
+  .airport-fare-table tbody td::before {
+    content: attr(data-label);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .airport-fare-table tbody td .fare-amount {
+    justify-self: end;
+  }
+
+  .airport-fare-table tbody td .fare-save {
+    grid-column: 1 / -1;
+    max-width: none;
+    margin-top: 0.1rem;
+  }
+
+  .airport-fare-table tbody tr:last-child {
+    border-bottom: none;
   }
 }
 
@@ -2074,15 +2164,16 @@ h2,
 }
 
 .price-save {
-  display: inline-block;
-  margin: 0.45rem 0 0.7rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: var(--gold-soft);
-  color: var(--blue);
+  display: block;
+  margin: 0.28rem 0 0.7rem;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .price-save--table {
@@ -2133,6 +2224,47 @@ h2,
 .card__price-lines .card__price {
   margin: 0.1rem 0;
   font-size: 1.25rem;
+}
+
+.oxon-fare-card__label {
+  margin: 0.15rem 0 0.55rem;
+}
+
+.oxon-fare-card__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+}
+
+.oxon-fare-card__class {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.oxon-fare-card__price {
+  margin: 0;
+  font-weight: 600;
+  color: var(--blue);
+  font-size: 1.02rem;
+}
+
+.oxon-fare-card__price span {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.oxon-fare-card__more {
+  margin: 0.9rem 0 0;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 420px) {
+  .oxon-fare-card__grid { grid-template-columns: 1fr; }
 }
 
 .fuel-tracker {

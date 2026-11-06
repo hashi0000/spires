@@ -21,7 +21,7 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Airport Transfers from Bicester | Spires Taxis">
   <title>Airport Transfers from Bicester | Spires Taxis</title>
-  <meta name="description" content="Airport transfers from Bicester to Heathrow, Luton, Gatwick and Birmingham. Quoted from your address, separate from a shopping trip. Standard Car or 8 Seater. Request a quote.">
+  <meta name="description" content="Airport transfers from Bicester. Heathrow Standard Car £110 one way, 8 Seater £140. Fares are fixed per vehicle and include the standard airport charge.">
   <link rel="canonical" href="https://www.spires-taxis.com/bicester-airport-transfers">
   <meta name="robots" content="index, follow">
   <meta property="og:type" content="website">
@@ -31,7 +31,7 @@
   <meta property="og:image:height" content="512">
   <meta name="twitter:image" content="https://www.spires-taxis.com/android-chrome-512x512.png">
   <meta property="og:title" content="Airport Transfers from Bicester | Spires Taxis">
-  <meta property="og:description" content="Airport transfers from Bicester to Heathrow, Luton, Gatwick and Birmingham. Quoted from your address, separate from a shopping trip. Standard Car or 8 Seater. Request a quote.">
+  <meta property="og:description" content="Airport transfers from Bicester. Heathrow Standard Car £110 one way, 8 Seater £140. Fares are fixed per vehicle and include the standard airport charge.">
   <meta property="og:url" content="https://www.spires-taxis.com/bicester-airport-transfers">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,7 +47,7 @@
         "name": "How much is a taxi from Bicester to Heathrow Airport?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "There is no published Bicester to Heathrow fare. Oxford airport prices do not apply. The Oxford to Bicester local guide fare is not an airport price. Send your Bicester address for a fixed quote."
+          "text": "Standard Car is £110 one way or £205 return. 8 Seater is £140 one way or £275 return. Fares are fixed per vehicle and include the standard airport charge. Oxford airport prices do not apply. The Oxford to Bicester local guide fare is not an airport price."
         }
       },
       {
@@ -110,7 +110,7 @@
         "name": "Airport transfers from Bicester",
         "serviceType": "Airport transfer",
         "url": "https://www.spires-taxis.com/bicester-airport-transfers",
-        "description": "Pre booked private airport transfers from Bicester to Heathrow, Luton, Gatwick and Birmingham Airport. Quoted from your pickup address.",
+        "description": "Pre booked private airport transfers from Bicester. Fixed fares for Heathrow, Gatwick, Luton and Stansted. Fares are fixed per vehicle and include the standard airport charge.",
         "provider": { "@id": "https://www.spires-taxis.com/#taxiservice" },
         "areaServed": { "@type": "City", "name": "Bicester" }
       },
@@ -378,7 +378,7 @@
   <section class="hero hero--compact">
     <div class="container hero__inner fade-in">
       <h1>Airport Transfers from Bicester</h1>
-      <p class="hero__lead">Pre booked private airport transfers from Bicester, separate from Bicester Village shopping trips. Heathrow via the M40, plus Luton, Gatwick and Birmingham Airport, quoted from your Bicester address.</p>
+      <p class="hero__lead">Pre booked private airport transfers from Bicester, separate from Bicester Village shopping trips. Heathrow, Gatwick, Luton and Stansted have fixed fares. Birmingham Airport is quoted from your Bicester address.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="https://wa.me/447776897772?text=Hi%2C%20airport%20transfer%20from%20Bicester%20on%20%5Bdate%5D.%20Pickup%3A%20%5Baddress%5D.%20Airport%3A%20%5Bairport%5D" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
@@ -405,33 +405,63 @@
     </div>
   </section>
 
-  <section class="section section--soft">
+  <section class="section section--soft" id="airport-fares">
     <div class="container">
+      <div class="price-block fade-in" data-spires-fare-table="bicester">
+        <div class="price-block__head">
+          <h2>Airport prices from Bicester</h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row">Heathrow</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£205</span><span class="fare-save" data-one-way="110" data-return="205">Save £15 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£140</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£275</span><span class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Gatwick</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£160</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£310</span><span class="fare-save" data-one-way="160" data-return="310">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£200</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="200" data-return="290">Save £110 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£165</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£320</span><span class="fare-save" data-one-way="165" data-return="320">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£210</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£410</span><span class="fare-save" data-one-way="210" data-return="410">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Luton</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£215</span><span class="fare-save" data-one-way="110" data-return="215">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£142</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£280</span><span class="fare-save" data-one-way="142" data-return="280">Save £4 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/rates#bicester-airport-fares">These fares on the rates page</a></p>
+      </div>
       <div class="section__header fade-in">
-        <h2>Airports from Bicester</h2>
-        <p>Heathrow, Luton and Birmingham are the natural geography. Gatwick and Stansted are quoted when those are the flights. Bristol is available but is a longer, less common request from Bicester than from the A34 towns.</p>
+        <h2>Other airports</h2>
+        <p>Airports not listed in the table are quoted from your address. Those fares are subject to change and are confirmed when you book.</p>
       </div>
       <div class="grid grid-3 fade-in">
-        <article class="card">
-          <h3>Bicester to Heathrow</h3>
-          <p class="card__price">Request a fixed quote</p>
-          <p class="card__meta">M40 corridor</p>
-        </article>
-        <article class="card">
-          <h3>Bicester to Luton</h3>
-          <p class="card__price">Request a fixed quote</p>
-          <p class="card__meta">A41 corridor</p>
-        </article>
-        <article class="card">
-          <h3>Bicester to Gatwick</h3>
-          <p class="card__price">Request a fixed quote</p>
-          <p class="card__meta">North or South terminal</p>
-        </article>
-        <article class="card">
-          <h3>Stansted</h3>
-          <p class="card__price">Request a fixed quote</p>
-          <p class="card__meta">Quoted from your address</p>
-        </article>
         <article class="card">
           <h3>Birmingham Airport</h3>
           <p class="card__price">Request a fixed quote</p>
@@ -445,11 +475,11 @@
     </div>
   </section>
 
-  <section class="section">
+<section class="section">
     <div class="container split">
       <div class="prose fade-in">
         <h2>Bicester to Heathrow taxi</h2>
-        <p>Send the terminal or flight number. Do not use <a href="/oxford-to-heathrow-taxi">Oxford to Heathrow</a> prices for a Bicester postcode. A Heathrow collection back to Bicester is quoted from your drop address, with flight monitoring as on <a href="/how-airport-pickup-works">how airport pickup works</a>. The wider county page is <a href="/oxfordshire-to-heathrow-airport-transfers">Oxfordshire to Heathrow airport transfers</a>.</p>
+        <p>Send the terminal or flight number. Do not use <a href="/oxford-to-heathrow-taxi">Oxford to Heathrow</a> prices for a Bicester postcode. The Bicester table on this page is the fixed fare, including a Heathrow collection back to Bicester, with flight monitoring as on <a href="/how-airport-pickup-works">how airport pickup works</a>. The wider county page is <a href="/oxfordshire-to-heathrow-airport-transfers">Oxfordshire to Heathrow airport transfers</a>.</p>
       </div>
       <div class="fade-in">
         <h2>Vehicles</h2>
@@ -486,7 +516,7 @@
       <div class="faq fade-in">
         <details>
           <summary>How much is a taxi from Bicester to Heathrow Airport?</summary>
-          <p>There is no published Bicester to Heathrow fare. Oxford airport prices do not apply. The Oxford to Bicester local guide fare is not an airport price. Send your Bicester address for a fixed quote.</p>
+          <p>Standard Car is £110 one way or £205 return. 8 Seater is £140 one way or £275 return. Fares are fixed per vehicle and include the standard airport charge. Oxford airport prices do not apply. The Oxford to Bicester local guide fare is not an airport price.</p>
         </details>
         <details>
           <summary>Do you provide airport transfers from Bicester?</summary>

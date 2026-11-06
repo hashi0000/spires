@@ -368,7 +368,7 @@
   <section class="hero hero--compact">
     <div class="container hero__inner fade-in">
       <h1>Taxi prices from&nbsp;Oxford</h1>
-      <p class="hero__lead">Clear fixed fares for pre booked journeys from Oxford. Airport prices apply to journeys to or from Oxford, and are agreed at the time of booking.</p>
+      <p class="hero__lead">Clear fixed fares for pre booked journeys from Oxford. Airport prices apply to journeys to or from Oxford, and are agreed at the time of booking. Fixed airport fares for Abingdon, Didcot, Bicester and Witney are further down this page.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="/contact" class="btn btn--outline">Ask for a quote</a>
@@ -378,61 +378,75 @@
 
   <section class="section section--soft">
     <div class="container">
-      <div class="price-block fade-in">
+      <div class="price-block fade-in" data-spires-fare-table="oxford">
         <div class="price-block__head">
           <h2>Airport prices from Oxford</h2>
-          <p class="price-block__note" data-spires-origin="tableIntro">Fixed fares for airport transfers to or from Oxford. Airport charges are included.</p>
+          <p class="price-block__note" data-spires-origin="tableIntro">Fares are fixed per vehicle and include the standard airport charge.</p>
         </div>
         <div class="airport-fare-table-wrap">
           <table class="airport-fare-table">
-            <thead>
+            <thead data-spires-fare-head>
               <tr>
-                <th>Airport</th>
-                <th>Standard Car<span class="th-sub">RAV4 / Corolla or similar</span></th>
-                <th>8 Seater<span class="th-sub">Mercedes Vito or similar</span></th>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
               </tr>
             </thead>
-            <tbody id="airport-price-tbody">
+            <tbody data-spires-fare-body>
               <tr class="airport-fare-table__row--featured">
                 <th scope="row"><a href="/oxford-to-heathrow-taxi">Heathrow</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£92 one way</span><span class="fare-stack__line fare-stack__line--return">£180 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£120 one way</span><span class="fare-stack__line fare-stack__line--return">£235 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£92</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£180</span><span class="fare-save" data-one-way="92" data-return="180">Save £4 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£120</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£235</span><span class="fare-save" data-one-way="120" data-return="235">Save £5 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-gatwick-taxi">Gatwick</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£140 one way</span><span class="fare-stack__line fare-stack__line--return">£270 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£175 one way</span><span class="fare-stack__line fare-stack__line--return">£340 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£140</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£270</span><span class="fare-save" data-one-way="140" data-return="270">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£175</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£340</span><span class="fare-save" data-one-way="175" data-return="340">Save £10 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-stansted-taxi">Stansted</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£150 one way</span><span class="fare-stack__line fare-stack__line--return">£290 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£185 one way</span><span class="fare-stack__line fare-stack__line--return">£360 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£150</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="150" data-return="290">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£185</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£360</span><span class="fare-save" data-one-way="185" data-return="360">Save £10 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-luton-taxi">Luton</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£105 one way</span><span class="fare-stack__line fare-stack__line--return">£205 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£130 one way</span><span class="fare-stack__line fare-stack__line--return">£255 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£105</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£205</span><span class="fare-save" data-one-way="105" data-return="205">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£130</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£255</span><span class="fare-save" data-one-way="130" data-return="255">Save £5 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-birmingham-airport-taxi">Birmingham</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£110 one way</span><span class="fare-stack__line fare-stack__line--return">£215 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£145 one way</span><span class="fare-stack__line fare-stack__line--return">£280 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£215</span><span class="fare-save" data-one-way="110" data-return="215">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£145</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£280</span><span class="fare-save" data-one-way="145" data-return="280">Save £10 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-london-city-airport-taxi">London City</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£150 one way</span><span class="fare-stack__line fare-stack__line--return">£290 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£190 one way</span><span class="fare-stack__line fare-stack__line--return">£370 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£150</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="150" data-return="290">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£190</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£370</span><span class="fare-save" data-one-way="190" data-return="370">Save £10 compared with two one way bookings.</span></td>
               </tr>
               <tr>
                 <th scope="row"><a href="/oxford-to-bristol-airport-taxi">Bristol</a></th>
-                <td><div class="fare-stack"><span class="fare-stack__line">£165 one way</span><span class="fare-stack__line fare-stack__line--return">£320 return</span></div></td>
-                <td><div class="fare-stack"><span class="fare-stack__line">£205 one way</span><span class="fare-stack__line fare-stack__line--return">£400 return</span></div></td>
+                <td data-label="Standard Car one way"><span class="fare-amount">£165</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£320</span><span class="fare-save" data-one-way="165" data-return="320">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£205</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£400</span><span class="fare-save" data-one-way="205" data-return="400">Save £10 compared with two one way bookings.</span></td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div class="airport-fare-cards" id="airport-price-cards"></div>
-        <p class="price-block__save-note" id="airport-return-saving-note">Book both journeys together and save on the return fare.</p>
         <p class="price-block__outside" data-spires-origin="outsideOxfordNote">Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.</p>
         <div class="airport-included">
           <h3>Included with your airport transfer</h3>
@@ -446,6 +460,215 @@
         <p class="vehicle-disclaimer" data-spires-disclaimer>Vehicle models are examples only and may vary depending on availability and booking requirements. Luggage capacity depends on passenger numbers. Please tell us about large or additional luggage when booking.</p>
         <p class="price-block__quote">Need a different journey? Send us your pickup address, travel date and flight details for a quote. Fares from outside Oxford are subject to change and are confirmed when you book. Existing quotes and confirmed bookings keep the fare originally agreed.</p>
         <div id="uk-fuel-tracker" class="fuel-tracker" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="oxfordshire-airport-fares">
+    <div class="container">
+      <div class="section__header fade-in">
+        <h2>Fixed airport fares from Oxfordshire</h2>
+        <p>These fares are for Abingdon, Didcot, Bicester and Witney. Fares are fixed per vehicle and include the standard airport charge. Other towns, and airports not listed here, are quoted separately and are subject to change.</p>
+      </div>
+      <div class="price-block fade-in" id="abingdon-airport-fares" data-spires-fare-table="abingdon">
+        <div class="price-block__head">
+          <h2><a href="/abingdon-airport-transfers#airport-fares">Abingdon</a></h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row">Heathrow</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£105</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£205</span><span class="fare-save" data-one-way="105" data-return="205">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£138</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£270</span><span class="fare-save" data-one-way="138" data-return="270">Save £6 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Gatwick</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£150</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£295</span><span class="fare-save" data-one-way="150" data-return="295">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£190</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£375</span><span class="fare-save" data-one-way="190" data-return="375">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£160</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£315</span><span class="fare-save" data-one-way="160" data-return="315">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£195</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£380</span><span class="fare-save" data-one-way="195" data-return="380">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Luton</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£115</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£225</span><span class="fare-save" data-one-way="115" data-return="225">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£150</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="150" data-return="290">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/abingdon-airport-transfers#airport-fares">Full Abingdon fare table</a></p>
+      </div>
+      <div class="price-block fade-in" id="didcot-airport-fares" data-spires-fare-table="didcot">
+        <div class="price-block__head">
+          <h2><a href="/didcot-airport-transfers#airport-fares">Didcot</a></h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row">Heathrow</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£216</span><span class="fare-save" data-one-way="110" data-return="216">Save £4 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£140</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£275</span><span class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Gatwick</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£160</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£310</span><span class="fare-save" data-one-way="160" data-return="310">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£205</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£400</span><span class="fare-save" data-one-way="205" data-return="400">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£175</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£340</span><span class="fare-save" data-one-way="175" data-return="340">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£215</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£420</span><span class="fare-save" data-one-way="215" data-return="420">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Luton</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£130</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£255</span><span class="fare-save" data-one-way="130" data-return="255">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£160</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£310</span><span class="fare-save" data-one-way="160" data-return="310">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/didcot-airport-transfers#airport-fares">Full Didcot fare table</a></p>
+      </div>
+      <div class="price-block fade-in" id="bicester-airport-fares" data-spires-fare-table="bicester">
+        <div class="price-block__head">
+          <h2><a href="/bicester-airport-transfers#airport-fares">Bicester</a></h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row">Heathrow</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£205</span><span class="fare-save" data-one-way="110" data-return="205">Save £15 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£140</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£275</span><span class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Gatwick</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£160</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£310</span><span class="fare-save" data-one-way="160" data-return="310">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£200</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£290</span><span class="fare-save" data-one-way="200" data-return="290">Save £110 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£165</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£320</span><span class="fare-save" data-one-way="165" data-return="320">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£210</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£410</span><span class="fare-save" data-one-way="210" data-return="410">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Luton</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£110</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£215</span><span class="fare-save" data-one-way="110" data-return="215">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£142</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£280</span><span class="fare-save" data-one-way="142" data-return="280">Save £4 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/bicester-airport-transfers#airport-fares">Full Bicester fare table</a></p>
+      </div>
+      <div class="price-block fade-in" id="witney-airport-fares" data-spires-fare-table="witney">
+        <div class="price-block__head">
+          <h2><a href="/witney-airport-transfers#airport-fares">Witney</a></h2>
+          <p class="price-block__note">Fares are fixed per vehicle and include the standard airport charge.</p>
+        </div>
+        <div class="airport-fare-table-wrap">
+          <table class="airport-fare-table">
+            <thead data-spires-fare-head>
+              <tr>
+                <th scope="col">Airport</th>
+                <th scope="col">Standard Car one way<span class="th-sub">RAV4 / Corolla or&nbsp;similar</span></th>
+                <th scope="col">Standard Car return</th>
+                <th scope="col">8 Seater one way<span class="th-sub">Mercedes Vito or&nbsp;similar</span></th>
+                <th scope="col">8 Seater return</th>
+              </tr>
+            </thead>
+            <tbody data-spires-fare-body>
+              <tr class="airport-fare-table__row--featured">
+                <th scope="row">Heathrow</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£108</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£212</span><span class="fare-save" data-one-way="108" data-return="212">Save £4 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£140</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£275</span><span class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Gatwick</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£160</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£315</span><span class="fare-save" data-one-way="160" data-return="315">Save £5 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£205</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£395</span><span class="fare-save" data-one-way="205" data-return="395">Save £15 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Stansted</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£172</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£334</span><span class="fare-save" data-one-way="172" data-return="334">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£210</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£410</span><span class="fare-save" data-one-way="210" data-return="410">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Luton</th>
+                <td data-label="Standard Car one way"><span class="fare-amount">£125</span></td>
+                <td data-label="Standard Car return"><span class="fare-amount">£240</span><span class="fare-save" data-one-way="125" data-return="240">Save £10 compared with two one way bookings.</span></td>
+                <td data-label="8 Seater one way"><span class="fare-amount">£155</span></td>
+                <td data-label="8 Seater return"><span class="fare-amount">£300</span><span class="fare-save" data-one-way="155" data-return="300">Save £10 compared with two one way bookings.</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="price-block__quote"><a href="/witney-airport-transfers#airport-fares">Full Witney fare table</a></p>
       </div>
     </div>
   </section>

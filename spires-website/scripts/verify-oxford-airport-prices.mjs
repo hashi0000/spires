@@ -100,6 +100,86 @@ for (const file of ["index.html", "rates.html", "airport-transfers.html", "oxfor
   }
 }
 
+const regional = ctx.window.SPIRES_REGIONAL_FARES;
+const expectedRegional = {
+  abingdon: {
+    heathrow: { standardCar: [105, 205], vito: [138, 270] },
+    gatwick: { standardCar: [150, 295], vito: [190, 375] },
+    stansted: { standardCar: [160, 315], vito: [195, 380] },
+    luton: { standardCar: [115, 225], vito: [150, 290] },
+  },
+  didcot: {
+    heathrow: { standardCar: [110, 216], vito: [140, 275] },
+    gatwick: { standardCar: [160, 310], vito: [205, 400] },
+    stansted: { standardCar: [175, 340], vito: [215, 420] },
+    luton: { standardCar: [130, 255], vito: [160, 310] },
+  },
+  bicester: {
+    heathrow: { standardCar: [110, 205], vito: [140, 275] },
+    gatwick: { standardCar: [160, 310], vito: [200, 290] },
+    stansted: { standardCar: [165, 320], vito: [210, 410] },
+    luton: { standardCar: [110, 215], vito: [142, 280] },
+  },
+  witney: {
+    heathrow: { standardCar: [108, 212], vito: [140, 275] },
+    gatwick: { standardCar: [160, 315], vito: [205, 395] },
+    stansted: { standardCar: [172, 334], vito: [210, 410] },
+    luton: { standardCar: [125, 240], vito: [155, 300] },
+  },
+};
+for (const [originId, airports] of Object.entries(expectedRegional)) {
+  const origin = regional[originId];
+  assert(!!origin, "missing regional origin " + originId);
+  for (const [airportId, classes] of Object.entries(airports)) {
+    const route = origin.routes[airportId];
+    assert(!!route, originId + " missing " + airportId);
+    assert(route.standardCar.oneWay === classes.standardCar[0], originId + " " + airportId + " SC one way");
+    assert(route.standardCar.return === classes.standardCar[1], originId + " " + airportId + " SC return");
+    assert(route.vito.oneWay === classes.vito[0], originId + " " + airportId + " 8s one way");
+    assert(route.vito.return === classes.vito[1], originId + " " + airportId + " 8s return");
+  }
+}
+const bicesterGatwickEight = ctx.window.SPIRES_returnSaving(regional.bicester.routes.gatwick.vito);
+assert(bicesterGatwickEight === 110, "Bicester Gatwick 8 Seater saving should calculate to 110, got " + bicesterGatwickEight);
+assert(
+  ctx.window.SPIRES_saveSentence(110) === "Save £110 compared with two one way bookings.",
+  "saving sentence"
+);
+
+const columnHeading = "Standard Car one way";
+const farePages = {
+  "rates.html": ["oxford", "abingdon", "didcot", "bicester", "witney"],
+  "airport-transfers.html": ["oxford"],
+  "abingdon-airport-transfers.html": ["abingdon"],
+  "didcot-airport-transfers.html": ["didcot"],
+  "bicester-airport-transfers.html": ["bicester"],
+  "witney-airport-transfers.html": ["witney"],
+};
+for (const [file, origins] of Object.entries(farePages)) {
+  const html = readFileSync(join(website, file), "utf8");
+  assert(html.includes(columnHeading), file + " missing shared column heading");
+  assert(html.includes("8 Seater return"), file + " missing 8 Seater return column");
+  assert(html.includes("Fares are fixed per vehicle and include the standard airport charge."), file + " missing fare note");
+  for (const origin of origins) {
+    assert(html.includes('data-spires-fare-table="' + origin + '"'), file + " missing table " + origin);
+  }
+}
+assert(readFileSync(join(website, "bicester-airport-transfers.html"), "utf8").includes("Save £110 compared with two one way bookings."), "Bicester page should show the calculated £110 saving");
+assert(readFileSync(join(website, "rates.html"), "utf8").includes("Save £110 compared with two one way bookings."), "rates page should show the calculated £110 saving");
+
+const homeFares = readFileSync(join(website, "index.html"), "utf8");
+assert(homeFares.includes("Fixed airport fares from Oxfordshire"), "homepage Oxfordshire fare heading");
+assert(homeFares.includes("Heathrow one way fares"), "homepage Heathrow one way label");
+assert(homeFares.includes('href="/abingdon-airport-transfers#airport-fares"'), "homepage Abingdon fare link");
+assert(homeFares.includes('href="/didcot-airport-transfers#airport-fares"'), "homepage Didcot fare link");
+assert(homeFares.includes('href="/bicester-airport-transfers#airport-fares"'), "homepage Bicester fare link");
+assert(homeFares.includes('href="/witney-airport-transfers#airport-fares"'), "homepage Witney fare link");
+assert(homeFares.includes('href="/rates#oxfordshire-airport-fares"'), "homepage rates link");
+assert(homeFares.includes(">£105 <span>one way</span>"), "homepage Abingdon Heathrow one way");
+assert(homeFares.includes(">£138 <span>one way</span>"), "homepage Abingdon 8 Seater");
+assert(homeFares.includes(">£110 <span>one way</span>"), "homepage Didcot or Bicester Heathrow one way");
+assert(homeFares.includes(">£108 <span>one way</span>"), "homepage Witney Heathrow one way");
+
 if (failures.length) {
   console.error("FAILED:\n" + failures.map((f) => " - " + f).join("\n"));
   process.exit(1);
