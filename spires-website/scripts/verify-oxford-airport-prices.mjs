@@ -76,20 +76,20 @@ assert(!home.includes("trust-strip"), "homepage must not have the lower trust st
 const homeH1 = (home.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || "";
 assert(
   homeH1.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim() ===
-    "Spires Taxis. Book ahead with your price agreed before you travel.",
+    "Oxford Airport Transfers and Private Hire",
   "homepage H1"
 );
 assert(home.includes("Book online"), "homepage primary CTA");
 assert(home.includes("WhatsApp for a quote"), "homepage WhatsApp CTA");
 assert(home.includes("Call now"), "homepage call CTA");
 assert(home.includes("Oxford to Stansted"), "homepage should feature Stansted");
-assert(home.includes("Do not assume these prices apply"), "homepage should warn other towns not to assume Oxford fares");
+assert(home.includes("each have their own published airport fares"), "homepage should point to published town fares");
 
 const rates = readFileSync(join(website, "rates.html"), "utf8");
 assert(rates.includes("Airport prices from Oxford"), "rates heading");
 assert(rates.includes("Travelling from outside Oxford?"), "rates outside Oxford note");
 assert(rates.includes("subject to change"), "rates should say other-town fares are subject to change");
-assert(rates.includes("Do not assume these prices apply"), "rates should warn other towns not to assume Oxford fares");
+assert(rates.includes("each have their own published airport fares"), "rates should point to published town fares");
 assert(!rates.includes("From £92"), "do not use From £ on published Oxford fares");
 
 const oldPrices = ["£95 one way", "£185 return", "£125 one way", "£245 return"];
@@ -116,7 +116,7 @@ const expectedRegional = {
   },
   bicester: {
     heathrow: { standardCar: [110, 205], vito: [140, 275] },
-    gatwick: { standardCar: [160, 310], vito: [200, 290] },
+    gatwick: { standardCar: [160, 290], vito: [200, 290] },
     stansted: { standardCar: [165, 320], vito: [210, 410] },
     luton: { standardCar: [110, 215], vito: [142, 280] },
   },
@@ -142,7 +142,7 @@ for (const [originId, airports] of Object.entries(expectedRegional)) {
 const bicesterGatwickEight = ctx.window.SPIRES_returnSaving(regional.bicester.routes.gatwick.vito);
 assert(bicesterGatwickEight === 110, "Bicester Gatwick 8 Seater saving should calculate to 110, got " + bicesterGatwickEight);
 assert(
-  ctx.window.SPIRES_saveSentence(110) === "Save £110 compared with two one way bookings.",
+  ctx.window.SPIRES_saveSentence(110) === "Save £110 on a return",
   "saving sentence"
 );
 
@@ -159,13 +159,14 @@ for (const [file, origins] of Object.entries(farePages)) {
   const html = readFileSync(join(website, file), "utf8");
   assert(html.includes(columnHeading), file + " missing shared column heading");
   assert(html.includes("8 Seater return"), file + " missing 8 Seater return column");
-  assert(html.includes("Fares are fixed per vehicle and include the standard airport charge."), file + " missing fare note");
+  assert(html.includes("Prices are per vehicle and include standard airport pickup or drop off charges."), file + " missing fare note");
   for (const origin of origins) {
     assert(html.includes('data-spires-fare-table="' + origin + '"'), file + " missing table " + origin);
   }
 }
-assert(readFileSync(join(website, "bicester-airport-transfers.html"), "utf8").includes("Save £110 compared with two one way bookings."), "Bicester page should show the calculated £110 saving");
-assert(readFileSync(join(website, "rates.html"), "utf8").includes("Save £110 compared with two one way bookings."), "rates page should show the calculated £110 saving");
+assert(readFileSync(join(website, "bicester-airport-transfers.html"), "utf8").includes("Save £110 on a return"), "Bicester page should show the calculated £110 saving");
+assert(readFileSync(join(website, "rates.html"), "utf8").includes("Save £110 on a return"), "rates page should show the calculated £110 saving");
+assert(readFileSync(join(website, "bicester-airport-transfers.html"), "utf8").includes("Save £30 on a return"), "Bicester Gatwick Standard Car return saving");
 
 const homeFares = readFileSync(join(website, "index.html"), "utf8");
 assert(homeFares.includes("Fixed airport fares from Oxfordshire"), "homepage Oxfordshire fare heading");

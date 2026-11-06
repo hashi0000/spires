@@ -56,11 +56,17 @@
       {
         "@type": "Organization",
         "@id": "https://www.spires-taxis.com/#organization",
-        "name": "Spires Taxis",
+        "name": "Spires Taxis Ltd",
+        "alternateName": "Spires Taxis",
         "url": "https://www.spires-taxis.com",
         "logo": "https://www.spires-taxis.com/android-chrome-512x512.png",
         "telephone": "+447776897772",
         "email": "bookings@spires-taxis.com",
+        "identifier": {
+          "@type": "PropertyValue",
+          "propertyID": "Oxford City Council private hire operator number",
+          "value": "55"
+        },
         "sameAs": [
           "https://www.trustpilot.com/review/spires-taxis.com",
           "https://www.facebook.com/profile.php?id=61581257649968",
@@ -78,7 +84,7 @@
       {
         "@type": "TaxiService",
         "@id": "https://www.spires-taxis.com/#taxiservice",
-        "name": "Spires Taxis",
+        "name": "Spires Taxis Ltd",
         "url": "https://www.spires-taxis.com",
         "telephone": "+447776897772",
         "email": "bookings@spires-taxis.com",
@@ -390,25 +396,8 @@
       </svg>
     </div>
     <div class="container hero__inner fade-in">
-      <aside id="half-term-offer" class="half-term-banner" hidden>
-        <svg class="half-term-banner__art" viewBox="0 0 92 56" aria-hidden="true">
-          <path d="M4 40 C0 30 8 22 16 26 C18 16 30 16 30 28 C38 24 44 34 36 42 C28 50 8 48 4 40 Z" fill="#f08a2a"/>
-          <path d="M18 28 C20 20 28 20 26 30" stroke="#3d7a45" stroke-width="1.6" fill="none"/>
-          <path d="M14 34 L18 38 L14 39 Z M26 34 L22 38 L26 39 Z" fill="#5a2e12"/>
-          <path d="M40 44 C36 34 46 26 54 32 C58 22 72 24 70 36 C80 34 84 46 74 50 C62 56 44 52 40 44 Z" fill="#e07a2f"/>
-          <path d="M56 34 C58 26 66 26 64 36" stroke="#3d7a45" stroke-width="1.6" fill="none"/>
-          <path d="M52 42 L56 46 L52 47 Z M66 42 L62 46 L66 47 Z" fill="#5a2e12"/>
-          <path d="M70 16 C78 8 88 14 84 24 C76 20 72 18 70 16 Z" fill="#d4532a"/>
-          <path d="M8 14 C16 6 24 12 20 20 C12 16 8 16 8 14 Z" fill="#c9842f"/>
-        </svg>
-        <div class="half-term-banner__copy">
-          <h2>Half term offer: £5 off airport return bookings</h2>
-          <p>Request your quote online by <span class="half-term-banner__date">2 November</span></p>
-        </div>
-        <a class="btn btn--primary" href="/contact#booking">Request a quote</a>
-      </aside>
-      <h1>Spires Taxis.<br>Book ahead with your price agreed before&nbsp;you&nbsp;travel.</h1>
-      <p class="hero__lead">We're a private hire company based in Oxford, providing airport transfers, hotel pickups and journeys around the city. Book in advance and we'll confirm your fare before you travel, with no meter running in traffic or surge pricing.</p>
+      <h1>Oxford Airport Transfers and Private Hire</h1>
+      <p class="hero__lead">Spires Taxis Ltd provides pre booked airport transfers, hotel pickups and private hire around Oxford. The fare is confirmed before you travel.</p>
       <div class="btn-group">
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="https://wa.me/447776897772?text=Hi%2C%20I%27d%20like%20a%20quote%20for%20a%20taxi%20please" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp for a quote</a>
@@ -445,7 +434,7 @@
     <div class="container">
       <div class="section__header fade-in">
         <h2>Airport transfers from Oxford</h2>
-        <p>Fixed fares for journeys to or from Oxford. Heathrow, Gatwick and Stansted are the routes we book most often. Airport charges are included. <a href="/rates">Full airport price guide</a> including 8 Seater prices.</p>
+        <p>Fixed fares for journeys to or from Oxford. Heathrow, Gatwick and Stansted are the routes we book most often. <a href="/rates">All airport fares</a> include Standard Car and 8 Seater. Prices are per vehicle and include standard airport pickup or drop off charges.</p>
       </div>
       <div class="grid grid-3 fade-in">
         <a href="/oxford-to-heathrow-taxi" class="card card--link">
@@ -454,8 +443,11 @@
             <p class="card__price"><span data-spires-price="heathrow.standardCar.oneWay">£92</span> one way</p>
             <p class="card__price"><span data-spires-price="heathrow.standardCar.return">£180</span> return</p>
           </div>
-          <p class="price-save" data-spires-save="heathrow.standardCar">Save £4 compared with two one way bookings.</p>
-          <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar · up to 4</p>
+          <p class="price-save" data-spires-save="heathrow.standardCar">Save £4 on a return</p>
+          <p class="card__meta">Standard Car · up to 4</p>
+          <p class="card__price"><span data-spires-price="heathrow.vito.oneWay">£120</span> one way · <span data-spires-price="heathrow.vito.return">£235</span> return</p>
+          <p class="price-save" data-spires-save="heathrow.vito">Save £5 on a return</p>
+          <p class="card__meta">8 Seater · up to 8</p>
         </a>
         <a href="/oxford-to-gatwick-taxi" class="card card--link">
           <h3>Oxford to Gatwick</h3>
@@ -463,7 +455,11 @@
             <p class="card__price"><span data-spires-price="gatwick.standardCar.oneWay">£140</span> one way</p>
             <p class="card__price"><span data-spires-price="gatwick.standardCar.return">£270</span> return</p>
           </div>
-          <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar · up to 4</p>
+          <p class="price-save" data-spires-save="gatwick.standardCar">Save £10 on a return</p>
+          <p class="card__meta">Standard Car · up to 4</p>
+          <p class="card__price"><span data-spires-price="gatwick.vito.oneWay">£175</span> one way · <span data-spires-price="gatwick.vito.return">£340</span> return</p>
+          <p class="price-save" data-spires-save="gatwick.vito">Save £10 on a return</p>
+          <p class="card__meta">8 Seater · up to 8</p>
         </a>
         <a href="/oxford-to-stansted-taxi" class="card card--link">
           <h3>Oxford to Stansted</h3>
@@ -471,11 +467,15 @@
             <p class="card__price"><span data-spires-price="stansted.standardCar.oneWay">£150</span> one way</p>
             <p class="card__price"><span data-spires-price="stansted.standardCar.return">£290</span> return</p>
           </div>
-          <p class="card__meta">Standard Car · Toyota RAV4 / Corolla or similar · up to 4</p>
+          <p class="price-save" data-spires-save="stansted.standardCar">Save £10 on a return</p>
+          <p class="card__meta">Standard Car · up to 4</p>
+          <p class="card__price"><span data-spires-price="stansted.vito.oneWay">£185</span> one way · <span data-spires-price="stansted.vito.return">£360</span> return</p>
+          <p class="price-save" data-spires-save="stansted.vito">Save £10 on a return</p>
+          <p class="card__meta">8 Seater · up to 8</p>
         </a>
       </div>
-      <p class="fade-in" style="margin-top:1.5rem;"><a href="/airport-transfers">All airport transfers</a> · <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a> · <a href="/oxford-to-luton-taxi">Oxford to Luton</a> · <a href="/how-airport-pickup-works">How pickup works</a> · <a href="/rates">Full rate card</a></p>
-      <p class="fade-in" data-spires-origin="outsideOxfordNote" style="margin-top:0.75rem;">Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.</p>
+      <p class="fade-in" style="margin-top:1.5rem;">The saving compares the return fare with two one way bookings. <a href="/airport-transfers">All airport transfers</a> · <a href="/heathrow-to-oxford-taxi">Heathrow to Oxford</a> · <a href="/oxford-to-luton-taxi">Oxford to Luton</a> · <a href="/how-airport-pickup-works">How pickup works</a> · <a href="/rates">Full rate card</a></p>
+      <p class="fade-in" data-spires-origin="outsideOxfordNote" style="margin-top:0.75rem;">Travelling from outside Oxford? Oxford fares apply to Oxford. Abingdon, Didcot, Bicester and Witney each have their own published airport fares. An individual quote is needed when there is no published fare, for nearby villages outside that coverage, or for extra requirements.</p>
     </div>
   </section>
 
@@ -483,7 +483,7 @@
     <div class="container">
       <div class="section__header fade-in">
         <h2>Fixed airport fares from Oxfordshire</h2>
-        <p>Heathrow one way fares from Abingdon, Didcot, Bicester and Witney, with the return fare beside them. Fares are fixed per vehicle and include the standard airport charge.</p>
+        <p>Heathrow fares from Abingdon, Didcot, Bicester and Witney. Each town has its own published prices. Prices are per vehicle and include standard airport pickup or drop off charges.</p>
       </div>
       <div class="grid grid-2 fade-in">
         <a href="/abingdon-airport-transfers#airport-fares" class="card card--link oxon-fare-card">
@@ -494,16 +494,16 @@
               <p class="oxon-fare-card__class">Standard Car</p>
               <p class="oxon-fare-card__price">£105 <span>one way</span></p>
               <p class="oxon-fare-card__price">£205 <span>return</span></p>
-              <p class="fare-save" data-one-way="105" data-return="205">Save £5 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="105" data-return="205">Save £5 on a return</p>
             </div>
             <div>
               <p class="oxon-fare-card__class">8 Seater</p>
               <p class="oxon-fare-card__price">£138 <span>one way</span></p>
               <p class="oxon-fare-card__price">£270 <span>return</span></p>
-              <p class="fare-save" data-one-way="138" data-return="270">Save £6 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="138" data-return="270">Save £6 on a return</p>
             </div>
           </div>
-          <p class="oxon-fare-card__more">Full Abingdon fare table</p>
+          <p class="oxon-fare-card__more">Abingdon airport taxi prices</p>
         </a>
         <a href="/didcot-airport-transfers#airport-fares" class="card card--link oxon-fare-card">
           <h3>Didcot</h3>
@@ -513,16 +513,16 @@
               <p class="oxon-fare-card__class">Standard Car</p>
               <p class="oxon-fare-card__price">£110 <span>one way</span></p>
               <p class="oxon-fare-card__price">£216 <span>return</span></p>
-              <p class="fare-save" data-one-way="110" data-return="216">Save £4 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="110" data-return="216">Save £4 on a return</p>
             </div>
             <div>
               <p class="oxon-fare-card__class">8 Seater</p>
               <p class="oxon-fare-card__price">£140 <span>one way</span></p>
               <p class="oxon-fare-card__price">£275 <span>return</span></p>
-              <p class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="140" data-return="275">Save £5 on a return</p>
             </div>
           </div>
-          <p class="oxon-fare-card__more">Full Didcot fare table</p>
+          <p class="oxon-fare-card__more">Didcot airport taxi prices</p>
         </a>
         <a href="/bicester-airport-transfers#airport-fares" class="card card--link oxon-fare-card">
           <h3>Bicester</h3>
@@ -532,16 +532,16 @@
               <p class="oxon-fare-card__class">Standard Car</p>
               <p class="oxon-fare-card__price">£110 <span>one way</span></p>
               <p class="oxon-fare-card__price">£205 <span>return</span></p>
-              <p class="fare-save" data-one-way="110" data-return="205">Save £15 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="110" data-return="205">Save £15 on a return</p>
             </div>
             <div>
               <p class="oxon-fare-card__class">8 Seater</p>
               <p class="oxon-fare-card__price">£140 <span>one way</span></p>
               <p class="oxon-fare-card__price">£275 <span>return</span></p>
-              <p class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="140" data-return="275">Save £5 on a return</p>
             </div>
           </div>
-          <p class="oxon-fare-card__more">Full Bicester fare table</p>
+          <p class="oxon-fare-card__more">Bicester airport taxi prices</p>
         </a>
         <a href="/witney-airport-transfers#airport-fares" class="card card--link oxon-fare-card">
           <h3>Witney</h3>
@@ -551,16 +551,16 @@
               <p class="oxon-fare-card__class">Standard Car</p>
               <p class="oxon-fare-card__price">£108 <span>one way</span></p>
               <p class="oxon-fare-card__price">£212 <span>return</span></p>
-              <p class="fare-save" data-one-way="108" data-return="212">Save £4 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="108" data-return="212">Save £4 on a return</p>
             </div>
             <div>
               <p class="oxon-fare-card__class">8 Seater</p>
               <p class="oxon-fare-card__price">£140 <span>one way</span></p>
               <p class="oxon-fare-card__price">£275 <span>return</span></p>
-              <p class="fare-save" data-one-way="140" data-return="275">Save £5 compared with two one way bookings.</p>
+              <p class="fare-save" data-one-way="140" data-return="275">Save £5 on a return</p>
             </div>
           </div>
-          <p class="oxon-fare-card__more">Full Witney fare table</p>
+          <p class="oxon-fare-card__more">Witney airport taxi prices</p>
         </a>
       </div>
       <p class="fade-in" style="margin-top:1.25rem;"><a href="/rates#oxfordshire-airport-fares">All airport fares on the rates page</a></p>
@@ -628,8 +628,8 @@
       <div class="prose fade-in">
         <p class="section__eyebrow">Why book with us</p>
         <h2>You know the price before the car turns up</h2>
-        <p>That's the main reason people use us for airports. We quote a fixed fare for the journey. It includes the driver, fuel and the standard airport charge. If we are collecting you from the airport, we also monitor your flight. If your plans change, such as an extra stop or a different terminal, we'll tell you before anything extra is added.</p>
-        <p>We know Oxford's roads, the college areas, where traffic builds at rush hour, and which route to Heathrow makes sense at what time of day. We're licensed for private hire work in Oxford, not a national app dispatching cars from miles away.</p>
+        <p>That's the main reason people use us for airports. We quote a fixed fare for the journey. Prices are per vehicle and include standard airport pickup or drop off charges. If we are collecting you from the airport, we monitor the flight. If your plans change, such as an extra stop or a different terminal, we'll tell you before anything extra is added.</p>
+        <p>We know Oxford's roads, the college areas, where traffic builds at rush hour, and which route to Heathrow makes sense at what time of day. Spires Taxis Ltd is an Oxford City Council licensed private hire operator.</p>
         <p><a href="/about">Read about the company</a></p>
       </div>
       <div class="fade-in">
@@ -670,13 +670,24 @@
       </div>
       <div class="grid grid-3 fade-in">
         <a href="/oxford-taxis" class="card card--link"><h3>Oxford</h3><p class="card__meta">Headington · Summertown · Cowley</p></a>
-        <a href="/abingdon-taxis" class="card card--link"><h3>Abingdon</h3><p class="card__meta">Standard Car £20–£35</p></a>
-        <a href="/bicester-taxis" class="card card--link"><h3>Bicester</h3><p class="card__meta">Standard Car £35–£55</p></a>
-        <a href="/banbury-to-oxford-taxi" class="card card--link"><h3>Banbury</h3><p class="card__meta">Standard Car £45–£70</p></a>
-        <a href="/witney-taxis" class="card card--link"><h3>Witney</h3><p class="card__meta">Standard Car £35–£55</p></a>
-        <a href="/didcot-taxis" class="card card--link"><h3>Didcot</h3><p class="card__meta">Standard Car £35–£55</p></a>
+        <a href="/abingdon-taxis" class="card card--link"><h3>Oxford ↔ Abingdon</h3><p class="card__meta">Local guide, Standard Car £20–£35</p></a>
+        <a href="/bicester-taxis" class="card card--link"><h3>Oxford ↔ Bicester</h3><p class="card__meta">Local guide, Standard Car £35–£55</p></a>
+        <a href="/banbury-to-oxford-taxi" class="card card--link"><h3>Oxford ↔ Banbury</h3><p class="card__meta">Local guide, Standard Car £45–£70</p></a>
+        <a href="/witney-taxis" class="card card--link"><h3>Oxford ↔ Witney</h3><p class="card__meta">Local guide, Standard Car £35–£55</p></a>
+        <a href="/didcot-taxis" class="card card--link"><h3>Oxford ↔ Didcot</h3><p class="card__meta">Local guide, Standard Car £35–£55</p></a>
       </div>
-      <p class="fade-in" style="margin-top:1.25rem;">Also <a href="/kidlington-taxis">Kidlington</a>, <a href="/woodstock-taxis">Woodstock</a>, <a href="/wantage-taxis">Wantage</a>, <a href="/thame-taxis">Thame</a>, <a href="/henley-on-thames-taxis">Henley-on-Thames</a>, <a href="/chipping-norton-taxis">Chipping Norton</a> and the full <a href="/rates#regional-fares">Oxfordshire fare guide</a>.</p>
+      <p class="fade-in" style="margin-top:1.25rem;">These ranges are local town transfer guide prices between Oxford and each town. They are not airport fares. Also <a href="/kidlington-taxis">Kidlington</a>, <a href="/woodstock-taxis">Woodstock</a>, <a href="/wantage-taxis">Wantage</a>, <a href="/thame-taxis">Thame</a>, <a href="/henley-on-thames-taxis">Henley-on-Thames</a>, <a href="/chipping-norton-taxis">Chipping Norton</a> and the full <a href="/rates#regional-fares">Oxfordshire fare guide</a>.</p>
+    </div>
+  </section>
+
+  <section class="section section--soft" id="customer-reviews">
+    <div class="container">
+      <div class="section__header">
+        <h2>Customer reviews</h2>
+        <p>Individual testimonials originally posted on Google.</p>
+      </div>
+      <div class="grid grid-3" data-review-list="home"></div>
+      <p class="review-list__actions"><a class="btn btn--primary" href="https://share.google/fLBM4r9Ggeivi0TCk" target="_blank" rel="noopener noreferrer">Read our reviews on Google</a></p>
     </div>
   </section>
 
@@ -688,7 +699,7 @@
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
         <a href="/contact" class="btn btn--outline" style="border-color:rgba(255,255,255,0.4); color:#fff;">Contact us</a>
       </div>
-      <p class="fade-in" style="margin-top:1.25rem; font-size:0.9rem;"><a href="/reviews" style="color:rgba(255,255,255,0.85);">Read customer reviews on Trustpilot</a></p>
+      <p class="fade-in" style="margin-top:1.25rem; font-size:0.9rem;"><a href="/reviews" style="color:rgba(255,255,255,0.85);">Customer reviews</a> · <a href="https://share.google/fLBM4r9Ggeivi0TCk" style="color:rgba(255,255,255,0.85);" target="_blank" rel="noopener noreferrer">Read our reviews on Google</a></p>
     </div>
   </section>
 </main>
@@ -746,7 +757,7 @@
   <div class="site-footer__bottom">
     <div class="container site-footer__bottom-inner">
       <p>&copy; 2026 Spires Taxis. Oxford, Oxfordshire.</p>
-      <p class="site-footer__license">Licensed private hire operator, Oxford City Council. All journeys are pre booked.</p>
+      <p class="site-footer__license">Licensed private hire operator, Oxford City Council. Private hire operator number 55. All journeys are pre booked.</p>
     </div>
   </div>
 </footer>
@@ -754,6 +765,8 @@
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/></svg>
 </a>
 <script src="/js/airport-prices.js" defer></script>
+<script src="/js/reviews-data.js" defer></script>
+<script src="/js/review-cards.js" defer></script>
 <script src="/js/share-teaser.js" defer></script>
 <script src="/js/main.js" defer></script>
 <script src="/js/lang-switcher.js" defer></script>

@@ -1,19 +1,18 @@
 /**
  * SOURCE OF TRUTH for currently published OXFORD airport fares.
  *
- * These fares apply only to journeys TO or FROM OXFORD (for example
- * Oxford ↔ Heathrow). They do not apply automatically to Abingdon,
- * Kidlington, Witney, Bicester, Didcot or other nearby towns.
+ * These Oxford fares apply to Oxford. Abingdon, Didcot, Bicester and Witney
+ * have their own published fares in REGIONAL. Other towns are quoted.
  *
  * Historical bookings are NOT calculated from this file. Confirmed fares
  * are stored on each Firestore booking as `actualFare`.
  *
  * Per vehicle class:
  *   oneWay  advertised one way fare (null = quote on request)
- *   return  advertised return TOTAL when both Oxford legs are booked together
+ *   return  advertised return TOTAL when both legs are booked together
  *
  * Return saving is (oneWay × 2) − return. Do not hard-code a single saving.
- * Wording: "Save £X compared with two one way bookings."
+ * Wording: "Save £X on a return". Explain once that this compares with two one way bookings.
  *
  * Regional fares (Abingdon, Didcot, Bicester, Witney) live in REGIONAL.
  * They must not be copied onto Oxford routes or data-spires-price tokens.
@@ -60,8 +59,8 @@
       id: "oxford",
       name: "Oxford",
       fareScope: "journeys to or from Oxford",
-      tableIntro: "Fares are fixed per vehicle and include the standard airport charge.",
-      outsideOxfordNote: "Travelling from outside Oxford? Do not assume these prices apply. Fares from other towns are quoted separately and are subject to change. Send us your pickup address for a quote.",
+      tableIntro: "Prices are per vehicle and include standard airport pickup or drop off charges.",
+      outsideOxfordNote: "Travelling from outside Oxford? Oxford fares apply to Oxford. Abingdon, Didcot, Bicester and Witney each have their own published airport fares. An individual quote is needed when there is no published fare, for nearby villages outside that coverage, or for extra requirements.",
     },
     waitingPolicy: {
       freeMinutesAfterActualLanding: 50,
@@ -152,7 +151,7 @@
     },
   };
 
-  var FARE_NOTE = "Fares are fixed per vehicle and include the standard airport charge.";
+  var FARE_NOTE = "Prices are per vehicle and include standard airport pickup or drop off charges.";
 
   var REGIONAL_ORDER = ["heathrow", "gatwick", "stansted", "luton"];
 
@@ -185,7 +184,7 @@
       page: "/bicester-airport-transfers#airport-fares",
       routes: {
         heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 205 }, vito: { oneWay: 140, return: 275 } },
-        gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 310 }, vito: { oneWay: 200, return: 290 } },
+        gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 290 }, vito: { oneWay: 200, return: 290 } },
         stansted: { name: "Stansted", standardCar: { oneWay: 165, return: 320 }, vito: { oneWay: 210, return: 410 } },
         luton: { name: "Luton", standardCar: { oneWay: 110, return: 215 }, vito: { oneWay: 142, return: 280 } },
       },
@@ -213,7 +212,7 @@
   }
 
   function saveSentence(amount) {
-    return "Save " + formatMoney(amount) + " compared with two one way bookings.";
+    return "Save " + formatMoney(amount) + " on a return";
   }
 
   function getRoute(id) {
