@@ -1149,6 +1149,7 @@ a.btn-primary, .btn.btn-primary,
 }
 .prose h2 { margin: 2rem 0 0.75rem; }
 .prose h2:first-child { margin-top: 0; }
+.prose h3 { margin: 1.35rem 0 0.45rem; }
 .prose p { margin-bottom: 1rem; }
 .prose ul,
 .prose ol {
