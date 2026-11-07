@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
 import { formatVehicleTypeLabel } from '../utils/vehicleTypes';
 import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMapper';
-import { functions } from '../utils/firebase';
+import { db, functions } from '../utils/firebase';
+import { planBulkJobUpdate, type BulkJobChanges } from '../utils/bulkBookingEdit';
+import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
 import { getCallableErrorMessage } from '../utils/callableErrorMessage';
@@ -98,8 +100,25 @@ const Bookings: React.FC<BookingsProps> = ({
   const [quickView, setQuickView] = useState<QuickView>('upcoming');
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
   const [compactList, setCompactList] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDriver, setBulkDriver] = useState('');
+  const [bulkVehicle, setBulkVehicle] = useState('');
+  const [bulkStatus, setBulkStatus] = useState<BulkJobChanges['status']>('');
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState('');
 
   useEffect(() => {
+    const node = listRef.current;
+    if (node && typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver((entries) => {
+        const width = entries[0]?.contentRect.width ?? 0;
+        if (width > 0) setCompactList(width < 680);
+      });
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
     if (typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(max-width: 900px)');
     const apply = () => setCompactList(media.matches);
@@ -449,6 +468,58 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     onEditBooking(booking);
   };
 
+  const visibleIds = sortedBookings.map((booking) => booking.id).filter((id): id is string => Boolean(id));
+  const selectedBookings = sortedBookings.filter((booking) => booking.id && selectedIds.includes(booking.id));
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const activeDrivers = drivers.filter((driver) => driver.active);
+  const availableVehicles = vehicles.filter((vehicle) => vehicle.available);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedIds((current) => allVisibleSelected
+      ? current.filter((id) => !visibleIds.includes(id))
+      : Array.from(new Set([...current, ...visibleIds])));
+  };
+
+  const applyBulkEdit = async () => {
+    if (bulkSaving || selectedBookings.length === 0) return;
+    const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, note: bulkNote };
+    const updates: { id: string; patch: Extract<ReturnType<typeof planBulkJobUpdate>, { ok: true }>['patch'] }[] = [];
+    const skipped: string[] = [];
+    selectedBookings.forEach((booking) => {
+      const plan = planBulkJobUpdate(booking, changes, new Date().toISOString());
+      if (!plan.ok) {
+        skipped.push(`${booking.bookingNumber}: ${plan.reason}`);
+        return;
+      }
+      if (booking.id) updates.push({ id: booking.id, patch: plan.patch });
+    });
+    setBulkSaving(true);
+    try {
+      if (updates.length > 0) await applyBulkJobUpdates(db, updates);
+      const updatedIds = new Set(updates.map((item) => item.id));
+      setSelectedIds((current) => current.filter((id) => !updatedIds.has(id)));
+      if (updates.length > 0) {
+        setBulkDriver('');
+        setBulkVehicle('');
+        setBulkStatus('');
+        setBulkNote('');
+      }
+      const updatedText = updates.length === 1 ? 'Updated 1 job.' : `Updated ${updates.length} jobs.`;
+      const skippedText = skipped.length === 0
+        ? ''
+        : ` ${skipped.length === 1 ? '1 job was left unchanged.' : `${skipped.length} jobs were left unchanged.`} ${skipped.join(' ')}`;
+      setBulkMessage(`${updates.length > 0 ? updatedText : 'No jobs were updated.'}${skippedText}`);
+    } catch {
+      setBulkMessage('Could not save the selected jobs. Check the connection and try again.');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const quickViews: { id: QuickView; label: string }[] = [
     { id: 'upcoming', label: 'Upcoming' },
     { id: 'today', label: 'Today' },
@@ -557,7 +628,54 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         </div>
       </div>
       </div>
-      <div className="card" style={{ marginTop: '1.5rem' }}>
+      <div className="card booking-list-card" style={{ marginTop: '1.5rem' }} ref={listRef}>
+        {selectedBookings.length > 0 && (
+          <section className="bulk-edit" aria-label="Edit selected jobs">
+            <p className="bulk-edit-count">{selectedBookings.length} selected</p>
+            <div className="bulk-edit-grid">
+              <label>
+                Driver
+                <select className="form-input" value={bulkDriver} onChange={(event) => setBulkDriver(event.target.value)} disabled={bulkSaving}>
+                  <option value="">Leave unchanged</option>
+                  <option value="clear">Remove driver</option>
+                  {activeDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+                </select>
+              </label>
+              <label>
+                Vehicle
+                <select className="form-input" value={bulkVehicle} onChange={(event) => setBulkVehicle(event.target.value)} disabled={bulkSaving}>
+                  <option value="">Leave unchanged</option>
+                  <option value="clear">Remove vehicle</option>
+                  {availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration}</option>)}
+                </select>
+              </label>
+              <label>
+                Job status
+                <select className="form-input" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as BulkJobChanges['status'])} disabled={bulkSaving}>
+                  <option value="">Leave unchanged</option>
+                  <option value="pending">Pending</option>
+                  <option value="awaiting_customer_confirmation">Awaiting customer confirmation</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="allocated">Allocated</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+              <label>
+                Add a note
+                <textarea className="form-input" rows={2} value={bulkNote} onChange={(event) => setBulkNote(event.target.value)} disabled={bulkSaving} />
+              </label>
+            </div>
+            <p className="bulk-edit-note">Fare, payment and customer details stay on each job. Only the fields you change are saved.</p>
+            {bulkMessage ? <p className="bulk-edit-result" role="status">{bulkMessage}</p> : null}
+            <div className="bulk-edit-actions">
+              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
+                {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => { setSelectedIds([]); setBulkMessage(''); }} disabled={bulkSaving}>Clear selection</button>
+            </div>
+          </section>
+        )}
         {filteredBookings.length === 0 ? (
           <div className="text-center" style={{ padding: '3rem 1rem' }}>
             <Calendar className="h-12 w-12" style={{ margin: '0 auto 1rem', color: '#9ca3af' }} />
@@ -582,6 +700,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 <caption className="sr-only">Bookings</caption>
                 <thead>
                   <tr>
+                    <th>
+                      <input className="booking-select" type="checkbox" aria-label="Select all shown jobs" checked={allVisibleSelected} onChange={toggleAllVisible} />
+                    </th>
                     <th>Pickup</th>
                     <th>Customer</th>
                     <th>Route</th>
@@ -609,6 +730,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const unassigned = !driver && workflow !== 'cancelled' && workflow !== 'completed';
                     return (
                       <tr key={booking.id} className={unassigned ? 'is-unassigned' : undefined}>
+                        <td>
+                          <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
+                        </td>
                         <td>{londonWhen(booking.pickupTime || booking.dateTime)}</td>
                         <td>
                           <div className="booking-customer">{booking.hirerName}</div>
@@ -669,7 +793,12 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   : workflow === 'confirmed' && !booking.driverId ? 'Assign driver' : 'Open booking';
                 const returnJourney = isReturnBooking(booking);
                 return (
-                  <details key={booking.id} className="booking-mobile-card">
+                  <div key={booking.id} className="booking-mobile-card">
+                    <label className="booking-mobile-select">
+                      <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
+                      Select
+                    </label>
+                    <details>
                     <summary>
                       <span>{londonWhen(booking.pickupTime || booking.dateTime)}</span>
                       <strong>{booking.hirerName}</strong>
@@ -694,7 +823,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </div>
                       </details>
                     </div>
-                  </details>
+                    </details>
+                  </div>
                 );
               })}
             </div>

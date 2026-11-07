@@ -1,7 +1,12 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Bookings from './Bookings';
 import { Booking } from '../types/types';
+import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
+
+jest.mock('../utils/applyBulkJobUpdates', () => ({
+  applyBulkJobUpdates: jest.fn(() => Promise.resolve()),
+}));
 
 jest.mock('../utils/firebase', () => ({ functions: {} }));
 jest.mock('firebase/functions', () => ({
@@ -20,7 +25,10 @@ const callbacks = {
   onDeleteBooking: jest.fn(), onGeneratePDF: jest.fn(), onDuplicateBooking: jest.fn(), onCreateReturnBooking: jest.fn(),
 };
 
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  (applyBulkJobUpdates as jest.Mock).mockClear();
+});
 
 test('shows the deposit balance and gives an accepted quote a payment action', () => {
   const row = booking('SP1', 'Test Customer');
@@ -41,4 +49,19 @@ test('search remains applied when a month filter is selected', () => {
   fireEvent.change(container.querySelector('input[type="month"]')!, { target: { value: '2026-10' } });
   expect(screen.getByText('Alice')).toBeTruthy();
   expect(screen.queryByText('Bob')).toBeNull();
+});
+
+test('updates the selected jobs and leaves an unaccepted quote unchanged', async () => {
+  const open = booking('SP1', 'Alice');
+  const quoted = booking('SP9', 'Quoted');
+  quoted.quoteIssuedVersion = 2;
+  render(<Bookings bookings={[open, quoted]} drivers={[{ id: 'd1', name: 'Sam', licenseNumber: '', phoneNumber: '', email: '', active: true, licenseExpiry: '' }]} vehicles={[]} {...callbacks} />);
+  fireEvent.click(screen.getByRole('button', { name: 'All bookings' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select all shown jobs' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Job status' }), { target: { value: 'confirmed' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply to 2 jobs' }));
+  await waitFor(() => expect(screen.getByText(/left unchanged/)).toBeTruthy());
+  const updates = (applyBulkJobUpdates as jest.Mock).mock.calls[0][1];
+  expect(updates).toEqual([{ id: 'SP1', patch: { status: 'confirmed', adminStatus: 'confirmed', customerStatus: 'confirmed' } }]);
+  expect(screen.getByText(/SP9: Record customer acceptance/)).toBeTruthy();
 });
