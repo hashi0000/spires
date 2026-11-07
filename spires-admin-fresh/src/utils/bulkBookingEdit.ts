@@ -4,6 +4,7 @@ export type BulkJobChanges = {
   driver?: '' | 'clear' | string;
   vehicle?: '' | 'clear' | string;
   status?: '' | 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  payment?: '' | 'pending' | 'partial' | 'paid' | 'refunded';
   note?: string;
 };
 
@@ -16,6 +17,7 @@ export type BulkJobRecord = {
   customerStatus?: string | null;
   quoteIssuedVersion?: number | null;
   quoteAcceptedVersion?: number | null;
+  paymentStatus?: string | null;
   amountReceivedPence?: number | null;
   amountRequestedPence?: number | null;
   issuedQuote?: { amountRequestedPence?: number; paymentRequirement?: string } | null;
@@ -31,6 +33,7 @@ export type BulkPatch = {
   customerStatus?: BulkJobChanges['status'];
   allocatedTime?: string;
   notes?: string;
+  paymentStatus?: 'pending' | 'partial' | 'paid' | 'refunded';
 };
 
 export type BulkJobPlan =
@@ -41,6 +44,7 @@ export function planBulkJobUpdate(booking: BulkJobRecord, changes: BulkJobChange
   const driver = changes.driver || '';
   const vehicle = changes.vehicle || '';
   const status = changes.status || '';
+  const payment = changes.payment || '';
   const note = (changes.note || '').trim();
   const workflow = effectiveWorkflowStatus(booking);
   const nextDriver = driver === 'clear' ? '' : driver || booking.driverId || '';
@@ -76,6 +80,10 @@ export function planBulkJobUpdate(booking: BulkJobRecord, changes: BulkJobChange
     patch.adminStatus = status;
     patch.customerStatus = status;
     if (status === 'allocated' && !patch.allocatedTime) patch.allocatedTime = nowIso;
+  }
+
+  if (payment && payment !== (booking.paymentStatus || 'pending')) {
+    patch.paymentStatus = payment;
   }
 
   if (note) {

@@ -21,6 +21,7 @@ export async function applyBulkJobUpdates(
       }
       if (item.patch.allocatedTime) data.allocatedTime = item.patch.allocatedTime;
       if (item.patch.notes !== undefined) data.notes = item.patch.notes;
+      if (item.patch.paymentStatus) data.paymentStatus = item.patch.paymentStatus;
       batch.update(doc(db, 'bookings', item.id), data as UpdateData<Record<string, unknown>>);
     });
     await batch.commit();

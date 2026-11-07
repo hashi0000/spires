@@ -1,6 +1,6 @@
 // Dashboard.tsx - Put this in a separate file
 import React, { useEffect, useMemo, useState } from 'react';
-import { Users, Car, FileText, Calendar, AlertTriangle, Bell, Clock } from 'lucide-react';
+import { Users, Car, FileText, Calendar, Bell, Clock } from 'lucide-react';
 import { Booking } from '../types/types';
 import {
   formatPickupDisplay,
@@ -13,7 +13,6 @@ interface DashboardProps {
   availableVehiclesCount: number;
   totalBookings: number;
   todaysBookingsCount: number;
-  isAtDriverLimit: boolean;
   pendingCustomerBookingsCount: number;
   bookings: Booking[];
   desktopRemindersEnabled: boolean;
@@ -45,7 +44,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   availableVehiclesCount,
   totalBookings,
   todaysBookingsCount,
-  isAtDriverLimit,
   pendingCustomerBookingsCount,
   bookings,
   desktopRemindersEnabled,
@@ -106,20 +104,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
       
-      {isAtDriverLimit && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">Maximum Driver Limit Reached</h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                You have reached the Oxford City Council limit of 3 active drivers.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
           <Clock className="h-5 w-5 text-indigo-600 flex-shrink-0" />

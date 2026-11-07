@@ -315,18 +315,3 @@ export const useBookings = () => {
     getTodaysBookings
   };
 };
-
-export const useDriverLimitCheck = (drivers: Driver[]) => {
-  const MAX_ACTIVE_DRIVERS = 3;
-  
-  const activeDrivers = drivers.filter(driver => driver.active);
-  const activeCount = activeDrivers.length;
-  const isAtLimit = activeCount >= MAX_ACTIVE_DRIVERS;
-  const remainingSlots = Math.max(0, MAX_ACTIVE_DRIVERS - activeCount);
-  
-  return {
-    activeCount,
-    isAtLimit,
-    remainingSlots
-  };
-};

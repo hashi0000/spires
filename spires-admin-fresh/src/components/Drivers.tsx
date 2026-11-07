@@ -5,9 +5,6 @@ import { getExpiryStatus, getDbsExpiryStatus, expiryStatusLabel, dbsExpiryStatus
 
 interface DriversProps {
   drivers: Driver[];
-  activeCount: number;
-  isAtLimit: boolean;
-  remainingSlots: number;
   onAddDriver: () => void;
   onEditDriver: (driver: Driver) => void;
   onDeleteDriver: (id: string, name: string) => void;
@@ -66,9 +63,6 @@ function DocLink({ url }: { url?: string }) {
 
 const Drivers: React.FC<DriversProps> = ({
   drivers,
-  activeCount,
-  isAtLimit,
-  remainingSlots,
   onAddDriver,
   onEditDriver,
   onDeleteDriver,
@@ -76,6 +70,7 @@ const Drivers: React.FC<DriversProps> = ({
   const [hideInactive, setHideInactive] = useState(true);
 
   const inactiveCount = useMemo(() => drivers.filter((d) => !d.active).length, [drivers]);
+  const activeCount = drivers.length - inactiveCount;
 
   const displayedDrivers = useMemo(() => {
     const sorted = sortDrivers(drivers);
@@ -109,25 +104,6 @@ const Drivers: React.FC<DriversProps> = ({
             <Plus className="h-4 w-4 mr-2" />
             Add Driver
           </button>
-        </div>
-      </div>
-
-      <div className="driver-limit-card">
-        <div>
-          <h3 className="driver-limit-card__title">Driver limit</h3>
-          <p className="driver-limit-card__subtitle">
-            Oxford City Council allows a maximum of 3 active drivers
-          </p>
-        </div>
-        <div className="driver-limit-card__count">
-          <p
-            className={`driver-limit-card__number ${
-              isAtLimit ? 'driver-limit-card__number--full' : 'driver-limit-card__number--ok'
-            }`}
-          >
-            {activeCount}/3
-          </p>
-          <p className="driver-limit-card__slots">{remainingSlots} slot{remainingSlots !== 1 ? 's' : ''} available</p>
         </div>
       </div>
 

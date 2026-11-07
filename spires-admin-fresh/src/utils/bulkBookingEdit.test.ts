@@ -41,6 +41,11 @@ test('adds a note after the existing note', () => {
   expect(plan).toEqual({ ok: true, patch: { notes: 'Gate code 12\nCall on arrival' } });
 });
 
+test('changes payment status without changing the fare or amount received', () => {
+  const plan = planBulkJobUpdate({ status: 'confirmed', paymentStatus: 'pending', amountReceivedPence: 0 }, { payment: 'paid' }, now);
+  expect(plan).toEqual({ ok: true, patch: { paymentStatus: 'paid' } });
+});
+
 test('clears a driver without touching the fare', () => {
   const plan = planBulkJobUpdate({ status: 'allocated', driverId: 'driver-1' }, { driver: 'clear' }, now);
   expect(plan).toEqual({ ok: true, patch: { driverId: null } });

@@ -3,7 +3,7 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from './utils/firebase';
 
 import { Driver, Vehicle, Booking } from './types/types';
-import { useDrivers, useVehicles, useBookings, useDriverLimitCheck } from './hooks/useFirebase';
+import { useDrivers, useVehicles, useBookings } from './hooks/useFirebase';
 import { useBookingDesktopReminders } from './hooks/useBookingDesktopReminders';
 import { usePendingBookingAlerts } from './hooks/usePendingBookingAlerts';
 import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
@@ -80,8 +80,6 @@ const App: React.FC = () => {
   const driversHook = useDrivers();
   const vehiclesHook = useVehicles();
   const bookingsHook = useBookings();
-  const driverLimitCheck = useDriverLimitCheck(driversHook.drivers);
-
   const bookingLocationSuggestions = useMemo(() => {
     const seen = new Set<string>();
     for (const b of bookingsHook.bookings) {
@@ -159,10 +157,6 @@ const App: React.FC = () => {
 
   const handleAddDriver = async (driver: Omit<Driver, 'id' | 'createdAt'>) => {
     try {
-      if (driver.active && driverLimitCheck.isAtLimit) {
-        alert('Maximum 3 active drivers allowed by Oxford City Council.');
-        return;
-      }
       await driversHook.addDriver(driver);
       setShowDriverModal(false);
       setEditingItem(null);
@@ -178,10 +172,6 @@ const App: React.FC = () => {
 
   const handleUpdateDriver = async (driver: Omit<Driver, 'id' | 'createdAt'>) => {
     try {
-      if (driver.active && !editingItem.active && driverLimitCheck.isAtLimit) {
-        alert('Maximum 3 active drivers allowed by Oxford City Council.');
-        return;
-      }
       await driversHook.updateDriver(editingItem.id!, driver);
       setShowDriverModal(false);
       setEditingItem(null);
@@ -398,7 +388,6 @@ const App: React.FC = () => {
             availableVehiclesCount={availableVehicles.length}
             totalBookings={bookingsHook.bookings.length}
             todaysBookingsCount={todaysBookings.length}
-            isAtDriverLimit={driverLimitCheck.isAtLimit}
             pendingCustomerBookingsCount={pendingCustomerBookingsCount}
             bookings={bookingsHook.bookings}
             desktopRemindersEnabled={desktopRemindersEnabled}
@@ -409,9 +398,6 @@ const App: React.FC = () => {
         return (
           <Drivers
             drivers={driversHook.drivers}
-            activeCount={driverLimitCheck.activeCount}
-            isAtLimit={driverLimitCheck.isAtLimit}
-            remainingSlots={driverLimitCheck.remainingSlots}
             onAddDriver={openDriverModal}
             onEditDriver={handleEditDriver}
             onDeleteDriver={handleDeleteDriver}
@@ -490,7 +476,7 @@ const App: React.FC = () => {
         Licensed private hire operator, Oxford City Council. Private hire operator number 55.
       </footer>
       </div>
-      {showDriverModal && (<DriverModal isOpen={showDriverModal} onClose={closeDriverModal} onSubmit={editingItem ? handleUpdateDriver : handleAddDriver} editingDriver={editingItem} isAtLimit={driverLimitCheck.isAtLimit} />)}
+      {showDriverModal && (<DriverModal isOpen={showDriverModal} onClose={closeDriverModal} onSubmit={editingItem ? handleUpdateDriver : handleAddDriver} editingDriver={editingItem} />)}
       {showVehicleModal && (<VehicleModal isOpen={showVehicleModal} onClose={closeVehicleModal} onSubmit={editingItem ? handleUpdateVehicle : handleAddVehicle} editingVehicle={editingItem} />)}
       {showBookingModal && (
         <BookingModal

@@ -65,3 +65,12 @@ test('updates the selected jobs and leaves an unaccepted quote unchanged', async
   expect(updates).toEqual([{ id: 'SP1', patch: { status: 'confirmed', adminStatus: 'confirmed', customerStatus: 'confirmed' } }]);
   expect(screen.getByText(/SP9: Record customer acceptance/)).toBeTruthy();
 });
+
+test('changes one payment status without rewriting the fare', async () => {
+  const row = booking('SP1', 'Test Customer');
+  render(<Bookings bookings={[row]} drivers={[]} vehicles={[]} {...callbacks} />);
+  fireEvent.click(screen.getByRole('button', { name: 'All bookings' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Payment status for SP1' }), { target: { value: 'paid' } });
+  await waitFor(() => expect(screen.getByText(/amount already received is unchanged/)).toBeTruthy());
+  expect((applyBulkJobUpdates as jest.Mock).mock.calls[0][1]).toEqual([{ id: 'SP1', patch: { paymentStatus: 'paid' } }]);
+});

@@ -13,7 +13,6 @@ interface DriverModalProps {
   onClose: () => void;
   onSubmit: (driver: Omit<Driver, 'id' | 'createdAt'>) => void;
   editingDriver?: Driver | null;
-  isAtLimit: boolean;
 }
 
 const emptyForm = (): Partial<Driver> => ({
@@ -55,7 +54,7 @@ function DbsExpiryStatusBadge({
   );
 }
 
-const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, editingDriver, isAtLimit }) => {
+const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, editingDriver }) => {
   const [formData, setFormData] = useState<Partial<Driver>>(emptyForm);
   const [uploading, setUploading] = useState<DriverDocumentSlot | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -118,11 +117,6 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (formData.active && !editingDriver?.active && isAtLimit) {
-      alert('Maximum 3 active drivers allowed by Oxford City Council.');
-      return;
-    }
 
     const payload: Omit<Driver, 'id' | 'createdAt'> = {
       name: formData.name ?? '',
@@ -509,15 +503,11 @@ const DriverModal: React.FC<DriverModalProps> = ({ isOpen, onClose, onSubmit, ed
                     checked={formData.active || false}
                     onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
                     className="mr-3 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    disabled={!editingDriver && formData.active && isAtLimit}
                   />
                   <span className="text-sm font-medium text-gray-700">
-                    Active Driver {!editingDriver && isAtLimit && '(⚠️ Limit: 3/3)'}
+                    Active driver
                   </span>
                 </label>
-                {!editingDriver && isAtLimit && (
-                  <p className="text-xs text-red-600 mt-1">Maximum 3 active drivers allowed by Oxford City Council</p>
-                )}
               </div>
             </div>
 

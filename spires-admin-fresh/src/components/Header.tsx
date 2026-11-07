@@ -21,8 +21,6 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenMenu,
 }) => {
-  const driversAtLimit = activeDriversCount >= 3;
-
   return (
     <header className="admin-header">
       <div className="admin-header-content">
@@ -39,11 +37,11 @@ const Header: React.FC<HeaderProps> = ({
 
         <div className="admin-header-actions">
           <div className="admin-header-stats">
-            <div className={`admin-stat-chip${driversAtLimit ? ' admin-stat-chip--warn' : ''}`}>
+            <div className="admin-stat-chip">
               <Users className="admin-stat-chip__icon" aria-hidden="true" />
               <div>
                 <span className="admin-stat-chip__label">Active drivers</span>
-                <span className="admin-stat-chip__value">{activeDriversCount} of 3</span>
+                <span className="admin-stat-chip__value">{activeDriversCount}</span>
               </div>
             </div>
             <div className="admin-stat-chip">

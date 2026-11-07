@@ -105,9 +105,12 @@ const Bookings: React.FC<BookingsProps> = ({
   const [bulkDriver, setBulkDriver] = useState('');
   const [bulkVehicle, setBulkVehicle] = useState('');
   const [bulkStatus, setBulkStatus] = useState<BulkJobChanges['status']>('');
+  const [bulkPayment, setBulkPayment] = useState<BulkJobChanges['payment']>('');
   const [bulkNote, setBulkNote] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState('');
+  const [paymentSavingId, setPaymentSavingId] = useState<string | null>(null);
+  const [paymentMessage, setPaymentMessage] = useState('');
 
   useEffect(() => {
     const node = listRef.current;
@@ -486,7 +489,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
 
   const applyBulkEdit = async () => {
     if (bulkSaving || selectedBookings.length === 0) return;
-    const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, note: bulkNote };
+    const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, payment: bulkPayment, note: bulkNote };
     const updates: { id: string; patch: Extract<ReturnType<typeof planBulkJobUpdate>, { ok: true }>['patch'] }[] = [];
     const skipped: string[] = [];
     selectedBookings.forEach((booking) => {
@@ -506,6 +509,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         setBulkDriver('');
         setBulkVehicle('');
         setBulkStatus('');
+        setBulkPayment('');
         setBulkNote('');
       }
       const updatedText = updates.length === 1 ? 'Updated 1 job.' : `Updated ${updates.length} jobs.`;
@@ -517,6 +521,21 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
       setBulkMessage('Could not save the selected jobs. Check the connection and try again.');
     } finally {
       setBulkSaving(false);
+    }
+  };
+
+  const changePaymentStatus = async (booking: Booking, paymentStatus: 'pending' | 'partial' | 'paid' | 'refunded') => {
+    const current = booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending';
+    if (!booking.id || paymentSavingId || paymentStatus === current) return;
+    const label = paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'partial' ? 'Part paid' : paymentStatus === 'refunded' ? 'Refunded' : 'Unpaid';
+    setPaymentSavingId(booking.id);
+    try {
+      await applyBulkJobUpdates(db, [{ id: booking.id, patch: { paymentStatus } }]);
+      setPaymentMessage(`${booking.bookingNumber} payment is now ${label}. The amount already received is unchanged.`);
+    } catch {
+      setPaymentMessage(`Could not update payment for ${booking.bookingNumber}. Try again.`);
+    } finally {
+      setPaymentSavingId(null);
     }
   };
 
@@ -650,6 +669,16 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 </select>
               </label>
               <label>
+                Payment status
+                <select className="form-input" value={bulkPayment} onChange={(event) => setBulkPayment(event.target.value as BulkJobChanges['payment'])} disabled={bulkSaving}>
+                  <option value="">Leave unchanged</option>
+                  <option value="pending">Unpaid</option>
+                  <option value="partial">Part paid</option>
+                  <option value="paid">Paid</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </label>
+              <label>
                 Job status
                 <select className="form-input" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as BulkJobChanges['status'])} disabled={bulkSaving}>
                   <option value="">Leave unchanged</option>
@@ -666,10 +695,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 <textarea className="form-input" rows={2} value={bulkNote} onChange={(event) => setBulkNote(event.target.value)} disabled={bulkSaving} />
               </label>
             </div>
-            <p className="bulk-edit-note">Fare, payment and customer details stay on each job. Only the fields you change are saved.</p>
+            <p className="bulk-edit-note">The fare and customer details stay on each job. Changing the payment status does not change the amount already received.</p>
             {bulkMessage ? <p className="bulk-edit-result" role="status">{bulkMessage}</p> : null}
             <div className="bulk-edit-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
+              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkPayment && !bulkNote.trim())}>
                 {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => { setSelectedIds([]); setBulkMessage(''); }} disabled={bulkSaving}>Clear selection</button>
@@ -694,6 +723,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           </div>
 ) : (
           <>
+            {paymentMessage ? <p className="booking-payment-result" role="status">{paymentMessage}</p> : null}
             {!compactList ? (
             <div className="booking-table-wrap">
               <table className="booking-table">
@@ -745,9 +775,11 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           </button>
                           {returnJourney ? (
                             <div className="booking-legs">
-                              <p><span>Outbound</span> {londonWhen(booking.pickupTime)} · {booking.pickupLocation} → {booking.destination}</p>
-                              <p><span>Return</span> {londonWhen(ext.returnPickupTime)} · {ext.returnPickupLocation || 'Pickup not recorded'} → {ext.returnDestination || 'Destination not recorded'}</p>
-                              <p>Driver and vehicle are recorded once for this booking. The fare below is the whole booking, not a separate charge for each leg.</p>
+                              <p><span>Outbound</span> {londonWhen(booking.pickupTime)}</p>
+                              <p>{booking.pickupLocation} → {booking.destination}</p>
+                              <p><span>Return</span> {londonWhen(ext.returnPickupTime)}</p>
+                              <p>{ext.returnPickupLocation || 'Pickup not recorded'} → {ext.returnDestination || 'Destination not recorded'}</p>
+                              <p>The fare is for the whole booking.</p>
                             </div>
                           ) : null}
                         </td>
@@ -756,7 +788,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         <td><span className={`badge ${workflowBadgeClass(workflow)}`}>{workflowStatusLabel(workflow)}</span></td>
                         <td>
                           <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
-                          {receivedPence > 0 && booking.paymentStatus !== 'paid' ? <div className="booking-balance">Received £{(receivedPence / 100).toFixed(2)} · Remaining £{(balancePence / 100).toFixed(2)}</div> : null}
+                          <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
+                            <option value="pending">Unpaid</option>
+                            <option value="partial">Part paid</option>
+                            <option value="paid">Paid</option>
+                            <option value="refunded">Refunded</option>
+                          </select>
+                          {receivedPence > 0 && balancePence > 0 ? <div className="booking-balance">Received £{(receivedPence / 100).toFixed(2)} · Remaining £{(balancePence / 100).toFixed(2)}</div> : null}
                           {booking.quoteEmailStatus === 'failed' ? <p role="status" className="booking-failed">Quote email failed. Open booking to retry.</p> : null}
                         </td>
                         <td className={unassigned ? 'booking-unassigned' : undefined}>{driver?.name || 'Unassigned'}{vehicle?.registration ? ` · ${vehicle.registration}` : ''}</td>
@@ -809,7 +847,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     </summary>
                     <div className="booking-mobile-body">
                       <p>{booking.bookingNumber}</p>
-                      {returnJourney ? <p>Return {londonWhen(ext.returnPickupTime)} · {ext.returnPickupLocation} → {ext.returnDestination}. Fare is for the whole booking.</p> : null}
+                      {returnJourney ? <p>Return {londonWhen(ext.returnPickupTime)}. {ext.returnPickupLocation} → {ext.returnDestination}. The fare is for the whole booking.</p> : null}
+                      <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
+                        <option value="pending">Unpaid</option>
+                        <option value="partial">Part paid</option>
+                        <option value="paid">Paid</option>
+                        <option value="refunded">Refunded</option>
+                      </select>
                       <button type="button" onClick={() => openBooking(booking)} className="btn btn-primary btn-sm">{nextAction}</button>
                       <details className="booking-more-actions">
                         <summary className="btn btn-secondary btn-sm">More actions</summary>
