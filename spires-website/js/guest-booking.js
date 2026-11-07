@@ -181,12 +181,19 @@
       button.disabled = true;
       button.textContent = "Sending request...";
     }
+    function placeFrom(name) {
+      var field = form.querySelector("[name='" + name + "']");
+      if (!field || !field.dataset.place) return null;
+      try { return JSON.parse(field.dataset.place); } catch (err) { return null; }
+    }
     var payload = {
       name: name,
       email: email,
       phone: phone,
       pickup: data.get("pickup"),
       destination: data.get("destination"),
+      pickupPlace: placeFrom("pickup"),
+      destinationPlace: placeFrom("destination"),
       date: data.get("date"),
       time: data.get("time"),
       bookingType: data.get("bookingType"),

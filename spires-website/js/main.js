@@ -314,3 +314,9 @@ function initBookingTerms() {
 }
 
 window.SpiresTaxis = { showNotification: () => {} };
+
+["/js/location-suggest.js", "/js/journey-stats.js"].forEach(function (src) {
+  var script = document.createElement("script");
+  script.src = src;
+  document.body.appendChild(script);
+});

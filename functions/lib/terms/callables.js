@@ -41,6 +41,7 @@ const driverReminderEmail_1 = require("../driverReminderEmail");
 const emails_1 = require("../quotes/emails");
 const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
 const bookingTerms_1 = require("./bookingTerms");
+const placeRecord_1 = require("../locations/placeRecord");
 const db = () => admin.firestore();
 function httpsError(code, message) {
     return new functions.https.HttpsError(code, message);
@@ -106,6 +107,8 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         phone: str(data?.phone),
         pickup,
         destination,
+        ...((0, placeRecord_1.placeRecord)(data?.pickupPlace, pickup) ? { pickupPlace: (0, placeRecord_1.placeRecord)(data?.pickupPlace, pickup) } : {}),
+        ...((0, placeRecord_1.placeRecord)(data?.destinationPlace, destination) ? { destinationPlace: (0, placeRecord_1.placeRecord)(data?.destinationPlace, destination) } : {}),
         dateTime,
         passengers,
         luggage: Number(data?.luggage) || 0,

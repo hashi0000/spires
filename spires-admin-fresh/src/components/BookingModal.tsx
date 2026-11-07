@@ -20,7 +20,7 @@ import {
   splitLocalDateTime,
 } from '../utils/bookingJourney';
 import { db } from '../utils/firebase';
-import { collection, doc, setDoc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, runTransaction, serverTimestamp, deleteField } from 'firebase/firestore';
 import {
   accountLinkForBooking,
   customerSuggestionLabel,
@@ -29,6 +29,7 @@ import {
   type CustomerProfile,
 } from '../utils/customerSuggestions';
 import QuoteEditor from './QuoteEditor';
+import LocationField from './LocationField';
 import TermsAcceptance from './TermsAcceptance';
 
 interface BookingModalProps {
@@ -485,7 +486,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         // Quote/payment functions own these fields. A stale open form must never write them back.
         for (const key of Object.keys(cleanedUpdateData)) {
-          if (/^(quote|issuedQuote|quotes$|paymentLink|amountReceived|amountRequested|outstanding|paymentVerified|paymentRecorded|paymentReceipt|confirmationEmail|normalFarePence|discountPence|finalFarePence|paidAt$|terms)/.test(key)) {
+          if (/^(quote|issuedQuote|quotes$|paymentLink|amountReceived|amountRequested|outstanding|paymentVerified|paymentRecorded|paymentReceipt|paymentEntries|confirmationEmail|normalFarePence|discountPence|finalFarePence|paidAt$|terms)/.test(key)) {
             delete cleanedUpdateData[key];
           }
         }
@@ -534,6 +535,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         console.log('📝 Updating booking:', bookingId);
         console.log('📝 Update data:', cleanedUpdateData);
+        let fareNote = '';
         await runTransaction(db, async transaction => {
           const ref = doc(db, 'bookings', bookingId);
           const latest = await transaction.get(ref);
@@ -543,9 +545,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
           if (current.quoteIssuedVersion) {
             for (const key of ['depositRequired', 'depositAmount', 'depositStatus', 'paymentStatus', 'paymentMethod']) delete safeUpdate[key];
             if (safeUpdate.actualFare !== undefined && Number(safeUpdate.actualFare) !== Number(current.actualFare)) {
-              throw new Error('This booking has an issued quote. Change its fare through Quote and payment so the customer receives the correct price.');
+              delete safeUpdate.actualFare;
+              fareNote = 'Other details were saved. Use Save draft or Send quote to change the agreed fare on a quote that was already sent.';
+            } else {
+              delete safeUpdate.actualFare;
             }
-            delete safeUpdate.actualFare;
             if (safeUpdate.status === 'confirmed') {
               const accepted = current.quoteAcceptedVersion === current.quoteIssuedVersion;
               const required = Number(current.issuedQuote?.amountRequestedPence || current.amountRequestedPence || 0);
@@ -555,8 +559,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
               }
             }
           }
+          if (!formData.pickupPlace) safeUpdate.pickupPlace = deleteField();
+          if (!formData.destinationPlace) safeUpdate.destinationPlace = deleteField();
           transaction.update(ref, safeUpdate);
         });
+        if (fareNote) window.alert(fareNote);
         console.log('✅ Booking updated successfully:', bookingId);
       } else {
         const createPayload: Record<string, unknown> = {};
@@ -789,29 +796,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       </div>
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Pickup address *</label>
-                      <input
-                        type="text"
+                      <LocationField
+                        label="Pickup address *"
                         value={formData.pickupLocation}
-                        onChange={(e) => setFormData({ ...formData, pickupLocation: e.target.value })}
                         required
-                        className="form-input"
-                        list={listId}
-                        placeholder="Type or pick a past location"
-                        autoComplete="off"
+                        onChange={(value, place) => setFormData({ ...formData, pickupLocation: value, pickupPlace: place })}
                       />
                     </div>
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Destination *</label>
-                      <input
-                        type="text"
-                        value={formData.destination}
-                        onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                      <LocationField
+                        label="Destination *"
+                        value={formData.destination || ''}
                         required
-                        className="form-input"
-                        list={listId}
-                        placeholder="Type or pick a past location"
-                        autoComplete="off"
+                        onChange={(value, place) => setFormData({ ...formData, destination: value, destinationPlace: place })}
                       />
                     </div>
                     <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
@@ -992,6 +989,30 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <Calculator className="w-5 h-5 text-yellow-600 mr-2" />
                 <h4 className="text-md font-semibold text-yellow-900">Fare & Payment</h4>
               </div>
+              {editingBooking?.id ? (
+                <QuoteEditor
+                  bookingId={editingBooking.id}
+                  form={{
+                    actualFare: String(formData.actualFare || ''),
+                    vehicleType: formData.vehicleType || '',
+                    paymentMethod: formData.paymentMethod || 'cash',
+                    depositRequired: formData.depositRequired === true,
+                    depositAmount: String(formData.depositAmount || ''),
+                    pickupLocation: formData.pickupLocation || '',
+                    destination: formData.destination || '',
+                    pickupTime: formData.pickupTime || formData.dateTime || '',
+                    bookingType: formData.bookingType || 'one_way',
+                    returnPickupLocation: formData.returnPickupLocation || '',
+                    returnDestination: formData.returnDestination || '',
+                    returnPickupTime: formData.returnPickupTime || '',
+                    passengers: (formData as { passengers?: number }).passengers,
+                    status: formData.status,
+                  }}
+                  onChange={(patch) => setFormData((prev) => ({ ...prev, ...patch }) as ExtendedBooking)}
+                  onWorkflowStatus={(status) => setFormData((prev) => ({ ...prev, status: status as ExtendedBooking['status'] }))}
+                />
+              ) : (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Actual Fare (£)</label>
@@ -1002,9 +1023,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, actualFare: e.target.value })}
                     className="form-input"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Published airport card is Oxford only (Oxford to airport or airport to Oxford). Quote Abingdon, Kidlington, Witney, Bicester, Didcot and other towns separately. Those fares are subject to change. Do not change an already agreed fare.
-                  </p>
+                  <details className="text-xs text-gray-500 mt-1">
+                    <summary>Fare guidance</summary>
+                    <p>Published airport prices are for Oxford only. Quote Abingdon, Kidlington, Witney, Bicester, Didcot and other towns separately. Do not change a fare that has already been agreed.</p>
+                  </details>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
@@ -1107,6 +1129,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     placeholder="e.g. 50"
                   />
                 </div>
+              )}
+              </>
               )}
 
               {formData.bookingType === 'return' && (
@@ -1252,14 +1276,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
           </div>
 
           <TermsAcceptance booking={editingBooking || {}} />
-
-          {editingBooking?.id ? (
-            <QuoteEditor
-              bookingId={editingBooking.id}
-              booking={editingBooking}
-              onWorkflowStatus={(status) => setFormData((prev) => ({ ...prev, status: status as ExtendedBooking['status'] }))}
-            />
-          ) : null}
 
           <div className="modal-footer">
             {formError ? (

@@ -12,6 +12,7 @@ import {
   airportWaitingWebsiteBody,
 } from "../airportWaitingPolicy";
 import "../styles.css";
+import LocationField from "./LocationField";
 
 const PAYMENT_OPTIONS = [
   { value: "cash", label: "Cash (pay driver)" },
@@ -198,6 +199,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         phone: formData.phone || "",
         pickup: formData.pickup,
         destination: formData.destination,
+        pickupPlace: formData.pickupPlace || null,
+        destinationPlace: formData.destinationPlace || null,
         dateTime: formData.dateTime,
         passengers,
         luggage: parseInt(formData.luggage, 10) || 0,
@@ -362,13 +365,11 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 </div>
               </div>
             )}
-            <input
-              type="text"
-              name="pickup"
-              placeholder="Pickup Location"
+            <LocationField
+              placeholder="Pickup location"
               value={formData.pickup}
-              onChange={handleChange}
               required
+              onChange={(value, place) => setFormData((prev) => ({ ...prev, pickup: value, pickupPlace: place }))}
             />
             {savedAddresses.length > 0 && (
               <div>
@@ -401,13 +402,11 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 </div>
               </div>
             )}
-            <input
-              type="text"
-              name="destination"
+            <LocationField
               placeholder="Destination"
               value={formData.destination}
-              onChange={handleChange}
               required
+              onChange={(value, place) => setFormData((prev) => ({ ...prev, destination: value, destinationPlace: place }))}
             />
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
               <input
@@ -468,19 +467,17 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                   />
                 </div>
               </div>
-              <input
-                type="text"
+              <LocationField
                 placeholder="Return pickup address"
                 value={formData.returnPickupLocation || ''}
-                onChange={(e) => setFormData({ ...formData, returnPickupLocation: e.target.value })}
                 required
+                onChange={(value) => setFormData({ ...formData, returnPickupLocation: value })}
               />
-              <input
-                type="text"
+              <LocationField
                 placeholder="Return destination"
                 value={formData.returnDestination || ''}
-                onChange={(e) => setFormData({ ...formData, returnDestination: e.target.value })}
                 required
+                onChange={(value) => setFormData({ ...formData, returnDestination: value })}
               />
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
                 <input

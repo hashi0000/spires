@@ -8,6 +8,7 @@ import { functions } from '../utils/firebase';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
 import { getCallableErrorMessage } from '../utils/callableErrorMessage';
+import JourneyStatsCard from './JourneyStatsCard';
 
 const sendDriverReminderManualCallable = httpsCallable(functions, 'sendDriverReminderManual');
 const sendBookingPdfToCustomerCallable = httpsCallable(functions, 'sendBookingPdfToCustomer');
@@ -433,6 +434,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
 
   return (
     <div>
+      <JourneyStatsCard />
       {bookings.filter(b => isPendingIncomingRequest(b)).length > 0 && (
         <div className="alert alert-warning">
           <AlertCircle className="h-5 w-5" />

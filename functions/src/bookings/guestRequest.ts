@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { onlineTermsAcceptance } from "../terms/bookingTerms";
+import { placeRecord } from "../locations/placeRecord";
 
 export const OFFICE_PHONE = "07776 897772";
 export const CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
@@ -64,6 +65,15 @@ export type GuestCommitResult =
       name: string;
     }
   | { ok: false; status: number; error: string };
+
+function parsePlace(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
 
 function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -228,6 +238,8 @@ export function prepareGuestBooking(
       }
     : null;
 
+  const pickupPlace = placeRecord(parsePlace(body.pickupPlace), pickup);
+  const destinationPlace = placeRecord(parsePlace(body.destinationPlace), destination);
   const record: Record<string, unknown> = {
     source: "website",
     guestRequest: true,
@@ -245,6 +257,8 @@ export function prepareGuestBooking(
     pickup,
     pickupLocation: pickup,
     destination,
+    ...(pickupPlace ? { pickupPlace } : {}),
+    ...(destinationPlace ? { destinationPlace } : {}),
     dateTime,
     pickupTime: dateTime,
     passengers,

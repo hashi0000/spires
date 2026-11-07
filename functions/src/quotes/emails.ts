@@ -85,20 +85,26 @@ export function paymentRequestHtml(input: {
   customerName: string;
   amount: string;
   description: string;
-  paymentUrl: string;
+  paymentUrl?: string;
+  instructions?: string;
   bookingUrl: string;
   confirmed: boolean;
 }): string {
   const state = input.confirmed
     ? "This booking is confirmed."
     : "This is a payment request for your quote. The booking is not confirmed until we tell you it is confirmed.";
+  const instructions = input.instructions
+    ? `<p>${escapeHtml(input.instructions).replace(/\n/g, "<br>")}</p>`
+    : "";
   return shell(`
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">Payment request</h1>
     <p>Dear ${escapeHtml(input.customerName || "Customer")},</p>
     <p>Booking reference <strong>${escapeHtml(input.bookingNumber)}</strong>.</p>
     <p>${escapeHtml(state)}</p>
     <p>${escapeHtml(input.description)} requested: <strong>${escapeHtml(input.amount)}</strong>.</p>
-    ${button(input.paymentUrl, "Pay securely")}
+    ${input.paymentUrl ? button(input.paymentUrl, "Pay securely") : ""}
+    ${instructions}
+    <p>This message asks for payment. It does not record that the money has been received.</p>
     <p><a href="${escapeHtml(input.bookingUrl)}">View your booking quote</a></p>
   `);
 }

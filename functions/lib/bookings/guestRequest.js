@@ -15,6 +15,7 @@ exports.decideGuestClaim = decideGuestClaim;
 exports.guestClaimPatch = guestClaimPatch;
 const crypto_1 = require("crypto");
 const bookingTerms_1 = require("../terms/bookingTerms");
+const placeRecord_1 = require("../locations/placeRecord");
 exports.OFFICE_PHONE = "07776 897772";
 exports.CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
 exports.CONTACT_REQUIRED_MESSAGE = `${exports.CONTACT_HELPER} You can also call us on ${exports.OFFICE_PHONE}.`;
@@ -29,6 +30,16 @@ function isGuestRateError(err) {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+?[0-9]{8,15}$/;
 const SUBMISSION_PATTERN = /^[A-Za-z0-9_-]{16,80}$/;
+function parsePlace(value) {
+    if (typeof value !== "string")
+        return value;
+    try {
+        return JSON.parse(value);
+    }
+    catch {
+        return null;
+    }
+}
 function str(value) {
     return typeof value === "string" ? value.trim() : "";
 }
@@ -173,6 +184,8 @@ function prepareGuestBooking(body, options) {
             email,
         }
         : null;
+    const pickupPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.pickupPlace), pickup);
+    const destinationPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.destinationPlace), destination);
     const record = {
         source: "website",
         guestRequest: true,
@@ -190,6 +203,8 @@ function prepareGuestBooking(body, options) {
         pickup,
         pickupLocation: pickup,
         destination,
+        ...(pickupPlace ? { pickupPlace } : {}),
+        ...(destinationPlace ? { destinationPlace } : {}),
         dateTime,
         pickupTime: dateTime,
         passengers,

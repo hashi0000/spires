@@ -3687,3 +3687,33 @@ html[dir="rtl"] .booking-form label {
 .review-list__actions {
   margin-top: 1.25rem;
 }
+
+.loc-suggest { position: relative; }
+.loc-suggest__list {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #d5dbe3;
+  max-height: 240px;
+  overflow: auto;
+}
+.loc-suggest__list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  border: 0;
+  color: inherit;
+}
+.loc-suggest__list button:hover,
+.loc-suggest__list [aria-selected="true"] button { background: #f5efe6; }
+.loc-suggest__note { font-size: 0.85rem; color: #5c6570; margin: 0.35rem 0 0; }
+.spires-numbers h2 { margin-bottom: 0.5rem; }
+.spires-numbers__list { margin: 0.75rem 0; padding-left: 1.1rem; }
+.spires-numbers__note { color: #5c6570; font-size: 0.9rem; }

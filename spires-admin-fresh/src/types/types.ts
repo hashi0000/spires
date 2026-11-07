@@ -79,6 +79,8 @@ export interface Booking {
   pickupTime: string;
   pickupLocation: string;
   destination: string;
+  pickupPlace?: { label: string; placeId?: string; postcode?: string; latitude?: number | null; longitude?: number | null; premise?: string } | null;
+  destinationPlace?: { label: string; placeId?: string; postcode?: string; latitude?: number | null; longitude?: number | null; premise?: string } | null;
   flightNumber?: string;
   driverId?: string;
   vehicleId?: string;

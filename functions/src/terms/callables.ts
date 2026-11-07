@@ -10,6 +10,7 @@ import {
   onlineTermsAcceptance,
   validateStaffTermsReport,
 } from "./bookingTerms";
+import { placeRecord } from "../locations/placeRecord";
 
 const db = () => admin.firestore();
 
@@ -80,6 +81,8 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     phone: str(data?.phone),
     pickup,
     destination,
+    ...(placeRecord(data?.pickupPlace, pickup) ? { pickupPlace: placeRecord(data?.pickupPlace, pickup) } : {}),
+    ...(placeRecord(data?.destinationPlace, destination) ? { destinationPlace: placeRecord(data?.destinationPlace, destination) } : {}),
     dateTime,
     passengers,
     luggage: Number(data?.luggage) || 0,
