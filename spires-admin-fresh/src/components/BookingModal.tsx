@@ -1,5 +1,5 @@
 // components/BookingModal.tsx - FIXED CLEAN VERSION
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Minus, Calculator, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import { expenseTypes, paymentMethods } from '../utils/constants';
@@ -101,6 +101,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }));
   };
   const [formError, setFormError] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<ExtendedBooking>({
     bookingNumber: '',
     dateTime: '',
@@ -148,6 +150,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   // ✅ Pre-fill form for editing or default new booking
   useEffect(() => {
+    setDirty(false);
     if (editingBooking) {
       // Map customer booking fields to admin format if needed
       const mappedBooking: any = {
@@ -281,6 +284,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
       }
     }
   }, [editingBooking, isOpen, initialDraft]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    panelRef.current?.focus();
+  }, [isOpen, editingBooking]);
 
   // ✅ Expense logic
   const addExpense = () => {
@@ -600,12 +608,38 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   if (!isOpen) return null;
 
+  const requestClose = () => {
+    if (dirty && !window.confirm('You have unsaved changes. Close without saving?')) return;
+    onClose();
+  };
+
+  const showSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay booking-drawer"
+      onClick={requestClose}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          requestClose();
+        }
+      }}
+    >
+      <div
+        className="modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-panel-title"
+        ref={panelRef}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <button className="modal-close" onClick={onClose}>×</button>
-          <h3 className="modal-title">
+          <button className="modal-close" type="button" onClick={requestClose} aria-label="Close booking">×</button>
+          <h3 className="modal-title" id="booking-panel-title">
             {editingBooking ? 'Edit Booking' : 'Create New Booking'}
           </h3>
           <p className="modal-subtitle">
@@ -613,9 +647,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
               ? 'Update booking details and expenses'
               : 'Choose One Way or Return. A return stays on this same booking.'}
           </p>
+          <nav className="booking-section-nav" aria-label="Booking sections">
+            <button type="button" onClick={() => showSection('booking-section-journey')}>Journey</button>
+            <button type="button" onClick={() => showSection('booking-section-customer')}>Customer</button>
+            <button type="button" onClick={() => showSection('booking-section-fare')}>Fare & Payment</button>
+            <button type="button" onClick={() => showSection('booking-section-documents')}>Documents and communications</button>
+            <button type="button" onClick={() => showSection('booking-section-history')}>History</button>
+          </nav>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onChange={() => setDirty(true)}>
           <div className="modal-body">
             <div className="mb-6 p-4 rounded-lg border-2 border-blue-800 bg-blue-50">
               <label className="block text-sm font-semibold text-blue-900 mb-1">Booking type *</label>
@@ -673,7 +714,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </datalist>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div id="booking-section-customer" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
                 <input
@@ -766,7 +807,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               };
               return (
                 <>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                  <div id="booking-section-journey" className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center mb-3">
                       <Clock className="w-5 h-5 text-green-600 mr-2" />
                       <h4 className="text-md font-semibold text-green-900">
@@ -984,7 +1025,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div id="booking-section-fare" className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="flex items-center mb-3">
                 <Calculator className="w-5 h-5 text-yellow-600 mr-2" />
                 <h4 className="text-md font-semibold text-yellow-900">Fare & Payment</h4>
@@ -1264,7 +1305,18 @@ const BookingModal: React.FC<BookingModalProps> = ({
               )}
             </div>
 
-            <div className="mb-6">
+            <div id="booking-section-history" className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-2">History</h4>
+              <p className="text-sm text-gray-600">
+                {editingBooking
+                  ? `Status ${effectiveWorkflowStatus(editingBooking)}. Payment ${editingBooking.paymentStatus || 'not recorded'}.`
+                  : 'History is available after the booking is saved.'}
+              </p>
+            </div>
+
+            <div id="booking-section-documents" className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-2">Documents and communications</h4>
+              <p className="text-sm text-gray-600 mb-3">Quote, payment request and confirmation messages are sent from Fare & Payment. PDF and reminder actions stay on the booking list.</p>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea
                 value={formData.notes || ''}
@@ -1281,9 +1333,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {formError ? (
               <p className="text-sm" style={{ color: '#b91c1c', marginRight: 'auto' }}>{formError}</p>
             ) : null}
+            {dirty ? <p className="text-sm" style={{ marginRight: 'auto' }}>Unsaved changes</p> : null}
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="btn btn-secondary"
             >
               Cancel

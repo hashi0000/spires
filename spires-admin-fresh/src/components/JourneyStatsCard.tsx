@@ -35,10 +35,12 @@ export default function JourneyStatsCard() {
   }
 
   useEffect(() => {
-    readFn({})
+    const pending = readFn({}) as Promise<{ data?: Summary & { ready?: boolean } }> | undefined;
+    if (!pending || typeof pending.then !== "function") return;
+    pending
       .then((res) => {
         const data = res.data as Summary & { ready?: boolean };
-        if (data.ready) setSummary(data);
+        if (data?.ready) setSummary(data);
       })
       .catch(() => setSummary(null));
   }, []);

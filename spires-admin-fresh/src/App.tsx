@@ -33,6 +33,17 @@ import './styles.css';
 const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
 const UPCOMING_SOON_MS = 48 * 60 * 60 * 1000;
 const LAST_TAB_KEY = 'spires_admin_last_tab';
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: 'Dashboard',
+  bookings: 'Bookings',
+  customers: 'Customers',
+  drivers: 'Drivers',
+  vehicles: 'Vehicles',
+  invoices: 'Invoices',
+  'school-invoices': 'School invoices',
+  'spires-share': 'Spires Share',
+  'link-bookings': 'Link Bookings',
+};
 
 function initialAdminTab(): string {
   if (typeof window === 'undefined') return 'dashboard';
@@ -43,6 +54,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialAdminTab);
+  const [navOpen, setNavOpen] = useState(false);
   const [desktopRemindersEnabled, setDesktopRemindersEnabled] = useState(() =>
     typeof window !== 'undefined' && localStorage.getItem(DESKTOP_REMINDERS_KEY) === 'true'
   );
@@ -454,20 +466,30 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="admin-wrapper">
-      <div className="admin-topbar">
-        <Header
-          activeDriversCount={activeDrivers.length}
-          availableVehiclesCount={availableVehicles.length}
-          pendingCustomerBookingsCount={pendingCustomerBookingsCount}
-          upcomingSoonCount={upcomingSoonCount}
-          onLogout={handleLogout}
-        />
-        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-      </div>
+    <div className="admin-shell">
+      <Navigation
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+      />
+      <div className="admin-workspace">
+      <Header
+        pageTitle={PAGE_TITLES[activeTab] || 'Admin dashboard'}
+        activeDriversCount={activeDrivers.length}
+        availableVehiclesCount={availableVehicles.length}
+        pendingCustomerBookingsCount={pendingCustomerBookingsCount}
+        upcomingSoonCount={upcomingSoonCount}
+        onLogout={handleLogout}
+        onOpenMenu={() => setNavOpen(true)}
+      />
       <main className="admin-main">
         {renderContent()}
       </main>
+      <footer className="admin-footer">
+        Licensed private hire operator, Oxford City Council. Private hire operator number 55.
+      </footer>
+      </div>
       {showDriverModal && (<DriverModal isOpen={showDriverModal} onClose={closeDriverModal} onSubmit={editingItem ? handleUpdateDriver : handleAddDriver} editingDriver={editingItem} isAtLimit={driverLimitCheck.isAtLimit} />)}
       {showVehicleModal && (<VehicleModal isOpen={showVehicleModal} onClose={closeVehicleModal} onSubmit={editingItem ? handleUpdateVehicle : handleAddVehicle} editingVehicle={editingItem} />)}
       {showBookingModal && (

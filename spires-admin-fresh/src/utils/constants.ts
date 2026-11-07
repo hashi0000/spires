@@ -2,15 +2,15 @@
 import { Calendar, Car, FileText, Users, Link2, UserCircle, Receipt, DollarSign, Share2 } from 'lucide-react';
 
 export const navigation = [
-  { id: 'dashboard', name: 'Dashboard', icon: Calendar },
-  { id: 'drivers', name: 'Drivers', icon: Users },
-  { id: 'vehicles', name: 'Vehicles', icon: Car },
-  { id: 'bookings', name: 'Bookings', icon: FileText },
-  { id: 'customers', name: 'Customers', icon: UserCircle },
-  { id: 'invoices', name: 'Invoices', icon: DollarSign },
-  { id: 'school-invoices', name: 'School invoices', icon: Receipt },
-  { id: 'spires-share', name: 'Spires Share', icon: Share2 },
-  { id: 'link-bookings', name: 'Link Bookings', icon: Link2 },
+  { id: 'dashboard', name: 'Dashboard', icon: Calendar, quiet: false },
+  { id: 'bookings', name: 'Bookings', icon: FileText, quiet: false },
+  { id: 'customers', name: 'Customers', icon: UserCircle, quiet: false },
+  { id: 'drivers', name: 'Drivers', icon: Users, quiet: false },
+  { id: 'vehicles', name: 'Vehicles', icon: Car, quiet: false },
+  { id: 'invoices', name: 'Invoices', icon: DollarSign, quiet: true },
+  { id: 'school-invoices', name: 'School invoices', icon: Receipt, quiet: true },
+  { id: 'spires-share', name: 'Spires Share', icon: Share2, quiet: true },
+  { id: 'link-bookings', name: 'Link Bookings', icon: Link2, quiet: true },
 ];
 
 export const expenseTypes = [

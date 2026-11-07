@@ -26,9 +26,12 @@
   const pinError = document.getElementById("pin-error");
   const pinSubmit = document.getElementById("pin-submit");
   const jobList = document.getElementById("job-list");
+  const nextJobEl = document.getElementById("next-job");
   const emptyEl = document.getElementById("app-empty");
   const errorEl = document.getElementById("app-error");
   const statusEl = document.getElementById("app-status");
+  const loadingEl = document.getElementById("app-loading");
+  const retryEl = document.getElementById("app-retry");
   const sheet = document.getElementById("sheet");
   const sheetCard = document.getElementById("sheet-card");
 
@@ -36,6 +39,8 @@
   let view = "today";
   let unsub = null;
   let editingId = null;
+  let loaded = false;
+  let saving = false;
 
   function show(el, on) {
     el.hidden = !on;
@@ -144,6 +149,54 @@
     return pickup >= now;
   }
 
+  function statusLabel(booking) {
+    const status = String(booking.status || "confirmed");
+    if (status === "completed") return "Completed";
+    if (status === "pending") return "Pending";
+    if (status === "allocated") return "Allocated";
+    if (status === "confirmed") return "Confirmed";
+    if (status === "awaiting_customer_confirmation") return "Awaiting confirmation";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
+  function partyLine(booking) {
+    const parts = [];
+    const people = Number(booking.passengers);
+    if (people) parts.push(people === 1 ? "1 passenger" : people + " passengers");
+    const bags = booking.luggage != null && booking.luggage !== "" ? booking.luggage : booking.luggagePieces;
+    const bagCount = Number(bags);
+    if (bags != null && bags !== "" && !Number.isNaN(bagCount)) {
+      parts.push(bagCount === 1 ? "1 bag" : bagCount + " bags");
+    }
+    return parts.join(" · ");
+  }
+
+  function notesLine(booking) {
+    const notes = [];
+    if (textOf(booking, ["flightNumber"])) notes.push("Flight " + textOf(booking, ["flightNumber"]));
+    if (textOf(booking, ["terminal"])) notes.push("Terminal " + textOf(booking, ["terminal"]));
+    if (textOf(booking, ["specialRequirements"])) notes.push(textOf(booking, ["specialRequirements"]));
+    if (textOf(booking, ["notes"])) notes.push(textOf(booking, ["notes"]));
+    return notes.join(" · ");
+  }
+
+  function placePoint(place, address) {
+    if (!place || typeof place !== "object") return "";
+    const label = String(place.label || "").trim().toLowerCase();
+    if (!label || label !== String(address || "").trim().toLowerCase()) return "";
+    const lat = Number(place.latitude);
+    const lng = Number(place.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+    return lat + "," + lng;
+  }
+
+  function mapsHref(address, place) {
+    const point = placePoint(place, address);
+    const target = point || String(address || "").trim();
+    if (!target) return "";
+    return "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(target);
+  }
+
   function vehicleLabel(type) {
     const match = VEHICLES.find((row) => row.value === type || (type === "8-seater" && row.value === "8_seater"));
     return match ? match.label : "Standard car";
@@ -207,42 +260,70 @@
       });
   }
 
+  function nextJob() {
+    const now = new Date();
+    return bookings
+      .filter((row) => !isCancelled(row) && String(row.status || "") !== "completed")
+      .flatMap(expandJobs)
+      .filter((job) => job.pickup && job.pickup.getTime() >= now.getTime() - 30 * 60 * 1000)
+      .sort((a, b) => a.pickup.getTime() - b.pickup.getTime())[0] || null;
+  }
+
+  function cardMarkup(job, prominent) {
+    const booking = job.booking;
+    const party = partyLine(booking);
+    const notes = notesLine(booking);
+    return (
+      (prominent ? '<p class="next-kicker">Next job</p>' : "") +
+      '<div class="job-when">' + escapeHtml(formatWhen(job.pickup)) + "</div>" +
+      (hasReturn(booking) ? '<div class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</div>" : "") +
+      '<div class="job-route">' + escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</div>" +
+      '<div class="job-meta">' + escapeHtml(vehicleLabel(booking.vehicleType)) + " · " + escapeHtml(statusLabel(booking)) +
+      (party ? " · " + escapeHtml(party) : "") + "</div>" +
+      (notes ? '<p class="job-notes">' + escapeHtml(notes) + "</p>" : "")
+    );
+  }
+
   function renderList() {
-    const rows = visibleJobs();
+    const upcoming = nextJob();
+    const rows = visibleJobs().filter((job) => !(view === "today" && upcoming && job.booking.id === upcoming.booking.id && job.leg === upcoming.leg));
     jobList.innerHTML = "";
-    emptyEl.textContent =
-      view === "upcoming" ? "No upcoming jobs." : view === "completed" ? "No completed jobs." : "No jobs in this view.";
-    show(emptyEl, rows.length === 0);
+    if (view === "today") {
+      nextJobEl.hidden = false;
+      if (!loaded) {
+        nextJobEl.innerHTML = "";
+      } else if (!upcoming) {
+        nextJobEl.innerHTML = '<div class="next-empty"><strong>No jobs assigned.</strong><p>New jobs appear here when they are added.</p></div>';
+      } else {
+        nextJobEl.innerHTML = "";
+        const hero = document.createElement("button");
+        hero.type = "button";
+        hero.className = "next-card";
+        hero.innerHTML = cardMarkup(upcoming, true);
+        hero.addEventListener("click", () => openDetail(upcoming));
+        nextJobEl.appendChild(hero);
+      }
+    } else {
+      nextJobEl.hidden = true;
+      nextJobEl.innerHTML = "";
+    }
+    const emptyCopy = {
+      today: "Nothing else today.",
+      tomorrow: "No jobs tomorrow.",
+      upcoming: "No upcoming jobs.",
+      completed: "No completed jobs.",
+    };
+    emptyEl.textContent = rows.length === 0 && view === "today" && !upcoming
+      ? "No jobs assigned."
+      : emptyCopy[view] || "No jobs in this view.";
+    show(loadingEl, !loaded);
+    show(emptyEl, loaded && rows.length === 0 && !(view === "today" && upcoming));
     rows.forEach((job) => {
-      const booking = job.booking;
-      const charge = chargeFor(booking, job.leg);
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
       button.className = "job-card" + (job.leg === "return" ? " is-return" : "") + (view === "completed" ? " is-completed" : "");
-      button.innerHTML =
-        '<div class="job-head">' +
-        '<div class="job-when">' +
-        escapeHtml(formatWhen(job.pickup)) +
-        "</div>" +
-        '<div class="job-charge job-charge--' +
-        charge.kind +
-        '">' +
-        escapeHtml(charge.text) +
-        "</div></div>" +
-        (hasReturn(booking)
-          ? '<div class="job-leg">' + (job.leg === "return" ? "Return journey" : "Outbound") + "</div>"
-          : "") +
-        '<div class="job-route">' +
-        escapeHtml(job.pickupLocation) +
-        " to " +
-        escapeHtml(job.destination) +
-        "</div>" +
-        '<div class="job-meta">' +
-        escapeHtml(textOf(booking, ["hirerName", "name"])) +
-        " · " +
-        escapeHtml(vehicleLabel(booking.vehicleType)) +
-        "</div>";
+      button.innerHTML = cardMarkup(job, false);
       button.addEventListener("click", () => openDetail(job));
       item.appendChild(button);
       jobList.appendChild(item);
@@ -315,31 +396,24 @@
     const phone = textOf(booking, ["hirerPhone", "phone"]);
     const call = telHref(phone);
     const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || ""));
+    const place = job.leg === "return" ? null : booking.pickupPlace;
+    const navigate = mapsHref(job.pickupLocation, place);
+    const party = partyLine(booking);
+    const notes = notesLine(booking);
     sheetCard.innerHTML =
-      "<h2>" +
-      escapeHtml(formatWhen(job.pickup)) +
-      "</h2>" +
-      (hasReturn(booking)
-        ? '<p class="job-leg">' + (job.leg === "return" ? "Return journey" : "Outbound") + "</p>"
-        : "") +
-      '<p class="job-route">' +
-      escapeHtml(job.pickupLocation) +
-      " to " +
-      escapeHtml(job.destination) +
-      "</p>" +
-      '<p class="job-charge job-charge--' +
-      charge.kind +
-      '">' +
-      escapeHtml(charge.text) +
-      "</p>" +
-      "<p>" +
-      escapeHtml(textOf(booking, ["hirerName", "name"])) +
-      "</p>" +
-      "<p>" +
-      escapeHtml(vehicleLabel(booking.vehicleType)) +
-      "</p>" +
+      "<h2>" + escapeHtml(formatWhen(job.pickup)) + "</h2>" +
+      '<p class="job-status">' + escapeHtml(statusLabel(booking)) + "</p>" +
+      (hasReturn(booking) ? '<p class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</p>" : "") +
+      '<div class="detail-block"><h3>Journey</h3><p class="job-route">' +
+      escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</p>" +
+      "<p>" + escapeHtml(vehicleLabel(booking.vehicleType)) + (party ? " · " + escapeHtml(party) : "") + "</p></div>" +
+      (notes ? '<div class="detail-block"><h3>Collection notes</h3><p class="job-notes">' + escapeHtml(notes) + "</p></div>" : "") +
+      '<div class="detail-block"><h3>Customer</h3><p>' + escapeHtml(textOf(booking, ["hirerName", "name"]) || "Name not recorded") + "</p>" +
+      (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</div>" +
+      '<div class="detail-block"><h3>Collect</h3><p class="job-charge job-charge--' + charge.kind + '">' + escapeHtml(charge.text) + "</p></div>" +
       '<div class="actions">' +
-      (call ? '<a class="btn btn-primary" href="' + call + '">Call</a>' : "") +
+      (navigate ? '<a class="btn btn-primary" href="' + navigate + '" target="_blank" rel="noreferrer">Navigate</a>' : "") +
+      (call ? '<a class="btn" href="' + call + '">Call</a>' : "") +
       (wa ? '<a class="btn" href="' + wa + '" target="_blank" rel="noreferrer">WhatsApp</a>' : "") +
       '<button type="button" class="btn" id="edit-job">Edit</button>' +
       '<button type="button" class="btn btn-danger" id="cancel-job">Cancel job</button>' +
@@ -363,6 +437,10 @@
       '<p id="detail-error" class="error" hidden></p>';
     document.getElementById("keep-job").onclick = () => openDetail(job || expandJobs(booking)[0]);
     document.getElementById("confirm-cancel").onclick = async () => {
+      if (saving) return;
+      saving = true;
+      const button = document.getElementById("confirm-cancel");
+      if (button) button.disabled = true;
       try {
         const payload = {
           status: "cancelled",
@@ -379,6 +457,9 @@
         closeSheet();
       } catch (err) {
         setError(document.getElementById("detail-error"), err.message || "Could not cancel.");
+        if (button) button.disabled = false;
+      } finally {
+        saving = false;
       }
     };
   }
@@ -470,11 +551,15 @@
   }
 
   async function saveJob(draft, existing) {
+    if (saving) return;
     const err = document.getElementById("form-error");
     if (!draft.pickupDate || !draft.pickupTime || !draft.pickupLocation || !draft.destination || !draft.hirerName || !draft.hirerPhone) {
       setError(err, "Fill in every field.");
       return;
     }
+    saving = true;
+    const submit = document.querySelector("#job-form button[type='submit']");
+    if (submit) submit.disabled = true;
     const pickupIso = fromDateAndTime(draft.pickupDate, draft.pickupTime);
     const actor = auth.currentUser && auth.currentUser.uid;
     const fare = money(draft.actualFare);
@@ -539,6 +624,9 @@
       closeSheet();
     } catch (error) {
       setError(err, error.message || "Could not save.");
+      if (submit) submit.disabled = false;
+    } finally {
+      saving = false;
     }
   }
 
@@ -547,13 +635,22 @@
     unsub = db.collection("bookings").orderBy("createdAt", "desc").onSnapshot(
       (snap) => {
         bookings = snap.docs.map((doc) => Object.assign({ id: doc.id }, doc.data()));
+        loaded = true;
         setError(errorEl, "");
+        show(retryEl, false);
         renderList();
       },
       async (error) => {
-        setError(errorEl, "Could not load jobs. Sign in again with the PIN.");
-        await auth.signOut();
-        showApp(false);
+        const code = error && error.code;
+        if (code === "permission-denied" || code === "unauthenticated") {
+          setError(errorEl, "Could not load jobs. Sign in again with the PIN.");
+          await auth.signOut();
+          showApp(false);
+          return;
+        }
+        setError(errorEl, "Could not load jobs. Check the connection and try again.");
+        show(retryEl, true);
+        show(loadingEl, false);
       }
     );
   }
@@ -593,12 +690,24 @@
     }
   });
 
-  document.querySelectorAll(".tabs button").forEach((button) => {
-    button.addEventListener("click", () => {
-      view = button.getAttribute("data-view");
-      document.querySelectorAll(".tabs button").forEach((row) => row.classList.toggle("is-active", row === button));
-      renderList();
+  function setView(next) {
+    view = next;
+    document.querySelectorAll("[data-view]").forEach((row) => {
+      const active = row.getAttribute("data-view") === view;
+      row.classList.toggle("is-active", active);
+      if (row.closest(".bottom-nav")) row.setAttribute("aria-current", active ? "page" : "false");
     });
+    renderList();
+  }
+
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.addEventListener("click", () => setView(button.getAttribute("data-view")));
+  });
+
+  retryEl.addEventListener("click", () => {
+    show(retryEl, false);
+    show(loadingEl, true);
+    listenBookings();
   });
 
   document.getElementById("add-job").addEventListener("click", () => openForm(null));
