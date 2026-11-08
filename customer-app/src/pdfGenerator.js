@@ -111,6 +111,19 @@ export const generateBookingPDF = (
 
   const documentTitle = getDocumentTitle(type);
   const documentTitleUpper = documentTitle.toUpperCase();
+  const stopListMarkup = (stops) => {
+    if (!Array.isArray(stops) || stops.length < 3) return "";
+    const items = stops.filter((stop) => String(stop?.address || "").trim());
+    if (items.length < 3) return "";
+    const rows = items.map((stop, index) => {
+      const kind = stop.type === "dropoff" ? "Drop off" : "Pickup";
+      const notes = stop.notes ? ` (${stop.notes})` : "";
+      return `<li><strong>${index + 1}.</strong> ${kind}: ${stop.address || ""}${notes}</li>`;
+    }).join("");
+    return `<ol class="stop-list">${rows}</ol><p class="stop-fare-note">Extra stops. Agree the fare.</p>`;
+  };
+  const outboundStopsHtml = stopListMarkup(booking.stops);
+  const returnStopsHtml = stopListMarkup(booking.returnStops);
 
   const pdfContent = `
     <!DOCTYPE html>
@@ -345,6 +358,10 @@ export const generateBookingPDF = (
                 margin: 8px 0;
                 text-align: center;
             }
+
+            .stop-list { margin: 0; padding: 0; list-style: none; text-align: left; }
+            .stop-list li { display: block; margin: 0 0 8px; text-align: left; color: #002147; }
+            .stop-fare-note { margin: 2px 0 0; text-align: left; font-size: 0.8rem; font-weight: 700; color: #9a3412; }
             
             .journey-point {
                 flex: 1;
@@ -562,13 +579,11 @@ export const generateBookingPDF = (
 
                 <div class="info-box full-width">
                     <h2 class="section-header">Journey Details</h2>
-                    ${Array.isArray(booking.stops) && booking.stops.length > 2 ? `<div class="detail-row"><span class="detail-label">Stops</span><span class="detail-value">${booking.stops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</span></div>` : ""}
-                    ${Array.isArray(booking.returnStops) && booking.returnStops.length > 2 ? `<div class="detail-row"><span class="detail-label">Return stops</span><span class="detail-value">${booking.returnStops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</span></div>` : ""}
                     ${booking.bookingType === "return" || (booking.returnPickupLocation && booking.returnDestination) ? `
                     <div style="margin-bottom:10px;">
                         <div style="font-weight:700;color:#002147;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Outbound Journey</div>
                         <div class="journey-section">
-                            <div class="journey-flow">
+                            ${outboundStopsHtml || `<div class="journey-flow">
                                 <div class="journey-point">
                                     <div class="journey-time">Pick up: ${formatTime(booking.dateTime || booking.pickupTime)}</div>
                                     <div class="journey-location">${booking.pickup || booking.pickupLocation || "N/A"}</div>
@@ -577,29 +592,30 @@ export const generateBookingPDF = (
                                 <div class="journey-point">
                                     <div class="journey-location">${booking.destination || "N/A"}</div>
                                 </div>
-                            </div>
+                            </div>`}
                         </div>
                         ${booking.airportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.flightNumber ? ` · ${booking.flightNumber}` : ""}</span></div>` : ""}
                     </div>
                     <div>
                         <div style="font-weight:700;color:#002147;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Return Journey</div>
                         <div class="journey-section">
-                            <div class="journey-flow">
+                            ${booking.openReturn === true ? `<div class="journey-time">Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime || booking.returnDateTime ? `Pickup time now set for ${formatTime(booking.returnPickupTime || booking.returnDateTime)}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.</div>` : ""}
+                            ${returnStopsHtml || `<div class="journey-flow">
                                 <div class="journey-point">
-                                    <div class="journey-time">${booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime || booking.returnDateTime ? `Pickup time now set for ${formatTime(booking.returnPickupTime || booking.returnDateTime)}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.` : `Pick up: ${formatTime(booking.returnPickupTime || booking.returnDateTime)}`}</div>
+                                    <div class="journey-time">${booking.openReturn === true ? "" : `Pick up: ${formatTime(booking.returnPickupTime || booking.returnDateTime)}`}</div>
                                     <div class="journey-location">${booking.returnPickupLocation || "N/A"}</div>
                                 </div>
                                 <div class="journey-arrow">→</div>
                                 <div class="journey-point">
                                     <div class="journey-location">${booking.returnDestination || "N/A"}</div>
                                 </div>
-                            </div>
+                            </div>`}
                         </div>
                         ${booking.returnAirportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.returnFlightNumber ? ` · ${booking.returnFlightNumber}` : ""}</span></div>` : ""}
                     </div>
                     ` : `
                     <div class="journey-section">
-                        <div class="journey-flow">
+                        ${outboundStopsHtml || `<div class="journey-flow">
                             <div class="journey-point">
                                 <div class="journey-time">Pick up: ${formatTime(booking.dateTime || booking.pickupTime)}</div>
                                 <div class="journey-location">${booking.pickup || booking.pickupLocation || "N/A"}</div>
@@ -608,7 +624,7 @@ export const generateBookingPDF = (
                             <div class="journey-point">
                                 <div class="journey-location">${booking.destination || "N/A"}</div>
                             </div>
-                        </div>
+                        </div>`}
                     </div>
                     ${booking.airportCollection ? `<div class="detail-row"><span class="detail-label">Airport collection</span><span class="detail-value">Yes${booking.flightNumber ? ` · ${booking.flightNumber}` : ""}</span></div>` : ""}
                     `}

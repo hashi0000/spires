@@ -39,7 +39,6 @@ const issueQuoteFn = httpsCallable(functions, "issueQuote");
 const saveQuoteDraftFn = httpsCallable(functions, "saveQuoteDraft");
 const sendPaymentRequestFn = httpsCallable(functions, "sendPaymentRequest");
 const recordManualPaymentFn = httpsCallable(functions, "recordManualPayment");
-const recordManualAcceptanceFn = httpsCallable(functions, "recordManualAcceptance");
 const resendQuoteEmailFn = httpsCallable(functions, "resendQuoteEmail");
 const retryEmailJobFn = httpsCallable(functions, "retryEmailJob");
 const listBookingEmailsFn = httpsCallable(functions, "listBookingEmails");
@@ -353,12 +352,6 @@ export default function QuoteEditor({ bookingId, form, onChange, onWorkflowStatu
             await resendQuoteEmailFn({ bookingId });
             setMessage("The current quote was resent. The price was not changed.");
           })}>Resend quote</button>
-          <button type="button" className="btn btn-secondary btn-sm" disabled={Boolean(busy) || !booking?.quoteIssuedVersion || (!quoteState.send && !quoteState.reissue)} onClick={() => run("accept", async () => {
-            const res = await recordManualAcceptanceFn({ bookingId });
-            const data = res.data as { status?: string; substatus?: string };
-            if (data.status) onWorkflowStatus?.(data.status);
-            setMessage(data.substatus === "awaiting_payment" ? "Acceptance recorded. Waiting for payment." : "Acceptance recorded.");
-          })}>Record acceptance by phone</button>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPanel(panel === "correct" ? "" : "correct")}>Correct a payment</button>
         </div>
         {panel === "correct" ? (

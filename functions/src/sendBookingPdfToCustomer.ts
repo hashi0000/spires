@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import { getTransporter, mailFrom, reminderConfigOk, escapeHtml } from "./driverReminderEmail";
 import { confirmationTermsParagraph } from "./terms/bookingTerms";
 import { isQuoteAdmin } from "./quotes/quoteWorkflow";
+import { emailJourneyText } from "./bookings/journeyStops";
 
 type EmailDocType =
   | "confirmation"
@@ -74,16 +75,18 @@ async function sendMailWithPdf(params: {
   bookingNumber: string;
   hirerName: string;
   termsParagraph?: string;
+  journeyText?: string;
 }): Promise<void> {
-  const { pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph } = params;
+  const { pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph, journeyText } = params;
   const subject = getSubjectLine(pdfType, bookingNumber);
   const introCopy = getIntroCopy(pdfType);
   const filenamePrefix = getFilenamePrefix(pdfType);
 
   const html = `
       <div style="font-family:sans-serif;font-size:16px;color:#333;">
-        <p>Dear ${hirerName},</p>
+        <p>Dear ${escapeHtml(hirerName)},</p>
         ${introCopy}
+        ${journeyText ? `<div style="margin-top:12px;padding:12px;border:1px solid #C5A572;background:#faf8f4;border-radius:8px;white-space:pre-line;">${escapeHtml(journeyText)}</div>` : ""}
         ${termsParagraph ? `<p>${escapeHtml(termsParagraph)}</p>` : ""}
         <p style="font-size:14px;color:#555;">Attached: ${bookingNumber}</p>
         <p>
@@ -144,14 +147,17 @@ export const sendBookingPdfToCustomer = functions.https.onCall(async (data, cont
     typeof data?.hirerName === "string" && data.hirerName.trim() ? data.hirerName.trim() : "Customer";
 
   let termsParagraph = "";
+  let journeyText = "";
   const bookingId = typeof data?.bookingId === "string" ? data.bookingId.trim() : "";
-  if (
-    (pdfType === "confirmation" || pdfType === "booking_confirmation") &&
-    bookingId &&
-    isQuoteAdmin(String(context.auth.token.email || ""))
-  ) {
+  if (bookingId && isQuoteAdmin(String(context.auth.token.email || ""))) {
     const snap = await admin.firestore().collection("bookings").doc(bookingId).get();
-    if (snap.exists) termsParagraph = confirmationTermsParagraph(snap.data() || {});
+    if (snap.exists) {
+      const booking = snap.data() || {};
+      journeyText = emailJourneyText(booking);
+      if (pdfType === "confirmation" || pdfType === "booking_confirmation") {
+        termsParagraph = confirmationTermsParagraph(booking);
+      }
+    }
   }
 
   const pdfBase64Raw = typeof data?.pdfBase64 === "string" ? data.pdfBase64.trim() : "";
@@ -176,7 +182,7 @@ export const sendBookingPdfToCustomer = functions.https.onCall(async (data, cont
       );
     }
 
-    await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph });
+    await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph, journeyText });
     functions.logger.info(`Booking PDF emailed (inline) ${bookingNumber} to ${toEmail}`);
     return { success: true as const, to: toEmail, via: "inline" as const };
   }
@@ -220,7 +226,7 @@ export const sendBookingPdfToCustomer = functions.https.onCall(async (data, cont
   }
 
   try {
-    await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph });
+    await sendMailWithPdf({ pdfBuffer, toEmail, pdfType, bookingNumber, hirerName, termsParagraph, journeyText });
   } finally {
     await file.delete().catch((err) => functions.logger.warn("Temp PDF delete failed", err));
   }

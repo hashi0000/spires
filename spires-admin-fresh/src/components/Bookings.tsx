@@ -774,12 +774,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           <button type="button" className="booking-route-toggle" aria-expanded={routeOpen} onClick={() => setOpenRouteId(routeOpen ? null : booking.id || null)}>
                             {routeOpen ? 'Hide full address' : 'Full address'}
                           </button>
+                          {hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p className="booking-legs">{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
                           {returnJourney ? (
                             <div className="booking-legs">
                               <p><span>Outbound</span> {londonWhen(booking.pickupTime)}</p>
                               <p>{booking.pickupLocation} → {booking.destination}</p>
                               <p><span>Return</span> {ext.openReturn ? openReturnSummary(ext) : londonWhen(ext.returnPickupTime)}</p>
                               <p>{ext.returnPickupLocation || 'Pickup not recorded'} → {ext.returnDestination || 'Destination not recorded'}</p>
+                              {hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
                               <p>The fare is for the whole booking.</p>
                             </div>
                           ) : null}
@@ -850,6 +852,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                       <p>{booking.bookingNumber}</p>
                       {hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p>{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
                       {returnJourney ? <p>{ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} The fare is for the whole booking.</p> : null}
+                      {hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
                       <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
                         <option value="pending">Unpaid</option>
                         <option value="partial">Part paid</option>

@@ -28,4 +28,29 @@ const journeyStops_1 = require("./journeyStops");
         strict_1.default.match(text, /outside Oxford/);
         strict_1.default.doesNotMatch(text, /00:00/);
     });
+    (0, node_test_1.it)("lists every extra pickup and drop off for an email", () => {
+        const text = (0, journeyStops_1.emailJourneyText)({
+            pickupLocation: "1 High Street, Oxford",
+            destination: "Heathrow Terminal 5",
+            bookingType: "return",
+            openReturn: true,
+            returnDate: "2026-11-21",
+            returnPickupTime: "",
+            stops: [
+                { type: "pickup", address: "1 High Street, Oxford", notes: "Wait at the door" },
+                { type: "pickup", address: "Headington, Oxford" },
+                { type: "dropoff", address: "Heathrow Terminal 5" },
+            ],
+            returnStops: [
+                { type: "pickup", address: "Heathrow Terminal 5" },
+                { type: "dropoff", address: "Summertown, Oxford" },
+                { type: "dropoff", address: "1 High Street, Oxford" },
+            ],
+        });
+        strict_1.default.match(text, /Wait at the door/);
+        strict_1.default.match(text, /Headington, Oxford/);
+        strict_1.default.match(text, /Summertown, Oxford/);
+        strict_1.default.match(text, /Return time to be confirmed/);
+        strict_1.default.match(text, /Extra stops. Agree the fare/);
+    });
 });

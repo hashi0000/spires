@@ -230,7 +230,7 @@ function detailRow(doc, x, y, width, label, value) {
         .text(value || "", x + labelW + 6, y, { width: valueW, align: "right" });
     return y + h + 5;
 }
-function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, destination, airportCollection, flightNumber) {
+function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, destination, airportCollection, flightNumber, stops) {
     let cy = y;
     doc
         .fillColor(NAVY)
@@ -240,32 +240,45 @@ function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, desti
     cy += 16;
     cy = detailRow(doc, x, cy, width, "Date", formatPdfDate(pickupTime));
     cy = detailRow(doc, x, cy, width, "Pickup time", formatPdfTime(pickupTime));
-    const panelH = 48;
-    doc.save();
-    doc.roundedRect(x, cy, width, panelH, 5).fill(CREAM_PANEL);
-    doc.rect(x, cy, 3, panelH).fill(GOLD);
-    doc.restore();
-    const innerW = (width - 28) / 2;
-    doc
-        .fillColor(MUTED)
-        .font("Helvetica")
-        .fontSize(8)
-        .text(formatPdfTime(pickupTime), x + 12, cy + 8, { width: innerW, align: "center" });
-    doc
-        .fillColor(NAVY)
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .text(pickupLocation || "", x + 12, cy + 22, { width: innerW, align: "center" });
-    doc.fillColor(GOLD).font("Helvetica-Bold").fontSize(14).text(">", x + 12 + innerW, cy + 16, {
-        width: 16,
-        align: "center",
-    });
-    doc
-        .fillColor(NAVY)
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .text(destination || "", x + 12 + innerW + 16, cy + 22, { width: innerW, align: "center" });
-    cy += panelH + 8;
+    const extraStops = Array.isArray(stops) ? stops.filter((stop) => String(stop?.address || "").trim()) : [];
+    if (extraStops.length > 2) {
+        extraStops.forEach((stop, index) => {
+            const kind = stop?.type === "dropoff" ? "Drop off" : "Pickup";
+            const notes = stop?.notes ? ` (${stop.notes})` : "";
+            doc.fillColor(NAVY).font("Helvetica").fontSize(9).text(`${index + 1}. ${kind}: ${stop?.address || ""}${notes}`, x, cy, { width });
+            cy = doc.y + 3;
+        });
+        doc.fillColor(SLATE).font("Helvetica-Bold").fontSize(8).text("Extra stops. Agree the fare.", x, cy, { width });
+        cy = doc.y + 8;
+    }
+    else {
+        const panelH = 48;
+        doc.save();
+        doc.roundedRect(x, cy, width, panelH, 5).fill(CREAM_PANEL);
+        doc.rect(x, cy, 3, panelH).fill(GOLD);
+        doc.restore();
+        const innerW = (width - 28) / 2;
+        doc
+            .fillColor(MUTED)
+            .font("Helvetica")
+            .fontSize(8)
+            .text(formatPdfTime(pickupTime), x + 12, cy + 8, { width: innerW, align: "center" });
+        doc
+            .fillColor(NAVY)
+            .font("Helvetica-Bold")
+            .fontSize(9)
+            .text(pickupLocation || "", x + 12, cy + 22, { width: innerW, align: "center" });
+        doc.fillColor(GOLD).font("Helvetica-Bold").fontSize(14).text(">", x + 12 + innerW, cy + 16, {
+            width: 16,
+            align: "center",
+        });
+        doc
+            .fillColor(NAVY)
+            .font("Helvetica-Bold")
+            .fontSize(9)
+            .text(destination || "", x + 12 + innerW + 16, cy + 22, { width: innerW, align: "center" });
+        cy += panelH + 8;
+    }
     if (airportCollection) {
         cy = detailRow(doc, x, cy, width, "Airport collection", "Yes");
     }
@@ -345,25 +358,19 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     y = boxedSection(doc, leftX, y, contentW, "Journey Details", (innerY) => {
         let cy = innerY;
         if (isReturn) {
-            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Outbound Journey", outboundTime, booking.pickupLocation || booking.pickup || "", booking.destination || "", booking.airportCollection === true, booking.flightNumber);
+            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Outbound Journey", outboundTime, booking.pickupLocation || booking.pickup || "", booking.destination || "", booking.airportCollection === true, booking.flightNumber, booking.stops);
             cy += 8;
-            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Return Journey", booking.openReturn === true && !returnTime ? "" : returnTime, booking.returnPickupLocation || "", booking.returnDestination || "", booking.returnAirportCollection === true, booking.returnFlightNumber);
+            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Return Journey", booking.openReturn === true && !returnTime ? "" : returnTime, booking.returnPickupLocation || "", booking.returnDestination || "", booking.returnAirportCollection === true, booking.returnFlightNumber, booking.returnStops);
             if (booking.openReturn === true) {
                 cy += 6;
                 doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(booking.returnPickupTime
-                    ? `Open return. Pickup time now set for ${booking.returnPickupTime}.`
-                    : `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. Return time to be confirmed. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+                    ? `Open return. Pickup time now set for ${booking.returnPickupTime}. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`
+                    : `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. Return time to be confirmed. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
                 cy = doc.y + 4;
             }
         }
         else {
-            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Journey", outboundTime, booking.pickupLocation || booking.pickup || "", booking.destination || "", booking.airportCollection === true, booking.flightNumber);
-        }
-        if (Array.isArray(booking.stops) && booking.stops.length > 2) {
-            const stopText = booking.stops.map((stop, index) => `${index + 1}. ${stop?.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop?.address || ""}${stop?.notes ? ` (${stop.notes})` : ""}`).join("\n");
-            cy += 6;
-            doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(`Extra stops. Agree the fare.\n${stopText}`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
-            cy = doc.y + 4;
+            cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Journey", outboundTime, booking.pickupLocation || booking.pickup || "", booking.destination || "", booking.airportCollection === true, booking.flightNumber, booking.stops);
         }
         if (booking.vehicleType) {
             cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Vehicle Class", (0, vehicleTypes_1.formatVehicleTypeLabel)(booking.vehicleType));

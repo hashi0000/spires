@@ -132,4 +132,33 @@ describe("booking confirmation PDF", () => {
     expect(html).toContain("actual landing time");
     expect(html).toContain("50 minutes");
   });
+
+  it("lists every extra pickup and drop off in the journey", () => {
+    const html = buildBookingConfirmationHtml({
+      ...baseBooking,
+      bookingType: "return",
+      returnPickupTime: "2026-09-30T18:00:00.000Z",
+      returnPickupLocation: "Heathrow T5",
+      returnDestination: "Marston",
+      stops: [
+        { id: "1", type: "pickup", address: "1 High Street, Oxford", notes: "Wait at the door" },
+        { id: "2", type: "pickup", address: "Headington, Oxford" },
+        { id: "3", type: "dropoff", address: "Heathrow Terminal 5" },
+      ],
+      returnStops: [
+        { id: "r1", type: "pickup", address: "Heathrow Terminal 5" },
+        { id: "r2", type: "dropoff", address: "Summertown, Oxford" },
+        { id: "r3", type: "dropoff", address: "Marston" },
+      ],
+    });
+    expect(html).toContain("1 High Street, Oxford");
+    expect(html).toContain("Wait at the door");
+    expect(html).toContain("Headington, Oxford");
+    expect(html).toContain("Heathrow Terminal 5");
+    expect(html).toContain("Summertown, Oxford");
+    expect(html).toContain("Extra stops. Agree the fare.");
+    expect(html).toContain("Drop off");
+    expect(html).toContain("class=\"stop-list\"");
+    expect(html.match(/class="stop-list"/g)?.length).toBe(2);
+  });
 });

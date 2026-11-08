@@ -95,4 +95,32 @@ describe("branded booking confirmation PDF", () => {
     assert.match(text, /actual landing time/);
     assert.match(text, /BA249/);
   });
+
+  it("prints every extra pickup and drop off", async () => {
+    const buf = await generateBookingPDF(
+      {
+        ...sample,
+        bookingType: "return",
+        returnPickupTime: "2026-10-18T16:00:00.000Z",
+        returnPickupLocation: "London Heathrow",
+        returnDestination: "HB Allen Centre Oxford",
+        stops: [
+          { type: "pickup", address: "HB Allen Centre Oxford" },
+          { type: "pickup", address: "Headington Oxford" },
+          { type: "dropoff", address: "London Heathrow" },
+        ],
+        returnStops: [
+          { type: "pickup", address: "London Heathrow" },
+          { type: "dropoff", address: "Summertown Oxford" },
+          { type: "dropoff", address: "HB Allen Centre Oxford" },
+        ],
+      },
+      "confirmation"
+    );
+    const text = pdfText(buf);
+    assert.match(text, /Headington Oxford/);
+    assert.match(text, /Summertown Oxford/);
+    assert.match(text, /Extra stops. Agree the fare/);
+    assert.match(text, /Drop off/);
+  });
 });

@@ -19,12 +19,20 @@ import {
 
 export type AdminPDFType = "booking_confirmation" | "payment_request" | "payment_receipt";
 
-function stopListText(stops: unknown): string {
-  if (!Array.isArray(stops) || stops.length < 3) return "";
-  return stops.map((stop: { type?: string; address?: string; notes?: string }, index: number) => {
+function stopItems(stops: unknown): { type?: string; address?: string; notes?: string }[] {
+  if (!Array.isArray(stops) || stops.length < 3) return [];
+  return stops.filter((stop) => String(stop?.address || "").trim());
+}
+
+function stopListHtml(stops: unknown): string {
+  const items = stopItems(stops);
+  if (!items.length) return "";
+  const rows = items.map((stop, index) => {
+    const kind = stop?.type === "dropoff" ? "Drop off" : "Pickup";
     const notes = stop?.notes ? " (" + stop.notes + ")" : "";
-    return (index + 1) + ". " + (stop?.type === "dropoff" ? "Drop off" : "Pickup") + ": " + (stop?.address || "") + notes;
-  }).join("; ") + ". Extra stops. Agree the fare.";
+    return `<li><span class="stop-index">${index + 1}.</span> <strong>${kind}</strong> ${escapePdfText((stop?.address || "") + notes)}</li>`;
+  }).join("");
+  return `<ol class="stop-list">${rows}</ol><p class="stop-fare-note">Extra stops. Agree the fare.</p>`;
 }
 
 function openReturnText(booking: { openReturn?: boolean; returnDate?: string; returnPickupTime?: string; returnNoticeNote?: string }): string {
@@ -61,7 +69,8 @@ function journeyDetailsHtml(
   pickupLocation: string | undefined,
   destination: string | undefined,
   airportCollection: boolean,
-  flightNumber?: string
+  flightNumber?: string,
+  stops?: unknown
 ): string {
   const flightRow =
     airportCollection && (flightNumber || "").trim()
@@ -76,6 +85,18 @@ function journeyDetailsHtml(
             <span class="detail-value">Yes</span>
          </div>`
     : "";
+  const listed = stopListHtml(stops);
+  const route = listed || `
+        <div class="journey-flow">
+          <div class="journey-point">
+            <div class="journey-time">${formatPdfTime(pickupTime)}</div>
+            <div class="journey-location">${escapePdfText(pickupLocation || "")}</div>
+          </div>
+          <div class="journey-arrow">→</div>
+          <div class="journey-point">
+            <div class="journey-location">${escapePdfText(destination || "")}</div>
+          </div>
+        </div>`;
   return `
     <div class="journey-block">
       <h3 class="journey-heading">${escapePdfText(title)}</h3>
@@ -87,17 +108,8 @@ function journeyDetailsHtml(
         <span class="detail-label">Pickup time</span>
         <span class="detail-value">${formatPdfTime(pickupTime)}</span>
       </div>
-      <div class="journey-section">
-        <div class="journey-flow">
-          <div class="journey-point">
-            <div class="journey-time">${formatPdfTime(pickupTime)}</div>
-            <div class="journey-location">${escapePdfText(pickupLocation || "")}</div>
-          </div>
-          <div class="journey-arrow">→</div>
-          <div class="journey-point">
-            <div class="journey-location">${escapePdfText(destination || "")}</div>
-          </div>
-        </div>
+      <div class="journey-section${listed ? " has-stops" : ""}">
+        ${route}
       </div>
       ${collectionRow}
       ${flightRow}
@@ -443,6 +455,11 @@ export function buildBookingConfirmationHtml(
 
             .booking-pdf-root .journey-point { flex: 1; text-align: center; min-width: 0; }
             .booking-pdf-root .journey-location { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+            .booking-pdf-root .stop-list { margin: 0; padding: 0; list-style: none; text-align: left; }
+            .booking-pdf-root .stop-list li { display: block; margin: 0 0 8px; text-align: left; color: #002147; font-size: 0.9rem; }
+            .booking-pdf-root .stop-index { font-weight: 700; }
+            .booking-pdf-root .stop-fare-note { margin: 2px 0 0; text-align: left; font-size: 0.8rem; font-weight: 700; color: #9a3412; }
+            .booking-pdf-root .journey-section.has-stops { page-break-inside: auto; height: auto; overflow: visible; }
             .booking-pdf-root .journey-arrow { font-size: 1.2rem; color: #C5A572; flex-shrink: 0; }
 
             .booking-pdf-root .payment-schedule-box { page-break-inside: avoid; }
@@ -600,7 +617,8 @@ export function buildBookingConfirmationHtml(
                             booking.pickupLocation,
                             booking.destination,
                             booking.airportCollection === true,
-                            (booking as any).flightNumber
+                            (booking as any).flightNumber,
+                            (booking as any).stops
                           )}
                           ${journeyDetailsHtml(
                             "Return Journey",
@@ -608,17 +626,18 @@ export function buildBookingConfirmationHtml(
                             booking.returnPickupLocation,
                             booking.returnDestination,
                             booking.returnAirportCollection === true,
-                            booking.returnFlightNumber
+                            booking.returnFlightNumber,
+                            (booking as any).returnStops
                           )}
-                          ${openReturnText(booking as any) ? '<div class="detail-row"><span class="detail-label">Open return</span><span class="detail-value">' + escapePdfText(openReturnText(booking as any)) + "</span></div>" : ""}
-                          ${stopListText((booking as any).returnStops) ? '<div class="detail-row"><span class="detail-label">Return stops</span><span class="detail-value">' + escapePdfText(stopListText((booking as any).returnStops)) + "</span></div>" : ""}`
+                          ${openReturnText(booking as any) ? '<div class="detail-row"><span class="detail-label">Open return</span><span class="detail-value">' + escapePdfText(openReturnText(booking as any)) + "</span></div>" : ""}`
                         : `${journeyDetailsHtml(
                             "Journey",
                             booking.pickupTime,
                             booking.pickupLocation,
                             booking.destination,
                             booking.airportCollection === true,
-                            (booking as any).flightNumber
+                            (booking as any).flightNumber,
+                            (booking as any).stops
                           )}
                           ${
                             (booking as any).returnTrip && (booking as any).returnDateTime
@@ -631,7 +650,6 @@ export function buildBookingConfirmationHtml(
                           }`
                     }
 
-                    ${stopListText((booking as any).stops) ? '<div class="detail-row"><span class="detail-label">Stops</span><span class="detail-value">' + escapePdfText(stopListText((booking as any).stops)) + "</span></div>" : ""}
                     <div class="detail-row" style="margin-top:10px;">
                         <span class="detail-label">Vehicle Class</span>
                         <span class="detail-value">${formatVehicleTypeLabel((booking as any).vehicleType)}${
@@ -841,6 +859,19 @@ const PDF_EMAIL_CAPTURE_CSS = `
     justify-content: space-between !important;
     gap: 8px !important;
     align-items: baseline !important;
+  }
+  .booking-pdf-root.pdf-email-capture .journey-section.has-stops {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    page-break-inside: auto !important;
+  }
+  .booking-pdf-root.pdf-email-capture .stop-list,
+  .booking-pdf-root.pdf-email-capture .stop-list li,
+  .booking-pdf-root.pdf-email-capture .stop-fare-note {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
   }
   .booking-pdf-root.pdf-email-capture .journey-flow {
     display: table !important;

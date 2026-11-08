@@ -413,7 +413,14 @@
     const charge = chargeFor(booking, job.leg);
     const phone = textOf(booking, ["hirerPhone", "phone"]);
     const call = telHref(phone);
-    const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || ""));
+    const stopText = (function () {
+      const stops = job.leg === "return" ? booking.returnStops : booking.stops;
+      if (!Array.isArray(stops) || stops.length < 3) return "";
+      return "\n" + stops.map(function (stop, index) {
+        return (index + 1) + ". " + (stop.type === "dropoff" ? "Drop off" : "Pickup") + ": " + (stop.address || "");
+      }).join("; ") + ". Extra stops. Agree the fare.";
+    })();
+    const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || "") + "\n" + (job.pickupLocation || "") + " to " + (job.destination || "") + stopText);
     const place = job.leg === "return" ? null : booking.pickupPlace;
     const navigate = mapsHref(job.pickupLocation, place);
     const party = partyLine(booking);

@@ -178,6 +178,12 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     termsAcceptanceRecordedAt: (customerBooking as any).termsAcceptanceRecordedAt,
     termsAcceptanceRecordedBy: (customerBooking as any).termsAcceptanceRecordedBy,
     termsAcceptanceNote: (customerBooking as any).termsAcceptanceNote,
+    stops: (customerBooking as any).stops,
+    returnStops: (customerBooking as any).returnStops,
+    extraStops: (customerBooking as any).extraStops === true,
+    openReturn: (customerBooking as any).openReturn === true,
+    returnDate: (customerBooking as any).returnDate,
+    returnNoticeNote: (customerBooking as any).returnNoticeNote,
   } as Partial<Booking>;
 };
 

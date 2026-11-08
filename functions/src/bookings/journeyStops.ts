@@ -63,6 +63,29 @@ export function routeSentence(stops: JourneyStop[], when = ""): string {
   return `${describeStops(stops)}${clock ? `. ${clock}` : ""}`;
 }
 
+export function emailJourneyText(booking: Loose): string {
+  const outbound = normaliseStops(
+    booking.stops,
+    text(booking.pickupLocation) || text(booking.pickup),
+    text(booking.destination)
+  );
+  const lines: string[] = [];
+  if (hasExtraStops(outbound)) {
+    lines.push(`Stops: ${describeStops(outbound)}. Extra stops. Agree the fare.`);
+  } else if (outbound.length >= 2 && outbound[0].address && outbound[outbound.length - 1].address) {
+    lines.push(`${outbound[0].address} to ${outbound[outbound.length - 1].address}`);
+  }
+  const returning = normaliseStops(booking.returnStops, text(booking.returnPickupLocation), text(booking.returnDestination));
+  const isReturn = text(booking.bookingType) === "return" || Boolean(text(booking.returnPickupLocation)) || booking.openReturn === true;
+  if (isReturn && booking.openReturn === true) lines.push(openReturnSummary(booking));
+  if (hasExtraStops(returning)) {
+    lines.push(`Return stops: ${describeStops(returning)}. Extra stops. Agree the fare.`);
+  } else if (isReturn && booking.openReturn !== true && returning.length >= 2 && returning[0].address && returning[returning.length - 1].address) {
+    lines.push(`Return: ${returning[0].address} to ${returning[returning.length - 1].address}`);
+  }
+  return lines.filter(Boolean).join("\n");
+}
+
 export function describeStops(stops: JourneyStop[]): string {
   return stops
     .map((stop, index) => {

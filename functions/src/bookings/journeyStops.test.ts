@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { describeStops, normaliseStops, openReturnSummary, validateStops } from "./journeyStops";
+import { describeStops, emailJourneyText, normaliseStops, openReturnSummary, validateStops } from "./journeyStops";
 
 describe("journey stops", () => {
   it("keeps an older pickup and destination as two stops", () => {
@@ -25,5 +25,31 @@ describe("journey stops", () => {
     assert.match(text, /at least 30 minutes/);
     assert.match(text, /outside Oxford/);
     assert.doesNotMatch(text, /00:00/);
+  });
+
+  it("lists every extra pickup and drop off for an email", () => {
+    const text = emailJourneyText({
+      pickupLocation: "1 High Street, Oxford",
+      destination: "Heathrow Terminal 5",
+      bookingType: "return",
+      openReturn: true,
+      returnDate: "2026-11-21",
+      returnPickupTime: "",
+      stops: [
+        { type: "pickup", address: "1 High Street, Oxford", notes: "Wait at the door" },
+        { type: "pickup", address: "Headington, Oxford" },
+        { type: "dropoff", address: "Heathrow Terminal 5" },
+      ],
+      returnStops: [
+        { type: "pickup", address: "Heathrow Terminal 5" },
+        { type: "dropoff", address: "Summertown, Oxford" },
+        { type: "dropoff", address: "1 High Street, Oxford" },
+      ],
+    });
+    assert.match(text, /Wait at the door/);
+    assert.match(text, /Headington, Oxford/);
+    assert.match(text, /Summertown, Oxford/);
+    assert.match(text, /Return time to be confirmed/);
+    assert.match(text, /Extra stops. Agree the fare/);
   });
 });

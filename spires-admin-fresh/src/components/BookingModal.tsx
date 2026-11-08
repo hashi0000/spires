@@ -19,7 +19,9 @@ import {
   resolveBookingType,
   splitLocalDateTime,
 } from '../utils/bookingJourney';
-import { db } from '../utils/firebase';
+import { db, functions } from '../utils/firebase';
+import { getCallableErrorMessage } from '../utils/callableErrorMessage';
+import { httpsCallable } from 'firebase/functions';
 import { collection, doc, setDoc, runTransaction, serverTimestamp, deleteField } from 'firebase/firestore';
 import {
   accountLinkForBooking,
@@ -593,6 +595,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
         console.log('📝 Updating booking:', bookingId);
         console.log('📝 Update data:', cleanedUpdateData);
         let fareNote = '';
+        let confirmNote = '';
+        const needsPhoneAcceptance = Boolean(editingBooking.quoteIssuedVersion)
+          && bookingData.status === 'confirmed'
+          && editingBooking.quoteAcceptedVersion !== editingBooking.quoteIssuedVersion;
+        if (needsPhoneAcceptance) {
+          delete cleanedUpdateData.status;
+          delete cleanedUpdateData.adminStatus;
+          delete cleanedUpdateData.customerStatus;
+        }
         await runTransaction(db, async transaction => {
           const ref = doc(db, 'bookings', bookingId);
           const latest = await transaction.get(ref);
@@ -611,8 +622,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
               const accepted = current.quoteAcceptedVersion === current.quoteIssuedVersion;
               const required = Number(current.issuedQuote?.amountRequestedPence || current.amountRequestedPence || 0);
               const advance = (current.issuedQuote?.paymentRequirement || current.paymentRequirement) === 'advance';
-              if (!accepted || (advance && (required <= 0 || Number(current.amountReceivedPence || 0) < required))) {
-                throw new Error('Record customer acceptance and the required payment in Quote and payment before confirming.');
+              const paidEnough = !advance || (required > 0 && Number(current.amountReceivedPence || 0) >= required);
+              if (!accepted || !paidEnough) {
+                delete safeUpdate.status;
+                delete safeUpdate.adminStatus;
+                delete safeUpdate.customerStatus;
+                confirmNote = !accepted
+                  ? 'The other details were saved. This booking was not confirmed. Set the status to Confirmed and save again so the customer acceptance is recorded.'
+                  : 'The other details were saved. The customer acceptance is recorded. Record the required payment in Quote and payment before this booking can be confirmed.';
               }
             }
           }
@@ -620,7 +637,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
           if (!formData.destinationPlace) safeUpdate.destinationPlace = deleteField();
           transaction.update(ref, safeUpdate);
         });
-        if (fareNote) window.alert(fareNote);
+        if (needsPhoneAcceptance && !confirmNote) {
+          try {
+            const recordManualAcceptance = httpsCallable(functions, 'recordManualAcceptance');
+            const res = await recordManualAcceptance({ bookingId });
+            const data = res.data as { status?: string; substatus?: string };
+            if (data.substatus === 'awaiting_payment' || data.status !== 'confirmed') {
+              confirmNote = 'The other details were saved and the customer acceptance is recorded. Record the required payment in Quote and payment before this booking can be confirmed.';
+            }
+          } catch (acceptError) {
+            confirmNote = `The other details were saved. This booking was not confirmed. ${getCallableErrorMessage(acceptError)}`;
+          }
+        }
+        if (confirmNote) setFormData((prev) => ({ ...prev, status: originalStatus as ExtendedBooking['status'] }));
+        if (fareNote || confirmNote) window.alert([fareNote, confirmNote].filter(Boolean).join('\n\n'));
         console.log('✅ Booking updated successfully:', bookingId);
       } else {
         const createPayload: Record<string, unknown> = {};
@@ -1070,6 +1100,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
+                <p className="text-sm text-gray-600 mt-1">Confirmed records that the customer accepted, including by phone.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Contract</label>

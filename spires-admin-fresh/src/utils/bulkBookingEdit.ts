@@ -70,7 +70,7 @@ export function planBulkJobUpdate(booking: BulkJobRecord, changes: BulkJobChange
       const advance = (booking.issuedQuote?.paymentRequirement || booking.paymentRequirement) === 'advance';
       const paidEnough = !advance || (required > 0 && Number(booking.amountReceivedPence || 0) >= required);
       if (!accepted || !paidEnough) {
-        return { ok: false, reason: 'Record customer acceptance and the required payment before confirming.' };
+        return { ok: false, reason: 'Open the booking and set the status to Confirmed. That records the acceptance. Record the required payment first when the quote asks for payment in advance.' };
       }
     }
     if (status === 'allocated' && !nextDriver) {

@@ -114,6 +114,8 @@ async function processBookingReminders(logger) {
                 dropoff: trip.dropoff,
                 passengerName: trip.passengerName,
                 headline,
+                stops: trip.stops,
+                returnSummary: trip.returnSummary,
             });
             await doc.ref.update({
                 "reminderEmails.adminNoDriverWarningSentAt": new Date().toISOString(),

@@ -85,4 +85,28 @@ const sample = {
         strict_1.default.match(text, /actual landing time/);
         strict_1.default.match(text, /BA249/);
     });
+    (0, node_test_1.it)("prints every extra pickup and drop off", async () => {
+        const buf = await (0, pdfGenerator_1.generateBookingPDF)({
+            ...sample,
+            bookingType: "return",
+            returnPickupTime: "2026-10-18T16:00:00.000Z",
+            returnPickupLocation: "London Heathrow",
+            returnDestination: "HB Allen Centre Oxford",
+            stops: [
+                { type: "pickup", address: "HB Allen Centre Oxford" },
+                { type: "pickup", address: "Headington Oxford" },
+                { type: "dropoff", address: "London Heathrow" },
+            ],
+            returnStops: [
+                { type: "pickup", address: "London Heathrow" },
+                { type: "dropoff", address: "Summertown Oxford" },
+                { type: "dropoff", address: "HB Allen Centre Oxford" },
+            ],
+        }, "confirmation");
+        const text = pdfText(buf);
+        strict_1.default.match(text, /Headington Oxford/);
+        strict_1.default.match(text, /Summertown Oxford/);
+        strict_1.default.match(text, /Extra stops. Agree the fare/);
+        strict_1.default.match(text, /Drop off/);
+    });
 });

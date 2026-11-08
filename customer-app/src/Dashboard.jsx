@@ -431,6 +431,12 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="booking-card-body">
+                  {Array.isArray(booking.stops) && booking.stops.length > 2 ? (
+                    <div className="booking-info-row">
+                      <span className="info-label">Stops:</span>
+                      <span className="info-value">{booking.stops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</span>
+                    </div>
+                  ) : null}
                   <div className="booking-info-row">
                     <span className="info-label">Date & Time:</span>
                     <span className="info-value">{formatDateTime(booking.dateTime || (booking.date && booking.time ? `${booking.date} ${booking.time}` : null))}</span>
@@ -483,6 +489,9 @@ export default function Dashboard() {
                         <span className="info-label">Return:</span>
                         <span className="info-value">
                           {booking.returnPickupLocation || booking.destination} → {booking.returnDestination || booking.pickup}
+                          {Array.isArray(booking.returnStops) && booking.returnStops.length > 2
+                            ? ` · ${booking.returnStops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.`
+                            : ""}
                           {booking.openReturn
                             ? ` · Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime || booking.returnDateTime ? `Pickup time now set for ${formatDateTime(booking.returnPickupTime || booking.returnDateTime)}.` : "Return time to be confirmed."}`
                             : (booking.returnPickupTime || booking.returnDateTime
