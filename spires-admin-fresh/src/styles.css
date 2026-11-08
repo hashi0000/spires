@@ -2124,7 +2124,7 @@ header.admin-header,
 .bulk-edit-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .bulk-edit-actions .btn { min-height: 44px; }
 .stop-editor { display: grid; gap: 0.75rem; margin-bottom: 0.75rem; }
-.stop-row { display: grid; gap: 0.4rem; padding: 0.65rem; background: #fff; border: 1px solid #e6ebf0; border-radius: 8px; }
+.stop-row { display: grid; gap: 0.4rem; padding: 0.65rem; background: #fff; border: 1px solid #e6ebf0; border-radius: 8px; scroll-margin: 5rem; }
 .stop-row-head, .stop-row-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; justify-content: space-between; }
 .stop-row select, .stop-note input { font: inherit; padding: 0.4rem 0.5rem; border: 1px solid #d5dde6; border-radius: 8px; width: 100%; }
 .stop-note { display: grid; gap: 0.25rem; font-size: 0.8125rem; font-weight: 600; }

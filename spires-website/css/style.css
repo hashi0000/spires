@@ -2505,7 +2505,15 @@ h2,
 
   main,
   .site-footer {
-    padding-bottom: 5.5rem;
+    padding-bottom: 7.5rem;
+  }
+
+  .booking-form input,
+  .booking-form select,
+  .booking-form textarea,
+  .extra-stop {
+    scroll-margin-top: 5.5rem;
+    scroll-margin-bottom: 7.5rem;
   }
 
   body.is-menu-open .mobile-book-bar { display: none; }
@@ -3688,6 +3696,15 @@ html[dir="rtl"] .booking-form label {
   margin-top: 1.25rem;
 }
 
+.extra-stops { display: grid; gap: 0.75rem; margin: 0.25rem 0 1rem; }
+.extra-stop {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.extra-stop select,
+.extra-stop input { margin-top: 0.35rem; }
 .loc-suggest { position: relative; }
 .loc-suggest__list {
   position: absolute;

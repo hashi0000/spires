@@ -885,15 +885,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       </div>
                     </div>
                     <JourneyStopsEditor
-                      stops={normaliseStops(formData.stops, formData.pickupLocation, formData.destination || '')}
-                      onChange={(stops) => setFormData({
-                        ...formData,
+                      stops={formData.stops?.length ? formData.stops : normaliseStops(undefined, formData.pickupLocation, formData.destination || '')}
+                      onChange={(stops) => setFormData((prev) => ({
+                        ...prev,
                         stops,
                         pickupLocation: stops[0]?.address || '',
                         destination: stops[stops.length - 1]?.address || '',
                         pickupPlace: (stops[0]?.place as ExtendedBooking['pickupPlace']) || null,
                         destinationPlace: (stops[stops.length - 1]?.place as ExtendedBooking['destinationPlace']) || null,
-                      })}
+                      }))}
                     />
                     <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
                       <input
@@ -981,13 +981,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         </>
                       ) : null}
                       <JourneyStopsEditor
-                        stops={normaliseStops(formData.returnStops, formData.returnPickupLocation || '', formData.returnDestination || '')}
-                        onChange={(stops) => setFormData({
-                          ...formData,
+                        stops={formData.returnStops?.length ? formData.returnStops : normaliseStops(undefined, formData.returnPickupLocation || '', formData.returnDestination || '')}
+                        onChange={(stops) => setFormData((prev) => ({
+                          ...prev,
                           returnStops: stops,
                           returnPickupLocation: stops[0]?.address || '',
                           returnDestination: stops[stops.length - 1]?.address || '',
-                        })}
+                        }))}
                       />
                       <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
                         <input

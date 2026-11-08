@@ -7,7 +7,7 @@
 
   function stopRow(stop, onChange) {
     var row = document.createElement("div");
-    row.className = "form-field";
+    row.className = "form-field extra-stop";
     var kind = document.createElement("select");
     kind.innerHTML = "<option value='pickup'>Pickup</option><option value='dropoff'>Drop off</option>";
     kind.value = stop.type === "pickup" ? "pickup" : "dropoff";
@@ -60,20 +60,9 @@
     add.textContent = "Add a stop";
     var summary = document.createElement("p");
     summary.className = "form-help";
+    var reveal = false;
     form[key] = form[key] || [];
-    function paint() {
-      list.innerHTML = "";
-      form[key].forEach(function (stop, index) {
-        list.appendChild(stopRow(stop, function (action, value) {
-          var rows = form[key].slice();
-          if (action === "edit") rows[index] = value;
-          if (action === "remove") rows.splice(index, 1);
-          if (action === "up" && index > 0) rows.splice(index - 1, 0, rows.splice(index, 1)[0]);
-          if (action === "down" && index < rows.length - 1) rows.splice(index + 1, 0, rows.splice(index, 1)[0]);
-          form[key] = rows;
-          paint();
-        }));
-      });
+    function writeSummary() {
       var start = field(form, anchorName === "destination" ? "pickup" : "returnPickupLocation");
       var end = field(form, anchorName);
       var all = [{ type: "pickup", address: start ? start.value : "" }].concat(form[key]).concat([{ type: "dropoff", address: end ? end.value : "" }]);
@@ -81,13 +70,43 @@
         return (index + 1) + ". " + (stop.type === "pickup" ? "Pickup" : "Drop off") + ": " + stop.address + (stop.notes ? " (" + stop.notes + ")" : "");
       }).join("; ");
     }
+    function paint() {
+      list.innerHTML = "";
+      form[key].forEach(function (stop, index) {
+        list.appendChild(stopRow(stop, function (action, value) {
+          var rows = form[key].slice();
+          if (action === "edit") {
+            rows[index] = value;
+            form[key] = rows;
+            writeSummary();
+            return;
+          }
+          if (action === "remove") rows.splice(index, 1);
+          if (action === "up" && index > 0) rows.splice(index - 1, 0, rows.splice(index, 1)[0]);
+          if (action === "down" && index < rows.length - 1) rows.splice(index + 1, 0, rows.splice(index, 1)[0]);
+          form[key] = rows;
+          paint();
+        }));
+      });
+      writeSummary();
+      if (reveal) {
+        var added = list.lastElementChild;
+        if (added) {
+          added.scrollIntoView({ block: "center" });
+          var address = added.querySelector("input[name='stopAddress']");
+          if (address) address.focus();
+        }
+        reveal = false;
+      }
+    }
     add.addEventListener("click", function () {
       form[key].push({ id: "stop-" + Date.now(), type: "dropoff", address: "", notes: "" });
+      reveal = true;
       paint();
     });
     ["pickup", "destination", "returnPickupLocation", "returnDestination"].forEach(function (name) {
       var input = field(form, name);
-      if (input) input.addEventListener("input", paint);
+      if (input) input.addEventListener("input", writeSummary);
     });
     box.appendChild(list);
     box.appendChild(add);

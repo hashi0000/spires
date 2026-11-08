@@ -1,6 +1,6 @@
 import React from "react";
 import LocationField from "./LocationField";
-import { JourneyStop, describeStops, hasExtraStops, newStopId } from "../utils/journeyStops";
+import { describeStops, hasExtraStops, JourneyStop, newStopId } from "../utils/journeyStops";
 
 type Props = {
   stops: JourneyStop[];
@@ -12,9 +12,15 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
     onChange(stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)));
   };
   const addStop = () => {
+    const id = newStopId();
     const next = [...stops];
-    next.splice(Math.max(stops.length - 1, 1), 0, { id: newStopId(), type: "dropoff", address: "", notes: "", place: null });
+    next.splice(Math.max(stops.length - 1, 1), 0, { id, type: "dropoff", address: "", notes: "", place: null });
     onChange(next);
+    window.setTimeout(() => {
+      const row = document.getElementById(id);
+      row?.scrollIntoView({ block: "center" });
+      row?.querySelector("input")?.focus();
+    }, 0);
   };
   const removeStop = (index: number) => {
     if (stops.length <= 2) return;
@@ -32,7 +38,7 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
   return (
     <div className="stop-editor">
       {stops.map((stop, index) => (
-        <div key={stop.id} className="stop-row">
+        <div key={stop.id} id={stop.id} className="stop-row">
           <div className="stop-row-head">
             {stops.length === 2 ? (
               <strong>{stop.type === "pickup" ? "Pickup" : "Drop off"}</strong>
@@ -57,11 +63,11 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
             label="Address"
             value={stop.address}
             required
-            onChange={(value, place) => update(index, { address: value, place: (place as JourneyStop["place"]) || null })}
+            onChange={(value, place) => update(index, { address: value, place: place || null })}
           />
           <label className="stop-note">
             Note, optional
-            <input value={stop.notes} onChange={(event) => update(index, { notes: event.target.value })} placeholder="For example, side entrance" />
+            <input value={stop.notes || ""} onChange={(event) => update(index, { notes: event.target.value })} placeholder="For example, side entrance" />
           </label>
         </div>
       ))}

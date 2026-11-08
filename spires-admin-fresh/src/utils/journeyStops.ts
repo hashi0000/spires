@@ -2,8 +2,8 @@ export type JourneyStop = {
   id: string;
   type: "pickup" | "dropoff";
   address: string;
-  notes: string;
-  place: Record<string, unknown> | null;
+  notes?: string;
+  place?: Record<string, unknown> | null;
 };
 
 export const OPEN_RETURN_NOTICE =
@@ -29,7 +29,7 @@ export function normaliseStops(raw: unknown, pickup = "", destination = ""): Jou
           notes: text(row.notes, 400),
           place: row.place && typeof row.place === "object" ? (row.place as Record<string, unknown>) : null,
         } as JourneyStop;
-      }).filter((stop) => stop.address || stop.notes)
+      })
     : [];
   if (fromRaw.length > 0) return fromRaw;
   return [

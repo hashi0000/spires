@@ -58,7 +58,7 @@ function ExtraStops({ stops, onChange }) {
   return (
     <div style={{ display: "grid", gap: "0.5rem" }}>
       {rows.map((stop, index) => (
-        <div key={stop.id} style={{ display: "grid", gap: "0.35rem", padding: "0.5rem", border: "1px solid #dbe3ee", borderRadius: 8 }}>
+        <div id={stop.id} key={stop.id} style={{ display: "grid", gap: "0.35rem", padding: "0.5rem", border: "1px solid #dbe3ee", borderRadius: 8, scrollMargin: "5rem" }}>
           <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
             <select value={stop.type} onChange={(event) => update(index, { type: event.target.value })}>
               <option value="pickup">Pickup</option>
@@ -72,7 +72,11 @@ function ExtraStops({ stops, onChange }) {
           <input placeholder="Note, optional" value={stop.notes || ""} onChange={(event) => update(index, { notes: event.target.value })} />
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...rows, { id: `mid-${Date.now()}`, type: "dropoff", address: "", notes: "" }])}>Add a stop</button>
+      <button type="button" onClick={() => {
+        const id = `mid-${Date.now()}`;
+        onChange([...rows, { id, type: "dropoff", address: "", notes: "" }]);
+        window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "center" }), 0);
+      }}>Add a stop</button>
     </div>
   );
 }
