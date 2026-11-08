@@ -124,7 +124,8 @@
   }
 
   function start() {
-    document.querySelectorAll("input[name='pickup'], input[name='destination'], input[name='returnPickupLocation'], input[name='returnDestination']").forEach(attach);
+    document.querySelectorAll("input[name='pickup'], input[name='destination'], input[name='returnPickupLocation'], input[name='returnDestination'], input[name='stopAddress']").forEach(attach);
+    window.spiresAttachLocation = attach;
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);

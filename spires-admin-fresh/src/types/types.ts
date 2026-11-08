@@ -80,6 +80,12 @@ export interface Booking {
   pickupLocation: string;
   destination: string;
   pickupPlace?: { label: string; placeId?: string; postcode?: string; latitude?: number | null; longitude?: number | null; premise?: string } | null;
+  stops?: { id: string; type: 'pickup' | 'dropoff'; address: string; notes?: string; place?: Record<string, unknown> | null }[];
+  returnStops?: { id: string; type: 'pickup' | 'dropoff'; address: string; notes?: string; place?: Record<string, unknown> | null }[];
+  extraStops?: boolean;
+  openReturn?: boolean;
+  returnDate?: string;
+  returnNoticeNote?: string;
   destinationPlace?: { label: string; placeId?: string; postcode?: string; latitude?: number | null; longitude?: number | null; premise?: string } | null;
   flightNumber?: string;
   driverId?: string;

@@ -17,6 +17,7 @@ import {
 } from "./emails";
 import { decideHalfTermPromotion, formatPence, poundsToPence, qualifyingReturnNow, quoteTotals, JourneyShape } from "./halfTerm";
 import { handleGuestBookingHttp } from "../bookings/guestHandlers";
+import { normaliseStops, openReturnSummary, routeSentence } from "../bookings/journeyStops";
 import { onlineTermsAcceptance, CURRENT_BOOKING_TERMS } from "../terms/bookingTerms";
 import { paymentLinkAllowlist, validatePaymentLinkUrl } from "./paymentLink";
 import { nextReceivedPence, paymentPosition } from "./fareMath";
@@ -281,6 +282,19 @@ export async function enqueueConfirmationIfNeeded(
   });
 }
 
+function journeyLine(data: FirebaseFirestore.DocumentData, leg: "out" | "return"): string {
+  const quote = (data.issuedQuote || {}) as Record<string, unknown>;
+  if (leg === "return") {
+    if (data.openReturn === true && !str(data.returnPickupTime)) return openReturnSummary(data);
+    const stops = normaliseStops(data.returnStops, str(quote.returnPickupLocation) || str(data.returnPickupLocation), str(quote.returnDestination) || str(data.returnDestination));
+    const when = str(quote.returnPickupTime) || str(data.returnPickupTime);
+    const sentence = routeSentence(stops, when);
+    return data.openReturn === true ? `${openReturnSummary(data)} ${sentence}` : sentence;
+  }
+  const stops = normaliseStops(data.stops, str(quote.pickup) || str(data.pickupLocation) || str(data.pickup), str(quote.destination) || str(data.destination));
+  return routeSentence(stops, str(quote.dateTime) || str(data.dateTime) || str(data.pickupTime));
+}
+
 function quoteModel(data: FirebaseFirestore.DocumentData, token: string) {
   const quote = (data.issuedQuote || {}) as Record<string, unknown>;
   const paymentUrl = str(data.paymentLinkUrl);
@@ -297,11 +311,8 @@ function quoteModel(data: FirebaseFirestore.DocumentData, token: string) {
     bookingNumber: str(data.bookingNumber) || "Quote",
     customerName: customerName(data),
     vehicleLabel: vehicleLabel(str(quote.vehicleType) || str(data.vehicleType)),
-    outbound: `${str(quote.pickup) || str(data.pickupLocation) || str(data.pickup)} to ${str(quote.destination) || str(data.destination)} at ${str(quote.dateTime) || str(data.dateTime) || str(data.pickupTime)}`,
-    returnLeg:
-      str(quote.bookingType) === "return" || data.bookingType === "return"
-        ? `${str(quote.returnPickupLocation) || str(data.returnPickupLocation)} to ${str(quote.returnDestination) || str(data.returnDestination)} at ${str(quote.returnPickupTime) || str(data.returnPickupTime)}`
-        : "",
+    outbound: journeyLine(data, "out"),
+    returnLeg: data.bookingType === "return" || str((data.issuedQuote as Record<string, unknown> | undefined)?.bookingType) === "return" ? journeyLine(data, "return") : "",
     normalFare: moneyOrZero(Number(quote.normalFarePence) || 0),
     discount: moneyOrZero(Number(quote.discountPence) || 0),
     finalFare: moneyOrZero(Number(quote.finalFarePence) || 0),

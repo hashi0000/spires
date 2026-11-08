@@ -125,11 +125,23 @@ function extractTripDetailsFromBooking(data, pickupMsKnown) {
     const pickupMs = pickupMsKnown !== undefined ? pickupMsKnown : getPickupMs(data);
     if (pickupMs == null)
         return null;
+    const stops = Array.isArray(data.stops) && data.stops.length > 2
+        ? data.stops.map((stop, index) => {
+            const kind = stop?.type === "dropoff" ? "Drop off" : "Pickup";
+            const note = stop?.notes ? ` (${stop.notes})` : "";
+            return `${index + 1}. ${kind}: ${stop?.address || ""}${note}`;
+        }).join("; ")
+        : "";
+    const returnSummary = data.openReturn === true
+        ? `Open return${data.returnDate ? ` on ${data.returnDate}` : ""}. ${data.returnPickupTime ? `Pickup time now set for ${data.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.${data.returnNoticeNote ? ` ${data.returnNoticeNote}` : ""}`
+        : "";
     return {
         pickupTime: formatPickupTimeLabel(pickupMs),
         pickup: (data.pickupLocation || data.pickup || "").toString().trim() || "—",
         dropoff: (data.destination || "").toString().trim() || "—",
         passengerName: (data.hirerName || data.name || "—").toString().trim() || "—",
+        stops,
+        returnSummary,
     };
 }
 async function resolveDriver(db, cache, driverId) {
@@ -273,7 +285,9 @@ function buildTripDetailsHtml(trip) {
             </tr>
             ${tripFieldRow("🕐", "Time", trip.pickupTime, false)}
             ${tripFieldRow("📍", "Pickup", trip.pickup, false)}
-            ${tripFieldRow("🏁", "Drop-off", trip.dropoff, false)}
+            ${tripFieldRow("🏁", "Drop off", trip.dropoff, false)}
+            ${trip.stops ? tripFieldRow("🧭", "Stops", trip.stops, false) : ""}
+            ${trip.returnSummary ? tripFieldRow("↩", "Return", trip.returnSummary, false) : ""}
             ${tripFieldRow("👤", "Passenger", trip.passengerName, true)}
           </table>
         </td>
@@ -286,8 +300,8 @@ function buildAdminDriverReminderHtml(driver, trip) {
 
 Time: ${trip.pickupTime}
 Pickup: ${trip.pickup}
-Dropoff: ${trip.dropoff}
-Passenger: ${trip.passengerName}`;
+Drop off: ${trip.dropoff}
+${trip.stops ? `Stops: ${trip.stops}\n` : ""}${trip.returnSummary ? `Return: ${trip.returnSummary}\n` : ""}Passenger: ${trip.passengerName}`;
     const whatsappLink = buildWhatsAppLink(driver.phone, message);
     const telHref = `tel:${driver.phone}`;
     const inner = `
@@ -328,7 +342,7 @@ async function sendAdminDriverReminderEmail(driver, trip) {
 }
 function buildNoDriverAssignedHtml(params) {
     const { pickupTime, pickup, dropoff, passengerName, headline } = params;
-    const trip = { pickupTime, pickup, dropoff, passengerName };
+    const trip = { pickupTime, pickup, dropoff, passengerName, stops: "", returnSummary: "" };
     const alertText = headline.replace(/\s*:\s*$/, "").trim();
     const inner = `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#fffbeb" style="background-color:#fffbeb;border-left:5px solid #d97706;border-radius:0 10px 10px 0;margin:0 0 22px;">

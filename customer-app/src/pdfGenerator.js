@@ -562,6 +562,8 @@ export const generateBookingPDF = (
 
                 <div class="info-box full-width">
                     <h2 class="section-header">Journey Details</h2>
+                    ${Array.isArray(booking.stops) && booking.stops.length > 2 ? `<div class="detail-row"><span class="detail-label">Stops</span><span class="detail-value">${booking.stops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</span></div>` : ""}
+                    ${Array.isArray(booking.returnStops) && booking.returnStops.length > 2 ? `<div class="detail-row"><span class="detail-label">Return stops</span><span class="detail-value">${booking.returnStops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</span></div>` : ""}
                     ${booking.bookingType === "return" || (booking.returnPickupLocation && booking.returnDestination) ? `
                     <div style="margin-bottom:10px;">
                         <div style="font-weight:700;color:#002147;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Outbound Journey</div>
@@ -584,7 +586,7 @@ export const generateBookingPDF = (
                         <div class="journey-section">
                             <div class="journey-flow">
                                 <div class="journey-point">
-                                    <div class="journey-time">Pick up: ${formatTime(booking.returnPickupTime || booking.returnDateTime)}</div>
+                                    <div class="journey-time">${booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime || booking.returnDateTime ? `Pickup time now set for ${formatTime(booking.returnPickupTime || booking.returnDateTime)}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.` : `Pick up: ${formatTime(booking.returnPickupTime || booking.returnDateTime)}`}</div>
                                     <div class="journey-location">${booking.returnPickupLocation || "N/A"}</div>
                                 </div>
                                 <div class="journey-arrow">→</div>

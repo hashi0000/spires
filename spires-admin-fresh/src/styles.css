@@ -2123,6 +2123,14 @@ header.admin-header,
 .bulk-edit-note, .bulk-edit-result { margin: 0; font-size: 0.8125rem; color: #334155; }
 .bulk-edit-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .bulk-edit-actions .btn { min-height: 44px; }
+.stop-editor { display: grid; gap: 0.75rem; margin-bottom: 0.75rem; }
+.stop-row { display: grid; gap: 0.4rem; padding: 0.65rem; background: #fff; border: 1px solid #e6ebf0; border-radius: 8px; }
+.stop-row-head, .stop-row-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.stop-row select, .stop-note input { font: inherit; padding: 0.4rem 0.5rem; border: 1px solid #d5dde6; border-radius: 8px; width: 100%; }
+.stop-note { display: grid; gap: 0.25rem; font-size: 0.8125rem; font-weight: 600; }
+.stop-row-actions button { min-height: 36px; border: 1px solid #d5dde6; background: #fff; border-radius: 8px; padding: 0.25rem 0.5rem; cursor: pointer; }
+.stop-summary, .stop-review { margin: 0; font-size: 0.8125rem; }
+.stop-review { color: #9a3412; font-weight: 700; }
 
 @media (max-width: 900px) {
   .booking-drawer .modal-content { max-width: none; width: 100%; }

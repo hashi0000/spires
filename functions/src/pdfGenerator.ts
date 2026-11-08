@@ -426,12 +426,30 @@ export async function generateBookingPDF(
         cy,
         contentW - BOX_PAD * 2,
         "Return Journey",
-        returnTime,
+        booking.openReturn === true && !returnTime ? "" : returnTime,
         booking.returnPickupLocation || "",
         booking.returnDestination || "",
         booking.returnAirportCollection === true,
         booking.returnFlightNumber
       );
+      if (booking.openReturn === true) {
+        cy += 6;
+        doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(
+          booking.returnPickupTime
+            ? `Open return. Pickup time now set for ${booking.returnPickupTime}. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`
+            : `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. Return time to be confirmed. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`,
+          leftX + BOX_PAD,
+          cy,
+          { width: contentW - BOX_PAD * 2 }
+        );
+        cy = doc.y + 4;
+      }
+      if (Array.isArray(booking.returnStops) && booking.returnStops.length > 2) {
+        const returnStopText = booking.returnStops.map((stop: { type?: string; address?: string; notes?: string }, index: number) => `${index + 1}. ${stop?.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop?.address || ""}${stop?.notes ? ` (${stop.notes})` : ""}`).join("\n");
+        cy += 6;
+        doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(`Extra stops. Agree the fare.\n${returnStopText}`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+        cy = doc.y + 4;
+      }
     } else {
       cy = journeyBlock(
         doc,
@@ -445,6 +463,12 @@ export async function generateBookingPDF(
         booking.airportCollection === true,
         booking.flightNumber
       );
+    }
+    if (Array.isArray(booking.stops) && booking.stops.length > 2) {
+      const stopText = booking.stops.map((stop: { type?: string; address?: string; notes?: string }, index: number) => `${index + 1}. ${stop?.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop?.address || ""}${stop?.notes ? ` (${stop.notes})` : ""}`).join("\n");
+      cy += 6;
+      doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(`Extra stops. Agree the fare.\n${stopText}`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
+      cy = doc.y + 4;
     }
     if (booking.vehicleType) {
       cy = detailRow(

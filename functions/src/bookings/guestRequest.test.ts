@@ -171,6 +171,35 @@ describe("guest booking requests", () => {
   });
 });
 
+describe("stops and open returns", () => {
+  it("keeps an open return pending without a made up time", () => {
+    const result = prepare({
+      bookingType: "return",
+      openReturn: true,
+      returnDate: "2026-11-12",
+      returnTime: "00:00",
+      returnPickupLocation: "Heathrow Terminal 5",
+      returnDestination: "1 High Street, Oxford",
+      returnNoticeNote: "Customer will contact the driver when ready",
+      stops: [
+        { type: "pickup", address: "1 High Street, Oxford" },
+        { type: "dropoff", address: "Headington, Oxford" },
+        { type: "dropoff", address: "Heathrow Terminal 5" },
+      ],
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok || result.spam) return;
+    assert.equal(result.record.status, "pending");
+    assert.equal(result.record.openReturn, true);
+    assert.equal(result.record.returnPickupTime, "");
+    assert.equal(result.record.returnDateTime, "");
+    assert.equal(result.record.returnDate, "2026-11-12");
+    assert.equal(result.record.extraStops, true);
+    assert.equal(String(result.record.openReturnNotice).includes("outside Oxford"), true);
+    assert.equal(String(result.record.returnPickupTime).includes("00:00"), false);
+  });
+});
+
 describe("guest request rate window", () => {
   it("resets after the window", () => {
     const first = nextGuestRate(null, now);

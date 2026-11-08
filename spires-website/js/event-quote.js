@@ -133,9 +133,15 @@
       setStatus("Please choose a Standard Car or an 8 Seater.");
       return;
     }
+    var journeyDetails = window.spiresReadJourney ? window.spiresReadJourney(form) : null;
+    if (journeyDetails && journeyDetails.error) {
+      setStatus(journeyDetails.error);
+      return;
+    }
     if (journey && journey.value === "return") {
-      if (!data.get("returnDate") || !data.get("returnTime") || !String(data.get("returnPickupLocation") || "").trim() || !String(data.get("returnDestination") || "").trim()) {
-        setStatus("A return needs the date, the expected collection time, the return pickup and where you are going back to.");
+      var openReturn = journeyDetails && journeyDetails.openReturn;
+      if (!data.get("returnDate") || (!openReturn && !data.get("returnTime")) || !String(data.get("returnPickupLocation") || "").trim() || !String(data.get("returnDestination") || "").trim()) {
+        setStatus(openReturn ? "An open return needs the return date, pickup and destination." : "A return needs the date, the expected collection time, the return pickup and where you are going back to.");
         return;
       }
     }
@@ -175,7 +181,11 @@
       flightNumber: "",
       terminal: "",
       returnDate: data.get("returnDate") || "",
-      returnTime: data.get("returnTime") || "",
+      returnTime: journeyDetails && journeyDetails.openReturn ? "" : (data.get("returnTime") || ""),
+      stops: journeyDetails ? journeyDetails.stops : [],
+      returnStops: journeyDetails ? journeyDetails.returnStops : [],
+      openReturn: journeyDetails ? journeyDetails.openReturn : false,
+      returnNoticeNote: journeyDetails ? journeyDetails.returnNoticeNote : "",
       returnPickupLocation: data.get("returnPickupLocation") || "",
       returnDestination: data.get("returnDestination") || "",
       returnAirportCollection: false,

@@ -21,6 +21,62 @@ const PAYMENT_OPTIONS = [
   { value: "undecided", label: "Not decided yet" },
 ];
 
+const OPEN_RETURN_NOTICE = "For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.";
+
+function buildStops(start, end, startPlace, endPlace, middle) {
+  return [
+    { id: "start", type: "pickup", address: String(start || "").trim(), notes: "", place: startPlace || null },
+    ...(middle || []).map((stop, index) => ({
+      id: stop.id || `mid-${index}`,
+      type: stop.type === "pickup" ? "pickup" : "dropoff",
+      address: String(stop.address || "").trim(),
+      notes: String(stop.notes || "").trim(),
+      place: stop.place || null,
+    })),
+    { id: "end", type: "dropoff", address: String(end || "").trim(), notes: "", place: endPlace || null },
+  ];
+}
+
+function describeStops(stops) {
+  return stops
+    .filter((stop) => stop.address)
+    .map((stop, index) => `${index + 1}. ${stop.type === "pickup" ? "Pickup" : "Drop off"}: ${stop.address}${stop.notes ? ` (${stop.notes})` : ""}`)
+    .join("; ");
+}
+
+function ExtraStops({ stops, onChange }) {
+  const rows = stops || [];
+  const update = (index, patch) => onChange(rows.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)));
+  const move = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    onChange(next);
+  };
+  return (
+    <div style={{ display: "grid", gap: "0.5rem" }}>
+      {rows.map((stop, index) => (
+        <div key={stop.id} style={{ display: "grid", gap: "0.35rem", padding: "0.5rem", border: "1px solid #dbe3ee", borderRadius: 8 }}>
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <select value={stop.type} onChange={(event) => update(index, { type: event.target.value })}>
+              <option value="pickup">Pickup</option>
+              <option value="dropoff">Drop off</option>
+            </select>
+            <button type="button" onClick={() => move(index, -1)} disabled={index === 0}>Move up</button>
+            <button type="button" onClick={() => move(index, 1)} disabled={index === rows.length - 1}>Move down</button>
+            <button type="button" onClick={() => onChange(rows.filter((_, i) => i !== index))}>Remove</button>
+          </div>
+          <LocationField placeholder="Stop address" value={stop.address} onChange={(value, place) => update(index, { address: value, place })} />
+          <input placeholder="Note, optional" value={stop.notes || ""} onChange={(event) => update(index, { notes: event.target.value })} />
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...rows, { id: `mid-${Date.now()}`, type: "dropoff", address: "", notes: "" }])}>Add a stop</button>
+    </div>
+  );
+}
+
 const TERMS_VERSION = "2026-10-25";
 const TERMS_URL = "https://www.spires-taxis.com/terms/2026-10-25";
 const createCustomerBooking = httpsCallable(functions, "createCustomerBooking");
@@ -55,6 +111,11 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     returnPickupTime: "",
     returnPickupLocation: "",
     returnDestination: "",
+    openReturn: false,
+    returnDate: "",
+    returnNoticeNote: "",
+    middleStops: [],
+    returnMiddleStops: [],
     airportCollection: false,
     returnAirportCollection: false,
     returnFlightNumber: "",
@@ -179,9 +240,16 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     const isReturn = formData.bookingType === "return";
+    const stops = buildStops(formData.pickup, formData.destination, formData.pickupPlace, formData.destinationPlace, formData.middleStops);
+    if (stops.some((stop) => !stop.address)) {
+      setError("Every stop needs a full address, and the journey needs a pickup and a drop off.");
+      setSubmitting(false);
+      return;
+    }
     if (isReturn) {
-      if (!formData.returnPickupTime || !String(formData.returnPickupLocation || "").trim() || !String(formData.returnDestination || "").trim()) {
-        setError("Return bookings need a return date, pickup time, pickup address and destination.");
+      const returnStops = buildStops(formData.returnPickupLocation, formData.returnDestination, null, null, formData.returnMiddleStops);
+      if (returnStops.some((stop) => !stop.address) || !(formData.openReturn ? formData.returnDate : formData.returnPickupTime)) {
+        setError(formData.openReturn ? "An open return needs the return date, pickup and destination." : "Return bookings need a return date, pickup time, pickup address and destination.");
         setSubmitting(false);
         return;
       }
@@ -206,7 +274,12 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         luggage: parseInt(formData.luggage, 10) || 0,
         specialRequirements: formData.specialRequirements || "",
         bookingType: isReturn ? "return" : "one_way",
-        returnPickupTime: isReturn ? formData.returnPickupTime : "",
+        stops,
+        returnStops: isReturn ? buildStops(formData.returnPickupLocation, formData.returnDestination, null, null, formData.returnMiddleStops) : [],
+        openReturn: isReturn && formData.openReturn === true,
+        returnDate: isReturn ? (formData.openReturn ? formData.returnDate : String(formData.returnPickupTime || "").slice(0, 10)) : "",
+        returnNoticeNote: isReturn && formData.openReturn ? formData.returnNoticeNote : "",
+        returnPickupTime: isReturn && !formData.openReturn ? formData.returnPickupTime : "",
         returnPickupLocation: isReturn ? String(formData.returnPickupLocation || "").trim() : "",
         returnDestination: isReturn ? String(formData.returnDestination || "").trim() : "",
         airportCollection: formData.airportCollection === true,
@@ -408,6 +481,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
               required
               onChange={(value, place) => setFormData((prev) => ({ ...prev, destination: value, destinationPlace: place }))}
             />
+            <ExtraStops stops={formData.middleStops} onChange={(middleStops) => setFormData({ ...formData, middleStops })} />
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "#0b1c3d" }}>{describeStops(buildStops(formData.pickup, formData.destination, formData.pickupPlace, formData.destinationPlace, formData.middleStops))}</p>
+            {formData.middleStops.length > 0 ? <p style={{ margin: 0, fontSize: "0.85rem", color: "#9a3412", fontWeight: 700 }}>Extra stops. Agree the fare.</p> : null}
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -446,27 +522,43 @@ export default function BookingForm({ onClose, onBookingCreated }) {
           {isReturn && (
             <div style={journeyBox('blue')}>
               <div style={{ fontWeight: 600, marginBottom: '0.75rem', color: '#1e3a8a' }}>Return journey *</div>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                <label><input type="radio" name="open-return" checked={!formData.openReturn} onChange={() => setFormData({ ...formData, openReturn: false })} /> Set return pickup time</label>
+                <label><input type="radio" name="open-return" checked={formData.openReturn} onChange={() => setFormData({ ...formData, openReturn: true, returnDate: formData.returnDate || ret.date, returnPickupTime: "" })} /> Return time to be confirmed</label>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={labelStyle}>Date *</label>
                   <input
                     type="date"
-                    value={ret.date}
+                    value={formData.openReturn ? (formData.returnDate || ret.date) : (formData.returnDate || ret.date)}
                     min={outbound.date || getMinDate()}
-                    onChange={(e) => setFormData({ ...formData, returnPickupTime: combineLocalDateTime(e.target.value, ret.time || '00:00') })}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      returnDate: e.target.value,
+                      returnPickupTime: formData.openReturn || !ret.time ? "" : combineLocalDateTime(e.target.value, ret.time),
+                    })}
                     required
                   />
                 </div>
+                {formData.openReturn ? null : (
                 <div>
                   <label style={labelStyle}>Pickup time *</label>
                   <input
                     type="time"
                     value={ret.time}
-                    onChange={(e) => setFormData({ ...formData, returnPickupTime: combineLocalDateTime(ret.date, e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, returnPickupTime: e.target.value ? combineLocalDateTime(formData.returnDate || ret.date, e.target.value) : "" })}
                     required
                   />
                 </div>
+                )}
               </div>
+              {formData.openReturn ? (
+                <>
+                  <p style={{ fontSize: "0.85rem" }}>{OPEN_RETURN_NOTICE}</p>
+                  <input placeholder="Customer will contact the driver when ready" value={formData.returnNoticeNote} onChange={(event) => setFormData({ ...formData, returnNoticeNote: event.target.value })} />
+                </>
+              ) : null}
               <LocationField
                 placeholder="Return pickup address"
                 value={formData.returnPickupLocation || ''}
@@ -479,6 +571,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 required
                 onChange={(value) => setFormData({ ...formData, returnDestination: value })}
               />
+              <ExtraStops stops={formData.returnMiddleStops} onChange={(returnMiddleStops) => setFormData({ ...formData, returnMiddleStops })} />
+              <p style={{ margin: 0, fontSize: "0.85rem" }}>{describeStops(buildStops(formData.returnPickupLocation, formData.returnDestination, null, null, formData.returnMiddleStops))}</p>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#0b1c3d', cursor: 'pointer' }}>
                 <input
                   type="checkbox"

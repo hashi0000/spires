@@ -176,6 +176,7 @@ export async function notifyAdminNewBookingRequest(
           <tr><td style="padding:4px 8px;font-weight:600;">Email</td><td style="padding:4px 8px;">${escapeHtml(n.hirerEmail || "—")}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pickup</td><td style="padding:4px 8px;">${escapeHtml(n.pickupLocation || "—")}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Destination</td><td style="padding:4px 8px;">${escapeHtml(n.destination || "—")}</td></tr>
+          ${Array.isArray(booking.stops) && booking.stops.length > 2 ? `<tr><td style="padding:4px 8px;font-weight:600;">Stops</td><td style="padding:4px 8px;">${escapeHtml(booking.stops.map((stop: { type?: string; address?: string }, index: number) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}`).join("; "))}. Extra stops. Agree the fare.</td></tr>` : ""}
           <tr><td style="padding:4px 8px;font-weight:600;">When</td><td style="padding:4px 8px;">${escapeHtml(String(n.pickupTime || "—"))}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Passengers</td><td style="padding:4px 8px;">${escapeHtml(String(booking.passengers ?? "—"))}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Vehicle Class</td><td style="padding:4px 8px;">${escapeHtml(
@@ -187,7 +188,8 @@ export async function notifyAdminNewBookingRequest(
           }</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${escapeHtml(pay)}</td></tr>
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${escapeHtml(n.flightNumber)}${n.terminal ? ` · Terminal ${escapeHtml(n.terminal)}` : ""}</td></tr>` : ""}
-          ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${escapeHtml(n.returnPickupLocation || "")} → ${escapeHtml(n.returnDestination || "")}</td></tr>` : ""}
+          ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${escapeHtml(booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime ? `Pickup time now set for ${booking.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}` : `${n.returnPickupLocation || ""} → ${n.returnDestination || ""}`)}</td></tr>` : ""}
+          ${Array.isArray(booking.returnStops) && booking.returnStops.length > 2 ? `<tr><td style="padding:4px 8px;font-weight:600;">Return stops</td><td style="padding:4px 8px;">${escapeHtml(booking.returnStops.map((stop: { type?: string; address?: string }, index: number) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}`).join("; "))}. Extra stops. Agree the fare.</td></tr>` : ""}
           ${n.notes ? `<tr><td style="padding:4px 8px;font-weight:600;">Notes</td><td style="padding:4px 8px;">${escapeHtml(n.notes)}</td></tr>` : ""}
         </table>
         <p style="margin-top:16px;">Open the admin Bookings page to set the fare and confirm.</p>
@@ -206,8 +208,10 @@ export async function notifyAdminNewBookingRequest(
         `Pickup: ${n.pickupLocation}`,
         `Destination: ${n.destination}`,
         `When: ${n.pickupTime}`,
+        booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime ? `Pickup time now set for ${booking.returnPickupTime}.` : "Return time to be confirmed."}` : "",
+        booking.extraStops === true ? "Extra stops. Agree the fare." : "",
         `Pay by: ${pay}`,
-      ].join("\n"),
+      ].filter(Boolean).join("\n"),
     });
 
     functions.logger.info(`Admin notified of new booking ${bookingId}`);

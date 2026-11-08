@@ -42,6 +42,7 @@ const emails_1 = require("../quotes/emails");
 const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
 const bookingTerms_1 = require("./bookingTerms");
 const placeRecord_1 = require("../locations/placeRecord");
+const journeyStops_1 = require("../bookings/journeyStops");
 const db = () => admin.firestore();
 function httpsError(code, message) {
     return new functions.https.HttpsError(code, message);
@@ -83,18 +84,38 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
     });
     if (!decision.ok)
         throw httpsError("failed-precondition", decision.error);
-    const pickup = str(data?.pickup);
-    const destination = str(data?.destination);
     const dateTime = str(data?.dateTime);
     const vehicleType = str(data?.vehicleType);
     const paymentMethod = str(data?.paymentMethod);
-    if (!pickup || !destination || !dateTime || !vehicleType || !paymentMethod) {
+    const stops = (0, journeyStops_1.readStops)(data || {}, "stops", str(data?.pickup), str(data?.destination));
+    const stopError = (0, journeyStops_1.validateStops)(stops);
+    if (stopError)
+        throw httpsError("invalid-argument", stopError);
+    const ends = (0, journeyStops_1.applyStopEnds)(stops);
+    if (!ends.pickup || !ends.destination || !dateTime || !vehicleType || !paymentMethod) {
         throw httpsError("invalid-argument", "Pickup, destination, date, vehicle and payment method are required.");
     }
     const bookingType = str(data?.bookingType) === "return" ? "return" : "one_way";
+    const openReturn = bookingType === "return" && data?.openReturn === true;
+    const returnStops = bookingType === "return" ? (0, journeyStops_1.readStops)(data || {}, "returnStops", str(data?.returnPickupLocation), str(data?.returnDestination)) : [];
+    const returnEnds = (0, journeyStops_1.applyStopEnds)(returnStops);
+    const returnDate = str(data?.returnDate) || str(data?.returnPickupTime).slice(0, 10);
+    const returnWhen = openReturn ? "" : str(data?.returnPickupTime);
     if (bookingType === "return") {
-        if (!str(data?.returnPickupTime) || !str(data?.returnPickupLocation) || !str(data?.returnDestination)) {
-            throw httpsError("invalid-argument", "Return bookings need a return date, pickup and destination.");
+        const returnStopError = (0, journeyStops_1.validateStops)(returnStops);
+        if (returnStopError)
+            throw httpsError("invalid-argument", `Return: ${returnStopError}`);
+        if (!returnDate)
+            throw httpsError("invalid-argument", "Return bookings need a return date.");
+        if (!openReturn && !returnWhen) {
+            throw httpsError("invalid-argument", "Enter the return pickup time, or choose return time to be confirmed.");
+        }
+        const outboundDate = dateTime.slice(0, 10);
+        if (openReturn && outboundDate && returnDate < outboundDate) {
+            throw httpsError("invalid-argument", "The return date needs to be the same day as the outward journey, or later.");
+        }
+        if (!openReturn && returnWhen && returnWhen < dateTime) {
+            throw httpsError("invalid-argument", "The return needs to be at the same time as the outward journey, or later.");
         }
     }
     const passengers = Number(data?.passengers) || 1;
@@ -105,20 +126,28 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         name: str(data?.name) || email.split("@")[0] || "Customer",
         email,
         phone: str(data?.phone),
-        pickup,
-        destination,
-        ...((0, placeRecord_1.placeRecord)(data?.pickupPlace, pickup) ? { pickupPlace: (0, placeRecord_1.placeRecord)(data?.pickupPlace, pickup) } : {}),
-        ...((0, placeRecord_1.placeRecord)(data?.destinationPlace, destination) ? { destinationPlace: (0, placeRecord_1.placeRecord)(data?.destinationPlace, destination) } : {}),
+        pickup: ends.pickup,
+        pickupLocation: ends.pickup,
+        destination: ends.destination,
+        stops,
+        extraStops: (0, journeyStops_1.hasExtraStops)(stops) || (0, journeyStops_1.hasExtraStops)(returnStops),
+        ...((0, placeRecord_1.placeRecord)(data?.pickupPlace || ends.pickupPlace, ends.pickup) ? { pickupPlace: (0, placeRecord_1.placeRecord)(data?.pickupPlace || ends.pickupPlace, ends.pickup) } : {}),
+        ...((0, placeRecord_1.placeRecord)(data?.destinationPlace || ends.destinationPlace, ends.destination) ? { destinationPlace: (0, placeRecord_1.placeRecord)(data?.destinationPlace || ends.destinationPlace, ends.destination) } : {}),
         dateTime,
         passengers,
         luggage: Number(data?.luggage) || 0,
         specialRequirements: str(data?.specialRequirements).slice(0, 2000),
         bookingType,
         returnTrip: bookingType === "return",
-        returnDateTime: bookingType === "return" ? str(data?.returnPickupTime) : "",
-        returnPickupTime: bookingType === "return" ? str(data?.returnPickupTime) : "",
-        returnPickupLocation: bookingType === "return" ? str(data?.returnPickupLocation) : "",
-        returnDestination: bookingType === "return" ? str(data?.returnDestination) : "",
+        returnDateTime: bookingType === "return" ? returnWhen : "",
+        returnPickupTime: bookingType === "return" ? returnWhen : "",
+        returnDate: bookingType === "return" ? returnDate : "",
+        openReturn,
+        returnNoticeNote: bookingType === "return" ? str(data?.returnNoticeNote).slice(0, 400) : "",
+        openReturnNotice: openReturn ? journeyStops_1.OPEN_RETURN_NOTICE : "",
+        returnStops: bookingType === "return" ? returnStops : [],
+        returnPickupLocation: bookingType === "return" ? returnEnds.pickup : "",
+        returnDestination: bookingType === "return" ? returnEnds.destination : "",
         airportCollection: data?.airportCollection === true,
         returnAirportCollection: bookingType === "return" && data?.returnAirportCollection === true,
         returnFlightNumber: bookingType === "return" && data?.returnAirportCollection === true ? str(data?.returnFlightNumber) : "",

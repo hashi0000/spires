@@ -483,9 +483,11 @@ export default function Dashboard() {
                         <span className="info-label">Return:</span>
                         <span className="info-value">
                           {booking.returnPickupLocation || booking.destination} → {booking.returnDestination || booking.pickup}
-                          {booking.returnPickupTime || booking.returnDateTime
+                          {booking.openReturn
+                            ? ` · Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime || booking.returnDateTime ? `Pickup time now set for ${formatDateTime(booking.returnPickupTime || booking.returnDateTime)}.` : "Return time to be confirmed."}`
+                            : (booking.returnPickupTime || booking.returnDateTime
                             ? ` · ${formatDateTime(booking.returnPickupTime || booking.returnDateTime)}`
-                            : ""}
+                            : "")}
                         </span>
                       </div>
                     </>

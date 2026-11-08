@@ -21,6 +21,10 @@ function moneyFromBooking(data) {
     returnPickupLocation: quote.returnPickupLocation || data.returnPickupLocation || "",
     returnDestination: quote.returnDestination || data.returnDestination || "",
     returnPickupTime: quote.returnPickupTime || data.returnPickupTime || "",
+    openReturn: data.openReturn === true,
+    returnDate: data.returnDate || "",
+    returnNoticeNote: data.returnNoticeNote || "",
+    stops: Array.isArray(data.stops) ? data.stops : [],
     bookingType: quote.bookingType || data.bookingType || "",
     normalFare: quote.normalFarePence != null ? pence(quote.normalFarePence) : "",
     discount: quote.discountPence != null ? pence(quote.discountPence) : "",
@@ -129,9 +133,10 @@ export default function QuotePage() {
           <p><strong>Booking reference</strong> {quote.bookingNumber}</p>
           <p>This is a quote, not a confirmed booking, until we confirm it.</p>
           <p>{quote.pickup} to {quote.destination}</p>
+          {quote.stops.length > 2 ? <p>Stops: {quote.stops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address}`).join("; ")}. Extra stops. Agree the fare.</p> : null}
           {quote.dateTime ? <p>When: {quote.dateTime}</p> : null}
           {quote.bookingType === "return" ? (
-            <p>Return: {quote.returnPickupLocation} to {quote.returnDestination} {quote.returnPickupTime}</p>
+            <p>{quote.openReturn ? `Open return${quote.returnDate ? ` on ${quote.returnDate}` : ""}. ${quote.returnPickupTime ? `Pickup time now set for ${quote.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${quote.returnNoticeNote || ""}` : `Return: ${quote.returnPickupLocation} to ${quote.returnDestination} ${quote.returnPickupTime}`}</p>
           ) : null}
           <p>Vehicle: {String(quote.vehicle || "").includes("8") ? "8 Seater" : "Standard Car"}</p>
           <p>Normal fare {quote.normalFare}</p>

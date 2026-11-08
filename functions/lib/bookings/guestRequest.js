@@ -16,6 +16,7 @@ exports.guestClaimPatch = guestClaimPatch;
 const crypto_1 = require("crypto");
 const bookingTerms_1 = require("../terms/bookingTerms");
 const placeRecord_1 = require("../locations/placeRecord");
+const journeyStops_1 = require("./journeyStops");
 exports.OFFICE_PHONE = "07776 897772";
 exports.CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
 exports.CONTACT_REQUIRED_MESSAGE = `${exports.CONTACT_HELPER} You can also call us on ${exports.OFFICE_PHONE}.`;
@@ -116,7 +117,12 @@ function prepareGuestBooking(body, options) {
         return { ok: false, error: exports.CONTACT_REQUIRED_MESSAGE };
     const pickup = str(body.pickup).slice(0, 240);
     const destination = str(body.destination).slice(0, 240);
-    if (pickup.length < 3 || destination.length < 3) {
+    const stops = (0, journeyStops_1.readStops)(body, "stops", pickup, destination);
+    const stopError = (0, journeyStops_1.validateStops)(stops);
+    if (stopError)
+        return { ok: false, error: stopError };
+    const ends = (0, journeyStops_1.applyStopEnds)(stops);
+    if (ends.pickup.length < 3 || ends.destination.length < 3) {
         return { ok: false, error: "Enter a pickup address and a destination." };
     }
     const direct = splitDateTime(str(body.dateTime));
@@ -148,19 +154,30 @@ function prepareGuestBooking(body, options) {
         return { ok: false, error: "Enter the number of luggage pieces, from 0 to 10." };
     }
     const bookingType = str(body.bookingType) === "return" ? "return" : "one_way";
+    const openReturn = bookingType === "return" && (body.openReturn === true || body.openReturn === "yes");
     const returnDirect = splitDateTime(str(body.returnDateTime) || str(body.returnPickupTime));
     const returnDate = str(body.returnDate) || returnDirect.date;
-    const returnTime = str(body.returnTime) || returnDirect.time;
-    const returnWhen = returnDate && returnTime ? `${returnDate}T${returnTime}` : str(body.returnPickupTime);
-    const returnPickupLocation = str(body.returnPickupLocation).slice(0, 240);
-    const returnDestination = str(body.returnDestination).slice(0, 240);
+    const returnTime = openReturn ? "" : str(body.returnTime) || returnDirect.time;
+    const returnWhen = !openReturn && returnDate && returnTime && isHm(returnTime) ? `${returnDate}T${returnTime}` : "";
+    const returnStops = bookingType === "return" ? (0, journeyStops_1.readStops)(body, "returnStops", str(body.returnPickupLocation), str(body.returnDestination)) : [];
+    const returnEnds = (0, journeyStops_1.applyStopEnds)(returnStops);
+    const returnPickupLocation = returnEnds.pickup.slice(0, 240);
+    const returnDestination = returnEnds.destination.slice(0, 240);
+    const returnNoticeNote = str(body.returnNoticeNote).slice(0, 400);
     if (bookingType === "return") {
-        const returnParts = splitDateTime(returnWhen);
-        if (!isYmd(returnParts.date) || !isHm(returnParts.time) || !returnPickupLocation || !returnDestination) {
-            return { ok: false, error: "Return bookings need a return date, pickup time, pickup address and destination." };
+        const returnStopError = (0, journeyStops_1.validateStops)(returnStops);
+        if (returnStopError)
+            return { ok: false, error: `Return: ${returnStopError}` };
+        if (!isYmd(returnDate))
+            return { ok: false, error: "Return bookings need a return date." };
+        if (!openReturn && !isHm(returnTime)) {
+            return { ok: false, error: "Enter the return pickup time, or choose return time to be confirmed." };
         }
-        if (`${returnParts.date}T${returnParts.time}` < dateTime) {
+        if (!openReturn && `${returnDate}T${returnTime}` < dateTime) {
             return { ok: false, error: "The return needs to be at the same time as the outward journey, or later." };
+        }
+        if (openReturn && returnDate < date) {
+            return { ok: false, error: "The return date needs to be the same day as the outward journey, or later." };
         }
     }
     const terms = (0, bookingTerms_1.onlineTermsAcceptance)({
@@ -184,8 +201,8 @@ function prepareGuestBooking(body, options) {
             email,
         }
         : null;
-    const pickupPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.pickupPlace), pickup);
-    const destinationPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.destinationPlace), destination);
+    const pickupPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.pickupPlace) || ends.pickupPlace, ends.pickup);
+    const destinationPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.destinationPlace) || ends.destinationPlace, ends.destination);
     const record = {
         source: "website",
         guestRequest: true,
@@ -200,9 +217,11 @@ function prepareGuestBooking(body, options) {
         phone,
         hirerPhone: phone,
         contactBy,
-        pickup,
-        pickupLocation: pickup,
-        destination,
+        pickup: ends.pickup,
+        pickupLocation: ends.pickup,
+        destination: ends.destination,
+        stops,
+        extraStops: (0, journeyStops_1.hasExtraStops)(stops) || (0, journeyStops_1.hasExtraStops)(returnStops),
         ...(pickupPlace ? { pickupPlace } : {}),
         ...(destinationPlace ? { destinationPlace } : {}),
         dateTime,
@@ -215,6 +234,11 @@ function prepareGuestBooking(body, options) {
         returnTrip: bookingType === "return",
         returnDateTime: bookingType === "return" ? returnWhen : "",
         returnPickupTime: bookingType === "return" ? returnWhen : "",
+        returnDate: bookingType === "return" ? returnDate : "",
+        openReturn: openReturn,
+        returnNoticeNote: bookingType === "return" ? returnNoticeNote : "",
+        openReturnNotice: openReturn ? journeyStops_1.OPEN_RETURN_NOTICE : "",
+        returnStops: bookingType === "return" ? returnStops : [],
         returnPickupLocation: bookingType === "return" ? returnPickupLocation : "",
         returnDestination: bookingType === "return" ? returnDestination : "",
         airportCollection,

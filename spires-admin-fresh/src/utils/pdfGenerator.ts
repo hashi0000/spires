@@ -19,6 +19,20 @@ import {
 
 export type AdminPDFType = "booking_confirmation" | "payment_request" | "payment_receipt";
 
+function stopListText(stops: unknown): string {
+  if (!Array.isArray(stops) || stops.length < 3) return "";
+  return stops.map((stop: { type?: string; address?: string; notes?: string }, index: number) => {
+    const notes = stop?.notes ? " (" + stop.notes + ")" : "";
+    return (index + 1) + ". " + (stop?.type === "dropoff" ? "Drop off" : "Pickup") + ": " + (stop?.address || "") + notes;
+  }).join("; ") + ". Extra stops. Agree the fare.";
+}
+
+function openReturnText(booking: { openReturn?: boolean; returnDate?: string; returnPickupTime?: string; returnNoticeNote?: string }): string {
+  if (booking.openReturn !== true) return "";
+  const when = booking.returnPickupTime ? "Pickup time now set for " + booking.returnPickupTime + "." : "Return time to be confirmed.";
+  return "Open return" + (booking.returnDate ? " on " + booking.returnDate : "") + ". " + when + " For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. " + (booking.returnNoticeNote || "");
+}
+
 function escapePdfText(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -590,12 +604,14 @@ export function buildBookingConfirmationHtml(
                           )}
                           ${journeyDetailsHtml(
                             "Return Journey",
-                            booking.returnPickupTime,
+                            (booking as any).openReturn === true && !booking.returnPickupTime ? "" : booking.returnPickupTime,
                             booking.returnPickupLocation,
                             booking.returnDestination,
                             booking.returnAirportCollection === true,
                             booking.returnFlightNumber
-                          )}`
+                          )}
+                          ${openReturnText(booking as any) ? '<div class="detail-row"><span class="detail-label">Open return</span><span class="detail-value">' + escapePdfText(openReturnText(booking as any)) + "</span></div>" : ""}
+                          ${stopListText((booking as any).returnStops) ? '<div class="detail-row"><span class="detail-label">Return stops</span><span class="detail-value">' + escapePdfText(stopListText((booking as any).returnStops)) + "</span></div>" : ""}`
                         : `${journeyDetailsHtml(
                             "Journey",
                             booking.pickupTime,
@@ -615,6 +631,7 @@ export function buildBookingConfirmationHtml(
                           }`
                     }
 
+                    ${stopListText((booking as any).stops) ? '<div class="detail-row"><span class="detail-label">Stops</span><span class="detail-value">' + escapePdfText(stopListText((booking as any).stops)) + "</span></div>" : ""}
                     <div class="detail-row" style="margin-top:10px;">
                         <span class="detail-label">Vehicle Class</span>
                         <span class="detail-value">${formatVehicleTypeLabel((booking as any).vehicleType)}${

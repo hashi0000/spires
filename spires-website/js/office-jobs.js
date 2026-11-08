@@ -86,6 +86,7 @@
 
   function hasReturn(booking) {
     if (booking.bookingType === "return" || booking.returnTrip === true) return true;
+    if (booking.openReturn === true) return true;
     if (textOf(booking, ["returnPickupLocation"]) && textOf(booking, ["returnDestination"])) return true;
     return Boolean(booking.returnPickupTime || booking.returnDateTime);
   }
@@ -269,6 +270,21 @@
       .sort((a, b) => a.pickup.getTime() - b.pickup.getTime())[0] || null;
   }
 
+  function stopMarkup(booking, leg) {
+    const stops = leg === "return" ? booking.returnStops : booking.stops;
+    if (!Array.isArray(stops) || stops.length < 3) return "";
+    const text = stops.map(function (stop, index) {
+      return (index + 1) + ". " + (stop.type === "dropoff" ? "Drop off" : "Pickup") + ": " + (stop.address || "") + (stop.notes ? " (" + stop.notes + ")" : "");
+    }).join("; ");
+    return '<p class="job-notes">' + escapeHtml(text) + ". Extra stops. Agree the fare.</p>";
+  }
+
+  function openReturnMarkup(booking, job) {
+    if (job.leg !== "return" || booking.openReturn !== true) return "";
+    const set = job.pickup ? " Pickup time now set." : " Return time to be confirmed.";
+    return '<p class="job-notes">Open return.' + set + " For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.</p>";
+  }
+
   function cardMarkup(job, prominent) {
     const booking = job.booking;
     const party = partyLine(booking);
@@ -278,6 +294,8 @@
       '<div class="job-when">' + escapeHtml(formatWhen(job.pickup)) + "</div>" +
       (hasReturn(booking) ? '<div class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</div>" : "") +
       '<div class="job-route">' + escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</div>" +
+      stopMarkup(booking, job.leg) +
+      openReturnMarkup(booking, job) +
       '<div class="job-meta">' + escapeHtml(vehicleLabel(booking.vehicleType)) + " · " + escapeHtml(statusLabel(booking)) +
       (party ? " · " + escapeHtml(party) : "") + "</div>" +
       (notes ? '<p class="job-notes">' + escapeHtml(notes) + "</p>" : "")
@@ -406,6 +424,8 @@
       (hasReturn(booking) ? '<p class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</p>" : "") +
       '<div class="detail-block"><h3>Journey</h3><p class="job-route">' +
       escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</p>" +
+      stopMarkup(booking, job.leg) +
+      openReturnMarkup(booking, job) +
       "<p>" + escapeHtml(vehicleLabel(booking.vehicleType)) + (party ? " · " + escapeHtml(party) : "") + "</p></div>" +
       (notes ? '<div class="detail-block"><h3>Collection notes</h3><p class="job-notes">' + escapeHtml(notes) + "</p></div>" : "") +
       '<div class="detail-block"><h3>Customer</h3><p>' + escapeHtml(textOf(booking, ["hirerName", "name"]) || "Name not recorded") + "</p>" +

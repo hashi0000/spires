@@ -29,7 +29,8 @@ import {
   type CustomerProfile,
 } from '../utils/customerSuggestions';
 import QuoteEditor from './QuoteEditor';
-import LocationField from './LocationField';
+import JourneyStopsEditor from './JourneyStopsEditor';
+import { hasExtraStops, normaliseStops, OPEN_RETURN_NOTICE, validateStops } from '../utils/journeyStops';
 import TermsAcceptance from './TermsAcceptance';
 
 interface BookingModalProps {
@@ -136,6 +137,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
     returnFlightNumber: '',
     dueOnOutbound: '',
     dueOnReturn: '',
+    stops: normaliseStops(undefined, '', ''),
+    returnStops: normaliseStops(undefined, '', ''),
+    openReturn: false,
+    returnDate: '',
+    returnNoticeNote: '',
   });
 
   const [newExpense, setNewExpense] = useState<{
@@ -187,6 +193,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
         returnDestination: editingBooking.returnDestination || '',
         returnAirportCollection: editingBooking.returnAirportCollection === true,
         returnFlightNumber: editingBooking.returnFlightNumber || '',
+        stops: normaliseStops((editingBooking as any).stops, editingBooking.pickupLocation || (editingBooking as any).pickup || '', editingBooking.destination || ''),
+        returnStops: normaliseStops((editingBooking as any).returnStops, editingBooking.returnPickupLocation || '', editingBooking.returnDestination || ''),
+        openReturn: (editingBooking as any).openReturn === true,
+        returnDate: (editingBooking as any).returnDate || String(editingBooking.returnPickupTime || '').slice(0, 10),
+        returnNoticeNote: (editingBooking as any).returnNoticeNote || '',
         dueOnOutbound:
           editingBooking.dueOnOutbound !== undefined && editingBooking.dueOnOutbound !== null
             ? String(editingBooking.dueOnOutbound)
@@ -238,6 +249,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
         returnFlightNumber: '',
         dueOnOutbound: '',
         dueOnReturn: '',
+        stops: normaliseStops(undefined, '', ''),
+        returnStops: normaliseStops(undefined, '', ''),
+        openReturn: false,
+        returnDate: '',
+        returnNoticeNote: '',
       };
 
       if (initialDraft) {
@@ -274,6 +290,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
           returnDestination: (d as any).returnDestination || '',
           returnAirportCollection: (d as any).returnAirportCollection === true,
           returnFlightNumber: (d as any).returnFlightNumber || '',
+          stops: normaliseStops((d as any).stops, d.pickupLocation || '', d.destination || ''),
+          returnStops: normaliseStops((d as any).returnStops, (d as any).returnPickupLocation || '', (d as any).returnDestination || ''),
+          openReturn: (d as any).openReturn === true,
+          returnDate: (d as any).returnDate || String((d as any).returnPickupTime || '').slice(0, 10),
+          returnNoticeNote: (d as any).returnNoticeNote || '',
           dueOnOutbound: (d as any).dueOnOutbound !== undefined && (d as any).dueOnOutbound !== '' ? String((d as any).dueOnOutbound) : '',
           dueOnReturn: (d as any).dueOnReturn !== undefined && (d as any).dueOnReturn !== '' ? String((d as any).dueOnReturn) : '',
         });
@@ -352,9 +373,28 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setFormError(scheduleError);
       return;
     }
-    if (isReturn && (!formData.returnPickupTime || !formData.returnPickupLocation?.trim() || !formData.returnDestination?.trim())) {
-      setFormError('Return bookings need a return date, pickup time, pickup address and destination.');
+    const outboundStops = normaliseStops(formData.stops, formData.pickupLocation, formData.destination || '');
+    const outboundStopError = validateStops(outboundStops);
+    if (outboundStopError) {
+      setFormError(outboundStopError);
       return;
+    }
+    const returnStops = isReturn ? normaliseStops(formData.returnStops, formData.returnPickupLocation || '', formData.returnDestination || '') : [];
+    if (isReturn) {
+      const returnStopError = validateStops(returnStops);
+      if (returnStopError) {
+        setFormError(`Return: ${returnStopError}`);
+        return;
+      }
+      const returnDate = String(formData.returnDate || '').slice(0, 10) || String(formData.returnPickupTime || '').slice(0, 10);
+      if (!returnDate) {
+        setFormError('Return bookings need a return date.');
+        return;
+      }
+      if (!formData.openReturn && !formData.returnPickupTime) {
+        setFormError('Enter the return pickup time, or choose return time to be confirmed.');
+        return;
+      }
     }
     const typedEmail = String(formData.email || formData.hirerEmail || '').trim();
     if (typedEmail && !normaliseCustomerEmail(typedEmail)) {
@@ -409,15 +449,24 @@ const BookingModal: React.FC<BookingModalProps> = ({
       returnTrip: isReturn,
       airportCollection: formData.airportCollection === true,
       flightNumber: formData.airportCollection === true ? String(formData.flightNumber || '').trim() : '',
-      returnPickupTime: isReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
-      returnPickupLocation: isReturn ? String(formData.returnPickupLocation || '').trim() : '',
-      returnDestination: isReturn ? String(formData.returnDestination || '').trim() : '',
+      returnPickupTime: isReturn && !formData.openReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : (isReturn && formData.returnPickupTime ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : ''),
+      returnDate: isReturn ? (String(formData.returnDate || '').slice(0, 10) || String(formData.returnPickupTime || '').slice(0, 10)) : '',
+      openReturn: isReturn && formData.openReturn === true,
+      returnNoticeNote: isReturn ? String(formData.returnNoticeNote || '').trim() : '',
+      openReturnNotice: isReturn && formData.openReturn === true ? OPEN_RETURN_NOTICE : '',
+      stops: outboundStops,
+      returnStops: isReturn ? returnStops : [],
+      extraStops: hasExtraStops(outboundStops) || hasExtraStops(returnStops),
+      pickupLocation: outboundStops[0]?.address || formData.pickupLocation,
+      destination: outboundStops[outboundStops.length - 1]?.address || formData.destination,
+      returnPickupLocation: isReturn ? (returnStops[0]?.address || '') : '',
+      returnDestination: isReturn ? (returnStops[returnStops.length - 1]?.address || '') : '',
       returnAirportCollection: isReturn && formData.returnAirportCollection === true,
       returnFlightNumber:
         isReturn && formData.returnAirportCollection === true
           ? String(formData.returnFlightNumber || '').trim()
           : '',
-      returnDateTime: isReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
+      returnDateTime: isReturn && formData.returnPickupTime ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
       dueOnOutbound: isReturn && dueOnOutbound != null ? dueOnOutbound : '',
       dueOnReturn: isReturn && dueOnReturn != null ? dueOnReturn : '',
       hirerName,
@@ -798,7 +847,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {(() => {
               const outbound = splitLocalDateTime(toDatetimeLocalValue(formData.pickupTime || formData.dateTime));
               const ret = splitLocalDateTime(toDatetimeLocalValue(formData.returnPickupTime || ''));
-              const listId = locationSuggestions.length > 0 ? 'booking-past-locations' : undefined;
               const setOutboundDateTime = (date: string, time: string) => {
                 setFormData({ ...formData, pickupTime: combineLocalDateTime(date, time) });
               };
@@ -836,22 +884,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         />
                       </div>
                     </div>
-                    <div className="mb-4">
-                      <LocationField
-                        label="Pickup address *"
-                        value={formData.pickupLocation}
-                        required
-                        onChange={(value, place) => setFormData({ ...formData, pickupLocation: value, pickupPlace: place })}
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <LocationField
-                        label="Destination *"
-                        value={formData.destination || ''}
-                        required
-                        onChange={(value, place) => setFormData({ ...formData, destination: value, destinationPlace: place })}
-                      />
-                    </div>
+                    <JourneyStopsEditor
+                      stops={normaliseStops(formData.stops, formData.pickupLocation, formData.destination || '')}
+                      onChange={(stops) => setFormData({
+                        ...formData,
+                        stops,
+                        pickupLocation: stops[0]?.address || '',
+                        destination: stops[stops.length - 1]?.address || '',
+                        pickupPlace: (stops[0]?.place as ExtendedBooking['pickupPlace']) || null,
+                        destinationPlace: (stops[stops.length - 1]?.place as ExtendedBooking['destinationPlace']) || null,
+                      })}
+                    />
                     <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
                       <input
                         type="checkbox"
@@ -886,52 +929,66 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         <Clock className="w-5 h-5 text-blue-700 mr-2" />
                         <h4 className="text-md font-semibold text-blue-900">Return journey *</h4>
                       </div>
+                      <div className="flex flex-wrap gap-4 mb-4">
+                        <label className="flex items-center gap-2 text-sm text-gray-800">
+                          <input type="radio" name="return-time-choice" checked={formData.openReturn !== true} onChange={() => setFormData({ ...formData, openReturn: false })} />
+                          Set return pickup time
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-800">
+                          <input type="radio" name="return-time-choice" checked={formData.openReturn === true} onChange={() => setFormData({ ...formData, openReturn: true, returnDate: formData.returnDate || ret.date, returnPickupTime: '' })} />
+                          Return time to be confirmed
+                        </label>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
                           <input
                             type="date"
-                            value={ret.date}
-                            onChange={(e) => setReturnDateTime(e.target.value, ret.time || '00:00')}
+                            value={formData.openReturn ? (formData.returnDate || ret.date) : ret.date}
+                            onChange={(e) => setFormData({ ...formData, returnDate: e.target.value, returnPickupTime: formData.openReturn || !ret.time ? '' : combineLocalDateTime(e.target.value, ret.time) })}
                             required
                             className="form-input"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Pickup time *</label>
-                          <input
-                            type="time"
-                            value={ret.time}
-                            onChange={(e) => setReturnDateTime(ret.date, e.target.value)}
-                            required
-                            className="form-input"
-                          />
-                        </div>
+                        {formData.openReturn !== true ? (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Pickup time *</label>
+                            <input
+                              type="time"
+                              value={ret.time}
+                              onChange={(e) => setReturnDateTime(ret.date, e.target.value)}
+                              required
+                              className="form-input"
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Pickup time, if now known</label>
+                            <input
+                              type="time"
+                              value={ret.time}
+                              onChange={(e) => setFormData({ ...formData, returnPickupTime: e.target.value ? combineLocalDateTime(formData.returnDate || ret.date, e.target.value) : '' })}
+                              className="form-input"
+                            />
+                          </div>
+                        )}
                       </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Pickup address *</label>
-                        <input
-                          type="text"
-                          value={formData.returnPickupLocation || ''}
-                          onChange={(e) => setFormData({ ...formData, returnPickupLocation: e.target.value })}
-                          required
-                          className="form-input"
-                          list={listId}
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Destination *</label>
-                        <input
-                          type="text"
-                          value={formData.returnDestination || ''}
-                          onChange={(e) => setFormData({ ...formData, returnDestination: e.target.value })}
-                          required
-                          className="form-input"
-                          list={listId}
-                          autoComplete="off"
-                        />
-                      </div>
+                      {formData.openReturn === true ? (
+                        <>
+                          <p className="text-sm text-blue-900 mb-3">{OPEN_RETURN_NOTICE}</p>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Notice note, optional</label>
+                          <input className="form-input mb-4" value={formData.returnNoticeNote || ''} placeholder="Customer will contact the driver when ready" onChange={(e) => setFormData({ ...formData, returnNoticeNote: e.target.value })} />
+                        </>
+                      ) : null}
+                      <JourneyStopsEditor
+                        stops={normaliseStops(formData.returnStops, formData.returnPickupLocation || '', formData.returnDestination || '')}
+                        onChange={(stops) => setFormData({
+                          ...formData,
+                          returnStops: stops,
+                          returnPickupLocation: stops[0]?.address || '',
+                          returnDestination: stops[stops.length - 1]?.address || '',
+                        })}
+                      />
                       <label className="flex items-center gap-2 text-sm text-gray-800 mb-3">
                         <input
                           type="checkbox"

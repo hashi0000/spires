@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 import { onlineTermsAcceptance } from "../terms/bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
+import { applyStopEnds, hasExtraStops, OPEN_RETURN_NOTICE, readStops, validateStops } from "./journeyStops";
 
 export const OFFICE_PHONE = "07776 897772";
 export const CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
@@ -166,7 +167,11 @@ export function prepareGuestBooking(
 
   const pickup = str(body.pickup).slice(0, 240);
   const destination = str(body.destination).slice(0, 240);
-  if (pickup.length < 3 || destination.length < 3) {
+  const stops = readStops(body, "stops", pickup, destination);
+  const stopError = validateStops(stops);
+  if (stopError) return { ok: false, error: stopError };
+  const ends = applyStopEnds(stops);
+  if (ends.pickup.length < 3 || ends.destination.length < 3) {
     return { ok: false, error: "Enter a pickup address and a destination." };
   }
 
@@ -200,19 +205,28 @@ export function prepareGuestBooking(
   }
 
   const bookingType = str(body.bookingType) === "return" ? "return" : "one_way";
+  const openReturn = bookingType === "return" && (body.openReturn === true || body.openReturn === "yes");
   const returnDirect = splitDateTime(str(body.returnDateTime) || str(body.returnPickupTime));
   const returnDate = str(body.returnDate) || returnDirect.date;
-  const returnTime = str(body.returnTime) || returnDirect.time;
-  const returnWhen = returnDate && returnTime ? `${returnDate}T${returnTime}` : str(body.returnPickupTime);
-  const returnPickupLocation = str(body.returnPickupLocation).slice(0, 240);
-  const returnDestination = str(body.returnDestination).slice(0, 240);
+  const returnTime = openReturn ? "" : str(body.returnTime) || returnDirect.time;
+  const returnWhen = !openReturn && returnDate && returnTime && isHm(returnTime) ? `${returnDate}T${returnTime}` : "";
+  const returnStops = bookingType === "return" ? readStops(body, "returnStops", str(body.returnPickupLocation), str(body.returnDestination)) : [];
+  const returnEnds = applyStopEnds(returnStops);
+  const returnPickupLocation = returnEnds.pickup.slice(0, 240);
+  const returnDestination = returnEnds.destination.slice(0, 240);
+  const returnNoticeNote = str(body.returnNoticeNote).slice(0, 400);
   if (bookingType === "return") {
-    const returnParts = splitDateTime(returnWhen);
-    if (!isYmd(returnParts.date) || !isHm(returnParts.time) || !returnPickupLocation || !returnDestination) {
-      return { ok: false, error: "Return bookings need a return date, pickup time, pickup address and destination." };
+    const returnStopError = validateStops(returnStops);
+    if (returnStopError) return { ok: false, error: `Return: ${returnStopError}` };
+    if (!isYmd(returnDate)) return { ok: false, error: "Return bookings need a return date." };
+    if (!openReturn && !isHm(returnTime)) {
+      return { ok: false, error: "Enter the return pickup time, or choose return time to be confirmed." };
     }
-    if (`${returnParts.date}T${returnParts.time}` < dateTime) {
+    if (!openReturn && `${returnDate}T${returnTime}` < dateTime) {
       return { ok: false, error: "The return needs to be at the same time as the outward journey, or later." };
+    }
+    if (openReturn && returnDate < date) {
+      return { ok: false, error: "The return date needs to be the same day as the outward journey, or later." };
     }
   }
 
@@ -238,8 +252,8 @@ export function prepareGuestBooking(
       }
     : null;
 
-  const pickupPlace = placeRecord(parsePlace(body.pickupPlace), pickup);
-  const destinationPlace = placeRecord(parsePlace(body.destinationPlace), destination);
+  const pickupPlace = placeRecord(parsePlace(body.pickupPlace) || ends.pickupPlace, ends.pickup);
+  const destinationPlace = placeRecord(parsePlace(body.destinationPlace) || ends.destinationPlace, ends.destination);
   const record: Record<string, unknown> = {
     source: "website",
     guestRequest: true,
@@ -254,9 +268,11 @@ export function prepareGuestBooking(
     phone,
     hirerPhone: phone,
     contactBy,
-    pickup,
-    pickupLocation: pickup,
-    destination,
+    pickup: ends.pickup,
+    pickupLocation: ends.pickup,
+    destination: ends.destination,
+    stops,
+    extraStops: hasExtraStops(stops) || hasExtraStops(returnStops),
     ...(pickupPlace ? { pickupPlace } : {}),
     ...(destinationPlace ? { destinationPlace } : {}),
     dateTime,
@@ -269,6 +285,11 @@ export function prepareGuestBooking(
     returnTrip: bookingType === "return",
     returnDateTime: bookingType === "return" ? returnWhen : "",
     returnPickupTime: bookingType === "return" ? returnWhen : "",
+    returnDate: bookingType === "return" ? returnDate : "",
+    openReturn: openReturn,
+    returnNoticeNote: bookingType === "return" ? returnNoticeNote : "",
+    openReturnNotice: openReturn ? OPEN_RETURN_NOTICE : "",
+    returnStops: bookingType === "return" ? returnStops : [],
     returnPickupLocation: bookingType === "return" ? returnPickupLocation : "",
     returnDestination: bookingType === "return" ? returnDestination : "",
     airportCollection,

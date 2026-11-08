@@ -176,6 +176,11 @@
       return;
     }
 
+    var journey = window.spiresReadJourney ? window.spiresReadJourney(form) : null;
+    if (journey && journey.error) {
+      setStatus(journey.error);
+      return;
+    }
     var button = document.getElementById("booking-submit");
     if (button) {
       button.disabled = true;
@@ -206,7 +211,11 @@
       flightNumber: data.get("flightNumber") || "",
       terminal: data.get("terminal") || "",
       returnDate: data.get("returnDate") || "",
-      returnTime: data.get("returnTime") || "",
+      returnTime: journey && journey.openReturn ? "" : (data.get("returnTime") || ""),
+      stops: journey ? journey.stops : [],
+      returnStops: journey ? journey.returnStops : [],
+      openReturn: journey ? journey.openReturn : false,
+      returnNoticeNote: journey ? journey.returnNoticeNote : "",
       returnPickupLocation: data.get("returnPickupLocation") || "",
       returnDestination: data.get("returnDestination") || "",
       returnAirportCollection: returnAirport && returnAirport.checked,

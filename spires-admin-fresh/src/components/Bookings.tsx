@@ -7,6 +7,7 @@ import { formatVehicleTypeLabel } from '../utils/vehicleTypes';
 import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMapper';
 import { db, functions } from '../utils/firebase';
 import { planBulkJobUpdate, type BulkJobChanges } from '../utils/bulkBookingEdit';
+import { describeStops, hasExtraStops, normaliseStops, openReturnSummary } from '../utils/journeyStops';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
@@ -777,14 +778,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                             <div className="booking-legs">
                               <p><span>Outbound</span> {londonWhen(booking.pickupTime)}</p>
                               <p>{booking.pickupLocation} → {booking.destination}</p>
-                              <p><span>Return</span> {londonWhen(ext.returnPickupTime)}</p>
+                              <p><span>Return</span> {ext.openReturn ? openReturnSummary(ext) : londonWhen(ext.returnPickupTime)}</p>
                               <p>{ext.returnPickupLocation || 'Pickup not recorded'} → {ext.returnDestination || 'Destination not recorded'}</p>
                               <p>The fare is for the whole booking.</p>
                             </div>
                           ) : null}
                         </td>
                         <td>{formatVehicleTypeLabel(ext.vehicleType)}{ext.passengers ? ` · ${ext.passengers}` : ''}</td>
-                        <td>{booking.actualFare != null ? `£${Number(booking.actualFare).toFixed(2)}` : 'Not set'}</td>
+                        <td>{booking.actualFare != null ? `£${Number(booking.actualFare).toFixed(2)}` : 'Not set'}{hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <div className="booking-failed">Extra stops. Agree the fare.</div> : null}</td>
                         <td><span className={`badge ${workflowBadgeClass(workflow)}`}>{workflowStatusLabel(workflow)}</span></td>
                         <td>
                           <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
@@ -847,7 +848,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     </summary>
                     <div className="booking-mobile-body">
                       <p>{booking.bookingNumber}</p>
-                      {returnJourney ? <p>Return {londonWhen(ext.returnPickupTime)}. {ext.returnPickupLocation} → {ext.returnDestination}. The fare is for the whole booking.</p> : null}
+                      {hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p>{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
+                      {returnJourney ? <p>{ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} The fare is for the whole booking.</p> : null}
                       <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
                         <option value="pending">Unpaid</option>
                         <option value="partial">Part paid</option>

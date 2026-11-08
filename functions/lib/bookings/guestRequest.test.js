@@ -165,6 +165,35 @@ class MemoryGuestDb {
         strict_1.default.equal(Object.keys((0, guestRequest_1.guestClaimPatch)("user-1")).includes("email"), false);
     });
 });
+(0, node_test_1.describe)("stops and open returns", () => {
+    (0, node_test_1.it)("keeps an open return pending without a made up time", () => {
+        const result = prepare({
+            bookingType: "return",
+            openReturn: true,
+            returnDate: "2026-11-12",
+            returnTime: "00:00",
+            returnPickupLocation: "Heathrow Terminal 5",
+            returnDestination: "1 High Street, Oxford",
+            returnNoticeNote: "Customer will contact the driver when ready",
+            stops: [
+                { type: "pickup", address: "1 High Street, Oxford" },
+                { type: "dropoff", address: "Headington, Oxford" },
+                { type: "dropoff", address: "Heathrow Terminal 5" },
+            ],
+        });
+        strict_1.default.equal(result.ok, true);
+        if (!result.ok || result.spam)
+            return;
+        strict_1.default.equal(result.record.status, "pending");
+        strict_1.default.equal(result.record.openReturn, true);
+        strict_1.default.equal(result.record.returnPickupTime, "");
+        strict_1.default.equal(result.record.returnDateTime, "");
+        strict_1.default.equal(result.record.returnDate, "2026-11-12");
+        strict_1.default.equal(result.record.extraStops, true);
+        strict_1.default.equal(String(result.record.openReturnNotice).includes("outside Oxford"), true);
+        strict_1.default.equal(String(result.record.returnPickupTime).includes("00:00"), false);
+    });
+});
 (0, node_test_1.describe)("guest request rate window", () => {
     (0, node_test_1.it)("resets after the window", () => {
         const first = (0, guestRequest_1.nextGuestRate)(null, now);

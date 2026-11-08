@@ -11,6 +11,7 @@ import {
   validateStaffTermsReport,
 } from "./bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
+import { applyStopEnds, hasExtraStops, OPEN_RETURN_NOTICE, readStops, validateStops } from "../bookings/journeyStops";
 
 const db = () => admin.firestore();
 
@@ -57,18 +58,35 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
   });
   if (!decision.ok) throw httpsError("failed-precondition", decision.error);
 
-  const pickup = str(data?.pickup);
-  const destination = str(data?.destination);
   const dateTime = str(data?.dateTime);
   const vehicleType = str(data?.vehicleType);
   const paymentMethod = str(data?.paymentMethod);
-  if (!pickup || !destination || !dateTime || !vehicleType || !paymentMethod) {
+  const stops = readStops(data || {}, "stops", str(data?.pickup), str(data?.destination));
+  const stopError = validateStops(stops);
+  if (stopError) throw httpsError("invalid-argument", stopError);
+  const ends = applyStopEnds(stops);
+  if (!ends.pickup || !ends.destination || !dateTime || !vehicleType || !paymentMethod) {
     throw httpsError("invalid-argument", "Pickup, destination, date, vehicle and payment method are required.");
   }
   const bookingType = str(data?.bookingType) === "return" ? "return" : "one_way";
+  const openReturn = bookingType === "return" && data?.openReturn === true;
+  const returnStops = bookingType === "return" ? readStops(data || {}, "returnStops", str(data?.returnPickupLocation), str(data?.returnDestination)) : [];
+  const returnEnds = applyStopEnds(returnStops);
+  const returnDate = str(data?.returnDate) || str(data?.returnPickupTime).slice(0, 10);
+  const returnWhen = openReturn ? "" : str(data?.returnPickupTime);
   if (bookingType === "return") {
-    if (!str(data?.returnPickupTime) || !str(data?.returnPickupLocation) || !str(data?.returnDestination)) {
-      throw httpsError("invalid-argument", "Return bookings need a return date, pickup and destination.");
+    const returnStopError = validateStops(returnStops);
+    if (returnStopError) throw httpsError("invalid-argument", `Return: ${returnStopError}`);
+    if (!returnDate) throw httpsError("invalid-argument", "Return bookings need a return date.");
+    if (!openReturn && !returnWhen) {
+      throw httpsError("invalid-argument", "Enter the return pickup time, or choose return time to be confirmed.");
+    }
+    const outboundDate = dateTime.slice(0, 10);
+    if (openReturn && outboundDate && returnDate < outboundDate) {
+      throw httpsError("invalid-argument", "The return date needs to be the same day as the outward journey, or later.");
+    }
+    if (!openReturn && returnWhen && returnWhen < dateTime) {
+      throw httpsError("invalid-argument", "The return needs to be at the same time as the outward journey, or later.");
     }
   }
   const passengers = Number(data?.passengers) || 1;
@@ -79,20 +97,28 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     name: str(data?.name) || email.split("@")[0] || "Customer",
     email,
     phone: str(data?.phone),
-    pickup,
-    destination,
-    ...(placeRecord(data?.pickupPlace, pickup) ? { pickupPlace: placeRecord(data?.pickupPlace, pickup) } : {}),
-    ...(placeRecord(data?.destinationPlace, destination) ? { destinationPlace: placeRecord(data?.destinationPlace, destination) } : {}),
+    pickup: ends.pickup,
+    pickupLocation: ends.pickup,
+    destination: ends.destination,
+    stops,
+    extraStops: hasExtraStops(stops) || hasExtraStops(returnStops),
+    ...(placeRecord(data?.pickupPlace || ends.pickupPlace, ends.pickup) ? { pickupPlace: placeRecord(data?.pickupPlace || ends.pickupPlace, ends.pickup) } : {}),
+    ...(placeRecord(data?.destinationPlace || ends.destinationPlace, ends.destination) ? { destinationPlace: placeRecord(data?.destinationPlace || ends.destinationPlace, ends.destination) } : {}),
     dateTime,
     passengers,
     luggage: Number(data?.luggage) || 0,
     specialRequirements: str(data?.specialRequirements).slice(0, 2000),
     bookingType,
     returnTrip: bookingType === "return",
-    returnDateTime: bookingType === "return" ? str(data?.returnPickupTime) : "",
-    returnPickupTime: bookingType === "return" ? str(data?.returnPickupTime) : "",
-    returnPickupLocation: bookingType === "return" ? str(data?.returnPickupLocation) : "",
-    returnDestination: bookingType === "return" ? str(data?.returnDestination) : "",
+    returnDateTime: bookingType === "return" ? returnWhen : "",
+    returnPickupTime: bookingType === "return" ? returnWhen : "",
+    returnDate: bookingType === "return" ? returnDate : "",
+    openReturn,
+    returnNoticeNote: bookingType === "return" ? str(data?.returnNoticeNote).slice(0, 400) : "",
+    openReturnNotice: openReturn ? OPEN_RETURN_NOTICE : "",
+    returnStops: bookingType === "return" ? returnStops : [],
+    returnPickupLocation: bookingType === "return" ? returnEnds.pickup : "",
+    returnDestination: bookingType === "return" ? returnEnds.destination : "",
     airportCollection: data?.airportCollection === true,
     returnAirportCollection: bookingType === "return" && data?.returnAirportCollection === true,
     returnFlightNumber:
