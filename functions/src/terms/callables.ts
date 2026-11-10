@@ -1,3 +1,4 @@
+import { readAttribution } from "../marketing/attribution";
 import { createHash, randomBytes } from "crypto";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
@@ -128,6 +129,7 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     paymentStatus: "pending",
     vehicleType,
     source: "customer_app",
+    marketingAttribution: readAttribution(data?.marketingAttribution),
     createdByFunction: true,
     depositRequired: false,
     depositStatus: "not_required",

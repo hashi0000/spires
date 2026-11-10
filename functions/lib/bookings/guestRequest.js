@@ -13,6 +13,7 @@ exports.prepareGuestBooking = prepareGuestBooking;
 exports.commitGuestBooking = commitGuestBooking;
 exports.decideGuestClaim = decideGuestClaim;
 exports.guestClaimPatch = guestClaimPatch;
+const attribution_1 = require("../marketing/attribution");
 const crypto_1 = require("crypto");
 const bookingTerms_1 = require("../terms/bookingTerms");
 const placeRecord_1 = require("../locations/placeRecord");
@@ -205,6 +206,7 @@ function prepareGuestBooking(body, options) {
     const destinationPlace = (0, placeRecord_1.placeRecord)(parsePlace(body.destinationPlace) || ends.destinationPlace, ends.destination);
     const record = {
         source: "website",
+        marketingAttribution: (0, attribution_1.readAttribution)(body.marketingAttribution, options.now),
         guestRequest: true,
         accountLinked: false,
         createdByFunction: true,

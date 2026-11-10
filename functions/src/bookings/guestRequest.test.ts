@@ -73,6 +73,21 @@ class MemoryGuestDb implements GuestDb {
 }
 
 describe("guest booking requests", () => {
+  it("stores only validated consented attribution without copying contact data", () => {
+    const result = prepare({ marketingAttribution: {
+      consent: "granted", consentAt: now, capturedAt: now, expiresAt: now + 86400000,
+      clientId: "123.456", gclid: "test-click", email: "private@example.com",
+    } });
+    assert.ok(result.ok && !result.spam);
+    if (!result.ok || result.spam) return;
+    const attribution = result.record.marketingAttribution as Record<string, unknown>;
+    assert.equal(attribution.gclid, "test-click");
+    assert.equal(attribution.email, undefined);
+    const rejected = prepare({ marketingAttribution: { consent: "denied", gclid: "test-click" } });
+    assert.ok(rejected.ok && !rejected.spam);
+    if (rejected.ok && !rejected.spam) assert.equal(rejected.record.marketingAttribution, null);
+  });
+
   it("accepts email only, mobile only, landline only, and both", () => {
     const emailOnly = prepare({ phone: "" });
     const mobile = prepare({ email: "", phone: "07776 897772" }, false);
