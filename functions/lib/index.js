@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.guestClaimPreview = exports.claimGuestBooking = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
-exports.scheduledJourneyStats = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = void 0;
+exports.deliverBookingMeasurements = exports.queueBookingMeasurement = exports.scheduledJourneyStats = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
@@ -176,3 +176,6 @@ Object.defineProperty(exports, "getJourneyStats", { enumerable: true, get: funct
 Object.defineProperty(exports, "refreshJourneyStats", { enumerable: true, get: function () { return publishJourneyStats_1.refreshJourneyStats; } });
 Object.defineProperty(exports, "publicJourneyStats", { enumerable: true, get: function () { return publishJourneyStats_1.publicJourneyStats; } });
 Object.defineProperty(exports, "scheduledJourneyStats", { enumerable: true, get: function () { return publishJourneyStats_1.scheduledJourneyStats; } });
+var confirmation_1 = require("./marketing/confirmation");
+Object.defineProperty(exports, "queueBookingMeasurement", { enumerable: true, get: function () { return confirmation_1.queueBookingMeasurement; } });
+Object.defineProperty(exports, "deliverBookingMeasurements", { enumerable: true, get: function () { return confirmation_1.deliverBookingMeasurements; } });

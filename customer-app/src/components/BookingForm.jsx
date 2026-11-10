@@ -266,7 +266,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     try {
-      await createCustomerBooking({
+      const marketingAttribution = window.SpiresMeasurement ? await window.SpiresMeasurement.attribution().catch(() => null) : null;
+      const result = await createCustomerBooking({
+        marketingAttribution,
         name: user.displayName || user.email?.split("@")[0] || "Customer",
         phone: formData.phone || "",
         pickup: formData.pickup,
@@ -301,6 +303,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         termsVersion: TERMS_VERSION,
       });
 
+      if (result.data?.ok && result.data?.bookingId && window.SpiresMeasurement) {
+        try { window.SpiresMeasurement.lead(result.data.bookingId, "portal"); } catch (_) { /* Measurement must not interrupt a saved booking. */ }
+      }
       onBookingCreated();
     } catch (err) {
       console.error("Error creating booking:", err);

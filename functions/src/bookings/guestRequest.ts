@@ -1,3 +1,4 @@
+import { readAttribution } from "../marketing/attribution";
 import { createHash, randomBytes } from "crypto";
 import { onlineTermsAcceptance } from "../terms/bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
@@ -256,6 +257,7 @@ export function prepareGuestBooking(
   const destinationPlace = placeRecord(parsePlace(body.destinationPlace) || ends.destinationPlace, ends.destination);
   const record: Record<string, unknown> = {
     source: "website",
+    marketingAttribution: readAttribution(body.marketingAttribution, options.now),
     guestRequest: true,
     accountLinked: false,
     createdByFunction: true,

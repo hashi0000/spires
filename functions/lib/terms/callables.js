@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = void 0;
+const attribution_1 = require("../marketing/attribution");
 const crypto_1 = require("crypto");
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions/v1"));
@@ -156,6 +157,7 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         paymentStatus: "pending",
         vehicleType,
         source: "customer_app",
+        marketingAttribution: (0, attribution_1.readAttribution)(data?.marketingAttribution),
         createdByFunction: true,
         depositRequired: false,
         depositStatus: "not_required",

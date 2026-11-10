@@ -161,3 +161,5 @@ export {
 } from "./spiresShare/callables";
 export { searchLocations } from "./locations/searchLocations";
 export { getJourneyStats, refreshJourneyStats, publicJourneyStats, scheduledJourneyStats } from "./stats/publishJourneyStats";
+
+export { queueBookingMeasurement, deliverBookingMeasurements } from "./marketing/confirmation";

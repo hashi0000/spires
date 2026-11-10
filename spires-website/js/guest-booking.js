@@ -226,10 +226,13 @@
       _gotcha: data.get("_gotcha") || ""
     };
 
-    fetch(endpoint, {
+    Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
+      payload.marketingAttribution = attribution;
+      return fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
+      });
     })
       .then(function (res) {
         return res.json().then(function (body) { return { ok: res.ok, body: body || {} }; });
@@ -237,6 +240,9 @@
       .then(function (response) {
         if (!response.ok || !response.body.ok || !response.body.bookingNumber) {
           throw new Error((response.body && response.body.error) || "We could not save your request.");
+        }
+        if (!response.body.duplicate && window.SpiresMeasurement) {
+          try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website"); } catch (_) { /* Saved requests must still show success. */ }
         }
         form.hidden = true;
         if (result) {
