@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const { hrefForRoute } = require('../js/whatsapp-route.js');
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = 'https://www.spires-taxis.com';
@@ -105,7 +109,7 @@ function page(p) {
   }
   </script>
 </head>
-<body data-page="airport">
+<body data-page="airport" data-wa-route="${p.waRoute}">
 
 <!-- SITE-HEADER -->
 <!-- /SITE-HEADER -->
@@ -162,6 +166,7 @@ ${related}
 
 <!-- SITE-FOOTER -->
 <!-- /SITE-FOOTER -->
+<script src="/js/whatsapp-route.js" defer></script>
 </body>
 </html>
 `;
@@ -170,6 +175,7 @@ ${related}
 const pages = [
   {
     file: 'oxford-to-stansted-taxi.html',
+    waRoute: 'oxford-to-stansted',
     path: '/oxford-to-stansted-taxi',
     title: 'Oxford to Stansted Airport Taxi £150 | Spires Taxis',
     description:
@@ -181,8 +187,7 @@ const pages = [
     oneWay: '150',
     h1: 'Oxford to Stansted taxi',
     lead: 'Pre booked transfers from Oxford to London Stansted Airport. Standard Car: <strong>£150 one way</strong> or <strong>£290 return</strong> when both journeys are booked together (up to 4 passengers). Airport charges are included.',
-    whatsapp:
-      'https://wa.me/447776897772?text=Hi%2C%20Oxford%20to%20Stansted%20on%20%5Bdate%5D.%20Pickup%3A%20%5Baddress%5D',
+    whatsapp: hrefForRoute('oxford-to-stansted'),
     storyH2: 'Why Stansted is a longer job than Luton',
     story: `<p>Stansted sits north east of London. From Oxford that usually means the M40, then around the north of the M25 onto the M11. It is a longer drive than Luton and more exposed to M25 delays, so we set pickup times from the flight, not from a hopeful average.</p>
         <p>The airport has one main terminal. Send the flight number anyway so we can time a collection and so the driver is not working from a schedule that has already slipped. See <a href="/how-airport-pickup-works">how airport pickup works</a>.</p>`,
@@ -224,6 +229,7 @@ const pages = [
   },
   {
     file: 'oxford-to-birmingham-airport-taxi.html',
+    waRoute: 'oxford-to-birmingham',
     path: '/oxford-to-birmingham-airport-taxi',
     title: 'Oxford to Birmingham Airport Taxi £110 | Spires Taxis',
     description:
@@ -235,8 +241,7 @@ const pages = [
     oneWay: '110',
     h1: 'Oxford to Birmingham Airport taxi',
     lead: 'Pre booked transfers from Oxford to Birmingham Airport (BHX). Standard Car: <strong>£110 one way</strong> or <strong>£215 return</strong> when both journeys are booked together (up to 4 passengers). Airport charges are included.',
-    whatsapp:
-      'https://wa.me/447776897772?text=Hi%2C%20Oxford%20to%20Birmingham%20Airport%20on%20%5Bdate%5D.%20Pickup%3A%20%5Baddress%5D',
+    whatsapp: hrefForRoute('oxford-to-birmingham'),
     storyH2: 'North on the M40, not around London',
     story: `<p>Birmingham Airport is the published Oxford fare that heads north rather than into the London airport belt. The usual run is the M40 towards the Midlands. That makes it a different job from Heathrow or Gatwick: less M25, more junction timing around Solihull, and a terminal that is used heavily for domestic and short European flights.</p>
         <p>It is still a private hire airport transfer from Oxford. We collect from your address, drop at the terminal, and for the way home we monitor the flight. Nearby towns such as Banbury and Bicester are quoted from the pickup address. Do not assume the Oxford figure applies. See <a href="/airport-transfers">airport transfers from Oxford</a>.</p>`,
@@ -278,6 +283,7 @@ const pages = [
   },
   {
     file: 'oxford-to-bristol-airport-taxi.html',
+    waRoute: 'oxford-to-bristol',
     path: '/oxford-to-bristol-airport-taxi',
     title: 'Oxford to Bristol Airport Taxi £165 | Spires Taxis',
     description:
@@ -289,8 +295,7 @@ const pages = [
     oneWay: '165',
     h1: 'Oxford to Bristol Airport taxi',
     lead: 'Pre booked transfers from Oxford to Bristol Airport. Standard Car: <strong>£165 one way</strong> or <strong>£320 return</strong> when both journeys are booked together (up to 4 passengers). Airport charges are included.',
-    whatsapp:
-      'https://wa.me/447776897772?text=Hi%2C%20Oxford%20to%20Bristol%20Airport%20on%20%5Bdate%5D.%20Pickup%3A%20%5Baddress%5D',
+    whatsapp: hrefForRoute('oxford-to-bristol'),
     storyH2: 'West from Oxford, not the London airports',
     story: `<p>Bristol Airport is the longest of our published Oxford airport fares. The usual routing is west via the A34 and M4, then south to the airport above the city. It is a different direction of travel from Heathrow, Luton or Stansted, and the published price is higher because of that distance.</p>
         <p>Holiday flights and early departures are common on this route. Send the flight time so we can work back to a sensible pickup. For collections we track the landing time in the same way as our other airport work. See <a href="/how-airport-pickup-works">how airport pickup works</a>.</p>`,

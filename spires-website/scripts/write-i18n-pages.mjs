@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'url';
 import { LANGS, PAGE_DEFS, LANG_CLUSTERS, pathFor, fileFromPath } from './lib/i18n-clusters.mjs';
+
+const require = createRequire(import.meta.url);
+const { hrefForRoute } = require('../js/whatsapp-route.js');
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = 'https://www.spires-taxis.com';
@@ -133,7 +137,7 @@ ${hreflangBlock(p.enPath)}
   ${crumbsJson(p.crumbs)}
   </script>
 </head>
-<body data-page="${p.dataPage}">
+<body data-page="${p.dataPage}"${p.waRoute ? ` data-wa-route="${p.waRoute}"` : ""}>
 <!-- SITE-HEADER -->
 <!-- /SITE-HEADER -->
 <main id="main-content">
@@ -141,7 +145,7 @@ ${p.body}
 </main>
 <!-- SITE-FOOTER -->
 <!-- /SITE-FOOTER -->
-</body>
+${p.waRoute ? `<script src="/js/whatsapp-route.js" defer></script>\n` : ""}</body>
 </html>
 `;
 }
@@ -308,6 +312,7 @@ ${formHtml(lang, t.form, `${pfx}/airport-transfers`, "airport-transfer")}
   function routePage(spec, enPath, slug, dataPage, crumbName) {
     return {
       dataPage,
+      waRoute: spec.waRoute || "",
       enPath,
       canonical: `${pfx}${slug}`,
       title: spec.title,
@@ -325,7 +330,7 @@ ${formHtml(lang, t.form, `${pfx}/airport-transfers`, "airport-transfer")}
       <h1>${spec.h1}</h1>
       <p class="hero__lead">${spec.lead}</p>
       <div class="btn-group">
-        <a href="${wa(spec.wa)}" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">${t.ctaWa}</a>
+        <a href="${spec.waRoute ? hrefForRoute(spec.waRoute) : wa(spec.wa)}" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">${t.ctaWa}</a>
         <a href="tel:+447776897772" class="btn btn--outline">${t.ctaCall}</a>
         <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">${t.ctaBook}</a>
       </div>
@@ -354,11 +359,31 @@ ${formHtml(lang, t.form, `${pfx}${slug}`, spec.service || "airport-transfer")}
   }
 
   pages.push(
-    routePage(t.heathrowOut, "/oxford-to-heathrow-taxi", "/oxford-to-heathrow-taxi", "heathrow", t.crumbHeathrowOut)
+    routePage(
+      Object.assign({}, t.heathrowOut, { waRoute: "oxford-to-heathrow" }),
+      "/oxford-to-heathrow-taxi",
+      "/oxford-to-heathrow-taxi",
+      "heathrow",
+      t.crumbHeathrowOut
+    )
   );
-  pages.push(routePage(t.gatwick, "/oxford-to-gatwick-taxi", "/oxford-to-gatwick-taxi", "airport", t.crumbGatwick));
   pages.push(
-    routePage(t.heathrowIn, "/heathrow-to-oxford-taxi", "/heathrow-to-oxford-taxi", "airport", t.crumbHeathrowIn)
+    routePage(
+      Object.assign({}, t.gatwick, { waRoute: "oxford-to-gatwick" }),
+      "/oxford-to-gatwick-taxi",
+      "/oxford-to-gatwick-taxi",
+      "airport",
+      t.crumbGatwick
+    )
+  );
+  pages.push(
+    routePage(
+      Object.assign({}, t.heathrowIn, { waRoute: "heathrow-to-oxford" }),
+      "/heathrow-to-oxford-taxi",
+      "/heathrow-to-oxford-taxi",
+      "airport",
+      t.crumbHeathrowIn
+    )
   );
   pages.push(routePage(t.pickup, "/how-airport-pickup-works", "/how-airport-pickup-works", "pickup", t.crumbPickup));
   pages.push(

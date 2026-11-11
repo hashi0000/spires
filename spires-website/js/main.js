@@ -261,6 +261,14 @@ document.addEventListener('DOMContentLoaded', () => {
   legacyPanel.querySelectorAll('a').forEach((a) => a.addEventListener('click', close));
 });
 
+function routeWhatsAppHref() {
+  if (window.SpiresWhatsApp && typeof window.SpiresWhatsApp.hrefFromDocument === 'function') {
+    const href = window.SpiresWhatsApp.hrefFromDocument();
+    if (href) return href;
+  }
+  return 'https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please';
+}
+
 function initMobileBookBar() {
   if (document.querySelector('.mobile-book-bar')) return;
   const path = window.location.pathname;
@@ -270,7 +278,7 @@ function initMobileBookBar() {
   bar.setAttribute('aria-label', 'Book a journey');
   bar.innerHTML =
     '<a class="btn btn--primary" href="https://customer.spires-taxis.com" target="_blank" rel="noopener noreferrer">Book online</a>' +
-    '<a class="btn btn--whatsapp" href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" target="_blank" rel="noopener noreferrer">WhatsApp</a>';
+    '<a class="btn btn--whatsapp" href="' + routeWhatsAppHref() + '" target="_blank" rel="noopener noreferrer">WhatsApp</a>';
   document.body.appendChild(bar);
 }
 
