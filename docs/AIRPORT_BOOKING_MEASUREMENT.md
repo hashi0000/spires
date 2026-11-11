@@ -2,7 +2,7 @@
 
 Updated 11 November 2026.
 
-Cloud Functions and Firestore rules for this measurement work are deployed to `spires-taxis`. The scheduled sender remains off until `marketingConfig/ga4.enabled` is set. A debug validation of the booking and payment payloads returned no validation messages. That does not prove a GA4 report or a Google Ads conversion. The public website script is updated in the repository and still needs its hosting release before it replaces the live script.
+Cloud Functions, Firestore rules and the admin hosting build are deployed to `spires-taxis`. The public website and portal scripts at `https://www.spires-taxis.com/js/measurement.js` and `https://customer.spires-taxis.com/measurement.js` were checked after release and contain the safe referrer and campaign capture. The scheduled sender remains off until `marketingConfig/ga4.enabled` is set. A debug validation of the booking and payment payloads returned no validation messages. That does not prove a GA4 report or a Google Ads conversion.
 
 ## Verified configuration
 
@@ -22,10 +22,9 @@ Google Ads account 7328566496 and conversion action 7897318445 were not opened i
 
 ## Still required before the sender is switched on
 
-1. Release the website and portal scripts.
-2. In Google, confirm property 497204134 is linked to Ads customer 7328566496, auto tagging is on, and Enhanced Measurement is not also counting form submits.
-3. Import `booking_confirmed` as a secondary conversion. Do not change budgets, bidding or primary goals.
-4. Set Firestore `marketingConfig/ga4` to `{ enabled: true, measurementId: "G-RSE4NNBP64" }` only after that check. Do not replay older than 72 hours.
+1. In Google, confirm property 497204134 is linked to Ads customer 7328566496, auto tagging is on, and Enhanced Measurement is not also counting form submits.
+2. Import `booking_confirmed` as a secondary conversion. Do not change budgets, bidding or primary goals.
+3. Set Firestore `marketingConfig/ga4` to `{ enabled: true, measurementId: "G-RSE4NNBP64" }` only after that check. Do not replay older than 72 hours.
 
 ## Checks
 
