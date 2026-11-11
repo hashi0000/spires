@@ -34,7 +34,7 @@ The read did not change customer bookings and did not print customer information
 
 These steps have not been run.
 
-To stop delivery only, merge `enabled: false` into `marketingConfig/ga4` and keep the other fields. To roll the code back, revert `c8b02fa`, `6c49d9d` and `c003ad8`, push `main` so Vercel releases the website and the portal, then run `firebase deploy --only functions,firestore:rules,hosting --project spires-taxis`. That Firebase project is `spires-taxis`. The last command releases functions, Firestore rules and the admin site. The website and portal come from the git push.
+To stop delivery only, merge `enabled: false` into `marketingConfig/ga4` and keep the other fields. To roll the code back, revert `7de67c8`, `c8b02fa`, `6c49d9d` and `c003ad8`, push `main` so Vercel releases the website and the portal, then run `firebase deploy --only functions,firestore:rules,hosting --project spires-taxis`. That Firebase project is `spires-taxis`. The last command releases functions, Firestore rules and the admin site. The website and portal come from the git push.
 
 ## Checks
 
