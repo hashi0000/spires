@@ -352,7 +352,10 @@ function jobCosts(booking: AdvertisingBookingInput): Required<JobCostInput> {
 function clickValues(attribution: AttributionInput | null | undefined): string[] {
   if (!attribution) return [];
   const touches = [attribution, attribution.first, attribution.latest];
-  return touches.flatMap((touch) => touch ? [touch.gclid, touch.gbraid, touch.wbraid] : []);
+  return touches.flatMap((touch) => {
+    if (!touch) return [];
+    return [touch.gclid, touch.gbraid, touch.wbraid].filter((value): value is string => typeof value === "string");
+  });
 }
 
 function hasTrackedGoogleAds(booking: AdvertisingBookingInput, at: Date | null): boolean {
