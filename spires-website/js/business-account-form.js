@@ -6,10 +6,15 @@
   var button = form.querySelector("button[type='submit']");
   var label = button ? button.textContent : "Send enquiry";
 
+  var sending = false;
+  var attempt = "";
   form.addEventListener("submit", function (event) {
     event.preventDefault();
+    if (sending) return;
     if (status) status.hidden = true;
     if (!form.reportValidity()) return;
+    var trap = form.querySelector("[name='_gotcha']");
+    if (trap && String(trap.value || "").trim()) return;
 
     var data = new FormData(form);
     var payload = {
@@ -22,6 +27,8 @@
       message: data.get("message") || "",
       _gotcha: data.get("_gotcha") || "",
     };
+    sending = true;
+    if (!attempt) attempt = "enq" + Date.now().toString(36) + Math.random().toString(36).slice(2);
     if (button) {
       button.disabled = true;
       button.textContent = "Sending";
@@ -42,10 +49,14 @@
         if (!result.ok || !result.body || result.body.ok !== true) {
           throw new Error((result.body && result.body.error) || "We could not send your enquiry. Please call or WhatsApp us.");
         }
+        if (window.SpiresMeasurement) {
+          try { window.SpiresMeasurement.lead(attempt, "website", "contact"); } catch (err) { /* A saved enquiry must still show success. */ }
+        }
         form.hidden = true;
         if (success) success.hidden = false;
       })
       .catch(function (err) {
+        sending = false;
         if (button) {
           button.disabled = false;
           button.textContent = label;

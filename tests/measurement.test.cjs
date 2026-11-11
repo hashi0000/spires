@@ -50,5 +50,20 @@ test('a token in a referrer path is not sent',()=>{
  const b=browser('www.spires-taxis.com','granted','https://chatgpt.com/share/Abcd1234token5678path','');
  assert.equal(b.win.dataLayer.find(r=>r[0]==='config')[2].page_referrer,'https://chatgpt.com/share');
 });
+test('a saved enquiry can be a contact, a quote or a booking request, once',()=>{
+ const b=browser('www.spires-taxis.com','granted');
+ b.win.SpiresMeasurement.lead('enq1','website','contact');
+ b.win.SpiresMeasurement.lead('enq1','website','contact');
+ b.win.SpiresMeasurement.lead('ST100','website','quote');
+ b.win.SpiresMeasurement.lead('book1','portal','booking_request');
+ const leads=b.win.dataLayer.filter(r=>r[0]==='event'&&r[1]==='generate_lead');
+ assert.equal(leads.map(r=>String(r[2].lead_type)).join(','),'contact,quote,booking_request');
+ assert.equal(leads.map(r=>String(r[2].lead_channel)).join(','),'website,website,portal');
+ for (const lead of leads) {
+  assert.equal(Object.keys(lead[2]).map(String).sort().join(','),'lead_channel,lead_type,page_location,transport_type');
+  assert.equal(lead[2].page_location.includes('SECRET'),false);
+  assert.equal(lead[2].page_location.includes('private@'),false);
+ }
+});
 test('portal and marketing tracker copies stay identical',()=>assert.equal(code,fs.readFileSync('customer-app/public/measurement.js','utf8')));
 test('all marketing pages use a single bootstrap, not the old tag',()=>{const cp=require('node:child_process');const names=cp.execFileSync('git',['ls-files','spires-website/*.html','spires-website/**/*.html'],{encoding:'utf8'}).trim().split('\n');for(const name of names){const html=fs.readFileSync(name,'utf8');assert.equal(html.includes('googletagmanager.com/gtag/js'),false,name);assert.ok((html.match(/src="\/js\/measurement.js"/g)||[]).length<=1,name)}});

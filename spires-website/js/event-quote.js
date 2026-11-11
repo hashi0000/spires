@@ -92,8 +92,10 @@
     status.textContent = message || "";
   }
 
+  var sending = false;
   form.addEventListener("submit", function (event) {
     event.preventDefault();
+    if (sending) return;
     setStatus("");
     if (contactError) contactError.hidden = true;
     if (termsError) termsError.hidden = true;
@@ -151,6 +153,7 @@
       return;
     }
 
+    sending = true;
     var button = form.querySelector("[type='submit']");
     if (button) {
       button.disabled = true;
@@ -196,10 +199,13 @@
       _gotcha: data.get("_gotcha") || ""
     };
 
-    fetch(endpoint, {
+    Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
+      payload.marketingAttribution = attribution;
+      return fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
+      });
     })
       .then(function (res) {
         return res.json().then(function (body) { return { ok: res.ok, body: body || {} }; });
@@ -207,6 +213,9 @@
       .then(function (response) {
         if (!response.ok || !response.body.ok || !response.body.bookingNumber) {
           throw new Error(response.body.error || "We could not send the request. Please call " + officePhone + ".");
+        }
+        if (!response.body.duplicate && window.SpiresMeasurement) {
+          try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website", "quote"); } catch (err) { /* A saved quote must still show success. */ }
         }
         if (result) {
           result.hidden = false;
@@ -218,6 +227,7 @@
         form.hidden = true;
       })
       .catch(function (err) {
+        sending = false;
         setStatus(err.message || "We could not send the request. Please call " + officePhone + ".");
         if (button) {
           button.disabled = false;

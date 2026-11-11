@@ -23,7 +23,12 @@
     });
   }
 
+  var sending = false;
   form.addEventListener("submit", function (event) {
+    if (sending) {
+      event.preventDefault();
+      return;
+    }
     var agreed = form.querySelector("[name='termsAccepted']");
     var termsError = document.getElementById("terms-agreement-error");
     if (!agreed || !agreed.checked) {
@@ -34,6 +39,7 @@
     }
     if (termsError) termsError.hidden = true;
     event.preventDefault();
+    sending = true;
     var data = new FormData(form);
     var payload = {
       name: data.get("name"),
@@ -59,10 +65,13 @@
     };
     var button = form.querySelector("button[type='submit']");
     if (button) button.disabled = true;
-    fetch("https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote", {
+    Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
+      payload.marketingAttribution = attribution;
+      return fetch("https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      });
     })
       .then(function (res) {
         return res.json().then(function (body) {
@@ -70,12 +79,16 @@
         });
       })
       .then(function (result) {
-        if (!result.ok || !result.body.ok) {
+        if (!result.ok || !result.body.ok || !result.body.bookingNumber) {
           throw new Error((result.body && result.body.error) || "We could not save your quote request.");
+        }
+        if (!result.body.duplicate && window.SpiresMeasurement) {
+          try { window.SpiresMeasurement.lead(result.body.bookingNumber, "website", "quote"); } catch (err) { /* A saved quote must still show success. */ }
         }
         window.location.href = "/thank-you";
       })
       .catch(function (err) {
+        sending = false;
         if (button) button.disabled = false;
         window.alert(err.message || "We could not save your quote request. Please call or WhatsApp us.");
       });

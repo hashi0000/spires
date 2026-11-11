@@ -133,9 +133,11 @@
     return parts.join("");
   }
 
+  var sending = false;
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (sending) return;
     setStatus("");
     if (contactError) contactError.hidden = true;
     if (termsError) termsError.hidden = true;
@@ -181,6 +183,7 @@
       setStatus(journey.error);
       return;
     }
+    sending = true;
     var button = document.getElementById("booking-submit");
     if (button) {
       button.disabled = true;
@@ -242,7 +245,7 @@
           throw new Error((response.body && response.body.error) || "We could not save your request.");
         }
         if (!response.body.duplicate && window.SpiresMeasurement) {
-          try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website"); } catch (_) { /* Saved requests must still show success. */ }
+          try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website", "quote"); } catch (_) { /* Saved requests must still show success. */ }
         }
         form.hidden = true;
         if (result) {
@@ -252,6 +255,7 @@
           if (another) {
             another.addEventListener("click", function () {
               try { sessionStorage.removeItem("spires-guest-submission"); } catch (err) { /* ignore */ }
+              sending = false;
               form.hidden = false;
               result.hidden = true;
               result.innerHTML = "";
@@ -264,6 +268,7 @@
         }
       })
       .catch(function (err) {
+        sending = false;
         if (button) {
           button.disabled = false;
           button.textContent = "Send booking request";

@@ -137,11 +137,17 @@
     d.body.appendChild(panel);
   }
   var lastClick = { key: '', at: 0 };
-  function lead(key, channel) {
+  var sentLead = Object.create(null);
+  function lead(key, channel, type) {
     if (!live || consent !== 'granted' || !key) return;
-    try { var k = 'spires_lead_' + key; if (w.sessionStorage.getItem(k)) return; w.sessionStorage.setItem(k, '1'); } catch (_) {}
-    var portal = channel === 'portal';
-    w.gtag('event', 'generate_lead', { lead_channel: portal ? 'portal' : 'website', lead_type: portal ? 'booking_request' : 'quote', transport_type: 'beacon', page_location: w.location.origin + cleanPath() });
+    var id = String(key);
+    if (sentLead[id]) return;
+    var storageKey = 'spires_lead_' + id;
+    try { if (w.sessionStorage.getItem(storageKey)) return; } catch (_) {}
+    var kind = type === 'contact' || type === 'quote' || type === 'booking_request' ? type : (channel === 'portal' ? 'booking_request' : channel === 'contact' ? 'contact' : 'quote');
+    sentLead[id] = true;
+    try { w.sessionStorage.setItem(storageKey, '1'); } catch (_) {}
+    w.gtag('event', 'generate_lead', { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: w.location.origin + cleanPath() });
   }
   function bestTouch(saved) {
     if (!saved) return null;

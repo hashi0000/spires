@@ -329,9 +329,11 @@
     return parts.join("");
   }
 
+  var sending = false;
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (sending) return;
     setStatus("");
     if (contactError) contactError.hidden = true;
     if (termsError) termsError.hidden = true;
@@ -430,6 +432,7 @@
       field("tw-notes")
     ].filter(Boolean).join(" ");
 
+    sending = true;
     if (submitButton) {
       submitButton.disabled = true;
       submitButton.textContent = "Sending request...";
@@ -459,10 +462,13 @@
       _gotcha: field("tw-gotcha")
     };
 
-    fetch(endpoint, {
+    Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
+      payload.marketingAttribution = attribution;
+      return fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
+      });
     })
       .then(function (res) {
         return res.json().then(function (body) { return { ok: res.ok, body: body || {} }; });
@@ -471,7 +477,12 @@
         if (!response.ok || !response.body.ok || !response.body.bookingNumber) {
           throw new Error((response.body && response.body.error) || "We could not save your request.");
         }
-        track("twickenham_quote_success", { contact_by: response.body.contactBy || "" });
+        if (!response.body.duplicate) {
+          track("twickenham_quote_success", { contact_by: response.body.contactBy === "phone" ? "phone" : "email" });
+          if (window.SpiresMeasurement) {
+            try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website", "quote"); } catch (err) { /* A saved quote must still show success. */ }
+          }
+        }
         form.hidden = true;
         if (result) {
           result.hidden = false;
@@ -479,6 +490,7 @@
         }
       })
       .catch(function (err) {
+        sending = false;
         if (submitButton) {
           submitButton.disabled = false;
           submitButton.textContent = "Send booking request";

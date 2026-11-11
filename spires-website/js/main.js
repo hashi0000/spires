@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSmoothScroll();
   initMobileBookBar();
   initBookingTerms();
+  initFormspreeLeads();
 });
 
 function initNavActive() {
@@ -321,6 +322,57 @@ function initBookingTerms() {
   });
 }
 
+function formspreeLeadType(form) {
+  const service = form.querySelector("[name='service']");
+  return service && service.value === "contact" ? "contact" : "quote";
+}
+
+function bindFormspreeLead(form) {
+  if (!form || form.getAttribute("data-lead-bound") === "yes") return;
+  const action = form.getAttribute("action") || "";
+  if (action.indexOf("https://formspree.io/") !== 0) return;
+  form.setAttribute("data-lead-bound", "yes");
+  let sending = false;
+  let attempt = "";
+  form.addEventListener("submit", (event) => {
+    if (event.defaultPrevented) return;
+    if (typeof form.checkValidity === "function" && !form.checkValidity()) return;
+    const trap = form.querySelector("[name='_gotcha']");
+    if (trap && String(trap.value || "").trim()) return;
+    event.preventDefault();
+    if (sending) return;
+    sending = true;
+    if (!attempt) attempt = "web" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    const button = form.querySelector("[type='submit']");
+    if (button) button.disabled = true;
+    const nextField = form.querySelector("[name='_next']");
+    const next = nextField ? String(nextField.value || "") : "";
+    fetch(action, { method: "POST", headers: { Accept: "application/json" }, body: new FormData(form) })
+      .then((res) => res.json().then((body) => ({ ok: res.ok, body: body || {} }), () => ({ ok: false, body: {} })))
+      .then((result) => {
+        if (!result.ok || !result.body || result.body.ok !== true) throw new Error("not saved");
+        if (window.SpiresMeasurement) {
+          try { window.SpiresMeasurement.lead(attempt, "website", formspreeLeadType(form)); } catch (err) { /* A saved enquiry must still show success. */ }
+        }
+        if (/^https:\/\/(www\.)?spires-taxis\.com\/thank-you\/?$/.test(next)) {
+          window.location.assign(next);
+          return;
+        }
+        form.hidden = true;
+      })
+      .catch(() => {
+        sending = false;
+        if (button) button.disabled = false;
+        window.alert("We could not send your enquiry. Please call or WhatsApp us.");
+      });
+  });
+}
+
+function initFormspreeLeads() {
+  document.querySelectorAll("form[action^='https://formspree.io/']").forEach(bindFormspreeLead);
+}
+
+window.SpiresEnquiryLead = { type: formspreeLeadType, bind: bindFormspreeLead };
 window.SpiresTaxis = { showNotification: () => {} };
 
 ["/js/location-suggest.js", "/js/journey-stats.js?v=3", "/js/journey-map.js?v=2", "/js/journey-form.js?v=2"].forEach(function (src) {

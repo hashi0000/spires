@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { recordPortalLead } from "../savedLead";
 import { auth, db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
@@ -134,6 +135,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
   const [selectedDestinationAddress, setSelectedDestinationAddress] = useState("");
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const submitLock = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -209,6 +211,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     setError("");
     setSubmitting(true);
 
@@ -216,18 +220,21 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     if (!user) {
       setError("You must be logged in to create a booking.");
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
 
     if (!formData.paymentMethod) {
       setError("Please choose how you would like to pay.");
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
 
     if (!formData.vehicleType) {
       setError("Please choose a Standard Car or 8 Seater.");
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
 
@@ -240,6 +247,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
           : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups."
       );
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
 
@@ -248,6 +256,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     if (stops.some((stop) => !stop.address)) {
       setError("Every stop needs a full address, and the journey needs a pickup and a drop off.");
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
     if (isReturn) {
@@ -255,6 +264,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       if (returnStops.some((stop) => !stop.address) || !(formData.openReturn ? formData.returnDate : formData.returnPickupTime)) {
         setError(formData.openReturn ? "An open return needs the return date, pickup and destination." : "Return bookings need a return date, pickup time, pickup address and destination.");
         setSubmitting(false);
+        submitLock.current = false;
         return;
       }
     }
@@ -262,6 +272,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     if (!termsAccepted) {
       setError("Please agree to the Terms and Conditions before submitting.");
       setSubmitting(false);
+      submitLock.current = false;
       return;
     }
 
@@ -303,9 +314,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         termsVersion: TERMS_VERSION,
       });
 
-      if (result.data?.ok && result.data?.bookingId && window.SpiresMeasurement) {
-        try { window.SpiresMeasurement.lead(result.data.bookingId, "portal"); } catch (_) { /* Measurement must not interrupt a saved booking. */ }
-      }
+      try { recordPortalLead(window.SpiresMeasurement, result.data); } catch (_) { /* Measurement must not interrupt a saved booking. */ }
       onBookingCreated();
     } catch (err) {
       console.error("Error creating booking:", err);
@@ -313,6 +322,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       const fromServer = err && typeof err.code === "string" && err.code.indexOf("functions/") === 0;
       setError(fromServer && serverMessage ? serverMessage : "Failed to create booking. Please try again.");
       setSubmitting(false);
+      submitLock.current = false;
     }
   };
 
