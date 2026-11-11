@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { auth } from './utils/firebase';
 
-import { Driver, Vehicle, Booking } from './types/types';
+import { Driver, Vehicle, Booking, ExtendedBooking } from './types/types';
 import { useDrivers, useVehicles, useBookings } from './hooks/useFirebase';
 import { useBookingDesktopReminders } from './hooks/useBookingDesktopReminders';
 import { usePendingBookingAlerts } from './hooks/usePendingBookingAlerts';
@@ -10,7 +10,8 @@ import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
 import { isPendingIncomingRequest } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
-import type { ExtendedBooking } from './types/types';
+import { isAdminEmail } from './utils/staffAccess';
+import { advertisingPreviewBookings } from './utils/advertisingResults';
 
 import Login from './components/Login';
 import Header from './components/Header';
@@ -24,6 +25,7 @@ import Customers from './components/Customers';
 import SchoolInvoices from './components/SchoolInvoices';
 import GeneralInvoices from './components/GeneralInvoices';
 import SpiresShareAdmin from './components/SpiresShareAdmin';
+import AdvertisingResults from './components/AdvertisingResults';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -43,6 +45,7 @@ const PAGE_TITLES: Record<string, string> = {
   'school-invoices': 'School invoices',
   'spires-share': 'Spires Share',
   'link-bookings': 'Link Bookings',
+  advertising: 'Advertising results',
 };
 
 function initialAdminTab(): string {
@@ -121,8 +124,18 @@ const App: React.FC = () => {
     return <Loading />;
   }
 
-  if (!user) {
+  if (!user && !(process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).has("advertisingPreview"))) {
     return <Login onLoginSuccess={() => {}} />;
+  }
+
+  if (!user) {
+    return (
+      <div className="admin-shell">
+        <main className="admin-main">
+          <AdvertisingResults bookings={advertisingPreviewBookings} previewMode />
+        </main>
+      </div>
+    );
   }
 
   const activeDrivers = driversHook.getActiveDrivers();
@@ -446,6 +459,8 @@ const App: React.FC = () => {
         return <SpiresShareAdmin />;
       case 'link-bookings':
         return <LinkBookings />;
+      case 'advertising':
+        return <AdvertisingResults bookings={bookingsHook.bookings} email={user.email} />;
       default:
         return <div>Page not found</div>;
     }
@@ -458,6 +473,7 @@ const App: React.FC = () => {
         setActiveTab={setActiveTab}
         open={navOpen}
         onClose={() => setNavOpen(false)}
+        isAdmin={isAdminEmail(user.email)}
       />
       <div className="admin-workspace">
       <Header

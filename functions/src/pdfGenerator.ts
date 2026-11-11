@@ -358,7 +358,7 @@ export async function generateBookingPDF(
   const leftX = PAGE_MARGIN;
   const rightX = PAGE_MARGIN + colW + colGap;
 
-  const outboundTime = booking.dateTime || booking.pickupTime;
+  const outboundTime = booking.pickupTime || booking.dateTime;
   const returnTime = booking.returnPickupTime || booking.returnDateTime;
   const isReturn = isReturnBooking(booking);
   const fareRaw =

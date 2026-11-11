@@ -25,6 +25,7 @@ import {
   familyVehicleLabel,
   filterFamilyJobs,
   findJobConflicts,
+  isCompletedJob,
   isUnassignedJob,
   loadFamilyJobDraft,
   saveFamilyJobDraft,
@@ -221,7 +222,7 @@ const FamilyJobs: React.FC<Props> = ({
   const daysWithJobs = useMemo(() => {
     const set = new Set<string>();
     for (const booking of bookings) {
-      if (booking.status === "cancelled") continue;
+      if (booking.status === "cancelled" || isCompletedJob(booking)) continue;
       const pickup = getBookingPickupDate(booking);
       if (!pickup) continue;
       set.add(ymd(pickup));

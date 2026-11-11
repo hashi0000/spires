@@ -51,9 +51,14 @@
           return "<li>" + row.count + " completed journeys starting or ending at " + row.label + "</li>";
         }).join("") + "</ul><p class=\"spires-numbers__note\">Route figures are journeys to or from that place. They are not added together.</p>";
       }
-      section.innerHTML = "<div class=\"container\"><h2>Spires in numbers</h2><p>" + sentence(data, key, count) + "</p>" + highlights + "<p class=\"spires-numbers__note\">Figures updated " + new Date(data.updatedAt).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "numeric", month: "long", year: "numeric" }) + ".</p></div>";
+      var mapSlot = key === "home" ? "<div class=\"spires-map\" data-spires-map></div>" : "";
+      section.innerHTML = "<div class=\"container\"><h2>Spires in numbers</h2><p>" + sentence(data, key, count) + "</p>" + highlights + mapSlot + "<p class=\"spires-numbers__note\">Figures updated " + new Date(data.updatedAt).toLocaleDateString("en-GB", { timeZone: "Europe/London", day: "numeric", month: "long", year: "numeric" }) + ".</p></div>";
       var anchor = document.querySelector("footer") || document.body;
       anchor.parentNode.insertBefore(section, anchor);
+      if (key === "home") {
+        section.setAttribute("data-spires-numbers", "home");
+        document.dispatchEvent(new Event("spires-numbers-ready"));
+      }
     })
     .catch(function () { /* the section stays hidden when figures are unavailable */ });
 })();

@@ -109,7 +109,7 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     hirerName: customerBooking.name || 'Customer',
     hirerAddress: '', // Customer app doesn't collect address
     hirerPhone: customerBooking.phone || '',
-    bookingMethod: 'internet', // Customer bookings are always from internet
+    bookingMethod: (customerBooking as any).bookingMethod || "internet",
     pickupTime,
     pickupLocation: customerBooking.pickup || '',
     destination: customerBooking.destination || '',
@@ -184,6 +184,13 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     openReturn: (customerBooking as any).openReturn === true,
     returnDate: (customerBooking as any).returnDate,
     returnNoticeNote: (customerBooking as any).returnNoticeNote,
+    source: (customerBooking as any).source,
+    guestRequest: (customerBooking as any).guestRequest === true,
+    createdByFunction: (customerBooking as any).createdByFunction === true,
+    syntheticMeasurementTest: (customerBooking as any).syntheticMeasurementTest === true,
+    marketingAttribution: (customerBooking as any).marketingAttribution || null,
+    paymentEntries: (customerBooking as any).paymentEntries,
+    amountRefundedPence: (customerBooking as any).amountRefundedPence,
   } as Partial<Booking>;
 };
 

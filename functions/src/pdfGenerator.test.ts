@@ -96,6 +96,21 @@ describe("branded booking confirmation PDF", () => {
     assert.match(text, /BA249/);
   });
 
+  it("prints the journey pickup time rather than the time the booking was made", async () => {
+    const buf = await generateBookingPDF(
+      {
+        ...sample,
+        dateTime: "2026-11-09T12:13:00.000Z",
+        pickupTime: "2026-11-10T18:30:00.000Z",
+      },
+      "payment_receipt"
+    );
+    const text = pdfText(buf);
+    assert.match(text, /18:30/);
+    assert.match(text, /10\/11\/2026/);
+    assert.doesNotMatch(text, /12:13/);
+  });
+
   it("prints every extra pickup and drop off", async () => {
     const buf = await generateBookingPDF(
       {

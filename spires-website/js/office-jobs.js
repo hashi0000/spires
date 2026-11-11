@@ -84,6 +84,12 @@
     return booking.status === "cancelled" || booking.customerStatus === "cancelled";
   }
 
+  function isCompleted(booking) {
+    return [booking.status, booking.adminStatus, booking.customerStatus].some(function (value) {
+      return value === "completed" || value === "paid";
+    });
+  }
+
   function hasReturn(booking) {
     if (booking.bookingType === "return" || booking.returnTrip === true) return true;
     if (booking.openReturn === true) return true;
@@ -253,6 +259,7 @@
     const now = new Date();
     return bookings
       .filter((row) => !isCancelled(row))
+      .filter((row) => view === "completed" || !isCompleted(row))
       .flatMap(expandJobs)
       .filter((job) => inViewPickup(job.pickup, now))
       .sort((a, b) => {
@@ -264,7 +271,7 @@
   function nextJob() {
     const now = new Date();
     return bookings
-      .filter((row) => !isCancelled(row) && String(row.status || "") !== "completed")
+      .filter((row) => !isCancelled(row) && !isCompleted(row))
       .flatMap(expandJobs)
       .filter((job) => job.pickup && job.pickup.getTime() >= now.getTime() - 30 * 60 * 1000)
       .sort((a, b) => a.pickup.getTime() - b.pickup.getTime())[0] || null;

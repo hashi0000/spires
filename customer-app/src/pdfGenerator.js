@@ -530,11 +530,11 @@ export const generateBookingPDF = (
                         <h2 class="section-header">Trip Information</h2>
                         <div class="detail-row">
                             <span class="detail-label">Trip Date</span>
-                            <span class="detail-value">${formatDate(booking.dateTime || booking.pickupTime)}</span>
+                            <span class="detail-value">${formatDate(booking.pickupTime || booking.dateTime)}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Pickup Time</span>
-                            <span class="detail-value">${formatTime(booking.dateTime || booking.pickupTime)}</span>
+                            <span class="detail-value">${formatTime(booking.pickupTime || booking.dateTime)}</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Status</span>
@@ -585,7 +585,7 @@ export const generateBookingPDF = (
                         <div class="journey-section">
                             ${outboundStopsHtml || `<div class="journey-flow">
                                 <div class="journey-point">
-                                    <div class="journey-time">Pick up: ${formatTime(booking.dateTime || booking.pickupTime)}</div>
+                                    <div class="journey-time">Pick up: ${formatTime(booking.pickupTime || booking.dateTime)}</div>
                                     <div class="journey-location">${booking.pickup || booking.pickupLocation || "N/A"}</div>
                                 </div>
                                 <div class="journey-arrow">→</div>
@@ -617,7 +617,7 @@ export const generateBookingPDF = (
                     <div class="journey-section">
                         ${outboundStopsHtml || `<div class="journey-flow">
                             <div class="journey-point">
-                                <div class="journey-time">Pick up: ${formatTime(booking.dateTime || booking.pickupTime)}</div>
+                                <div class="journey-time">Pick up: ${formatTime(booking.pickupTime || booking.dateTime)}</div>
                                 <div class="journey-location">${booking.pickup || booking.pickupLocation || "N/A"}</div>
                             </div>
                             <div class="journey-arrow">→</div>

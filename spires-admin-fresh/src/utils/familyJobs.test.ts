@@ -8,6 +8,7 @@ import {
   familyVehicleLabel,
   filterFamilyJobs,
   findJobConflicts,
+  isCompletedJob,
   validateFamilyJobDraft,
   whatsappHref,
 } from "./familyJobs";
@@ -133,6 +134,26 @@ describe("family job helpers", () => {
       status: "confirmed",
     });
     expect(findJobConflicts([left, right]).some((row) => row.reason === "vehicle")).toBe(true);
+  });
+
+  it("hides a job once it is marked completed", () => {
+    const now = new Date(2026, 9, 16, 10, 0, 0);
+    const pickupTime = new Date(2026, 9, 16, 12, 0, 0).toISOString();
+    const completed = job({ id: "done", pickupTime, status: "completed" });
+    const paid = job({ id: "paid", pickupTime, status: "confirmed" });
+    (paid as { customerStatus?: string }).customerStatus = "paid";
+    const markedOnAdmin = job({
+      id: "admin",
+      pickupTime,
+      status: "allocated",
+      adminStatus: "completed",
+      driverId: "same-driver",
+    });
+    const stillOpen = job({ id: "open", pickupTime, status: "allocated", driverId: "same-driver" });
+    const rows = filterFamilyJobs([completed, paid, markedOnAdmin, stillOpen], { view: "today", now });
+    expect(rows.map((row) => row.id)).toEqual(["open"]);
+    expect(isCompletedJob(completed)).toBe(true);
+    expect(findJobConflicts([markedOnAdmin, stillOpen])).toEqual([]);
   });
 
   it("includes website bookings that have no family source field", () => {

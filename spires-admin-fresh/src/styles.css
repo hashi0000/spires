@@ -2132,6 +2132,27 @@ header.admin-header,
 .stop-summary, .stop-review { margin: 0; font-size: 0.8125rem; }
 .stop-review { color: #9a3412; font-weight: 700; }
 
+.advertising-results { display: grid; gap: 1rem; color: #102033; }
+.advertising-results h1, .advertising-results h2 { margin: 0; color: #002147; }
+.advertising-results p { margin: 0.35rem 0 0; }
+.advertising-results__header, .advertising-results__panel, .advertising-results__figures article, .advertising-results__counts article {
+  background: #fff; border: 1px solid #d5dde6; border-radius: 12px; padding: 1rem;
+}
+.advertising-results__header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.advertising-results__budget, .advertising-results__banner, .advertising-results__message { font-weight: 700; }
+.advertising-results__banner { background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 0.75rem 1rem; }
+.advertising-results__filters, .advertising-results__spend, .advertising-results__costs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+.advertising-results label { display: grid; gap: 0.3rem; font-size: 0.8125rem; font-weight: 700; }
+.advertising-results__counts, .advertising-results__figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
+.advertising-results__counts span, .advertising-results__figures h2 { font-size: 0.8125rem; }
+.advertising-results__counts strong, .advertising-results__amount { display: block; margin-top: 0.35rem; font-size: 1.4rem; color: #002147; }
+.advertising-results__check { display: flex; gap: 0.5rem; align-items: center; font-weight: 600; }
+.advertising-results__table-wrap { overflow-x: auto; }
+.advertising-results table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.advertising-results th, .advertising-results td { text-align: left; padding: 0.45rem; border-bottom: 1px solid #e6ebf0; vertical-align: top; }
+.advertising-results__footer { font-size: 0.8125rem; color: #334155; }
+
 @media (max-width: 900px) {
   .booking-drawer .modal-content { max-width: none; width: 100%; }
+  .advertising-results__header { flex-direction: column; }
 }

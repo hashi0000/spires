@@ -7,10 +7,12 @@ interface NavigationProps {
   setActiveTab: (tab: string) => void;
   open: boolean;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, open, onClose }) => {
-  const firstQuiet = navigation.find((item) => item.quiet)?.id;
+const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, open, onClose, isAdmin = false }) => {
+  const items = navigation.filter((item) => !item.adminOnly || isAdmin);
+  const firstQuiet = items.find((item) => item.quiet)?.id;
   const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, open, 
           <p className="admin-sidebar-subtitle">Admin dashboard</p>
         </div>
         <div className="admin-nav-content">
-          {navigation.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

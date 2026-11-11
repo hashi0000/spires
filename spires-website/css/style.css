@@ -3870,3 +3870,23 @@ html[dir="rtl"] .booking-form label {
 .spires-numbers h2 { margin-bottom: 0.5rem; }
 .spires-numbers__list { margin: 0.75rem 0; padding-left: 1.1rem; }
 .spires-numbers__note { color: #5c6570; font-size: 0.9rem; }
+.spires-map { margin-top: 1.25rem; }
+.spires-map h3 { margin: 0 0 0.75rem; color: var(--blue); font-size: 1.35rem; }
+.spires-map__controls label { display: flex; flex-direction: column; gap: 0.35rem; font-weight: 700; color: var(--blue); }
+.spires-map__controls select { max-width: 16rem; min-height: 44px; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 8px; background: #fff; font: inherit; }
+.spires-map__stats { margin: 0.85rem 0; }
+.spires-map__canvas { height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+.spires-map__canvas.is-still .spires-map__flow { animation: none; }
+.spires-map__flow { animation: spires-map-flow 2.8s linear infinite; }
+.spires-map__detail { margin: 0.75rem 0; font-weight: 700; color: var(--blue); }
+.spires-map__list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 16rem; overflow: auto; padding-right: 0.2rem; }
+.spires-map__list button { text-align: left; min-height: 44px; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: #fff; font: inherit; color: var(--text); }
+.spires-map__list button[aria-pressed="true"] { border-color: var(--blue); background: var(--gold-soft); }
+.spires-map__list button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@keyframes spires-map-flow { to { stroke-dashoffset: -36; } }
+@media (min-width: 800px) {
+  .spires-map__canvas { height: 460px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spires-map__flow { animation: none; }
+}

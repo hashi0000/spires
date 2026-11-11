@@ -85,6 +85,17 @@ const sample = {
         strict_1.default.match(text, /actual landing time/);
         strict_1.default.match(text, /BA249/);
     });
+    (0, node_test_1.it)("prints the journey pickup time rather than the time the booking was made", async () => {
+        const buf = await (0, pdfGenerator_1.generateBookingPDF)({
+            ...sample,
+            dateTime: "2026-11-09T12:13:00.000Z",
+            pickupTime: "2026-11-10T18:30:00.000Z",
+        }, "payment_receipt");
+        const text = pdfText(buf);
+        strict_1.default.match(text, /18:30/);
+        strict_1.default.match(text, /10\/11\/2026/);
+        strict_1.default.doesNotMatch(text, /12:13/);
+    });
     (0, node_test_1.it)("prints every extra pickup and drop off", async () => {
         const buf = await (0, pdfGenerator_1.generateBookingPDF)({
             ...sample,

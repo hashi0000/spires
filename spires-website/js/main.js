@@ -315,7 +315,7 @@ function initBookingTerms() {
 
 window.SpiresTaxis = { showNotification: () => {} };
 
-["/js/location-suggest.js", "/js/journey-stats.js", "/js/journey-form.js?v=2"].forEach(function (src) {
+["/js/location-suggest.js", "/js/journey-stats.js?v=3", "/js/journey-map.js?v=2", "/js/journey-form.js?v=2"].forEach(function (src) {
   var script = document.createElement("script");
   script.src = src;
   document.body.appendChild(script);

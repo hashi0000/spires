@@ -33,10 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledJourneyStats = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = void 0;
+exports.scheduledJourneyStats = exports.publicJourneyMap = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions/v1"));
 const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
+const journeyMap_1 = require("./journeyMap");
 const journeyStats_1 = require("./journeyStats");
 const db = () => admin.firestore();
 async function buildSummary() {
@@ -61,6 +62,7 @@ async function buildSummary() {
         "returnDestination",
         "pickupPlace",
         "destinationPlace",
+        "syntheticMeasurementTest",
     ];
     const bookings = [];
     let cursor = null;
@@ -75,6 +77,38 @@ async function buildSummary() {
     const updatedAt = new Date().toISOString();
     const summary = (0, journeyStats_1.summariseJourneys)(bookings, new Date(), updatedAt);
     await db().collection("publicStats").doc("journeys").set(summary);
+    try {
+        const drafts = (0, journeyMap_1.draftJourneyMap)(bookings);
+        const points = await (0, journeyMap_1.lookupOutcodePoints)((0, journeyMap_1.outcodesIn)(drafts));
+        const map = (0, journeyMap_1.materialiseJourneyMap)(drafts, points);
+        const index = {
+            updatedAt,
+            latest: map.latest,
+            months: map.months.map((month) => ({
+                key: month.key,
+                label: month.label,
+                completedJourneys: month.completedJourneys,
+                mappedJourneys: month.mappedJourneys,
+                destinations: month.destinations,
+                airports: month.airports,
+            })),
+        };
+        const root = db().collection("publicStats").doc("journeyMap");
+        await root.set(index);
+        const existing = await root.collection("months").get();
+        const keep = new Set(map.months.map((month) => month.key));
+        await Promise.all(existing.docs.filter((doc) => !keep.has(doc.id)).map((doc) => doc.ref.delete()));
+        await Promise.all(map.months.map((month) => root.collection("months").doc(month.key).set({
+            completedJourneys: month.completedJourneys,
+            mappedJourneys: month.mappedJourneys,
+            destinations: month.destinations,
+            airports: month.airports,
+            routes: month.routes,
+        })));
+    }
+    catch (error) {
+        console.error("Journey map aggregation failed", error instanceof Error ? error.message : "unknown");
+    }
     return summary;
 }
 function requireStatsAdmin(context) {
@@ -113,6 +147,53 @@ exports.publicJourneyStats = functions.https.onRequest(async (req, res) => {
         return;
     }
     res.json((0, journeyStats_1.publicJourneyView)(snap.data()));
+});
+exports.publicJourneyMap = functions.https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.set("Cache-Control", "public, max-age=300");
+    if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+    }
+    if (req.method !== "GET") {
+        res.status(405).json({ ok: false });
+        return;
+    }
+    const requested = String(req.query.month || "");
+    if (requested && !/^\d{4}-(0[1-9]|1[0-2])$/.test(requested)) {
+        res.status(400).json({ ok: false });
+        return;
+    }
+    const root = db().collection("publicStats").doc("journeyMap");
+    const indexSnap = await root.get();
+    if (!indexSnap.exists) {
+        res.json({ ok: true, show: false });
+        return;
+    }
+    const index = indexSnap.data() || {};
+    const latest = typeof index.latest === "string" ? index.latest : null;
+    const monthKeys = Array.isArray(index.months) ? index.months.map((month) => String(month.key || "")) : [];
+    const selected = requested || (0, journeyMap_1.defaultMapMonth)(monthKeys, new Date()) || latest;
+    if (!selected) {
+        res.json({ ok: true, show: false });
+        return;
+    }
+    const monthSnap = await root.collection("months").doc(selected).get();
+    const month = monthSnap.exists ? monthSnap.data() || null : null;
+    res.json((0, journeyMap_1.publicJourneyMapView)({
+        latest,
+        updatedAt: String(index.updatedAt || ""),
+        months: Array.isArray(index.months) ? index.months : [],
+    }, month && Array.isArray(month.routes) ? {
+        key: selected,
+        label: "",
+        completedJourneys: Number(month.completedJourneys) || 0,
+        mappedJourneys: Number(month.mappedJourneys) || 0,
+        destinations: Array.isArray(month.destinations) ? month.destinations : [],
+        airports: Array.isArray(month.airports) ? month.airports : [],
+        routes: month.routes,
+    } : null, selected));
 });
 exports.scheduledJourneyStats = functions
     .runWith({ timeoutSeconds: 300, memory: "512MB" })

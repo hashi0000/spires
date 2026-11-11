@@ -160,6 +160,6 @@ export {
   scheduledSpiresShareTick,
 } from "./spiresShare/callables";
 export { searchLocations } from "./locations/searchLocations";
-export { getJourneyStats, refreshJourneyStats, publicJourneyStats, scheduledJourneyStats } from "./stats/publishJourneyStats";
-
+export { getJourneyStats, refreshJourneyStats, publicJourneyStats, publicJourneyMap, scheduledJourneyStats } from "./stats/publishJourneyStats";
 export { queueBookingMeasurement, deliverBookingMeasurements } from "./marketing/confirmation";
+export { readAdvertisingSpend } from "./marketing/advertisingSpend";

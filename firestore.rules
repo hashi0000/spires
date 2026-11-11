@@ -150,6 +150,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /marketingSpend/{entryId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /marketingSpendSettings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /bookingMeasurementNotes/{bookingId} {
+      allow read, write: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

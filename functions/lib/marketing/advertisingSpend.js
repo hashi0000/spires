@@ -1,0 +1,54 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.readAdvertisingSpend = void 0;
+const functions = __importStar(require("firebase-functions/v1"));
+const ADMIN_EMAILS = ["spirestaxis24@gmail.com", "hashim@spires.com"];
+/**
+ * Read only advertising spend check.
+ * No Google Ads credentials are stored, so this does not call Google Ads and cannot change a campaign or budget.
+ * Customer details are not accepted or returned.
+ */
+exports.readAdvertisingSpend = functions.https.onCall((_data, context) => {
+    const email = String(context.auth?.token?.email || "").toLowerCase();
+    if (!ADMIN_EMAILS.includes(email)) {
+        throw new functions.https.HttpsError("permission-denied", "Admin only.");
+    }
+    return {
+        connected: false,
+        reason: "Google Ads credentials are not configured on the server.",
+        budgetChanged: false,
+    };
+});

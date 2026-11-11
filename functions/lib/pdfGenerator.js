@@ -299,7 +299,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     const colW = (contentW - colGap) / 2;
     const leftX = PAGE_MARGIN;
     const rightX = PAGE_MARGIN + colW + colGap;
-    const outboundTime = booking.dateTime || booking.pickupTime;
+    const outboundTime = booking.pickupTime || booking.dateTime;
     const returnTime = booking.returnPickupTime || booking.returnDateTime;
     const isReturn = (0, airportWaitingPolicy_1.isReturnBooking)(booking);
     const fareRaw = typeof booking.actualFare === "number" ? booking.actualFare : Number(booking.actualFare);

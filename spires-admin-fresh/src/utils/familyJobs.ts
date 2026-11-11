@@ -62,6 +62,13 @@ export function isCancelledJob(booking: Booking): boolean {
   return booking.status === "cancelled" || (booking as { customerStatus?: string }).customerStatus === "cancelled";
 }
 
+export function isCompletedJob(booking: Booking): boolean {
+  const customerStatus = (booking as { customerStatus?: string }).customerStatus;
+  return [booking.status, booking.adminStatus, customerStatus].some(
+    (value) => value === "completed" || value === "paid"
+  );
+}
+
 export function isUnassignedJob(booking: Booking): boolean {
   return !String(booking.driverId || "").trim();
 }
@@ -154,7 +161,9 @@ export type JobConflict = {
 };
 
 export function findJobConflicts(bookings: Booking[]): JobConflict[] {
-  const active = bookings.filter((row) => row.id && isActiveBookingStatus(row.status) && !isCancelledJob(row));
+  const active = bookings.filter(
+    (row) => row.id && isActiveBookingStatus(row.status) && !isCancelledJob(row) && !isCompletedJob(row)
+  );
   const conflicts: JobConflict[] = [];
   for (let i = 0; i < active.length; i += 1) {
     const left = active[i];
@@ -224,6 +233,7 @@ export function filterFamilyJobs(
   return sortJobsChronologically(
     bookings.filter((booking) => {
       if (!filters.includeCancelled && isCancelledJob(booking)) return false;
+      if (isCompletedJob(booking)) return false;
       if (!bookingInView(booking, filters.view, filters.now, filters.calendarDay)) return false;
       if (filters.driverId === "unassigned" && !isUnassignedJob(booking)) return false;
       if (filters.driverId && filters.driverId !== "unassigned" && booking.driverId !== filters.driverId) {
