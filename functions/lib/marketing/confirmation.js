@@ -39,30 +39,82 @@ const functions = __importStar(require("firebase-functions/v1"));
 const params_1 = require("firebase-functions/params");
 const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
 const attribution_1 = require("./attribution");
+const payments_1 = require("./payments");
 const apiSecret = (0, params_1.defineSecret)('SPIRES_GA4_API_SECRET');
+const MEASUREMENT_ID = 'G-RSE4NNBP64';
 const db = () => admin.firestore();
-/** A single outbox document per booking survives status reversals and trigger retries. */
-exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).firestore.document('bookings/{bookingId}').onWrite(async (change, context) => {
-    if (!change.after.exists)
-        return;
-    const after = change.after.data() || {}, before = change.before.data() || {};
-    if (!(0, quoteWorkflow_1.isWorkflowConfirmed)(after) || (change.before.exists && (0, quoteWorkflow_1.isWorkflowConfirmed)(before)))
-        return;
-    // Only the server-validated online booking paths can supply attribution.
-    if (after.createdByFunction !== true || !['website', 'customer_app'].includes(String(after.source)))
-        return;
-    const at = Date.now(), attribution = (0, attribution_1.readAttribution)(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
-    if (!attribution || attribution.expiresAt <= at)
-        return;
-    const ref = db().collection('marketingConversions').doc(context.params.bookingId);
+function safeId(value) {
+    return value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 120);
+}
+async function createOnce(id, data) {
+    const ref = db().collection('marketingConversions').doc(safeId(id));
     await db().runTransaction(async (tx) => {
         const existing = await tx.get(ref);
         if (existing.exists)
             return;
-        tx.create(ref, { bookingId: context.params.bookingId, event: 'booking_confirmed', attribution, occurredAt: at, status: 'pending', createdAt: admin.firestore.FieldValue.serverTimestamp() });
+        tx.create(ref, { ...data, status: 'pending', attempts: 0, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    });
+}
+/** A single outbox document per booking survives status reversals and trigger retries. */
+exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).firestore.document('bookings/{bookingId}').onWrite(async (change, context) => {
+    if (!change.after.exists)
+        return;
+    const after = change.after.data() || {};
+    const before = change.before.data() || {};
+    const bookingId = context.params.bookingId;
+    const at = Date.now();
+    if ((0, quoteWorkflow_1.isWorkflowConfirmed)(after) && !(change.before.exists && (0, quoteWorkflow_1.isWorkflowConfirmed)(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
+        const attribution = (0, attribution_1.readAttribution)(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
+        if (attribution && attribution.expiresAt > at) {
+            await createOnce(bookingId, { bookingId, event: 'booking_confirmed', attribution, occurredAt: at });
+        }
+    }
+    const changeInPayment = (0, payments_1.paymentChange)(before, after);
+    if (!changeInPayment)
+        return;
+    const attribution = (0, attribution_1.readAttribution)(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
+    if (!attribution?.clientId || attribution.expiresAt <= at)
+        return;
+    if (!['website', 'customer_app'].includes(String(after.source)) || after.createdByFunction !== true)
+        return;
+    const id = `${changeInPayment.direction}_${bookingId}_${changeInPayment.entryId}`;
+    await createOnce(id, {
+        bookingId,
+        event: changeInPayment.direction,
+        attribution,
+        occurredAt: at,
+        valuePence: changeInPayment.deltaPence,
+        currency: 'GBP',
+        paymentKind: changeInPayment.kind,
+        paymentMethod: changeInPayment.method || '',
+        receivedAfterPence: changeInPayment.receivedAfterPence,
+        entryId: changeInPayment.entryId,
     });
 });
-/** Scheduled delivery is intentionally opt-in via server config and a Secret Manager secret. */
+async function postMeasurement(secret, path, payload) {
+    return fetch(`https://www.google-analytics.com/${path}?measurement_id=${MEASUREMENT_ID}&api_secret=${encodeURIComponent(secret)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000),
+    });
+}
+function payloadFor(row) {
+    const attribution = row.attribution;
+    if (row.event === 'booking_confirmed')
+        return (0, attribution_1.confirmationPayload)(String(row.bookingId), attribution, Number(row.occurredAt));
+    const change = {
+        direction: row.event === 'refund' ? 'refund' : 'purchase',
+        deltaPence: Number(row.valuePence) || 0,
+        entryId: String(row.entryId || row.bookingId),
+        kind: row.paymentKind === 'deposit' || row.paymentKind === 'full' ? row.paymentKind : 'balance',
+        method: row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'bank' ? row.paymentMethod : undefined,
+        farePence: 0,
+        receivedAfterPence: Number(row.receivedAfterPence) || 0,
+    };
+    return (0, payments_1.paymentPayload)(String(row.bookingId), attribution, change, Number(row.occurredAt));
+}
+/** Scheduled delivery stays off until marketingConfig/ga4.enabled is set after a real debug validation. */
 exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], timeoutSeconds: 120 }).pubsub.schedule('every 15 minutes').onRun(async () => {
     const config = await db().collection('marketingConfig').doc('ga4').get();
     if (config.data()?.enabled !== true)
@@ -70,33 +122,70 @@ exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], t
     const secret = apiSecret.value();
     if (!secret)
         throw new Error('GA4 measurement secret is missing');
+    const stuck = await db().collection('marketingConversions').where('status', '==', 'sending').limit(20).get();
+    for (const row of stuck.docs) {
+        const attemptedAt = Number(row.data().attemptedAt) || 0;
+        if (attemptedAt && Date.now() - attemptedAt > 20 * 60000) {
+            await row.ref.update({ status: 'review_required', reason: 'Sending did not finish. Not sent again automatically.', transport: 'not_sent', ga4Receipt: 'not_confirmed', adsAttribution: 'not_confirmed' });
+        }
+    }
     const rows = await db().collection('marketingConversions').where('status', '==', 'pending').limit(20).get();
     for (const row of rows.docs) {
+        const attempts = Number(row.data().attempts) || 0;
         const claimed = await db().runTransaction(async (tx) => {
             const fresh = await tx.get(row.ref);
             if (fresh.data()?.status !== 'pending')
                 return null;
-            tx.update(row.ref, { status: 'sending', attemptedAt: Date.now() });
+            tx.update(row.ref, { status: 'sending', attemptedAt: Date.now(), attempts: attempts + 1 });
             return fresh.data();
         });
         if (!claimed)
             continue;
-        // Recheck the booking so deleted, cancelled or explicitly revoked requests are never sent.
-        const booking = await db().collection('bookings').doc(claimed.bookingId).get();
+        const booking = await db().collection('bookings').doc(String(claimed.bookingId)).get();
         const current = booking.data();
-        const payload = (0, attribution_1.confirmationPayload)(claimed.bookingId, claimed.attribution, claimed.occurredAt);
-        if (!current || !(0, quoteWorkflow_1.isWorkflowConfirmed)(current) || current.marketingAttribution?.consent !== 'granted' || !payload || claimed.attribution.expiresAt <= Date.now() || Date.now() - claimed.occurredAt > 48 * 3600000) {
-            await row.ref.update({ status: 'skipped', reason: 'Not eligible at delivery' });
+        const payload = payloadFor(claimed);
+        const paymentStillThere = claimed.event !== 'purchase'
+            || Math.max(0, Math.round(Number(current?.amountReceivedPence) || 0)) >= Number(claimed.receivedAfterPence || 0);
+        const eligibility = !current || !paymentStillThere
+            ? { ok: false, reason: 'Booking payment or record changed before delivery' }
+            : (0, payments_1.eligibleToSend)({
+                consent: current.marketingAttribution?.consent,
+                occurredAt: Number(claimed.occurredAt),
+                now: Date.now(),
+                hasPayload: Boolean(payload),
+                confirmed: (0, quoteWorkflow_1.isWorkflowConfirmed)(current),
+                event: String(claimed.event),
+            });
+        if (!eligibility.ok || !payload) {
+            const outcome = (0, payments_1.deliveryOutcome)({ validationOk: false, thrown: false, attempts: attempts + 1, eligible: false, eligibilityReason: eligibility.reason });
+            await row.ref.update({ ...outcome, httpStatus: admin.firestore.FieldValue.delete() });
+            continue;
+        }
+        let validation = { ok: false, reason: 'Validation did not run' };
+        try {
+            const debug = await postMeasurement(secret, 'debug/mp/collect', payload);
+            validation = (0, payments_1.interpretValidation)(await debug.json());
+        }
+        catch {
+            const outcome = (0, payments_1.deliveryOutcome)({ validationOk: false, validationReason: 'Validation could not be reached. Nothing was sent.', thrown: false, attempts: attempts + 1, eligible: true });
+            if (outcome.status === 'invalid' && attempts + 1 < 3) {
+                await row.ref.update({ status: 'pending', reason: outcome.reason, validation: 'not_run', transport: 'not_sent', ga4Receipt: 'not_confirmed', adsAttribution: 'not_confirmed' });
+            }
+            else {
+                await row.ref.update(outcome);
+            }
+            continue;
+        }
+        if (!validation.ok) {
+            await row.ref.update((0, payments_1.deliveryOutcome)({ validationOk: false, validationReason: validation.reason, thrown: false, attempts: attempts + 1, eligible: true }));
             continue;
         }
         try {
-            const response = await fetch(`https://www.google-analytics.com/mp/collect?measurement_id=G-RSE4NNBP64&api_secret=${encodeURIComponent(secret)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(10000) });
-            // GA4's collection endpoint does not validate payloads: validate in staging before enabling.
-            await row.ref.update({ status: response.ok ? 'submitted' : 'review_required', httpStatus: response.status, submittedAt: Date.now() });
+            const response = await postMeasurement(secret, 'mp/collect', payload);
+            await row.ref.update({ ...(0, payments_1.deliveryOutcome)({ validationOk: true, httpStatus: response.status, thrown: false, attempts: attempts + 1, eligible: true }), httpStatus: response.status });
         }
-        catch (_) {
-            // An ambiguous network result may already be delivered. Never automatically resend and double-count.
-            await row.ref.update({ status: 'review_required', reason: 'Ambiguous delivery; inspect before retrying' });
+        catch {
+            await row.ref.update((0, payments_1.deliveryOutcome)({ validationOk: true, thrown: true, attempts: attempts + 1, eligible: true }));
         }
     }
 });

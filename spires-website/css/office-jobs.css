@@ -133,13 +133,14 @@ input, select, textarea {
   cursor: pointer;
 }
 .view-extra button {
-  background: #fff;
-  color: var(--navy);
-  border: 1px solid var(--line);
+  background: #b91c1c;
+  color: #fff;
+  border: 1px solid #991b1b;
   border-radius: 999px;
   padding: 0 1rem;
+  box-shadow: 0 6px 16px rgba(185, 28, 28, 0.28);
 }
-.view-extra button.is-active { background: var(--navy); color: #fff; }
+.view-extra button.is-active { background: #7f1d1d; color: #fff; }
 
 .next-job { margin-bottom: 0.8rem; }
 .next-card {

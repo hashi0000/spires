@@ -163,4 +163,15 @@ describe("advertising results", () => {
     expect(report.byVehicle[0].label).toBe("8 seater");
     expect(report.bySource[0].label).toBe("Unknown");
   });
+
+  it("keeps a website quote separate from a portal request and does not treat an unpaid confirmation as revenue", () => {
+    const report = buildAdvertisingReport([
+      booking({ id: "web", bookingNumber: "WEB", status: "pending", source: "website", amountReceivedPence: 0 }),
+      booking({ id: "app", bookingNumber: "APP", status: "pending", source: "customer_app", amountReceivedPence: 0 }),
+      booking({ id: "open", bookingNumber: "OPEN", status: "confirmed", amountReceivedPence: 0 }),
+    ], period);
+    expect(report.byEnquiry.map((row) => row.label).sort()).toEqual(["Portal booking request", "Unknown", "Website quote"]);
+    expect(report.unpaidConfirmed).toBe(1);
+    expect(report.netPayments.pence).toBe(0);
+  });
 });

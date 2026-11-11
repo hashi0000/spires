@@ -40,6 +40,7 @@ exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = v
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
 const stripe_1 = __importDefault(require("stripe"));
+const payments_1 = require("./marketing/payments");
 /** Lazy init: never call `functions.config()` at module load (Firebase deploy analysis times out). */
 let stripeSingleton = null;
 function getStripe() {
@@ -53,6 +54,30 @@ function getStripe() {
         });
     }
     return stripeSingleton;
+}
+/** Records the verified Stripe amount once. A deposit stays part paid and is not stored as the full fare. */
+async function recordCardReceipt(bookingId, paymentIntent) {
+    const amountPence = paymentIntent.amount_received || paymentIntent.amount;
+    if (!Number.isInteger(amountPence) || amountPence <= 0 || paymentIntent.currency !== "gbp")
+        return;
+    const ref = admin.firestore().collection("bookings").doc(bookingId);
+    await admin.firestore().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists)
+            return;
+        const patch = (0, payments_1.cardReceiptPatch)(snap.data() || {}, {
+            paymentIntentId: paymentIntent.id,
+            amountPence,
+            chargeId: typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : "",
+        }, new Date().toISOString());
+        if (!patch)
+            return;
+        tx.set(ref, {
+            ...patch,
+            paidAt: patch.paymentStatus === "paid" ? admin.firestore.FieldValue.serverTimestamp() : admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    });
 }
 /**
  * Create a payment intent for a booking
@@ -187,14 +212,7 @@ exports.confirmPayment = functions.https.onCall(async (data, context) => {
         if (paymentIntent.status !== "succeeded") {
             throw new functions.https.HttpsError("failed-precondition", `Payment not succeeded. Status: ${paymentIntent.status}`);
         }
-        // Update booking with payment confirmation
-        await bookingRef.update({
-            paymentStatus: "paid",
-            paymentMethod: "card",
-            paidAt: admin.firestore.FieldValue.serverTimestamp(),
-            stripePaymentIntentId: paymentIntentId,
-            stripeChargeId: paymentIntent.latest_charge,
-        });
+        await recordCardReceipt(bookingId, paymentIntent);
         return {
             success: true,
             message: "Payment confirmed successfully",
@@ -250,13 +268,7 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
             const bookingRef = admin.firestore().collection("bookings").doc(bookingId);
             const bookingDoc = await bookingRef.get();
             if (bookingDoc.exists) {
-                await bookingRef.update({
-                    paymentStatus: "paid",
-                    paymentMethod: "card",
-                    paidAt: admin.firestore.FieldValue.serverTimestamp(),
-                    stripePaymentIntentId: paymentIntent.id,
-                    stripeChargeId: paymentIntent.latest_charge,
-                });
+                await recordCardReceipt(bookingId, paymentIntent);
                 console.log(`Payment confirmed for booking ${bookingId}`);
             }
             else {

@@ -41,8 +41,19 @@ interface NoteRecord {
   paymentFeesPence?: number | null;
 }
 
+export interface DeliveryRow {
+  id: string;
+  bookingId: string;
+  event: string;
+  status: string;
+  reason: string;
+  validation: string;
+  transport: string;
+}
+
 export function AdvertisingResultsView({
   report,
+  deliveries = [],
   preview = false,
   message = "",
   saving = false,
@@ -55,6 +66,7 @@ export function AdvertisingResultsView({
   onSaveCost,
 }: {
   report: AdvertisingReport;
+  deliveries?: DeliveryRow[];
   preview?: boolean;
   message?: string;
   saving?: boolean;
@@ -119,12 +131,40 @@ export function AdvertisingResultsView({
         <h2>Attribution coverage</h2>
         <p>{report.attribution.trackedGoogleAds} tracked Google Ads, {report.attribution.customerReported} customer reported, {report.attribution.unknown} unknown, from {report.attribution.included} included bookings.</p>
         <p>{report.attribution.telephoneWithoutSource} telephone and {report.attribution.whatsappWithoutSource} WhatsApp bookings have no recorded source.</p>
-        <p>Tracked means a consented Google click id was stored with the booking. A customer saying the enquiry came from an advert is recorded separately.</p>
+        <p>{report.unpaidConfirmed} confirmed {report.unpaidConfirmed === 1 ? "booking has" : "bookings have"} no recorded payment. Those fares are not counted as money received.</p>
+        <p>Tracked means a consented Google click id was stored with the booking. A customer saying the enquiry came from an advert is recorded separately. An unknown source stays unknown.</p>
       </section>
 
       <ResultsTable title="Airport route" rows={report.byRoute} />
       <ResultsTable title="Vehicle" rows={report.byVehicle} />
       <ResultsTable title="Acquisition source" rows={report.bySource} />
+      <ResultsTable title="Enquiry type" rows={report.byEnquiry} />
+
+      <section className="advertising-results__panel">
+        <h2>Measurement delivery</h2>
+        <p>Submitted means Google's collection endpoint accepted the request. It does not prove the event is in a GA4 report or in Google Ads.</p>
+        {deliveries.length === 0 ? <p>No conversion deliveries are loaded.</p> : (
+          <div className="advertising-results__table-wrap">
+            <table>
+              <thead><tr><th>Booking</th><th>Event</th><th>Status</th><th>Validation</th><th>Transport</th><th>GA4 report</th><th>Ads attribution</th><th>Note</th></tr></thead>
+              <tbody>
+                {deliveries.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.bookingId}</td>
+                    <td>{row.event === "booking_confirmed" ? "Confirmed booking" : row.event === "purchase" ? "Payment" : row.event === "refund" ? "Refund" : row.event}</td>
+                    <td>{row.status}</td>
+                    <td>{row.validation || "not run"}</td>
+                    <td>{row.transport || "not sent"}</td>
+                    <td>Not confirmed</td>
+                    <td>Not confirmed</td>
+                    <td>{row.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="advertising-results__panel">
         <h2>Manual advertising spend</h2>
@@ -153,7 +193,7 @@ export function AdvertisingResultsView({
         {report.sourcePrompts.length === 0 ? <p>No telephone or WhatsApp bookings in this period.</p> : (
           <div className="advertising-results__table-wrap">
             <table>
-              <thead><tr><th>Booking</th><th>Journey date</th><th>Route</th><th>Channel</th><th>Customer reported source</th></tr></thead>
+              <thead><tr><th>Booking</th><th>Journey date</th><th>Route</th><th>Channel</th><th>Correct channel</th><th>Customer reported source</th></tr></thead>
               <tbody>
                 {report.sourcePrompts.map((row) => (
                   <tr key={row.id || row.bookingNumber}>
@@ -161,6 +201,12 @@ export function AdvertisingResultsView({
                     <td>{row.journeyDate}</td>
                     <td>{row.route}</td>
                     <td>{row.channel === "whatsapp" ? "WhatsApp" : "Telephone"}</td>
+                    <td>
+                      <select className="form-select" aria-label={`Channel for ${row.bookingNumber}`} value={row.channel} disabled={saving || preview || !row.id} onChange={(event) => onSaveSource(row.id, row.staffReportedSource, event.target.value === "whatsapp" ? "whatsapp" : "telephone")}>
+                        <option value="telephone">Telephone</option>
+                        <option value="whatsapp">WhatsApp</option>
+                      </select>
+                    </td>
                     <td>
                       <select className="form-select" aria-label={`Source for ${row.bookingNumber}`} value={row.staffReportedSource} disabled={saving || preview || !row.id} onChange={(event) => onSaveSource(row.id, event.target.value, row.channel)}>
                         {SOURCE_OPTIONS.map(([value, label]) => <option key={value || "blank"} value={value}>{label}</option>)}
@@ -269,6 +315,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     : "Checking whether Google Ads can be read from the server.");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
 
   useEffect(() => {
     if (previewMode) return undefined;
@@ -292,6 +339,20 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     const settingsUnsub = onSnapshot(doc(db, "marketingSpendSettings", "manual"), (snapshot) => {
       setManualIsComplete(snapshot.data()?.treatManualAsFullSpend === true);
     }, () => undefined);
+    const deliveryUnsub = onSnapshot(collection(db, "marketingConversions"), (snapshot) => {
+      setDeliveries(snapshot.docs.map((row) => {
+        const data = row.data();
+        return {
+          id: row.id,
+          bookingId: String(data.bookingId || ""),
+          event: String(data.event || ""),
+          status: String(data.status || ""),
+          reason: String(data.reason || "").slice(0, 240),
+          validation: String(data.validation || ""),
+          transport: String(data.transport || ""),
+        };
+      }));
+    }, () => setDeliveries([]));
     httpsCallable(functions, "readAdvertisingSpend")({}).then((result) => {
       const data = result.data as { connected?: boolean; reason?: string };
       setAdsConnected(data.connected === true);
@@ -304,6 +365,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       spendUnsub();
       notesUnsub();
       settingsUnsub();
+      deliveryUnsub();
     };
   }, [previewMode]);
 
@@ -330,6 +392,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   return (
     <AdvertisingResultsView
       report={report}
+      deliveries={deliveries}
       preview={previewMode}
       message={message}
       connectionNote={adsReason}

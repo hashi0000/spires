@@ -24,16 +24,85 @@
     ['gclid', 'gbraid', 'wbraid'].forEach(function (k) { var v = params.get(k); if (v && /^[A-Za-z0-9_.~-]{1,256}$/.test(v)) safe.set(k, v); });
     return w.location.origin + cleanPath() + (safe.toString() ? '?' + safe.toString() : '');
   }
+  function safePath(pathname) {
+    var parts = String(pathname || '').split('/');
+    var kept = [];
+    for (var i = 0; i < parts.length; i++) {
+      var part = parts[i];
+      if (!part) { kept.push(''); continue; }
+      if (part.indexOf('@') !== -1 || /\d{6,}/.test(part) || (part.length >= 16 && /[a-z]/i.test(part) && /\d/.test(part)) || !/^[a-z0-9._~-]{1,80}$/i.test(part)) break;
+      kept.push(part);
+    }
+    var path = kept.join('/');
+    if (path.charAt(0) !== '/') path = '/' + path;
+    return path === '/' ? '' : path;
+  }
+  function safeReferrer() {
+    try {
+      if (!d.referrer) return '';
+      var url = new URL(d.referrer);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:' || url.username || url.password) return '';
+      return url.origin + safePath(url.pathname);
+    } catch (_) { return ''; }
+  }
+  function cleanCampaign(value) {
+    var text = String(value || '').trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9 _+.|-]{0,79}$/.test(text)) return '';
+    if (/@|\d{6,}|https?:|www\.|[<>]/i.test(text)) return '';
+    return text;
+  }
+  function landingPath() {
+    if (w.location.hostname === 'customer.spires-taxis.com') return '/portal';
+    return safePath(w.location.pathname);
+  }
+  function referrerHost() {
+    try {
+      if (!d.referrer) return '';
+      var url = new URL(d.referrer);
+      var host = url.hostname.toLowerCase();
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+      if (host === 'spires-taxis.com' || host.indexOf('.spires-taxis.com') === host.length - 17) return '';
+      return /^[a-z0-9.-]{1,253}$/.test(host) ? host : '';
+    } catch (_) { return ''; }
+  }
+  function pageTouch() {
+    var touch = { capturedAt: now() };
+    var params = new URLSearchParams(w.location.search);
+    ['gclid', 'gbraid', 'wbraid'].forEach(function (key) { var value = params.get(key); if (value && /^[A-Za-z0-9_.~-]{1,256}$/.test(value)) touch[key] = value; });
+    [['utmSource', 'utm_source'], ['utmMedium', 'utm_medium'], ['utmCampaign', 'utm_campaign'], ['utmContent', 'utm_content'], ['utmTerm', 'utm_term']].forEach(function (pair) {
+      var value = cleanCampaign(params.get(pair[1]));
+      if (value) touch[pair[0]] = value;
+    });
+    var path = landingPath();
+    if (path) touch.landingPath = path;
+    var host = referrerHost();
+    if (host) touch.referrerHost = host;
+    return touch;
+  }
+  function nonDirect(touch) {
+    return !!(touch && (touch.gclid || touch.gbraid || touch.wbraid || touch.utmSource || touch.utmMedium || touch.utmCampaign || touch.utmContent || touch.utmTerm || touch.referrerHost));
+  }
+  function normalise(saved) {
+    if (!saved || !saved.expiresAt || saved.expiresAt <= now()) return null;
+    if (saved.first || saved.latest) return saved;
+    var touch = { capturedAt: saved.capturedAt || now() };
+    ['gclid', 'gbraid', 'wbraid'].forEach(function (key) { if (saved[key]) touch[key] = saved[key]; });
+    return { capturedAt: touch.capturedAt, expiresAt: saved.expiresAt, first: touch, latest: touch };
+  }
   function raw() { w.dataLayer = w.dataLayer || []; w.dataLayer.push(arguments); }
   // Existing page scripts may call gtag; nothing is queued or sent before consent or on previews.
   w.gtag = function () { if (live && consent === 'granted') raw.apply(null, arguments); };
   function capture() {
     if (!live || consent !== 'granted') return null;
-    var saved = read(contextKey);
-    if (saved && saved.expiresAt > now()) context = saved;
-    var p = new URLSearchParams(w.location.search), click = {};
-    ['gclid', 'gbraid', 'wbraid'].forEach(function (k) { var v = p.get(k); if (v && /^[A-Za-z0-9_.~-]{1,256}$/.test(v)) click[k] = v; });
-    if (Object.keys(click).length) context = Object.assign({ capturedAt: now(), expiresAt: now() + 30 * 86400000 }, click);
+    var saved = normalise(read(contextKey));
+    if (saved) context = saved;
+    var touch = pageTouch();
+    if (!context) context = { capturedAt: touch.capturedAt, expiresAt: touch.capturedAt + 30 * 86400000, first: touch, latest: touch };
+    else if (nonDirect(touch)) {
+      if (!context.first) context.first = touch;
+      context.latest = touch;
+      context.expiresAt = touch.capturedAt + 30 * 86400000;
+    }
     if (context) write(contextKey, context, Math.max(0, Math.floor((context.expiresAt - now()) / 1000)));
     return context;
   }
@@ -44,7 +113,7 @@
     if (loaded) return;
     loaded = true;
     raw('js', new Date());
-    raw('config', id, { page_location: safeLocation(), page_referrer: '', page_title: w.location.hostname === 'customer.spires-taxis.com' ? 'Spires Customer Portal' : d.title, allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: true });
+    raw('config', id, { page_location: safeLocation(), page_referrer: safeReferrer(), page_title: w.location.hostname === 'customer.spires-taxis.com' ? 'Spires Customer Portal' : d.title, allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: true });
     var s = d.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id; d.head.appendChild(s);
   }
   function choose(value) {
@@ -67,15 +136,31 @@
     [['Allow measurement', 'granted'], ['Reject measurement', 'denied']].forEach(function (item) { var b = d.createElement('button'); b.type = 'button'; b.textContent = item[0]; b.style.cssText = 'margin:4px;padding:10px 14px;border:1px solid #14243b;border-radius:6px;background:white;color:#14243b;cursor:pointer;font:inherit'; b.onclick = function () { choose(item[1]); }; panel.appendChild(b); });
     d.body.appendChild(panel);
   }
+  var lastClick = { key: '', at: 0 };
   function lead(key, channel) {
     if (!live || consent !== 'granted' || !key) return;
     try { var k = 'spires_lead_' + key; if (w.sessionStorage.getItem(k)) return; w.sessionStorage.setItem(k, '1'); } catch (_) {}
-    w.gtag('event', 'generate_lead', { lead_channel: channel === 'portal' ? 'portal' : 'website', transport_type: 'beacon', page_location: w.location.origin + cleanPath() });
+    var portal = channel === 'portal';
+    w.gtag('event', 'generate_lead', { lead_channel: portal ? 'portal' : 'website', lead_type: portal ? 'booking_request' : 'quote', transport_type: 'beacon', page_location: w.location.origin + cleanPath() });
+  }
+  function bestTouch(saved) {
+    if (!saved) return null;
+    if (nonDirect(saved.latest)) return saved.latest;
+    if (nonDirect(saved.first)) return saved.first;
+    return saved.first || saved.latest || null;
   }
   function attribution() {
     return new Promise(function (resolve) {
       if (!live || consent !== 'granted') return resolve(null);
-      var result = Object.assign({}, capture() || {}, { consent: 'granted', consentAt: now(), capturedAt: context ? context.capturedAt : now(), expiresAt: context ? context.expiresAt : now() + 30 * 86400000 });
+      var saved = capture();
+      var best = bestTouch(saved) || {};
+      var result = {
+        consent: 'granted', consentAt: now(),
+        capturedAt: best.capturedAt || now(),
+        expiresAt: (best.capturedAt || now()) + 30 * 86400000,
+        first: saved && saved.first, latest: nonDirect(saved && saved.latest) ? saved.latest : (nonDirect(saved && saved.first) ? saved.first : saved && saved.first)
+      };
+      ['gclid', 'gbraid', 'wbraid', 'utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm', 'landingPath', 'referrerHost'].forEach(function (key) { if (best[key]) result[key] = best[key]; });
       var done = false, timer = w.setTimeout(finish, 600);
       function finish() { if (done) return; done = true; w.clearTimeout(timer); resolve(result); }
       w.gtag('get', id, 'client_id', function (v) { if (!done && /^\d+\.\d+$/.test(String(v))) result.clientId = String(v); w.gtag('get', id, 'session_id', function (s) { if (!done && /^\d+$/.test(String(s))) { result.sessionId = String(s); result.sessionCapturedAt = Number(s) * 1000; } finish(); }); });
@@ -89,7 +174,20 @@
   function ready() {
     var button = d.createElement('button'); button.type = 'button'; button.textContent = 'Cookie preferences'; button.style.cssText = 'position:fixed;bottom:4px;left:8px;z-index:9999;font:12px system-ui;background:white;color:#14243b;border:1px solid #aaa;border-radius:4px;padding:3px'; button.onclick = showChoice; d.body.appendChild(button);
     if (!consent) showChoice();
-    d.addEventListener('click', function (event) { var a = event.target.closest && event.target.closest('a[href]'); if (!a || consent !== 'granted') return; var href = a.getAttribute('href') || ''; var name = /^tel:/i.test(href) ? 'phone_click' : /^https:\/\/(wa.me|api.whatsapp.com)\//i.test(href) ? 'whatsapp_click' : ''; if (name) w.gtag('event', name, { transport_type: 'beacon', page_location: w.location.origin + cleanPath() }); });
+    d.addEventListener('click', function (event) {
+      var a = event.target.closest && event.target.closest('a[href]');
+      if (!a || consent !== 'granted') return;
+      var href = a.getAttribute('href') || '';
+      var name = /^tel:/i.test(href) ? 'phone_click' : /^mailto:/i.test(href) ? 'email_click' : /^https:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(href) ? 'whatsapp_click' : '';
+      if (!name) return;
+      var key = name + '|' + href.split('?')[0].split('#')[0];
+      if (lastClick.key === key && now() - lastClick.at < 1000) return;
+      lastClick.key = key; lastClick.at = now();
+      var params = { transport_type: 'beacon', page_location: w.location.origin + cleanPath() };
+      var route = d.body && d.body.getAttribute && d.body.getAttribute('data-wa-route');
+      if (route && /^[a-z0-9-]{1,64}$/.test(route)) params.airport_route = route;
+      w.gtag('event', name, params);
+    });
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', ready); else ready();
 })(window, document);

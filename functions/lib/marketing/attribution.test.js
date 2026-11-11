@@ -19,7 +19,7 @@ const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: 
 (0, node_test_1.test)('confirmed payload has no invented monetary value or customer data', () => {
     const payload = (0, attribution_1.confirmationPayload)('booking123', valid, now);
     node_assert_1.strict.equal(payload.events[0].name, 'booking_confirmed');
-    node_assert_1.strict.equal(payload.events[0].params.session_id, valid.sessionId);
+    node_assert_1.strict.equal(payload.events[0].params.session_id, Number(valid.sessionId));
     node_assert_1.strict.equal('value' in payload.events[0].params, false);
     node_assert_1.strict.equal(payload.client_id, '123.456');
 });
@@ -27,4 +27,24 @@ const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: 
     const payload = (0, attribution_1.confirmationPayload)('booking123', { ...valid, expiresAt: now + 5 * 86400000 }, now + 2 * 86400000);
     node_assert_1.strict.equal('session_id' in payload.events[0].params, false);
     node_assert_1.strict.equal((0, attribution_1.confirmationPayload)('booking123', valid, now + 2 * 86400000), null);
+});
+(0, node_test_1.test)('keeps the first click when a later visit has no campaign and rejects personal campaign text', () => {
+    const result = (0, attribution_1.readAttribution)({
+        ...valid,
+        gclid: undefined,
+        first: { capturedAt: now, gclid: 'first-click', landingPath: '/oxford-to-heathrow' },
+        latest: { capturedAt: now, landingPath: '/oxford-to-heathrow', utmSource: 'private@example.com', utmCampaign: '07776897772' },
+    }, now);
+    node_assert_1.strict.equal(result.gclid, 'first-click');
+    node_assert_1.strict.equal(result.latest, undefined);
+    node_assert_1.strict.equal(JSON.stringify(result).includes('private@'), false);
+    node_assert_1.strict.equal(JSON.stringify(result).includes('07776'), false);
+    const dirty = (0, attribution_1.readAttribution)({
+        ...valid,
+        latest: { capturedAt: now, utmSource: 'newsletter', landingPath: '/claim/person@example.com', referrerHost: 'customer.spires-taxis.com' },
+    }, now);
+    node_assert_1.strict.equal(dirty.gclid, 'valid-click_1');
+    node_assert_1.strict.equal(dirty.latest && dirty.latest.utmSource, 'newsletter');
+    node_assert_1.strict.equal(dirty.latest && dirty.latest.landingPath, undefined);
+    node_assert_1.strict.equal(dirty.latest && dirty.latest.referrerHost, undefined);
 });

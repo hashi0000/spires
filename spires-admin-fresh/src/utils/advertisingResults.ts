@@ -6,12 +6,20 @@ export type Pence = number | null;
 export const MONTHLY_ADVERTISING_BUDGET_PENCE = 13500;
 export const ADVERTISING_BUDGET_LABEL = "Monthly advertising budget remains £135. This page does not change it.";
 
+export interface AttributionTouch {
+  gclid?: string;
+  gbraid?: string;
+  wbraid?: string;
+}
+
 export interface AttributionInput {
   consent?: string;
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
   expiresAt?: number;
+  first?: AttributionTouch;
+  latest?: AttributionTouch;
 }
 
 export interface PaymentEntryInput {
@@ -167,6 +175,8 @@ export interface AdvertisingReport {
   byRoute: BreakdownRow[];
   byVehicle: BreakdownRow[];
   bySource: BreakdownRow[];
+  byEnquiry: BreakdownRow[];
+  unpaidConfirmed: number;
   sourcePrompts: SourcePrompt[];
   costPrompts: CostPrompt[];
   excluded: { synthetic: number; duplicate: number; returnLegs: number };
@@ -339,10 +349,16 @@ function jobCosts(booking: AdvertisingBookingInput): Required<JobCostInput> {
   };
 }
 
+function clickValues(attribution: AttributionInput | null | undefined): string[] {
+  if (!attribution) return [];
+  const touches = [attribution, attribution.first, attribution.latest];
+  return touches.flatMap((touch) => touch ? [touch.gclid, touch.gbraid, touch.wbraid] : []);
+}
+
 function hasTrackedGoogleAds(booking: AdvertisingBookingInput, at: Date | null): boolean {
   const attribution = booking.marketingAttribution;
   if (!attribution || attribution.consent !== "granted") return false;
-  const click = [attribution.gclid, attribution.gbraid, attribution.wbraid].some((value) => typeof value === "string" && value.trim().length > 0);
+  const click = clickValues(attribution).some((value) => typeof value === "string" && value.trim().length > 0);
   if (!click) return false;
   if (typeof attribution.expiresAt === "number" && at && attribution.expiresAt <= at.getTime()) return false;
   return true;
@@ -352,6 +368,15 @@ export function sourceLabel(booking: AdvertisingBookingInput, at: Date | null = 
   if (hasTrackedGoogleAds(booking, at)) return "Tracked Google Ads";
   const reported = String(booking.staffReportedSource || "");
   return REPORTED_LABELS[reported] || "Unknown";
+}
+
+export function enquiryKind(booking: AdvertisingBookingInput): "quote" | "booking_request" | "telephone" | "whatsapp" | "unknown" {
+  const channel = enquiryChannel(booking);
+  if (channel) return channel;
+  const source = String(booking.source || "").toLowerCase();
+  if (source === "website") return "quote";
+  if (source === "customer_app") return "booking_request";
+  return "unknown";
 }
 
 export function enquiryChannel(booking: AdvertisingBookingInput): "telephone" | "whatsapp" | "" {
@@ -625,6 +650,15 @@ export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], opti
     byRoute: breakdown(rows, (row) => row.route),
     byVehicle: breakdown(rows, (row) => row.vehicle),
     bySource: breakdown(rows, (row) => row.source),
+    byEnquiry: breakdown(rows, (row) => {
+      const kind = enquiryKind(row.booking);
+      if (kind === "quote") return "Website quote";
+      if (kind === "booking_request") return "Portal booking request";
+      if (kind === "telephone") return "Telephone";
+      if (kind === "whatsapp") return "WhatsApp";
+      return "Unknown";
+    }),
+    unpaidConfirmed: rows.filter((row) => (row.status === "confirmed" || row.status === "allocated") && finiteNumber(row.booking.amountReceivedPence) === 0).length,
     sourcePrompts: rows.filter((row) => row.channel).map((row) => ({
       id: String(row.booking.id || ""),
       bookingNumber: row.booking.bookingNumber || "No booking number",

@@ -162,6 +162,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    match /marketingConversions/{conversionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
