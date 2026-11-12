@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="spires-ga4" content="">
+  <title>Request a quote | Spires International</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="book">
+  <div data-site-header></div>
+  <main class="section">
+    <div class="wrap" style="display:grid;gap:1.2rem">
+      <div>
+        <p class="kicker">Booking</p>
+        <h1>Tell us the journey.</h1>
+        <p class="lede">You do not need an account. There is no approved automatic fare, so this sends a quote request. Nothing is charged in this preview.</p>
+      </div>
+      <form id="journey-form" class="note form-grid" novalidate>
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
+        <div class="form-grid two">
+          <div><label for="pickup">Pick up</label><input id="pickup" name="pickup" required maxlength="160" autocomplete="street-address"></div>
+          <div><label for="destination">Destination</label><input id="destination" name="destination" required maxlength="160"></div>
+        </div>
+        <div>
+          <label>Extra stops</label>
+          <div id="stops" class="stops"></div>
+          <button class="button secondary" id="add-stop" type="button">Add a stop</button>
+          <p class="help">Up to two stops. Any stop is quoted by the office. It is not given an automatic fare.</p>
+        </div>
+        <div class="form-grid two">
+          <div><label for="date">Date</label><input id="date" name="date" type="date" required></div>
+          <div><label for="time">Time</label><input id="time" name="time" type="time" required></div>
+        </div>
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend>Journey</legend>
+          <div class="choice">
+            <label><input type="radio" name="trip" value="one" checked> One way</label>
+            <label><input type="radio" name="trip" value="return"> Return</label>
+          </div>
+        </fieldset>
+        <div id="return-fields" class="form-grid two" hidden>
+          <div><label for="returnDate">Return date</label><input id="returnDate" name="returnDate" type="date"></div>
+          <div><label for="returnTime">Return time</label><input id="returnTime" name="returnTime" type="time"></div>
+        </div>
+        <div class="form-grid two">
+          <div><label for="passengers">Passengers</label><input id="passengers" name="passengers" type="number" min="1" max="8" value="1" required></div>
+          <div><label for="luggage">Large bags</label><input id="luggage" name="luggage" type="number" min="0" max="12" value="0" required></div>
+        </div>
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend>Vehicle</legend>
+          <div class="choice">
+            <label><input type="radio" name="vehicle" value="standard" checked> Standard Car, up to 4 passengers</label>
+            <label><input type="radio" name="vehicle" value="vito_8"> 8 seater, Mercedes Vito or similar</label>
+          </div>
+        </fieldset>
+        <div class="form-grid two">
+          <div><label for="flight">Flight number</label><input id="flight" name="flight" maxlength="12" placeholder="Needed for an airport pick up"></div>
+          <div>
+            <label for="terminal">Terminal</label>
+            <select id="terminal" name="terminal">
+              <option value="">Not an airport, or not sure yet</option>
+              <option>Heathrow Terminal 2</option>
+              <option>Heathrow Terminal 3</option>
+              <option>Heathrow Terminal 4</option>
+              <option>Heathrow Terminal 5</option>
+              <option>Gatwick North Terminal</option>
+              <option>Gatwick South Terminal</option>
+              <option>Stansted main terminal</option>
+              <option>Luton main terminal</option>
+              <option>Birmingham main terminal</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid two">
+          <div><label for="name">Passenger name</label><input id="name" name="name" autocomplete="name" required></div>
+          <div><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" required></div>
+        </div>
+        <div><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+        <label class="choice"><input id="oxford" name="oxford" type="checkbox"> This journey starts or ends in Oxford</label>
+        <div class="flag">
+          <h2>Before any payment</h2>
+          <p>There is no approved International fare, so the button below requests a quote. A secure payment link would be sent only after the office approves a fare. This preview cannot take a card payment.</p>
+          <p>The published Spires Taxis terms say a cancellation less than 24 hours before pick up may incur a fee. They do not state the fee. They also say an airport collection includes 50 minutes from the actual landing time, then £10 for each extra 30 minutes. The owner has not confirmed that those rules apply to Spires International.</p>
+          <p>Paying a fare, once payments are switched on, means the payment was received. It does not mean a driver has been allocated or that the car is reserved.</p>
+        </div>
+        <label class="choice"><input id="terms" name="terms" type="checkbox"> I have read the notes above. I understand this is a quote request and no payment is taken now.</label>
+        <div id="form-errors" class="error" hidden></div>
+        <button class="button" type="submit">Request a quote</button>
+      </form>
+      <div id="journey-result" hidden></div>
+      <section id="payment-review" class="flag" hidden>
+        <h2>Payment review, test only</h2>
+        <p>This uses a fixture of 100 pence so the states can be reviewed. It is not a customer fare. No card form is shown and Stripe is not called.</p>
+        <p>
+          <button class="button secondary" id="start-review" type="button">Start test fixture</button>
+          <button class="button secondary" type="button" data-notice="payment_intent.succeeded" data-id="evt_ok">Test success</button>
+          <button class="button secondary" type="button" data-notice="payment_intent.succeeded" data-id="evt_ok">Send the same notice again</button>
+          <button class="button secondary" type="button" data-notice="payment_intent.payment_failed" data-id="evt_fail">Test failure</button>
+          <button class="button secondary" type="button" data-notice="checkout.session.expired" data-id="evt_left">Leave checkout</button>
+          <button class="button secondary" type="button" data-notice="charge.refunded" data-id="evt_refund">Test refund</button>
+          <button class="button secondary" id="confirm-review" type="button">Staff confirm</button>
+        </p>
+        <p id="review-state">The quote above cannot be charged.</p>
+      </section>
+    </div>
+  </main>
+  <div data-site-footer></div>
+  <script src="js/rules.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/book.js"></script>
+</body>
+</html>

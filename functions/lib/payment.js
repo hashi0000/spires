@@ -128,6 +128,9 @@ exports.createPaymentIntent = functions.https.onCall(async (data, context) => {
     if (booking.paymentStatus === "paid") {
         throw new functions.https.HttpsError("already-exists", "This booking has already been paid");
     }
+    if (booking.brand === "spires_international") {
+        throw new functions.https.HttpsError("failed-precondition", "Spires International payments are not taken through this payment call.");
+    }
     // Convert amount to pence (Stripe uses smallest currency unit)
     const amountInPence = Math.round(amountNumber * 100);
     if (amountInPence < 50) {

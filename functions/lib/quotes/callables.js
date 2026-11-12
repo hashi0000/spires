@@ -257,7 +257,9 @@ async function enqueueConfirmationIfNeeded(before, after, bookingId) {
         event: "booking_confirmed",
         version: "1",
         to,
-        subject: `Your Spires Taxis booking is confirmed`,
+        subject: after.brand === "spires_international"
+            ? "Your Spires International booking is confirmed"
+            : "Your Spires Taxis booking is confirmed",
         html: "",
         kind: "booking_confirmed",
     });
@@ -809,6 +811,7 @@ async function applyAcceptance(ref, input) {
                 final: (0, halfTerm_1.formatPence)(finalFarePence(booking)),
                 bookingId: ref.id,
                 version: issued,
+                international: booking.brand === "spires_international",
             };
         }
         return { decision, mail };
@@ -822,7 +825,9 @@ async function applyAcceptance(ref, input) {
                 version: String(row.version),
                 to: row.to,
                 subject: row.confirmed
-                    ? `Your Spires Taxis booking ${row.bookingNumber} is confirmed`
+                    ? (row.international
+                        ? `Your Spires International booking ${row.bookingNumber} is confirmed`
+                        : `Your Spires Taxis booking ${row.bookingNumber} is confirmed`)
                     : `Quote accepted, awaiting payment · ${row.bookingNumber}`,
                 html: (0, emails_1.acceptanceCustomerHtml)({
                     bookingNumber: row.bookingNumber,

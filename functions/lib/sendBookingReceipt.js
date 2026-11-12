@@ -43,15 +43,29 @@ const vehicleTypes_1 = require("./vehicleTypes");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const bookingTerms_1 = require("./terms/bookingTerms");
 const journeyStops_1 = require("./bookings/journeyStops");
-const getSubjectLine = (type, bookingNumber) => {
+function internationalBrand(booking) {
+    return booking?.brand === "spires_international";
+}
+const getSubjectLine = (type, bookingNumber, booking) => {
+    if (!internationalBrand(booking)) {
+        switch (type) {
+            case "payment":
+            case "payment_receipt":
+                return "Your Spires Taxis Payment Receipt";
+            case "payment_request":
+                return `Payment Request - Spires Taxis Booking ${bookingNumber || ""}`.trim();
+            default:
+                return "Your Spires Taxis Booking Confirmation";
+        }
+    }
     switch (type) {
         case "payment":
         case "payment_receipt":
-            return "Your Spires Taxis Payment Receipt";
+            return "Your Spires International payment receipt";
         case "payment_request":
-            return `Payment Request - Spires Taxis Booking ${bookingNumber || ""}`.trim();
+            return `Payment request for Spires International booking ${bookingNumber || ""}`.trim();
         default:
-            return "Your Spires Taxis Booking Confirmation";
+            return "Your Spires International booking confirmation";
     }
 };
 const getIntroCopy = (type, booking) => {
@@ -68,12 +82,17 @@ const getIntroCopy = (type, booking) => {
         case "payment_receipt":
             return `<p>We've received your payment. Your receipt is attached below.</p>`;
         case "payment_request":
-            return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
+            return internationalBrand(booking)
+                ? `<p>This is a payment request for your booking with Spires International, operated by Spires Taxis Ltd. Please arrange payment for the fare shown in the attached document. Paying does not allocate a driver.</p>${bankNote}${depositNote}`
+                : `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
         default: {
-            const collectionNote = (0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)
+            const collectionNote = !internationalBrand(booking) && (0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)
                 ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)())}</p>`
                 : "";
-            return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}<p>${(0, driverReminderEmail_1.escapeHtml)((0, bookingTerms_1.confirmationTermsParagraph)(booking))}</p>`;
+            const thanks = internationalBrand(booking)
+                ? "Thank you for booking with Spires International, operated by Spires Taxis Ltd. This confirms the booking. It does not mean a driver has been allocated. Pickup, waiting and cancellation terms are the ones agreed on your quote."
+                : "Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.";
+            return `<p>${thanks}</p>${bankNote}${depositNote}${collectionNote}<p>${(0, driverReminderEmail_1.escapeHtml)((0, bookingTerms_1.confirmationTermsParagraph)(booking))}</p>`;
         }
     }
 };
@@ -103,7 +122,7 @@ async function sendBookingReceipt(booking, type = "booking_confirmation", bookin
             throw new Error("Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions.");
         }
         const pdfBuffer = await (0, pdfGenerator_1.generateBookingPDF)(normalized, type);
-        const subject = getSubjectLine(type, normalized.bookingNumber);
+        const subject = getSubjectLine(type, normalized.bookingNumber, normalized);
         const introCopy = getIntroCopy(type, normalized);
         const filenamePrefix = getFilenamePrefix(type);
         const journey = (0, journeyStops_1.emailJourneyText)(normalized);

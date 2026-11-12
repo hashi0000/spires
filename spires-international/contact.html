@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="spires-ga4" content="">
+  <title>Contact | Spires International</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body data-page="contact">
+  <div data-site-header></div>
+  <main class="section">
+    <div class="wrap split">
+      <div>
+        <p class="kicker">Contact</p>
+        <h1>Speak to the office.</h1>
+        <p>Spires International is operated by Spires Taxis Ltd.</p>
+        <p>Phone <a href="tel:07776897772">07776 897772</a><br>
+        WhatsApp <a href="https://wa.me/447776897772">07776 897772</a><br>
+        Email <a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a></p>
+        <p>For a journey quote, use <a href="book.html">the booking form</a>. This form is for a general message.</p>
+      </div>
+      <form id="contact-form" class="note form-grid" novalidate>
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
+        <div><label for="name">Name</label><input id="name" name="name" autocomplete="name" required></div>
+        <div><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required></div>
+        <div><label for="message">Message</label><textarea id="message" name="message" required></textarea></div>
+        <div id="contact-errors" class="error" hidden></div>
+        <button class="button" type="submit">Send message</button>
+        <div id="contact-done" hidden></div>
+      </form>
+    </div>
+  </main>
+  <div data-site-footer></div>
+  <script src="js/rules.js"></script>
+  <script src="js/site.js"></script>
+  <script src="js/contact.js"></script>
+</body>
+</html>

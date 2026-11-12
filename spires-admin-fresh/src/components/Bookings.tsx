@@ -5,6 +5,7 @@ import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
 import { formatVehicleTypeLabel } from '../utils/vehicleTypes';
 import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMapper';
+import { brandOf } from '../utils/brand';
 import { db, functions } from '../utils/firebase';
 import { planBulkJobUpdate, type BulkJobChanges } from '../utils/bulkBookingEdit';
 import { describeStops, hasExtraStops, normaliseStops, openReturnSummary } from '../utils/journeyStops';
@@ -93,6 +94,7 @@ const Bookings: React.FC<BookingsProps> = ({
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   /** Organise work: app sign-in bookings vs phone/admin entries */
   const [audienceFilter, setAudienceFilter] = useState<'all' | 'customer_app' | 'other'>('all');
+  const [brandFilter, setBrandFilter] = useState<'all' | 'spires_taxis' | 'spires_international'>('all');
   const [quickView, setQuickView] = useState<QuickView>('upcoming');
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
   const [compactList, setCompactList] = useState(false);
@@ -130,11 +132,12 @@ const Bookings: React.FC<BookingsProps> = ({
     const saved = sessionStorage.getItem(FILTER_KEY);
     if (!saved) return;
     try {
-      const parsed = JSON.parse(saved) as { search?: string; quickView?: QuickView; statusFilter?: string; paymentFilter?: string };
+      const parsed = JSON.parse(saved) as { search?: string; quickView?: QuickView; statusFilter?: string; paymentFilter?: string; brandFilter?: 'all' | 'spires_taxis' | 'spires_international' };
       if (parsed.search) setSearch(parsed.search);
       if (parsed.quickView) setQuickView(parsed.quickView);
       if (parsed.statusFilter) setStatusFilter(parsed.statusFilter);
       if (parsed.paymentFilter) setPaymentFilter(parsed.paymentFilter);
+      if (parsed.brandFilter) setBrandFilter(parsed.brandFilter);
     } catch {
       sessionStorage.removeItem(FILTER_KEY);
     }
@@ -143,8 +146,8 @@ const Bookings: React.FC<BookingsProps> = ({
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem(FILTER_KEY, JSON.stringify({ search, quickView, statusFilter, paymentFilter }));
-  }, [search, quickView, statusFilter, paymentFilter]);
+    sessionStorage.setItem(FILTER_KEY, JSON.stringify({ search, quickView, statusFilter, paymentFilter, brandFilter }));
+  }, [search, quickView, statusFilter, paymentFilter, brandFilter]);
 
   const filteredBookings = useMemo(() => {
     let filtered = [...bookings];
@@ -184,6 +187,9 @@ const Bookings: React.FC<BookingsProps> = ({
     } else if (audienceFilter === 'other') {
       filtered = filtered.filter(b => !isCustomerBooking(b));
     }
+    if (brandFilter !== 'all') {
+      filtered = filtered.filter(b => brandOf(b) === brandFilter);
+    }
     const today = londonDay(new Date());
     const now = new Date();
     if (quickView !== 'all') {
@@ -201,7 +207,7 @@ const Bookings: React.FC<BookingsProps> = ({
       });
     }
     return filtered;
-  }, [bookings, search, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter, audienceFilter, quickView]);
+  }, [bookings, search, dateFrom, dateTo, selectedMonth, statusFilter, paymentFilter, audienceFilter, brandFilter, quickView]);
 
   const sortedBookings = useMemo(() => {
     const nearestFirst = quickView === 'upcoming' || quickView === 'today' || quickView === 'tomorrow';
@@ -409,6 +415,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     setStatusFilter('all');
     setPaymentFilter('all');
     setAudienceFilter('all');
+    setBrandFilter('all');
     setQuickView('upcoming');
   };
   const setQuickMonth = (monthsAgo: number) => {
@@ -659,6 +666,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 <option value="other">Phone, walk-in, admin</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+              <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value as 'all' | 'spires_taxis' | 'spires_international')} className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                <option value="all">All brands</option>
+                <option value="spires_taxis">Spires Taxis</option>
+                <option value="spires_international">Spires International</option>
+              </select>
+            </div>
           </div>
         </div>
         )}
@@ -805,6 +820,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         <td>
                           <div className="booking-customer">{booking.hirerName}</div>
                           <div className="booking-ref">{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</div>
+                          {brandOf(booking) === 'spires_international' ? <div className="booking-ref">Spires International</div> : null}
                         </td>
                         <td className="booking-route-cell">
                           <div className={`booking-route${routeOpen ? ' is-open' : ''}`}>{leg?.leg === 'return' ? 'Return: ' : leg?.leg === 'outbound' ? 'Outbound: ' : ''}{routeFrom} → {routeTo}</div>

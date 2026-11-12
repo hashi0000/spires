@@ -30,6 +30,7 @@ import {
 import { submitBusinessAccountEnquiry } from "./businessAccounts/callables";
 import { claimGuestBooking, guestClaimPreview } from "./bookings/guestHandlers";
 import { shouldSendConfirmation } from "./quotes/quoteWorkflow";
+import { skipsTaxisPaymentReceipt, skipsTaxisSideEffects } from "./international/rules";
 
 admin.initializeApp();
 admin.firestore().settings({ ignoreUndefinedProperties: true });
@@ -52,17 +53,17 @@ export const onBookingWrite = functions.firestore
       await stampPromotionOnCreate(change.after);
       const freshSnap = await change.after.ref.get();
       const fresh = freshSnap.data() || after;
-      if (isPendingRequest(fresh)) {
+      if (!skipsTaxisSideEffects(fresh) && isPendingRequest(fresh)) {
         await notifyAdminNewBookingRequest(fresh, bookingId);
       }
-      if (shouldSendConfirmation(null, fresh)) {
+      if (!skipsTaxisSideEffects(fresh) && shouldSendConfirmation(null, fresh)) {
         const familyWithoutEmail = fresh.source === "family" && !(fresh.hirerEmail || fresh.email);
         if (!familyWithoutEmail) await enqueueConfirmationIfNeeded(null, fresh, bookingId);
       }
       return;
     }
 
-    if (shouldSendConfirmation(before, after)) {
+    if (!skipsTaxisSideEffects(after) && shouldSendConfirmation(before, after)) {
       const familyWithoutEmail = after.source === "family" && !(after.hirerEmail || after.email);
       if (!familyWithoutEmail) await enqueueConfirmationIfNeeded(before, after, bookingId);
     }
@@ -72,7 +73,8 @@ export const onBookingWrite = functions.firestore
       before.paymentStatus !== "paid" &&
       after.paymentStatus === "paid" &&
       !after.paymentReceiptEmailSentAt &&
-      (after.hirerEmail || after.email)
+      (after.hirerEmail || after.email) &&
+      !skipsTaxisPaymentReceipt(after)
     ) {
       const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
       const existingReceipt = await receiptRef.get();
@@ -139,6 +141,7 @@ export {
 };
 export { submitBusinessAccountEnquiry };
 export { claimGuestBooking, guestClaimPreview };
+export { internationalPreview } from "./international/preview";
 export {
   spiresShareSession,
   spiresShareGetState,

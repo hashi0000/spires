@@ -28,15 +28,30 @@ type EmailDocType =
   | "payment_receipt"
   | "payment_request";
 
-const getSubjectLine = (type: EmailDocType, bookingNumber?: string) => {
+function internationalBrand(booking: { brand?: unknown } | null | undefined): boolean {
+  return booking?.brand === "spires_international";
+}
+
+const getSubjectLine = (type: EmailDocType, bookingNumber?: string, booking?: { brand?: unknown }) => {
+  if (!internationalBrand(booking)) {
+    switch (type) {
+      case "payment":
+      case "payment_receipt":
+        return "Your Spires Taxis Payment Receipt";
+      case "payment_request":
+        return `Payment Request - Spires Taxis Booking ${bookingNumber || ""}`.trim();
+      default:
+        return "Your Spires Taxis Booking Confirmation";
+    }
+  }
   switch (type) {
     case "payment":
     case "payment_receipt":
-      return "Your Spires Taxis Payment Receipt";
+      return "Your Spires International payment receipt";
     case "payment_request":
-      return `Payment Request - Spires Taxis Booking ${bookingNumber || ""}`.trim();
+      return `Payment request for Spires International booking ${bookingNumber || ""}`.trim();
     default:
-      return "Your Spires Taxis Booking Confirmation";
+      return "Your Spires International booking confirmation";
   }
 };
 
@@ -62,14 +77,19 @@ const getIntroCopy = (type: EmailDocType, booking: any) => {
     case "payment_receipt":
       return `<p>We've received your payment. Your receipt is attached below.</p>`;
     case "payment_request":
-      return `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
+      return internationalBrand(booking)
+        ? `<p>This is a payment request for your booking with Spires International, operated by Spires Taxis Ltd. Please arrange payment for the fare shown in the attached document. Paying does not allocate a driver.</p>${bankNote}${depositNote}`
+        : `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
     default: {
-      const collectionNote = bookingHasAirportCollection(booking)
+      const collectionNote = !internationalBrand(booking) && bookingHasAirportCollection(booking)
         ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${escapeHtml(
             airportWaitingDisclaimerBody()
           )}</p>`
         : "";
-      return `<p>Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.</p>${bankNote}${depositNote}${collectionNote}<p>${escapeHtml(confirmationTermsParagraph(booking))}</p>`;
+      const thanks = internationalBrand(booking)
+        ? "Thank you for booking with Spires International, operated by Spires Taxis Ltd. This confirms the booking. It does not mean a driver has been allocated. Pickup, waiting and cancellation terms are the ones agreed on your quote."
+        : "Thank you for booking with Spires Taxis. Your confirmed booking details are attached below.";
+      return `<p>${thanks}</p>${bankNote}${depositNote}${collectionNote}<p>${escapeHtml(confirmationTermsParagraph(booking))}</p>`;
     }
   }
 };
@@ -108,7 +128,7 @@ export async function sendBookingReceipt(
     }
 
     const pdfBuffer = await generateBookingPDF(normalized, type);
-    const subject = getSubjectLine(type, normalized.bookingNumber);
+    const subject = getSubjectLine(type, normalized.bookingNumber, normalized);
     const introCopy = getIntroCopy(type, normalized);
     const filenamePrefix = getFilenamePrefix(type);
     const journey = emailJourneyText(normalized);

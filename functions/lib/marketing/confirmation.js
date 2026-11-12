@@ -38,6 +38,7 @@ const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions/v1"));
 const params_1 = require("firebase-functions/params");
 const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
+const rules_1 = require("../international/rules");
 const attribution_1 = require("./attribution");
 const payments_1 = require("./payments");
 const apiSecret = (0, params_1.defineSecret)('SPIRES_GA4_API_SECRET');
@@ -61,6 +62,8 @@ exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).fir
         return;
     const after = change.after.data() || {};
     const before = change.before.data() || {};
+    if ((0, rules_1.measurementStream)(after) !== 'taxis')
+        return;
     const bookingId = context.params.bookingId;
     const at = Date.now();
     if ((0, quoteWorkflow_1.isWorkflowConfirmed)(after) && !(change.before.exists && (0, quoteWorkflow_1.isWorkflowConfirmed)(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {

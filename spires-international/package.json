@@ -1,0 +1,8 @@
+{
+  "name": "spires-international",
+  "private": true,
+  "description": "Private preview for Spires International. Do not attach a public domain.",
+  "scripts": {
+    "preview": "npx --yes serve . -p 4173"
+  }
+}

@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions/v1';
 import { defineSecret } from 'firebase-functions/params';
 import { isWorkflowConfirmed } from '../quotes/quoteWorkflow';
+import { measurementStream } from '../international/rules';
 import { confirmationPayload, readAttribution, type Attribution } from './attribution';
 import { deliveryOutcome, eligibleToSend, interpretValidation, paymentChange, paymentPayload, type PaymentMeasurement } from './payments';
 
@@ -27,6 +28,7 @@ export const queueBookingMeasurement = functions.runWith({ failurePolicy: true }
   if (!change.after.exists) return;
   const after = change.after.data() || {};
   const before = change.before.data() || {};
+  if (measurementStream(after) !== 'taxis') return;
   const bookingId = context.params.bookingId;
   const at = Date.now();
   if (isWorkflowConfirmed(after) && !(change.before.exists && isWorkflowConfirmed(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
