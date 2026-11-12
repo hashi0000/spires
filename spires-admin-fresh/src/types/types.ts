@@ -156,6 +156,16 @@ export interface Booking {
   /** Answer from the website booking form. Missing when the customer left it blank. */
   heardAbout?: string;
   heardAboutDetail?: string;
+  /** When the customer first enquired, if the office knows it. This is not the record creation time. */
+  enquiryAt?: Date | string;
+  /** Set once, when the booking first becomes confirmed, allocated or completed. */
+  confirmedAt?: Date | string;
+  /** Set once, when the booking first becomes completed. */
+  completedAt?: Date | string;
+  /** Opaque website reference from a WhatsApp prefill. Not a click id. */
+  websiteEnquiryRef?: string;
+  /** What the customer told the office. This is not tracked advertising. */
+  customerReportedSource?: '' | 'google_advert' | 'google_search' | 'recommendation' | 'repeat' | 'other';
 }
 
 // Extended booking interface for form handling

@@ -84,6 +84,10 @@ export interface AdvertisingBookingInput {
   dueOnReturn?: number;
   returnOfBookingNumber?: string;
   staffReportedSource?: string;
+  customerReportedSource?: string;
+  heardAbout?: string;
+  heardAboutDetail?: string;
+  enquiryAt?: string | Date | number;
   jobCosts?: JobCostInput | null;
 }
 
@@ -181,7 +185,7 @@ export interface PeriodPace {
   averageBookingPence: Pence;
 }
 
-export type AdvertisingDatePreset = "today" | "last_7";
+export type AdvertisingDatePreset = "today" | "last_7" | "last_28" | "month_to_date";
 
 export interface BreakdownRow {
   label: string;
@@ -293,6 +297,46 @@ export interface AdvertisingReport {
   limitations: string[];
   reportingBasis: string;
   freshness: string;
+  weekly: WeekPoint[];
+  upcomingWeeks: UpcomingWeek[];
+  funnel: ReportFunnel;
+  missingData: MissingData;
+  monthEquivalent: { text: string } | null;
+  manualSpendWeeks: Array<{ weekStarting: string; amountPence: Pence; entries: number }>;
+}
+
+export interface WeekPoint {
+  weekStarting: string;
+  bookings: number;
+  confirmed: number;
+  quotedKnownPence: Pence;
+  quotedMissing: number;
+  paymentsKnownPence: Pence;
+  paymentsMissing: number;
+}
+
+export interface UpcomingWeek {
+  weekStarting: string;
+  journeys: number;
+  knownFarePence: Pence;
+  missingFares: number;
+}
+
+export interface ReportFunnel {
+  enquiries: number;
+  confirmed: number;
+  completed: number;
+  rate: null;
+  reason: string;
+}
+
+export interface MissingData {
+  fares: number;
+  payments: number;
+  sources: number;
+  creation: number;
+  journey: number;
+  costs: number;
 }
 
 const STATUS_RANK: Record<string, number> = {
@@ -306,9 +350,21 @@ const STATUS_RANK: Record<string, number> = {
 
 const REPORTED_LABELS: Record<string, string> = {
   google_ads: "Customer reported Google Ads",
+  google_advert: "Customer reported Google advert",
+  google_search: "Customer reported Google search",
   website: "Customer reported website",
   repeat: "Customer reported repeat booking",
   recommendation: "Customer reported recommendation",
+  other: "Customer reported other",
+};
+
+const HEARD_LABELS: Record<string, string> = {
+  google: "Customer reported Google",
+  facebook: "Customer reported Facebook",
+  instagram: "Customer reported Instagram",
+  friend_or_family: "Customer reported friend or family",
+  used_before: "Customer reported used us before",
+  website: "Customer reported website",
   other: "Customer reported other",
 };
 
@@ -474,8 +530,10 @@ function shiftDateKey(ymd: string, days: number): string {
 export function advertisingDateRange(preset: AdvertisingDatePreset, now = new Date()): { from: string; to: string } {
   const today = londonDateKey(now) || "1970-01-01";
   if (preset === "today") return { from: today, to: today };
+  if (preset === "month_to_date") return currentLondonMonth(now);
   const yesterday = shiftDateKey(today, -1);
-  return { from: shiftDateKey(yesterday, -6), to: yesterday };
+  const span = preset === "last_28" ? 27 : 6;
+  return { from: shiftDateKey(yesterday, -span), to: yesterday };
 }
 
 export function currentLondonMonth(now = new Date()): { from: string; to: string } {
@@ -616,8 +674,14 @@ function hasTrackedGoogleAds(booking: AdvertisingBookingInput, at: Date | null):
 
 export function sourceLabel(booking: AdvertisingBookingInput, at: Date | null = null): string {
   if (hasTrackedGoogleAds(booking, at)) return "Tracked Google Ads";
-  const reported = String(booking.staffReportedSource || "");
-  return REPORTED_LABELS[reported] || "Unknown";
+  const reported = REPORTED_LABELS[String(booking.staffReportedSource || "")] || REPORTED_LABELS[String(booking.customerReportedSource || "")];
+  if (reported) return reported;
+  const heard = HEARD_LABELS[String(booking.heardAbout || "")];
+  if (heard) {
+    const detail = String(booking.heardAboutDetail || "").trim();
+    return booking.heardAbout === "other" && detail ? `${heard}: ${detail}` : heard;
+  }
+  return "Unknown";
 }
 
 export function enquiryKind(booking: AdvertisingBookingInput): "quote" | "booking_request" | "telephone" | "whatsapp" | "unknown" {
@@ -792,7 +856,7 @@ function breakdown(rows: Prepared[], labelFor: (row: Prepared) => string): Break
 }
 
 function creationDateKey(booking: AdvertisingBookingInput): string | null {
-  return londonDateKey(booking.createdAt);
+  return londonDateKey(booking.enquiryAt) || londonDateKey(booking.createdAt);
 }
 
 function rowDateKey(row: Prepared, basis: "journey" | "enquiry"): string | null {
@@ -975,7 +1039,7 @@ function historicalLimitations(rows: Prepared[], earlierRows: Prepared[], exclud
   }
   const missingCost = considered.filter((row) => bucket(row.status) === "completed" && Object.values(row.costs).some((value) => value === null)).length;
   if (missingCost > 0) {
-    lines.push(`${plural(missingCost, "completed job has", "completed jobs have")} a journey cost that was not recorded. Profit stays unknown while ${missingCost === 1 ? "that cost is" : "those costs are"} missing.`);
+    lines.push(`${plural(missingCost, "completed job has", "completed jobs have")} a journey cost that was not recorded. Contribution stays unknown while ${missingCost === 1 ? "that cost is" : "those costs are"} missing.`);
   }
   if (basis === "enquiry" && excluded.missingCreationDate > 0) {
     lines.push(`${plural(excluded.missingCreationDate, "booking has", "bookings have")} no creation time. ${excluded.missingCreationDate === 1 ? "It is" : "They are"} left out of this enquiry date comparison. A journey date is not substituted for ${excluded.missingCreationDate === 1 ? "the booking creation date" : "a booking creation date"}.`);
@@ -1215,6 +1279,57 @@ export function overallBusinessGrowth(bookings: AdvertisingBookingInput[], start
   };
 }
 
+function weekStartingMonday(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  const weekday = utc.getUTCDay();
+  const delta = weekday === 0 ? -6 : 1 - weekday;
+  utc.setUTCDate(utc.getUTCDate() + delta);
+  return utc.toISOString().slice(0, 10);
+}
+
+function shiftMonthKey(key: string, months: number): string {
+  const [year, month, day] = key.split("-").map(Number);
+  const anchor = new Date(Date.UTC(year, month - 1 + months, 1));
+  const nextYear = anchor.getUTCFullYear();
+  const nextMonth = anchor.getUTCMonth();
+  const last = new Date(Date.UTC(nextYear, nextMonth + 1, 0)).getUTCDate();
+  const nextDay = Math.min(day, last);
+  return `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(nextDay).padStart(2, "0")}`;
+}
+
+function knownMoney(values: Pence[]): { pence: Pence; missing: number } {
+  const missing = values.filter((value) => value === null).length;
+  const known = values.filter((value): value is number => value !== null);
+  if (known.length === 0) return { pence: null, missing };
+  return { pence: known.reduce((total, value) => total + value, 0), missing };
+}
+
+function weeklyPoints(rows: Prepared[], basis: "journey" | "enquiry"): WeekPoint[] {
+  const groups = new Map<string, Prepared[]>();
+  rows.forEach((row) => {
+    const key = rowDateKey(row, basis);
+    if (!key) return;
+    const week = weekStartingMonday(key);
+    const list = groups.get(week) || [];
+    list.push(row);
+    groups.set(week, list);
+  });
+  return Array.from(groups.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([weekStarting, list]) => {
+    const quoted = knownMoney(list.map((row) => row.quoted));
+    const payments = knownMoney(list.map((row) => row.net));
+    return {
+      weekStarting,
+      bookings: list.length,
+      confirmed: list.filter((row) => bucket(row.status) === "confirmed" || bucket(row.status) === "completed").length,
+      quotedKnownPence: quoted.pence,
+      quotedMissing: quoted.missing,
+      paymentsKnownPence: payments.pence,
+      paymentsMissing: payments.missing,
+    };
+  });
+}
+
 export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], options: AdvertisingReportOptions): AdvertisingReport {
   const { rows, excluded } = prepare(bookings, options);
   const now = options.now ?? new Date();
@@ -1363,9 +1478,9 @@ export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], opti
         : "Unknown until Google Ads is connected, or the manual entries are marked as the full spend for this period."
     ),
     contribution: moneyRow(
-      "Profit after advertising and recorded journey costs",
+      "Contribution after direct costs and advertising",
       contributionPence,
-      "Recorded payments on completed jobs, minus recorded journey costs and advertising spend. Other business overheads are not included. An unknown cost, payment or spend keeps this unknown."
+      "Recorded payments on completed jobs, minus recorded journey costs and advertising spend. This is not net profit. Overheads are not included. An unknown cost, payment or spend keeps this unknown."
     ),
     returnOnSpend,
     businessGrowth: overallBusinessGrowth(bookings, options.advertisingStartedOn || null, now, options.advertisingStartConfirmed === true),
@@ -1442,7 +1557,76 @@ export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], opti
     limitations: historicalLimitations(rows, earlierRows, excluded, options.dateBasis),
     reportingBasis: reportingBasis(options),
     freshness: latest ? `Newest included booking update: ${londonDateTimeLabel(new Date(latest))} Europe/London.` : "No included bookings have an update time.",
+    weekly: weeklyPoints(rows, options.dateBasis),
+    upcomingWeeks: upcomingWeeks(bookings, options, now),
+    funnel: {
+      enquiries: enquiries.length,
+      confirmed: confirmedForCost,
+      completed: completed.length,
+      rate: null,
+      reason: "Pending enquiries are not treated as lost. Unsuccessful enquiries are not all stored, so a conversion rate is not shown.",
+    },
+    missingData: {
+      fares: rows.filter((row) => row.quoted === null).length,
+      payments: rows.filter((row) => row.net === null).length,
+      sources: rows.filter((row) => row.source === "Unknown").length,
+      creation: excluded.missingCreationDate,
+      journey: excluded.missingJourneyDate,
+      costs: completed.filter((row) => Object.values(row.costs).some((value) => value === null)).length,
+    },
+    monthEquivalent: monthEquivalent(bookings, options, elapsed, selected),
+    manualSpendWeeks: manualSpendWeeks(options.spend, options.from, options.to),
   };
+}
+
+function upcomingWeeks(bookings: AdvertisingBookingInput[], options: AdvertisingReportOptions, now: Date): UpcomingWeek[] {
+  const today = londonDateKey(now);
+  if (!today) return [];
+  const prepared = prepare(bookings, { ...options, from: shiftDateKey(today, 1), to: "2999-12-31", dateBasis: "journey" });
+  const groups = new Map<string, Prepared[]>();
+  prepared.rows.forEach((row) => {
+    if (bucket(row.status) !== "confirmed" || !row.journeyDate) return;
+    const week = weekStartingMonday(row.journeyDate);
+    const list = groups.get(week) || [];
+    list.push(row);
+    groups.set(week, list);
+  });
+  return Array.from(groups.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([weekStarting, list]) => {
+    const fares = knownMoney(list.map((row) => row.quoted));
+    return { weekStarting, journeys: list.length, knownFarePence: fares.pence, missingFares: fares.missing };
+  });
+}
+
+function monthEquivalent(
+  bookings: AdvertisingBookingInput[],
+  options: AdvertisingReportOptions,
+  elapsed: { from: string; to: string } | null,
+  selected: PeriodPace
+): { text: string } | null {
+  if (!elapsed || !options.from.endsWith("-01")) return null;
+  const previousFrom = shiftMonthKey(elapsed.from, -1);
+  const previousTo = shiftMonthKey(elapsed.to, -1);
+  if (previousTo < previousFrom) return null;
+  const previousRows = rowsOnDates(prepare(bookings, { ...options, from: previousFrom, to: previousTo }).rows, previousFrom, previousTo, options.dateBasis);
+  const previous = periodPace(previousRows, previousFrom, previousTo);
+  return {
+    text: `Month to date compares finished days ${elapsed.from} to ${elapsed.to} with the same dates in the previous month, ${previousFrom} to ${previousTo}. Confirmed bookings a day were ${formatPace(previous.bookingsPerDay)} then ${formatPace(selected.bookingsPerDay)}. ${bookingPaceChange(previous.bookingsPerDay, selected.bookingsPerDay)}. This is the same calendar span last month. It is separate from the equal number of days immediately before the selected period.`,
+  };
+}
+
+function manualSpendWeeks(spend: SpendEntryInput[], from: string, to: string): Array<{ weekStarting: string; amountPence: Pence; entries: number }> {
+  const groups = new Map<string, SpendEntryInput[]>();
+  spend.filter((entry) => entry.source === "manual" && inRange(entry.date, from, to)).forEach((entry) => {
+    const week = weekStartingMonday(entry.date);
+    const list = groups.get(week) || [];
+    list.push(entry);
+    groups.set(week, list);
+  });
+  return Array.from(groups.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([weekStarting, list]) => ({
+    weekStarting,
+    amountPence: list.reduce((total, entry) => total + Math.round(entry.amountPence || 0), 0),
+    entries: list.length,
+  }));
 }
 
 /** Labelled records for the view test only. The admin page reads the Firebase bookings collection. */

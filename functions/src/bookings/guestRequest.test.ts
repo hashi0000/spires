@@ -230,6 +230,17 @@ describe("stops and open returns", () => {
     assert.equal(String(result.record.openReturnNotice).includes("outside Oxford"), true);
     assert.equal(String(result.record.returnPickupTime).includes("00:00"), false);
   });
+
+  it("stores an opaque website reference and drops anything else", () => {
+    const kept = prepare({ websiteEnquiryRef: "ST-AB23CD" });
+    assert.equal(kept.ok, true);
+    if (!kept.ok || kept.spam) return;
+    assert.equal(kept.record.websiteEnquiryRef, "ST-AB23CD");
+    const dropped = prepare({ websiteEnquiryRef: "gclid=abc" });
+    assert.equal(dropped.ok, true);
+    if (!dropped.ok || dropped.spam) return;
+    assert.equal(dropped.record.websiteEnquiryRef, undefined);
+  });
 });
 
 describe("guest request rate window", () => {

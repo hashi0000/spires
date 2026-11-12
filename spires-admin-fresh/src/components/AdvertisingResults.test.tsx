@@ -42,7 +42,7 @@ test("preview hides passenger details and labels missing costs as unknown", () =
   );
 
   expect(screen.getByRole("heading", { name: "Advertising results" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Profit after advertising and recorded journey costs" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Contribution after direct costs and advertising" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Cost per confirmed booking" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Advertising return on spend" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Selected period against the days before it" })).toBeTruthy();
@@ -95,7 +95,7 @@ test("preview hides passenger details and labels missing costs as unknown", () =
   expect(screen.queryByText("Do not show this note")).toBeNull();
   expect(screen.getByText("8 seater")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Today" }));
-  fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
+  fireEvent.click(screen.getByRole("button", { name: "Last 7 finished days" }));
   const today = advertisingDateRange("today");
   const week = advertisingDateRange("last_7");
   expect(onDates).toHaveBeenNthCalledWith(1, today.from, today.to, "journey");

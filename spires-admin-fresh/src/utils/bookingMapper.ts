@@ -119,9 +119,9 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     paymentMethod: customerBooking.paymentMethod as any,
     paymentStatus: customerBooking.paymentStatus as any,
     expenses: customerBooking.expenses || [],
-    createdAt: customerBooking.createdAt?.toDate 
-      ? customerBooking.createdAt.toDate() 
-      : (customerBooking.createdAt || new Date()),
+    createdAt: customerBooking.createdAt?.toDate
+      ? customerBooking.createdAt.toDate()
+      : (customerBooking.createdAt || undefined),
     updatedAt: customerBooking.updatedAt?.toDate 
       ? customerBooking.updatedAt.toDate() 
       : (customerBooking.updatedAt || new Date()),
