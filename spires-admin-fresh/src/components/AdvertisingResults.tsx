@@ -23,7 +23,11 @@ import {
   formatRate,
   formatReturn,
   interpretAttribution,
+  routeLabel,
+  sourceLabel,
+  vehicleLabel,
 } from "../utils/advertisingResults";
+import { effectiveWorkflowStatus } from "../utils/bookingWorkflow";
 import { ComparisonBars, growthComparisonItems, paceComparisonItems } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
 
@@ -80,6 +84,9 @@ export function AdvertisingResultsView({
   onAddSpend,
   onSaveSource,
   onSaveCost,
+  reportFilters,
+  filterChoices,
+  onReportFilters,
 }: {
   report: AdvertisingReport;
   deliveries?: DeliveryRow[];
@@ -96,6 +103,9 @@ export function AdvertisingResultsView({
   onAddSpend: (date: string, pounds: string, note: string) => void;
   onSaveSource: (id: string, source: string, channel: "telephone" | "whatsapp") => void;
   onSaveCost: (id: string, field: keyof JobCostInput, pounds: string) => void;
+  reportFilters?: { status: string; route: string; vehicle: string; source: string };
+  filterChoices?: { routes: string[]; vehicles: string[]; sources: string[] };
+  onReportFilters?: (next: { status: string; route: string; vehicle: string; source: string }) => void;
 }) {
   const [spendDate, setSpendDate] = useState(report.to);
   const [spendPounds, setSpendPounds] = useState("");
@@ -106,6 +116,9 @@ export function AdvertisingResultsView({
   }, [advertisingStartedOn]);
   const today = advertisingDateRange("today");
   const lastSeven = advertisingDateRange("last_7");
+  const lastTwentyEight = advertisingDateRange("last_28");
+  const monthToDate = advertisingDateRange("month_to_date");
+  const dateLabel = report.dateBasis === "enquiry" ? "enquiry or submission date" : "journey date";
   const figures = [report.costPerConfirmed, report.contribution, report.quoted, report.netPayments, report.manualSpend, report.adsSpend, report.advertisingSpend, report.costPerCompletedPaid, report.costs.driver, report.costs.fuel, report.costs.parking, report.costs.airport, report.costs.paymentFees];
 
   return (
@@ -123,7 +136,9 @@ export function AdvertisingResultsView({
       <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
         <div className="advertising-results__presets" role="group" aria-label="Date shortcuts">
           <button type="button" className={report.from === today.from && report.to === today.to ? "is-active" : ""} aria-pressed={report.from === today.from && report.to === today.to} onClick={() => onDates(today.from, today.to, report.dateBasis)}>Today</button>
-          <button type="button" className={report.from === lastSeven.from && report.to === lastSeven.to ? "is-active" : ""} aria-pressed={report.from === lastSeven.from && report.to === lastSeven.to} onClick={() => onDates(lastSeven.from, lastSeven.to, report.dateBasis)}>Last 7 days</button>
+          <button type="button" className={report.from === lastSeven.from && report.to === lastSeven.to ? "is-active" : ""} aria-pressed={report.from === lastSeven.from && report.to === lastSeven.to} onClick={() => onDates(lastSeven.from, lastSeven.to, report.dateBasis)}>Last 7 finished days</button>
+          <button type="button" className={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to ? "is-active" : ""} aria-pressed={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to} onClick={() => onDates(lastTwentyEight.from, lastTwentyEight.to, report.dateBasis)}>Last 28 finished days</button>
+          <button type="button" className={report.from === monthToDate.from && report.to === monthToDate.to ? "is-active" : ""} aria-pressed={report.from === monthToDate.from && report.to === monthToDate.to} onClick={() => onDates(monthToDate.from, monthToDate.to, report.dateBasis)}>Month to date</button>
         </div>
         <label>From
           <input className="form-input" type="date" value={report.from} onChange={(event) => onDates(event.target.value, report.to, report.dateBasis)} />
@@ -137,6 +152,39 @@ export function AdvertisingResultsView({
             <option value="enquiry">Enquiry date</option>
           </select>
         </label>
+        {onReportFilters && reportFilters && filterChoices ? (
+          <>
+            <label>Status
+              <select className="form-select" value={reportFilters.status} onChange={(event) => onReportFilters({ ...reportFilters, status: event.target.value })}>
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="awaiting_customer_confirmation">Awaiting customer confirmation</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="allocated">Allocated</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
+            <label>Route
+              <select className="form-select" value={reportFilters.route} onChange={(event) => onReportFilters({ ...reportFilters, route: event.target.value })}>
+                <option value="all">All routes</option>
+                {filterChoices.routes.map((route) => <option key={route} value={route}>{route}</option>)}
+              </select>
+            </label>
+            <label>Vehicle
+              <select className="form-select" value={reportFilters.vehicle} onChange={(event) => onReportFilters({ ...reportFilters, vehicle: event.target.value })}>
+                <option value="all">All vehicles</option>
+                {filterChoices.vehicles.map((vehicle) => <option key={vehicle} value={vehicle}>{vehicle}</option>)}
+              </select>
+            </label>
+            <label>Recorded source
+              <select className="form-select" value={reportFilters.source} onChange={(event) => onReportFilters({ ...reportFilters, source: event.target.value })}>
+                <option value="all">All sources</option>
+                {filterChoices.sources.map((source) => <option key={source} value={source}>{source}</option>)}
+              </select>
+            </label>
+          </>
+        ) : null}
       </form>
 
       <section className="advertising-results__panel">
@@ -148,7 +196,9 @@ export function AdvertisingResultsView({
             <p>Finished days, {report.selectedPace.from} to {report.selectedPace.to}: {formatPace(report.selectedPace.bookingsPerDay)} confirmed bookings a day.</p>
           </>
         )}
-        <p>{bookingPaceChange(report.earlierPace.bookingsPerDay, report.selectedPace.bookingsPerDay)}. This compares confirmed bookings on finished days. The current day is not finished, so it is left out of this comparison.</p>
+        <p>{bookingPaceChange(report.earlierPace.bookingsPerDay, report.selectedPace.bookingsPerDay)}. This compares confirmed bookings on finished days. The current day is not finished, so it is left out of this comparison. Last 7 finished days and last 28 finished days each use the equal number of days immediately before. A partial month is not compared with a full month.</p>
+        {report.monthEquivalent ? <p>{report.monthEquivalent.text}</p> : null}
+        <p>Active date basis: {dateLabel}.</p>
         {report.selectedPace.days > 0 ? <ComparisonBars earlierName="Earlier" laterName="Finished days" items={paceComparisonItems(report.earlierPace, report.selectedPace)} /> : null}
         <BookingFrequencyChart points={report.frequency} dateLabel={report.dateBasis === "enquiry" ? "enquiry date" : "journey date"} startDate={advertisingStartConfirmed ? advertisingStartedOn : null} frequencyChange={report.frequencyChange} revenuePerDayChange={report.revenuePerDayChange} averageBookingValueChange={report.averageBookingValueChange} confirmedBookingRateChange={report.confirmedBookingRateChange} />
         <p>{report.revenuePerDay.detail} {report.averageBookingValue.detail} {report.confirmedRateLabel} The earlier period is the same number of days immediately before the dates selected.</p>
@@ -200,6 +250,48 @@ export function AdvertisingResultsView({
           {report.limitations.map((line) => <p key={line}>{line}</p>)}
         </section>
       ) : null}
+
+      <BarList
+        title="Weekly volume"
+        caption={`Bookings in each week by ${dateLabel}. A return fare stays on the one booking.`}
+        rows={report.weekly.map((week) => ({ label: `Week of ${week.weekStarting}`, text: `${week.bookings} ${week.bookings === 1 ? "booking" : "bookings"}, ${week.confirmed} confirmed`, width: week.bookings }))}
+      />
+      <BarList
+        title="Weekly fares and payments"
+        caption="Quoted fares and payments received are separate. A missing amount is not shown as zero. The bar uses the known payment total only."
+        rows={report.weekly.map((week) => ({
+          label: `Week of ${week.weekStarting}`,
+          text: `Quoted fares ${formatGbp(week.quotedKnownPence)}${week.quotedMissing ? `, ${week.quotedMissing} missing` : ""}. Payments ${formatGbp(week.paymentsKnownPence)}${week.paymentsMissing ? `, ${week.paymentsMissing} missing` : ""}.`,
+          width: week.paymentsKnownPence === null ? 0 : week.paymentsKnownPence,
+        }))}
+      />
+      <section className="advertising-results__panel">
+        <h2>Enquiry to confirmed booking</h2>
+        <p>{report.funnel.enquiries} stored {report.funnel.enquiries === 1 ? "enquiry" : "enquiries"}, {report.funnel.confirmed} confirmed bookings, {report.funnel.completed} completed {report.funnel.completed === 1 ? "journey" : "journeys"}. {report.funnel.reason}</p>
+      </section>
+      <BarList
+        title="Upcoming confirmed work"
+        caption="Future confirmed and allocated journeys by the week of the journey. Completed work and receipts are not included."
+        rows={report.upcomingWeeks.map((week) => ({ label: `Week of ${week.weekStarting}`, text: `${week.journeys} journeys. Known quoted fares ${formatGbp(week.knownFarePence)}${week.missingFares ? `, ${week.missingFares} missing` : ""}.`, width: week.journeys }))}
+      />
+      <BarList
+        title="Manual advertising spend by week"
+        caption="Only dated manual entries are shown. Google Ads daily spend is not connected, so it is not drawn as zero."
+        rows={report.manualSpendWeeks.map((week) => ({ label: `Week of ${week.weekStarting}`, text: `${formatGbp(week.amountPence)} from ${week.entries} ${week.entries === 1 ? "entry" : "entries"}`, width: week.amountPence || 0 }))}
+      />
+      <section className="advertising-results__panel">
+        <h2>Missing data</h2>
+        <p>These counts are why some figures stay unknown. They are not treated as zero.</p>
+        <ul>
+          <li>{report.missingData.fares} missing fares</li>
+          <li>{report.missingData.payments} missing payments</li>
+          <li>{report.missingData.sources} bookings with no recorded source</li>
+          <li>{report.missingData.creation} missing creation times</li>
+          <li>{report.missingData.journey} missing journey dates</li>
+          <li>{report.missingData.costs} completed {report.missingData.costs === 1 ? "job has" : "jobs have"} a missing direct cost</li>
+        </ul>
+        <p>No campaign is stored on the booking, so the results cannot be filtered by advertising campaign.</p>
+      </section>
 
       <div className="advertising-results__counts">
         <article><span>Enquiries</span><strong>{report.enquiries}</strong></article>
@@ -420,6 +512,27 @@ function ResultsTable({ title, rows }: { title: string; rows: AdvertisingReport[
   );
 }
 
+function BarList({ title, caption, rows }: { title: string; caption: string; rows: Array<{ label: string; text: string; width: number }> }) {
+  const max = rows.reduce((largest, row) => Math.max(largest, row.width), 0);
+  return (
+    <section className="advertising-results__panel">
+      <h2>{title}</h2>
+      <p>{caption}</p>
+      {rows.length === 0 ? <p>Nothing to show for this selection.</p> : (
+        <ul className="advertising-results__bars">
+          {rows.map((row) => (
+            <li key={row.label}>
+              <span>{row.label}</span>
+              <span className="advertising-results__bar" style={{ width: `${max > 0 ? Math.max(4, Math.round((row.width / max) * 100)) : 0}%` }} />
+              <span>{row.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function poundsToPence(value: string): number | null {
   const cleaned = value.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
@@ -464,6 +577,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
+  const [reportFilters, setReportFilters] = useState({ status: "all", route: "all", vehicle: "all", source: "all" });
 
   useEffect(() => {
     if (previewMode) return undefined;
@@ -522,9 +636,22 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     };
   }, [previewMode]);
 
-  const report = useMemo(() => buildAdvertisingReport(withNotes(bookings, notes), {
+  const noted = useMemo(() => withNotes(bookings, notes), [bookings, notes]);
+  const filterChoices = useMemo(() => ({
+    routes: Array.from(new Set(noted.map((booking) => routeLabel(booking)))).sort(),
+    vehicles: Array.from(new Set(noted.map((booking) => vehicleLabel(booking)))).sort(),
+    sources: Array.from(new Set(noted.map((booking) => sourceLabel(booking)))).sort(),
+  }), [noted]);
+  const filteredBookings = useMemo(() => noted.filter((booking) => {
+    if (reportFilters.status !== "all" && effectiveWorkflowStatus(booking) !== reportFilters.status) return false;
+    if (reportFilters.route !== "all" && routeLabel(booking) !== reportFilters.route) return false;
+    if (reportFilters.vehicle !== "all" && vehicleLabel(booking) !== reportFilters.vehicle) return false;
+    if (reportFilters.source !== "all" && sourceLabel(booking) !== reportFilters.source) return false;
+    return true;
+  }), [noted, reportFilters]);
+  const report = useMemo(() => buildAdvertisingReport(filteredBookings, {
     from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected, adsSpendPence: null, advertisingStartedOn, advertisingStartConfirmed,
-  }), [bookings, notes, from, to, dateBasis, spend, manualIsComplete, adsConnected, advertisingStartedOn, advertisingStartConfirmed]);
+  }), [filteredBookings, from, to, dateBasis, spend, manualIsComplete, adsConnected, advertisingStartedOn, advertisingStartConfirmed]);
 
   if (!previewMode && !isAdminEmail(email)) {
     return <section className="advertising-results"><h1>Advertising results</h1><p>This page is only for admin accounts.</p></section>;
@@ -613,6 +740,9 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
           setSaving(false);
         }
       }}
+      reportFilters={reportFilters}
+      filterChoices={filterChoices}
+      onReportFilters={setReportFilters}
       onSaveSource={(id, source, channel) => { void saveNote(id, { staffReportedSource: source, enquiryChannel: channel }); }}
       onSaveCost={(id, field, pounds) => {
         const amount = poundsToPence(pounds);

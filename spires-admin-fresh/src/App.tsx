@@ -30,6 +30,7 @@ import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
 import BookingModal from './components/BookingModal';
 import ReturnJourneyPreview from './components/ReturnJourneyPreview';
+import ReportingPreview from './components/ReportingPreview';
 import './styles.css';
 
 const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
@@ -146,6 +147,14 @@ const App: React.FC = () => {
     new URLSearchParams(window.location.search).get('returnPreview') === '1'
   ) {
     return <ReturnJourneyPreview />;
+  }
+
+  if (
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('reportingPreview') === '1'
+  ) {
+    return <ReportingPreview />;
   }
 
   if (authLoading) {

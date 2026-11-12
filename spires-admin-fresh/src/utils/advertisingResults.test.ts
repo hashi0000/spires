@@ -71,7 +71,7 @@ describe("advertising results", () => {
     expect(report.costs.airport.pence).toBeNull();
     expect(report.costs.paymentFees.pence).toBeNull();
     expect(report.contribution.pence).toBeNull();
-    expect(report.contribution.label).toBe("Profit after advertising and recorded journey costs");
+    expect(report.contribution.label).toBe("Contribution after direct costs and advertising");
     expect(report.returnOnSpend.ratio).toBeNull();
     expect(formatGbp(report.costs.airport.pence)).toBe("Unknown");
   });
@@ -671,7 +671,7 @@ describe("advertising results", () => {
       "1 confirmed booking has no recorded payment. Revenue from that booking stays unknown, and the missing payment is not treated as zero.",
       "1 confirmed booking has no quoted fare. Average booking value stays unknown, and the missing fare is not treated as zero.",
       "1 confirmed booking has no recorded source. Attribution for that booking stays unknown.",
-      "1 completed job has a journey cost that was not recorded. Profit stays unknown while that cost is missing.",
+      "1 completed job has a journey cost that was not recorded. Contribution stays unknown while that cost is missing.",
       "1 booking in this comparison has no creation time. An enquiry date comparison leaves it out. A journey date is not substituted for the booking creation date.",
     ]);
     const enquiry = buildAdvertisingReport([incomplete], { ...period, dateBasis: "enquiry", now: new Date("2026-11-15T12:00:00Z") });
@@ -746,5 +746,39 @@ describe("advertising results", () => {
     expect(report.byEnquiry.map((row) => row.label).sort()).toEqual(["Portal booking request", "Unknown", "Website quote"]);
     expect(report.unpaidConfirmed).toBe(1);
     expect(report.netPayments.pence).toBe(0);
+  });
+
+  it("uses the entered enquiry time and does not treat a customer report as tracked advertising", () => {
+    const options = {
+      from: "2026-10-01",
+      to: "2026-10-31",
+      dateBasis: "enquiry" as const,
+      now: new Date("2026-11-15T12:00:00Z"),
+      spend: [],
+      manualSpendIsComplete: false,
+      adsConnected: false,
+    };
+    const asked = booking({
+      id: "asked",
+      bookingNumber: "ASK",
+      status: "confirmed",
+      createdAt: "2026-11-01T09:00:00Z",
+      enquiryAt: "2026-10-20T09:00:00Z",
+      pickupTime: "2026-11-10T09:00:00Z",
+      heardAbout: "google",
+      actualFare: 50,
+      amountReceivedPence: undefined,
+    });
+    const report = buildAdvertisingReport([asked], options);
+    expect(report.confirmed).toBe(1);
+    expect(report.bySource.map((row) => row.label)).toContain("Customer reported Google");
+    expect(report.directAds.confirmed).toBe(0);
+    expect(report.funnel.rate).toBeNull();
+    expect(report.weekly.some((week) => week.weekStarting === "2026-10-19" && week.paymentsKnownPence === null && week.paymentsMissing === 1)).toBe(true);
+    const createdWindow = buildAdvertisingReport([asked], { ...options, from: "2026-11-01", to: "2026-11-30" });
+    expect(createdWindow.confirmed).toBe(0);
+    const month = buildAdvertisingReport([asked], { ...options, from: "2026-11-01", to: "2026-11-30", dateBasis: "journey" });
+    expect(month.monthEquivalent?.text).toMatch(/previous month/);
+    expect(month.monthEquivalent?.text).toMatch(/2026-10-01/);
   });
 });
