@@ -121,7 +121,7 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     expenses: customerBooking.expenses || [],
     createdAt: customerBooking.createdAt?.toDate 
       ? customerBooking.createdAt.toDate() 
-      : (customerBooking.createdAt || new Date()),
+      : (customerBooking.createdAt || undefined),
     updatedAt: customerBooking.updatedAt?.toDate 
       ? customerBooking.updatedAt.toDate() 
       : (customerBooking.updatedAt || new Date()),
