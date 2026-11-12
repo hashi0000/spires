@@ -261,6 +261,7 @@ export function prepareGuestBooking(
   const paymentRaw = str(body.paymentMethod).toLowerCase();
   const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
   const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
+  const websiteEnquiryRef = /^ST-[A-Z0-9]{6}$/.test(str(body.websiteEnquiryRef)) ? str(body.websiteEnquiryRef) : "";
   const heardCode = str(body.heardAbout);
   const heardAbout = HEARD_ABOUT_LABELS[heardCode] ? heardCode : "";
   const heardAboutDetail = heardAbout === "other" ? str(body.heardAboutDetail).replace(/\s+/g, " ").slice(0, 80) : "";
@@ -332,6 +333,7 @@ export function prepareGuestBooking(
     termsVersion: terms.version,
     acceptanceMethod: "website",
     ...(heardAbout ? { heardAbout, heardAboutDetail } : {}),
+    ...(websiteEnquiryRef ? { websiteEnquiryRef } : {}),
   };
 
   return {

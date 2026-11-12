@@ -90,6 +90,14 @@ test("links use the existing business number and a URL-encoded message", () => {
   assert.equal(href.includes("'"), false);
 });
 
+test("a website reference is opaque and is not a click id", () => {
+  const message = wa.withWebsiteReference(wa.enquiryMessage("heathrow-to-oxford"), "ST-AB23CD");
+  assert.equal(message.includes("Website reference: ST-AB23CD"), true);
+  assert.equal(message.includes("gclid"), false);
+  assert.equal(wa.withWebsiteReference("gclid=abc", "ST-AB23CD"), "gclid=abc");
+  assert.equal(wa.withWebsiteReference("Hello", "click-id"), "Hello");
+});
+
 test("filename mapping stays aligned with the route registry", () => {
   for (const file of Object.keys(wa.ROUTE_FILES)) {
     const routeId = wa.routeIdForFilename(file);

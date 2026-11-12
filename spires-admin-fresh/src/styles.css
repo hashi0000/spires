@@ -2142,7 +2142,10 @@ header.admin-header,
 .advertising-results__budget, .advertising-results__banner, .advertising-results__message { font-weight: 700; }
 .advertising-results__banner { background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 0.75rem 1rem; }
 .advertising-results__filters, .advertising-results__spend, .advertising-results__costs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
-.advertising-results__presets { display: flex; gap: 0.4rem; }
+.advertising-results__presets { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.advertising-results__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.advertising-results__bars li { display: grid; gap: 0.25rem; }
+.advertising-results__bar { display: block; height: 0.5rem; max-width: 100%; background: #002147; border-radius: 999px; }
 .advertising-results__presets button { background: #fff; border: 1px solid #c5ced8; color: #002147; border-radius: 8px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer; }
 .advertising-results__presets button.is-active { background: #002147; color: #fff; }
 .advertising-results label { display: grid; gap: 0.3rem; font-size: 0.8125rem; font-weight: 700; }

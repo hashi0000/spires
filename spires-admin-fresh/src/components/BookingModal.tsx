@@ -131,6 +131,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
     hirerAddress: '',
     hirerPhone: '',
     bookingMethod: 'telephone',
+    enquiryAt: '',
+    customerReportedSource: '',
     pickupTime: '',
     pickupLocation: '',
     destination: '',
@@ -193,6 +195,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
         pickupLocation: editingBooking.pickupLocation || (editingBooking as any).pickup || '',
         destination: editingBooking.destination || '',
         bookingMethod: editingBooking.bookingMethod || 'internet',
+        enquiryAt: toDatetimeLocalValue(editingBooking.enquiryAt || ''),
+        customerReportedSource: editingBooking.customerReportedSource || '',
         pickupTime: toDatetimeLocalValue(
           editingBooking.pickupTime || (editingBooking as any).dateTime || editingBooking.dateTime || ''
         ),
@@ -522,6 +526,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
     if (!bookingData.returnDriverId) delete bookingData.returnDriverId;
     Object.assign(bookingData, applyRequestedLegStatus(editingBooking || null, bookingData));
 
+    const reportedSource = String(formData.customerReportedSource || '');
+    if (['google_advert', 'google_search', 'recommendation', 'repeat', 'other'].includes(reportedSource)) {
+      bookingData.customerReportedSource = reportedSource as ExtendedBooking['customerReportedSource'];
+    } else {
+      delete bookingData.customerReportedSource;
+    }
+    const enquiryLocal = typeof formData.enquiryAt === "string" ? formData.enquiryAt.trim() : "";
+    if (enquiryLocal) {
+      bookingData.enquiryAt = fromDatetimeLocalValue(enquiryLocal);
+    } else {
+      delete bookingData.enquiryAt;
+    }
+
     // Only add createdAt for new bookings
     if (!editingBooking) {
       bookingData.createdAt = serverTimestamp();
@@ -657,6 +674,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   ? 'The other details were saved. This booking was not confirmed. Set the status to Confirmed and save again so the customer acceptance is recorded.'
                   : 'The other details were saved. The customer acceptance is recorded. Record the required payment in Quote and payment before this booking can be confirmed.';
               }
+            }
+          }
+          delete safeUpdate.createdAt;
+          delete safeUpdate.confirmedAt;
+          delete safeUpdate.completedAt;
+          if (!formData.enquiryAt && current?.enquiryAt) safeUpdate.enquiryAt = deleteField();
+          if (!reportedSource && current?.customerReportedSource) safeUpdate.customerReportedSource = deleteField();
+          if (current?.websiteEnquiryRef) safeUpdate.websiteEnquiryRef = current.websiteEnquiryRef;
+          const previousStatus = String(current?.status || '');
+          if (safeUpdate.status && safeUpdate.status !== previousStatus) {
+            if (['confirmed', 'allocated', 'completed'].includes(String(safeUpdate.status)) && !current?.confirmedAt) {
+              safeUpdate.confirmedAt = serverTimestamp();
+            }
+            if (safeUpdate.status === 'completed' && !current?.completedAt) {
+              safeUpdate.completedAt = serverTimestamp();
             }
           }
           if (!formData.pickupPlace) safeUpdate.pickupPlace = deleteField();
@@ -890,6 +922,35 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <option value="in person">In Person</option>
                 <option value="internet">Internet</option>
               </select>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry date and time</label>
+              <input
+                type="datetime-local"
+                value={typeof formData.enquiryAt === "string" ? formData.enquiryAt : ""}
+                onChange={(e) => setFormData({ ...formData, enquiryAt: e.target.value })}
+                className="form-input"
+              />
+              <p className="text-xs text-gray-500 mt-1">When the customer first asked, if you know it. Leave this blank when you do not. This does not change the time the record was created.</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">How the customer said they heard about us</label>
+              <select
+                value={formData.customerReportedSource || ''}
+                onChange={(e) => setFormData({ ...formData, customerReportedSource: e.target.value as ExtendedBooking['customerReportedSource'] })}
+                className="form-input"
+              >
+                <option value="">Not recorded</option>
+                <option value="google_advert">Google advert</option>
+                <option value="google_search">Google search</option>
+                <option value="recommendation">Recommendation</option>
+                <option value="repeat">Repeat customer</option>
+                <option value="other">Other</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">This is what the customer told you. It is not tracked advertising. The booking method above is the channel, such as telephone or WhatsApp.</p>
+              {editingBooking?.websiteEnquiryRef ? <p className="text-xs text-gray-500 mt-1">Website reference: {editingBooking.websiteEnquiryRef}</p> : null}
             </div>
 
             {locationSuggestions.length > 0 && (
@@ -1265,7 +1326,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     ))}
                   </select>
                   {formData.vehicleType === 'standard' && (
-                    <p className="text-xs text-gray-500 mt-1">Toyota RAV4 / Corolla or similar — customer-facing class only.</p>
+                    <p className="text-xs text-gray-500 mt-1">Toyota RAV4 / Corolla or similar. Customer facing class only.</p>
                   )}
                 </div>
                 <div>

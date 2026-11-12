@@ -10,6 +10,8 @@ import { db, functions } from '../utils/firebase';
 import { planBulkJobUpdate, type BulkJobChanges } from '../utils/bulkBookingEdit';
 import { describeStops, hasExtraStops, normaliseStops, openReturnSummary } from '../utils/journeyStops';
 import { journeyLegs, legsForQuickView, type JourneyLeg } from '../utils/journeyLegs';
+import { londonExportDate, londonExportTime } from '../utils/bookingDates';
+import { buildAnalysisCsv, type AnalysisBooking } from '../utils/analysisExport';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
@@ -256,26 +258,26 @@ const Bookings: React.FC<BookingsProps> = ({
 
   const accountingSummary = useMemo(() => {
     const completed = filteredBookings.filter(b => b.status === 'completed');
-    const totalRevenue = completed.reduce((sum, b) => sum + (b.actualFare || 0), 0);
-    const totalExpenses = completed.reduce((sum, b) => {
-      const bookingExpenses = b.expenses?.reduce((eSum, e) => eSum + e.amount, 0) || 0;
-      return sum + bookingExpenses;
-    }, 0);
-    const netProfit = totalRevenue - totalExpenses;
-    const receivedFor = (b: Booking) => b.amountReceivedPence != null
+    const fareKnown = completed.every((b) => typeof b.actualFare === "number" && Number.isFinite(b.actualFare));
+    const totalRevenue = fareKnown ? completed.reduce((sum, b) => sum + Number(b.actualFare), 0) : null;
+    const expensesMissing = completed.some((b) => !b.expenses || b.expenses.length === 0);
+    const totalExpenses = expensesMissing ? null : completed.reduce((sum, b) => sum + (b.expenses || []).reduce((eSum, e) => eSum + Number(e.amount || 0), 0), 0);
+    const receivedFor = (b: Booking): number | null => b.amountReceivedPence != null && Number.isFinite(Number(b.amountReceivedPence))
       ? Math.max(0, Number(b.amountReceivedPence) / 100)
-      : b.paymentStatus === 'paid' ? b.actualFare || 0 : 0;
-    const outstandingFor = (b: Booking) => Math.max(0, (b.actualFare || 0) - receivedFor(b));
-    const paidBookings = completed.filter(b => outstandingFor(b) === 0);
-    const unpaidBookings = completed.filter(b => outstandingFor(b) > 0);
-    const paidAmount = completed.reduce((sum, b) => sum + receivedFor(b), 0);
-    const unpaidAmount = completed.reduce((sum, b) => sum + outstandingFor(b), 0);
+      : null;
+    const paymentsKnown = completed.every((b) => receivedFor(b) !== null);
+    const paidAmount = paymentsKnown ? completed.reduce((sum, b) => sum + (receivedFor(b) || 0), 0) : null;
+    const paidBookings = completed.filter((b) => {
+      const received = receivedFor(b);
+      return received !== null && (b.actualFare == null || received >= Number(b.actualFare));
+    });
+    const unpaidBookings = completed.filter((b) => receivedFor(b) === null);
     const driverRevenue = drivers.map(driver => {
       const driverBookings = completed.filter(b => b.driverId === driver.id);
       const revenue = driverBookings.reduce((sum, b) => sum + (b.actualFare || 0), 0);
       return { driver: driver.name, revenue, bookings: driverBookings.length };
     }).filter(d => d.bookings > 0);
-    return { totalRevenue, totalExpenses, netProfit, totalBookings: completed.length, paidAmount, unpaidAmount, paidCount: paidBookings.length, unpaidCount: unpaidBookings.length, driverRevenue };
+    return { totalRevenue, totalExpenses, totalBookings: completed.length, paidAmount, paidCount: paidBookings.length, unrecordedCount: unpaidBookings.length, driverRevenue };
   }, [filteredBookings, drivers]);
 
   const exportToCSV = () => {
@@ -285,10 +287,10 @@ const Bookings: React.FC<BookingsProps> = ({
       const vehicle = vehicles.find(v => v.id === booking.vehicleId);
       const fuelExpense = booking.expenses?.find(e => e.type === 'fuel')?.amount || '';
       const parkingExpense = booking.expenses?.find(e => e.type === 'parking')?.amount || '';
-      const bookingCreatedDate = booking.dateTime ? new Date(booking.dateTime).toLocaleDateString('en-GB') : '';
-      const bookingCreatedTime = booking.dateTime ? new Date(booking.dateTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-      const pickupDate = new Date(booking.pickupTime).toLocaleDateString('en-GB');
-      const pickupTime = new Date(booking.pickupTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const bookingCreatedDate = londonExportDate(booking.createdAt);
+      const bookingCreatedTime = londonExportTime(booking.createdAt);
+      const pickupDate = londonExportDate(booking.pickupTime);
+      const pickupTime = londonExportTime(booking.pickupTime);
       return [booking.bookingNumber, bookingCreatedDate, bookingCreatedTime, pickupDate, pickupTime, booking.hirerName, booking.hirerPhone, booking.bookingMethod, `"${booking.pickupLocation.replace(/"/g, '""')}"`, `"${booking.destination.replace(/"/g, '""')}"`, booking.actualFare || '', fuelExpense, parkingExpense, booking.paymentMethod || '', booking.paymentStatus || '', driver?.name || '', vehicle?.registration || '', booking.status, `"${(booking.notes || '').replace(/"/g, '""')}"`].join(',');
     });
     const csv = [headers.join(','), ...rows].join('\n');
@@ -298,6 +300,19 @@ const Bookings: React.FC<BookingsProps> = ({
     const filename = selectedMonth ? `bookings-${selectedMonth}.csv` : `bookings-${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportAnalysis = () => {
+    const csv = buildAnalysisCsv(filteredBookings as AnalysisBooking[]);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `booking-analysis-${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -609,6 +624,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
               <Download className="h-4 w-4" />
               Export CSV
             </button>
+            <button onClick={exportAnalysis} className="btn btn-secondary btn-sm" type="button">
+              Analysis export
+            </button>
             <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
               <Plus className="h-4 w-4" />
               Import CSV
@@ -680,13 +698,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200" style={{ marginTop: '1.5rem' }}>
         <div className="flex items-center mb-4"><DollarSign className="h-6 w-6 text-green-600 mr-2" /><h3 className="text-lg font-semibold text-gray-900">Accounting Summary</h3><span className="ml-auto text-sm text-gray-600">{filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}{selectedMonth && ` in ${new Date(selectedMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`}</span></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Total Revenue</p><p className="text-2xl font-bold text-green-600">£{accountingSummary.totalRevenue.toFixed(2)}</p></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Total Expenses</p><p className="text-2xl font-bold text-red-600">£{accountingSummary.totalExpenses.toFixed(2)}</p></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Net Profit</p><p className="text-2xl font-bold text-blue-600">£{accountingSummary.netProfit.toFixed(2)}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Quoted fares on completed jobs</p><p className="text-2xl font-bold text-green-600">{accountingSummary.totalRevenue === null ? "Unknown" : `£${accountingSummary.totalRevenue.toFixed(2)}`}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Recorded expenses</p><p className="text-2xl font-bold text-red-600">{accountingSummary.totalExpenses === null ? "Unknown" : `£${accountingSummary.totalExpenses.toFixed(2)}`}</p></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Money received</p><p className="text-2xl font-bold text-blue-600">{accountingSummary.paidAmount === null ? "Unknown" : `£${accountingSummary.paidAmount.toFixed(2)}`}</p><p className="text-xs text-gray-500 mt-1">A paid flag without a recorded amount stays unknown.</p></div>
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Completed Jobs</p><p className="text-2xl font-bold text-gray-900">{accountingSummary.totalBookings}</p></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Payment Status</p><div className="space-y-2"><div className="flex justify-between"><span className="text-sm text-gray-600">Paid ({accountingSummary.paidCount})</span><span className="text-sm font-semibold text-green-600">£{accountingSummary.paidAmount.toFixed(2)}</span></div><div className="flex justify-between"><span className="text-sm text-gray-600">Unpaid ({accountingSummary.unpaidCount})</span><span className="text-sm font-semibold text-red-600">£{accountingSummary.unpaidAmount.toFixed(2)}</span></div></div></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Payment Status</p><div className="space-y-2"><div className="flex justify-between"><span className="text-sm text-gray-600">Recorded payment ({accountingSummary.paidCount})</span><span className="text-sm font-semibold text-green-600">{accountingSummary.paidAmount === null ? "Unknown" : `£${accountingSummary.paidAmount.toFixed(2)}`}</span></div><div className="flex justify-between"><span className="text-sm text-gray-600">Payment not recorded ({accountingSummary.unrecordedCount})</span><span className="text-sm font-semibold text-red-600">Unknown</span></div></div></div>
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Revenue by Driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">£{dr.revenue.toFixed(2)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}</div></div>
         </div>
       </div>
