@@ -2,7 +2,7 @@
   "name": "spires-functions",
   "scripts": {
     "build": "tsc",
-    "test": "tsc && node --test lib/spiresShare/*.test.js lib/familyJobsAuth.test.js lib/pdfGenerator.test.js lib/quotes/*.test.js lib/terms/*.test.js lib/businessAccounts/*.test.js lib/bookings/*.test.js lib/locations/*.test.js lib/stats/*.test.js lib/marketing/*.test.js lib/international/*.test.js",
+    "test": "tsc && node --test lib/spiresShare/*.test.js lib/familyJobsAuth.test.js lib/familyPushLogic.test.js lib/pdfGenerator.test.js lib/quotes/*.test.js lib/terms/*.test.js lib/businessAccounts/*.test.js lib/bookings/*.test.js lib/locations/*.test.js lib/stats/*.test.js lib/marketing/*.test.js lib/international/*.test.js",
     "lint": "echo \"Skipping lint\"",
     "serve": "firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
@@ -18,7 +18,8 @@
     "get-stream": "^9.0.1",
     "nodemailer": "^6.9.8",
     "pdfkit": "^0.13.0",
-    "stripe": "^14.25.0"
+    "stripe": "^14.25.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/get-stream": "^3.0.1",

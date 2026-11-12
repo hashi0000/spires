@@ -18,6 +18,8 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
   const unlock = firebase.app().functions("us-central1").httpsCallable("unlockFamilyJobs");
+  const pushKey = firebase.app().functions("us-central1").httpsCallable("familyPushPublicKey");
+  const savePush = firebase.app().functions("us-central1").httpsCallable("saveFamilyPushSubscription");
 
   const pinScreen = document.getElementById("pin-screen");
   const appScreen = document.getElementById("app-screen");
@@ -32,6 +34,8 @@
   const statusEl = document.getElementById("app-status");
   const loadingEl = document.getElementById("app-loading");
   const retryEl = document.getElementById("app-retry");
+  const pushNote = document.getElementById("push-note");
+  const pushAllow = document.getElementById("push-allow");
   const sheet = document.getElementById("sheet");
   const sheetCard = document.getElementById("sheet-card");
 
@@ -760,10 +764,98 @@
       }
       showApp(true);
       listenBookings();
+      preparePush();
     } catch {
       await auth.signOut();
     }
   });
+
+  function setPushNote(message) {
+    if (!pushNote) return;
+    pushNote.textContent = message || "";
+    show(pushNote, Boolean(message));
+  }
+
+  function iosPhone() {
+    return /iPhone|iPad|iPod/.test(navigator.userAgent);
+  }
+
+  function standaloneApp() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
+  function urlBase64ToUint8Array(value) {
+    const padding = "=".repeat((4 - (value.length % 4)) % 4);
+    const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(base64);
+    const output = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i);
+    return output;
+  }
+
+  async function syncPushSubscription() {
+    const result = await pushKey({});
+    const publicKey = result.data && result.data.publicKey;
+    if (!publicKey) {
+      setPushNote("Job alerts are not ready yet.");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await savePush({ subscription: subscription.toJSON() });
+    if (pushAllow) show(pushAllow, false);
+    setPushNote("Job alerts are on. This phone can receive them when the app is closed.");
+  }
+
+  async function preparePush() {
+    if (!pushAllow) return;
+    if (iosPhone() && !standaloneApp()) {
+      show(pushAllow, false);
+      setPushNote("On an iPhone, add Family jobs to the home screen first. Alerts can then arrive when the app is closed.");
+      return;
+    }
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (Notification.permission === "denied") {
+      show(pushAllow, false);
+      setPushNote("Job alerts are blocked on this phone. Allow notifications for Spires Jobs in the phone settings.");
+      savePush({ subscription: null }).catch(function () { return undefined; });
+      return;
+    }
+    if (Notification.permission === "granted") {
+      try {
+        await syncPushSubscription();
+      } catch (error) {
+        setPushNote("Job alerts could not be turned on.");
+      }
+      return;
+    }
+    show(pushAllow, true);
+    setPushNote("Allow job alerts to hear about a new job, a change, or a pickup in the next hour when the app is closed.");
+  }
+
+  if (pushAllow) {
+    pushAllow.addEventListener("click", async function () {
+      pushAllow.disabled = true;
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          setPushNote("Job alerts stay off until this phone allows them.");
+          return;
+        }
+        await syncPushSubscription();
+      } catch (error) {
+        setPushNote("Job alerts could not be turned on.");
+      } finally {
+        pushAllow.disabled = false;
+      }
+    });
+  }
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/office-jobs-sw.js", { scope: "/office-jobs" }).catch(() => undefined);

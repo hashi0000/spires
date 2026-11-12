@@ -115,6 +115,7 @@ export const scheduledBookingReminderEmails = functions
 export { createPaymentIntent, confirmPayment, stripeWebhook };
 export { sendDriverReminderManual } from "./sendDriverReminderManual";
 export { unlockFamilyJobs } from "./familyJobsAuth";
+export { familyPushPublicKey, saveFamilyPushSubscription, onFamilyJobPush, scheduledFamilyJobPush } from "./familyPush";
 export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";
