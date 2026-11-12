@@ -255,7 +255,7 @@ const Bookings: React.FC<BookingsProps> = ({
       const created = booking.createdAt ? new Date(booking.createdAt) : null;
       const hasCreated = created !== null && !Number.isNaN(created.getTime());
       const bookingCreatedDate = hasCreated ? created.toLocaleDateString('en-GB', { timeZone: 'Europe/London' }) : '';
-      const bookingCreatedTime = hasCreated ? created.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+      const bookingCreatedTime = hasCreated ? created.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }) : '';
       const pickupDate = new Date(booking.pickupTime).toLocaleDateString('en-GB');
       const pickupTime = new Date(booking.pickupTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       return [booking.bookingNumber, bookingCreatedDate, bookingCreatedTime, pickupDate, pickupTime, booking.hirerName, booking.hirerPhone, booking.bookingMethod, `"${booking.pickupLocation.replace(/"/g, '""')}"`, `"${booking.destination.replace(/"/g, '""')}"`, booking.actualFare || '', fuelExpense, parkingExpense, booking.paymentMethod || '', booking.paymentStatus || '', driver?.name || '', vehicle?.registration || '', booking.status, `"${(booking.notes || '').replace(/"/g, '""')}"`].join(',');
