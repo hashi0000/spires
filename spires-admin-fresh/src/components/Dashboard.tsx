@@ -5,7 +5,8 @@ import { Booking } from '../types/types';
 import {
   formatPickupDisplay,
   formatTimeUntil,
-  getUpcomingBookings
+  getUpcomingBookings,
+  returnsToReview
 } from '../utils/bookingSchedule';
 import {
   bookingPaceChange,
@@ -100,6 +101,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     () => getUpcomingBookings(bookings, now, { withinMs: UPCOMING_WINDOW_MS, maxItems: UPCOMING_LIST_MAX }),
     [bookings, now]
   );
+  const reviewReturns = useMemo(
+    () => returnsToReview(bookings, now, UPCOMING_WINDOW_MS),
+    [bookings, now]
+  );
 
   const handleDesktopToggle = async (next: boolean) => {
     await onDesktopRemindersChange(next);
@@ -131,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <h3 className="text-base font-semibold text-gray-900">Upcoming jobs</h3>
             <p className="text-xs text-gray-500">
-              Active bookings in the next 7 days (pending, confirmed, or allocated)
+              Each journey in the next 7 days. A return is listed on its own pickup time.
             </p>
           </div>
         </div>
@@ -139,33 +144,52 @@ const Dashboard: React.FC<DashboardProps> = ({
           <p className="text-sm text-gray-600 px-4 py-6">No upcoming jobs in the next week.</p>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {upcoming.map(({ booking, pickupAt }) => {
-              const soon = pickupAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000;
+            {upcoming.map((item) => {
+              const soon = item.pickupAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000;
+              const route = [item.pickupLocation, item.destination].map((part) => part.trim()).filter(Boolean).join(' → ');
               return (
-                <li key={booking.id || booking.bookingNumber} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <li key={`${item.booking.id || item.booking.bookingNumber}-${item.leg}`} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {booking.bookingNumber}
-                      <span className="text-gray-500 font-normal"> · {booking.hirerName}</span>
+                      {item.booking.bookingNumber}
+                      {item.showLabel ? <span className="text-gray-500 font-normal"> · {item.label}</span> : null}
+                      <span className="text-gray-500 font-normal"> · {item.booking.hirerName}</span>
                     </p>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      {(booking.pickupLocation || '').trim() || '—'}
-                      {(booking.destination || '').trim() ? ` → ${(booking.destination || '').trim()}` : ''}
-                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">{route || '—'}</p>
+                    {item.leg === 'return' && !item.driverId ? (
+                      <p className="text-xs text-amber-700 mt-0.5">Driver not confirmed</p>
+                    ) : null}
                   </div>
                   <div className="text-left sm:text-right flex-shrink-0">
-                    <p className="text-sm text-gray-900">{formatPickupDisplay(pickupAt)}</p>
+                    <p className="text-sm text-gray-900">{formatPickupDisplay(item.pickupAt)}</p>
                     <p className={`text-xs mt-0.5 ${soon ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
-                      {formatTimeUntil(pickupAt, now)}
+                      {formatTimeUntil(item.pickupAt, now)}
                       {soon ? ' · next 24h' : ''}
                     </p>
-                    <p className="text-xs text-gray-400 capitalize mt-0.5">{booking.status}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.statusLabel}</p>
                   </div>
                 </li>
               );
             })}
           </ul>
         )}
+        {reviewReturns.length > 0 ? (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-900">Returns to review</h4>
+            <p className="text-xs text-gray-500 mt-1">
+              A completed booking still has a return that was not marked completed. The record was not changed.
+            </p>
+            <ul className="mt-2 divide-y divide-gray-100">
+              {reviewReturns.map((item) => (
+                <li key={`${item.booking.id || item.booking.bookingNumber}-${item.leg}-review`} className="py-2">
+                  <p className="text-sm font-medium text-gray-900">{item.booking.bookingNumber} · Return</p>
+                  <p className="text-xs text-gray-600">{[item.pickupLocation, item.destination].filter(Boolean).join(' → ')}</p>
+                  <p className="text-xs text-gray-500">{formatPickupDisplay(item.pickupAt)} · Needs review</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
           <label className="flex items-start gap-2 cursor-pointer">
             <input
@@ -177,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <span className="text-sm text-gray-700">
               <span className="font-medium text-gray-900">Desktop reminders</span>
               {' — '}
-              browser notifications for pickups in the next hour (and new booking alerts when permission is granted).
+              browser notifications for each journey in the next hour (and new booking alerts when permission is granted).
               A chime also plays for new customer requests while this tab is open.
             </span>
           </label>

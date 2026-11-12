@@ -235,6 +235,39 @@ describe("family job helpers", () => {
     );
     expect(payload.status).toBe("pending");
   });
+
+  it("keeps a future return on the driver schedule after the outbound is completed", () => {
+    const now = new Date(2026, 10, 12, 10, 0, 0);
+    const shared = {
+      status: "completed" as const,
+      bookingType: "return" as const,
+      pickupTime: new Date(2026, 9, 30, 17, 25, 0).toISOString(),
+      returnPickupTime: new Date(2026, 10, 15, 19, 5, 0).toISOString(),
+      returnPickupLocation: "Heathrow",
+      returnDestination: "Oxford",
+      driverId: "driver-a",
+    };
+    const openReturn = job({
+      ...shared,
+      id: "ret",
+      returnDriverId: "driver-b",
+      returnStatus: "allocated",
+    });
+    const bothDone = job({ ...shared, id: "done", returnStatus: "completed" });
+    const cancelledReturn = job({ ...shared, id: "cancelled-return", outboundStatus: "completed", returnStatus: "cancelled" });
+    expect(isCompletedJob(openReturn)).toBe(false);
+    expect(isCompletedJob(bothDone)).toBe(true);
+    expect(isCompletedJob(cancelledReturn)).toBe(true);
+    expect(filterFamilyJobs([openReturn, bothDone, cancelledReturn], { view: "week", now, driverId: "driver-b" }).map((row) => row.id)).toEqual(["ret"]);
+    expect(filterFamilyJobs([openReturn], { view: "week", now, driverId: "driver-a" })).toEqual([]);
+    const other = job({
+      id: "other",
+      driverId: "driver-b",
+      pickupTime: new Date(2026, 10, 15, 19, 20, 0).toISOString(),
+      status: "allocated",
+    });
+    expect(findJobConflicts([openReturn, other]).some((row) => row.reason === "driver")).toBe(true);
+  });
 });
 
 describe("family staff allow list", () => {

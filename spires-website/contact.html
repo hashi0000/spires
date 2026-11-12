@@ -532,6 +532,25 @@
           </div>
 
           <div class="form-field">
+            <label for="heard-about">How did you hear about us</label>
+            <select id="heard-about" name="heardAbout">
+              <option value="">Please choose</option>
+              <option value="google">Google</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="friend_or_family">Friend or family</option>
+              <option value="used_before">Used us before</option>
+              <option value="website">Your website</option>
+              <option value="other">Other</option>
+            </select>
+            <p class="form-help">Optional. This does not change the quote.</p>
+          </div>
+          <div class="form-field" id="heard-about-detail" hidden>
+            <label for="heard-about-other">Please tell us where</label>
+            <input type="text" id="heard-about-other" name="heardAboutDetail" maxlength="80" autocomplete="off">
+          </div>
+
+          <div class="form-field">
             <label for="message">Additional requirements</label>
             <textarea id="message" name="message" rows="4" placeholder="Child seats, extra luggage, or anything else we should know"></textarea>
           </div>

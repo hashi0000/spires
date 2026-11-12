@@ -81,6 +81,24 @@ function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export const HEARD_ABOUT_LABELS: Record<string, string> = {
+  google: "Google",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  friend_or_family: "Friend or family",
+  used_before: "Used us before",
+  website: "Your website",
+  other: "Other",
+};
+
+export function heardAboutLabel(code: unknown, detail?: unknown): string {
+  const key = str(code);
+  const label = HEARD_ABOUT_LABELS[key];
+  if (!label) return "";
+  const extra = str(detail).replace(/\s+/g, " ").slice(0, 80);
+  return key === "other" && extra ? `${label}: ${extra}` : label;
+}
+
 function flag(value: unknown): boolean {
   return value === true || value === "true" || value === "yes" || value === "on";
 }
@@ -243,6 +261,9 @@ export function prepareGuestBooking(
   const paymentRaw = str(body.paymentMethod).toLowerCase();
   const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
   const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
+  const heardCode = str(body.heardAbout);
+  const heardAbout = HEARD_ABOUT_LABELS[heardCode] ? heardCode : "";
+  const heardAboutDetail = heardAbout === "other" ? str(body.heardAboutDetail).replace(/\s+/g, " ").slice(0, 80) : "";
   const contactBy: GuestContactBy = email && phone ? "both" : email ? "email" : "phone";
   const submissionId = SUBMISSION_PATTERN.test(str(body.submissionId)) ? str(body.submissionId) : "";
   const claim = email
@@ -310,6 +331,7 @@ export function prepareGuestBooking(
     termsAccepted: true,
     termsVersion: terms.version,
     acceptanceMethod: "website",
+    ...(heardAbout ? { heardAbout, heardAboutDetail } : {}),
   };
 
   return {

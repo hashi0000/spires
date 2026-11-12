@@ -10,6 +10,7 @@ import {
   calculateAirportWaitingCharge,
 } from '../utils/airportWaitingPolicy';
 import { effectiveWorkflowStatus } from '../utils/bookingWorkflow';
+import { applyRequestedLegStatus, hasTimedReturn, proposedLegacyReturnCorrection } from '../utils/journeyLegs';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import {
@@ -79,6 +80,23 @@ const AirportWaitingAdminNote: React.FC = () => {
   );
 };
 
+const HEARD_ABOUT_LABELS: Record<string, string> = {
+  google: "Google",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  friend_or_family: "Friend or family",
+  used_before: "Used us before",
+  website: "Your website",
+  other: "Other",
+};
+
+function heardAboutText(code?: string, detail?: string): string {
+  const label = HEARD_ABOUT_LABELS[code || ""] || "";
+  if (!label) return "";
+  const extra = String(detail || "").trim();
+  return code === "other" && extra ? `${label}: ${extra}` : label;
+}
+
 const BookingModal: React.FC<BookingModalProps> = ({
   isOpen,
   onClose,
@@ -117,6 +135,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     pickupLocation: '',
     destination: '',
     driverId: '',
+    returnDriverId: '',
     vehicleId: '',
     subContract: '',
     status: 'pending',
@@ -167,6 +186,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
         hirerName: editingBooking.hirerName || (editingBooking as any).name || '',
         hirerPhone: editingBooking.hirerPhone || (editingBooking as any).phone || '',
         status: effectiveWorkflowStatus(editingBooking),
+        returnDriverId: editingBooking.returnDriverId || '',
+        returnStatus: editingBooking.returnStatus || '',
+        outboundStatus: editingBooking.outboundStatus || '',
         hirerAddress: editingBooking.hirerAddress || '',
         pickupLocation: editingBooking.pickupLocation || (editingBooking as any).pickup || '',
         destination: editingBooking.destination || '',
@@ -495,6 +517,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
       bookingData.phone = bookingData.hirerPhone || '';
       bookingData.pickup = bookingData.pickupLocation;
     }
+    if (!bookingData.returnStatus) delete bookingData.returnStatus;
+    if (!bookingData.outboundStatus) delete bookingData.outboundStatus;
+    if (!bookingData.returnDriverId) delete bookingData.returnDriverId;
+    Object.assign(bookingData, applyRequestedLegStatus(editingBooking || null, bookingData));
 
     // Only add createdAt for new bookings
     if (!editingBooking) {
@@ -1082,6 +1108,38 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   ))}
                 </select>
               </div>
+              {hasTimedReturn({ ...formData, returnPickupTime: formData.openReturn ? '' : formData.returnPickupTime }) ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Return driver</label>
+                  <select
+                    value={formData.returnDriverId || ''}
+                    onChange={(e) => setFormData({ ...formData, returnDriverId: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">Driver not confirmed</option>
+                    {activeDrivers.map(driver => (
+                      <option key={`return-${driver.id}`} value={driver.id}>{driver.name}</option>
+                    ))}
+                  </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 mt-3">Return status</label>
+                  <select
+                    value={formData.returnStatus || ''}
+                    onChange={(e) => setFormData({ ...formData, returnStatus: e.target.value as ExtendedBooking['returnStatus'] })}
+                    className="form-input"
+                  >
+                    <option value="">Not recorded</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="allocated">Allocated</option>
+                    <option value="needs_review">Needs review</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Completing the outbound does not complete the return. The fare stays on this booking.</p>
+                  {editingBooking && proposedLegacyReturnCorrection(editingBooking) ? (
+                    <p className="text-xs text-amber-700 mt-1">This return was not marked completed. Saving other details does not change the stored status until a return status is chosen.</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -1405,6 +1463,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
             <div id="booking-section-documents" className="mb-6">
               <h4 className="text-md font-semibold text-gray-900 mb-2">Documents and communications</h4>
               <p className="text-sm text-gray-600 mb-3">Quote, payment request and confirmation messages are sent from Fare & Payment. PDF and reminder actions stay on the booking list.</p>
+              {editingBooking?.heardAbout ? (
+                <p className="text-sm text-gray-700 mb-3">How they heard about us: {heardAboutText(editingBooking.heardAbout, editingBooking.heardAboutDetail)}. This is what the customer chose on the website form.</p>
+              ) : null}
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea
                 value={formData.notes || ''}

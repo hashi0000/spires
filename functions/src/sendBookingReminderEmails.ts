@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import {
   extractTripDetailsFromBooking,
+  formatPickupTimeLabel,
   getPickupMs,
   resolveDriver,
   reminderConfigOk,
@@ -9,6 +10,7 @@ import {
   sendNoDriverAssignedWarning,
   type DriverResolve,
 } from "./driverReminderEmail";
+import { returnReminderTarget } from "./bookings/journeyLegs";
 
 const ACTIVE_STATUSES = new Set(["pending", "confirmed", "allocated"]);
 
@@ -178,7 +180,125 @@ export async function processBookingReminders(logger: typeof functions.logger): 
     }
   }
 
+  try {
+    const returnResult = await processReturnReminders(db, driverCache, now, lower, upper, logger);
+    daySent += returnResult.daySent;
+    hourSent += returnResult.hourSent;
+    warningsSent += returnResult.warningsSent;
+  } catch (err) {
+    logger.error("Return reminder query failed", err);
+  }
+
   logger.info(
     `Driver booking reminders run: day_before=${daySent}, hour_before=${hourSent}, no_driver_warnings=${warningsSent}, skipped_bad_pickup=${skipped}, scanned=${docs.length}`
   );
+}
+
+async function processReturnReminders(
+  db: admin.firestore.Firestore,
+  driverCache: Map<string, DriverResolve>,
+  now: number,
+  lower: string,
+  upper: string,
+  logger: typeof functions.logger
+): Promise<{ daySent: number; hourSent: number; warningsSent: number }> {
+  const [byReturn, byReturnDate] = await Promise.all([
+    db.collection("bookings").where("returnPickupTime", ">", lower).where("returnPickupTime", "<", upper).get(),
+    db.collection("bookings").where("returnDateTime", ">", lower).where("returnDateTime", "<", upper).get(),
+  ]);
+  const seen = new Set<string>();
+  const docs: admin.firestore.QueryDocumentSnapshot[] = [];
+  for (const doc of [...byReturn.docs, ...byReturnDate.docs]) {
+    if (seen.has(doc.id)) continue;
+    seen.add(doc.id);
+    docs.push(doc);
+  }
+
+  let daySent = 0;
+  let hourSent = 0;
+  let warningsSent = 0;
+  const dayLow = DAY_MS - DAY_WINDOW_HALF_MS;
+  const dayHigh = DAY_MS + DAY_WINDOW_HALF_MS;
+
+  for (const doc of docs) {
+    const data = doc.data();
+    const target = returnReminderTarget(data);
+    if (!target) continue;
+    const msUntil = target.pickupMs - now;
+    if (msUntil <= 0) continue;
+    const inDayWindow = msUntil >= dayLow && msUntil <= dayHigh;
+    const inHourWindow = msUntil >= HOUR_MS - HOUR_WINDOW_HALF_MS && msUntil <= HOUR_MS + HOUR_WINDOW_HALF_MS;
+    if (!inDayWindow && !inHourWindow) continue;
+
+    const re = (data.reminderEmails || {}) as {
+      returnDriverDayBeforeSentAt?: unknown;
+      returnDriverHourBeforeSentAt?: unknown;
+      returnNoDriverWarningSentAt?: unknown;
+    };
+    const trip = {
+      pickupTime: formatPickupTimeLabel(target.pickupMs),
+      pickup: target.pickup,
+      dropoff: target.dropoff,
+      passengerName: String(data.hirerName || data.name || "—"),
+      stops: "",
+      returnSummary: "Return. The fare is for the whole booking.",
+    };
+
+    const warn = async (headline: string) => {
+      if (reminderFlagExists(re.returnNoDriverWarningSentAt)) return;
+      await sendNoDriverAssignedWarning({
+        pickupTime: trip.pickupTime,
+        pickup: trip.pickup,
+        dropoff: trip.dropoff,
+        passengerName: trip.passengerName,
+        headline,
+        stops: trip.stops,
+        returnSummary: trip.returnSummary,
+      });
+      await doc.ref.update({ "reminderEmails.returnNoDriverWarningSentAt": new Date().toISOString() });
+      warningsSent++;
+      logger.info(`Return has no confirmed driver for ${data.bookingNumber || doc.id}`);
+    };
+
+    if (target.status === "needs_review" || !target.driverId) {
+      try {
+        await warn(target.status === "needs_review" ? "Return needs review and has no confirmed driver:" : "Return has NO DRIVER assigned:");
+      } catch (err) {
+        logger.error(`Failed return no-driver warning for ${doc.id}`, err);
+      }
+      continue;
+    }
+
+    const resolved = await resolveDriver(db, driverCache, target.driverId);
+    if (resolved.status !== "ok") {
+      try {
+        await warn("Return driver was not found or has no phone number:");
+      } catch (err) {
+        logger.error(`Failed return driver warning for ${doc.id}`, err);
+      }
+      continue;
+    }
+
+    if (inDayWindow && !reminderFlagExists(re.returnDriverDayBeforeSentAt)) {
+      try {
+        await sendAdminDriverReminderEmail(resolved.driver, trip);
+        await doc.ref.update({ "reminderEmails.returnDriverDayBeforeSentAt": new Date().toISOString() });
+        daySent++;
+      } catch (err) {
+        logger.error(`Failed return 24h reminder for ${doc.id}`, err);
+      }
+      continue;
+    }
+    if (inHourWindow && !reminderFlagExists(re.returnDriverHourBeforeSentAt)) {
+      try {
+        await sendAdminDriverReminderEmail(resolved.driver, trip);
+        await doc.ref.update({ "reminderEmails.returnDriverHourBeforeSentAt": new Date().toISOString() });
+        hourSent++;
+      } catch (err) {
+        logger.error(`Failed return 1h reminder for ${doc.id}`, err);
+      }
+    }
+  }
+
+  return { daySent, hourSent, warningsSent };
 }

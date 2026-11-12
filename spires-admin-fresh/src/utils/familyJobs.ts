@@ -1,5 +1,6 @@
 import { Booking, Driver } from "../types/types";
 import { getBookingPickupDate, isActiveBookingStatus } from "./bookingSchedule";
+import { hasTimedReturn, journeyLegs, openJourneyLegs } from "./journeyLegs";
 import { addLocalDays, startOfLocalDay } from "./bookingDateTime";
 import { formatVehicleTypeLabel } from "./vehicleTypes";
 import { generateSpiresBookingNumber } from "./bookingNumber";
@@ -63,6 +64,12 @@ export function isCancelledJob(booking: Booking): boolean {
 }
 
 export function isCompletedJob(booking: Booking): boolean {
+  if (hasTimedReturn(booking)) {
+    const legs = journeyLegs(booking);
+    return legs.length > 0
+      && legs.every((leg) => leg.status === "completed" || leg.status === "cancelled")
+      && legs.some((leg) => leg.status === "completed");
+  }
   const customerStatus = (booking as { customerStatus?: string }).customerStatus;
   return [booking.status, booking.adminStatus, customerStatus].some(
     (value) => value === "completed" || value === "paid"
@@ -70,7 +77,26 @@ export function isCompletedJob(booking: Booking): boolean {
 }
 
 export function isUnassignedJob(booking: Booking): boolean {
+  if (hasTimedReturn(booking)) {
+    const open = openJourneyLegs(booking);
+    if (open.length > 0) return open.some((leg) => !leg.driverId);
+  }
   return !String(booking.driverId || "").trim();
+}
+
+function jobHasDriver(booking: Booking, driverId: string): boolean {
+  if (!hasTimedReturn(booking)) return booking.driverId === driverId;
+  const open = openJourneyLegs(booking);
+  if (!open.length) return booking.driverId === driverId;
+  return open.some((leg) => leg.driverId === driverId);
+}
+
+function nextOpenTime(booking: Booking): number {
+  const times = openJourneyLegs(booking)
+    .map((leg) => leg.pickupAt?.getTime() || 0)
+    .filter((value) => value > 0);
+  if (times.length) return Math.min(...times);
+  return getBookingPickupDate(booking)?.getTime() ?? 0;
 }
 
 export function familyVehicleLabel(type?: string | null): string {
@@ -132,9 +158,7 @@ export function clearFamilyJobDraft(): void {
   }
 }
 
-export function bookingInView(booking: Booking, view: FamilyJobView, now: Date, calendarDay?: Date): boolean {
-  const pickup = getBookingPickupDate(booking);
-  if (!pickup) return false;
+function pickupInView(pickup: Date, view: FamilyJobView, now: Date, calendarDay?: Date): boolean {
   const startToday = startOfLocalDay(now);
   const startTomorrow = addLocalDays(startToday, 1);
   const startWeekEnd = addLocalDays(startToday, 7);
@@ -146,12 +170,16 @@ export function bookingInView(booking: Booking, view: FamilyJobView, now: Date, 
   return pickup >= dayStart && pickup < addLocalDays(dayStart, 1);
 }
 
+export function bookingInView(booking: Booking, view: FamilyJobView, now: Date, calendarDay?: Date): boolean {
+  const open = openJourneyLegs(booking)
+    .map((leg) => leg.pickupAt)
+    .filter((pickup): pickup is Date => pickup instanceof Date);
+  const times = open.length > 0 ? open : [getBookingPickupDate(booking)].filter((pickup): pickup is Date => pickup instanceof Date);
+  return times.some((pickup) => pickupInView(pickup, view, now, calendarDay));
+}
+
 export function sortJobsChronologically(bookings: Booking[]): Booking[] {
-  return [...bookings].sort((a, b) => {
-    const aTime = getBookingPickupDate(a)?.getTime() ?? 0;
-    const bTime = getBookingPickupDate(b)?.getTime() ?? 0;
-    return aTime - bTime;
-  });
+  return [...bookings].sort((a, b) => nextOpenTime(a) - nextOpenTime(b));
 }
 
 export type JobConflict = {
@@ -161,25 +189,45 @@ export type JobConflict = {
 };
 
 export function findJobConflicts(bookings: Booking[]): JobConflict[] {
-  const active = bookings.filter(
-    (row) => row.id && isActiveBookingStatus(row.status) && !isCancelledJob(row) && !isCompletedJob(row)
-  );
+  const active = bookings.filter((row) => {
+    if (!row.id || isCancelledJob(row) || isCompletedJob(row)) return false;
+    if (hasTimedReturn(row)) return openJourneyLegs(row).length > 0;
+    return isActiveBookingStatus(row.status);
+  });
+  const points = active.flatMap((row) => {
+    const open = hasTimedReturn(row) ? openJourneyLegs(row) : [];
+    const legs = open.length
+      ? open
+      : [{ pickupAt: getBookingPickupDate(row), driverId: row.driverId || "" }];
+    return legs
+      .filter((leg) => leg.pickupAt && row.id)
+      .map((leg) => ({
+        id: row.id as string,
+        at: leg.pickupAt as Date,
+        driverId: leg.driverId,
+        vehicleId: row.vehicleId,
+        vehicleType: row.vehicleType,
+      }));
+  });
   const conflicts: JobConflict[] = [];
-  for (let i = 0; i < active.length; i += 1) {
-    const left = active[i];
-    const leftPickup = getBookingPickupDate(left);
-    if (!leftPickup || !left.id) continue;
-    for (let j = i + 1; j < active.length; j += 1) {
-      const right = active[j];
-      const rightPickup = getBookingPickupDate(right);
-      if (!rightPickup || !right.id) continue;
-      const gap = Math.abs(leftPickup.getTime() - rightPickup.getTime());
-      if (gap > FAMILY_CONFLICT_WINDOW_MS) continue;
+  const seen = new Set<string>();
+  const push = (conflict: JobConflict) => {
+    const key = `${conflict.bookingId}|${conflict.otherId}|${conflict.reason}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    conflicts.push(conflict);
+  };
+  for (let i = 0; i < points.length; i += 1) {
+    for (let j = i + 1; j < points.length; j += 1) {
+      const left = points[i];
+      const right = points[j];
+      if (left.id === right.id) continue;
+      if (Math.abs(left.at.getTime() - right.at.getTime()) > FAMILY_CONFLICT_WINDOW_MS) continue;
       if (left.driverId && right.driverId && left.driverId === right.driverId) {
-        conflicts.push({ bookingId: left.id, otherId: right.id, reason: "driver" });
+        push({ bookingId: left.id, otherId: right.id, reason: "driver" });
       }
       if (left.vehicleId && right.vehicleId && left.vehicleId === right.vehicleId) {
-        conflicts.push({ bookingId: left.id, otherId: right.id, reason: "vehicle" });
+        push({ bookingId: left.id, otherId: right.id, reason: "vehicle" });
       } else {
         const leftVehicle = String(left.vehicleType || "").replace("-", "_");
         const rightVehicle = String(right.vehicleType || "").replace("-", "_");
@@ -188,7 +236,7 @@ export function findJobConflicts(bookings: Booking[]): JobConflict[] {
           leftVehicle === rightVehicle &&
           (leftVehicle === "8_seater" || leftVehicle === "multiple")
         ) {
-          conflicts.push({ bookingId: left.id, otherId: right.id, reason: "vehicle" });
+          push({ bookingId: left.id, otherId: right.id, reason: "vehicle" });
         }
       }
     }
@@ -236,7 +284,7 @@ export function filterFamilyJobs(
       if (isCompletedJob(booking)) return false;
       if (!bookingInView(booking, filters.view, filters.now, filters.calendarDay)) return false;
       if (filters.driverId === "unassigned" && !isUnassignedJob(booking)) return false;
-      if (filters.driverId && filters.driverId !== "unassigned" && booking.driverId !== filters.driverId) {
+      if (filters.driverId && filters.driverId !== "unassigned" && !jobHasDriver(booking, filters.driverId)) {
         return false;
       }
       if (filters.vehicleType && booking.vehicleType !== filters.vehicleType) return false;

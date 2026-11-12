@@ -1,10 +1,19 @@
 import { Booking } from '../types/types';
+import { journeyLegs, legStatusLabel, type JourneyLeg } from './journeyLegs';
 
 const ACTIVE_STATUSES: Booking['status'][] = ['pending', 'awaiting_customer_confirmation', 'confirmed', 'allocated'];
 
 export interface UpcomingReminder {
   booking: Booking;
   pickupAt: Date;
+  leg: JourneyLeg['leg'];
+  label: JourneyLeg['label'];
+  pickupLocation: string;
+  destination: string;
+  driverId: string;
+  needsReview: boolean;
+  statusLabel: string;
+  showLabel: boolean;
 }
 
 export function getBookingPickupDate(booking: Booking): Date | null {
@@ -18,6 +27,21 @@ export function isActiveBookingStatus(status: Booking['status']): boolean {
   return ACTIVE_STATUSES.includes(status);
 }
 
+function toReminder(booking: Booking, leg: JourneyLeg): UpcomingReminder {
+  return {
+    booking,
+    pickupAt: leg.pickupAt as Date,
+    leg: leg.leg,
+    label: leg.label,
+    pickupLocation: leg.pickupLocation,
+    destination: leg.destination,
+    driverId: leg.driverId,
+    needsReview: leg.needsReview,
+    statusLabel: legStatusLabel(leg),
+    showLabel: leg.leg === 'return' || journeyLegs(booking).length > 1,
+  };
+}
+
 export function getUpcomingBookings(
   bookings: Booking[],
   now: Date,
@@ -27,18 +51,38 @@ export function getUpcomingBookings(
   const items: UpcomingReminder[] = [];
 
   for (const booking of bookings) {
-    if (!isActiveBookingStatus(booking.status)) continue;
-    const pickupAt = getBookingPickupDate(booking);
-    if (!pickupAt) continue;
-    const t = pickupAt.getTime();
-    if (t <= now.getTime() || t > end) continue;
-    items.push({ booking, pickupAt });
+    for (const leg of journeyLegs(booking, now)) {
+      if (leg.status === 'completed' || leg.status === 'cancelled' || !leg.pickupAt) continue;
+      const t = leg.pickupAt.getTime();
+      if (t <= now.getTime() || t > end) continue;
+      items.push(toReminder(booking, leg));
+    }
   }
 
   items.sort((a, b) => a.pickupAt.getTime() - b.pickupAt.getTime());
   if (options.maxItems != null) {
     return items.slice(0, options.maxItems);
   }
+  return items;
+}
+
+/** Legacy returns that are outside the upcoming window. A return already listed there is not repeated. */
+export function returnsToReview(
+  bookings: Booking[],
+  now: Date,
+  withinMs: number
+): UpcomingReminder[] {
+  const end = now.getTime() + withinMs;
+  const items: UpcomingReminder[] = [];
+  for (const booking of bookings) {
+    for (const leg of journeyLegs(booking, now)) {
+      if (leg.leg !== 'return' || !leg.needsReview || !leg.pickupAt) continue;
+      const t = leg.pickupAt.getTime();
+      if (t > now.getTime() && t <= end) continue;
+      items.push(toReminder(booking, leg));
+    }
+  }
+  items.sort((a, b) => a.pickupAt.getTime() - b.pickupAt.getTime());
   return items;
 }
 

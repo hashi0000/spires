@@ -121,6 +121,23 @@ describe("guest booking requests", () => {
     assert.match(result.error, /07776 897772/);
   });
 
+  it("stores how the customer heard about us and ignores an unknown answer", () => {
+    const chosen = prepare({ heardAbout: "google", heardAboutDetail: "should not be kept" });
+    assert.equal(chosen.ok, true);
+    if (!chosen.ok || chosen.spam) return;
+    assert.equal(chosen.record.heardAbout, "google");
+    assert.equal(chosen.record.heardAboutDetail, "");
+    const other = prepare({ heardAbout: "other", heardAboutDetail: "  Hotel card  " });
+    assert.equal(other.ok, true);
+    if (!other.ok || other.spam) return;
+    assert.equal(other.record.heardAbout, "other");
+    assert.equal(other.record.heardAboutDetail, "Hotel card");
+    const blank = prepare({ heardAbout: "billboard" });
+    assert.equal(blank.ok, true);
+    if (!blank.ok || blank.spam) return;
+    assert.equal(blank.record.heardAbout, undefined);
+  });
+
   it("keeps a request pending and does not invent a login", () => {
     const result = prepare({ vehicleType: "8_seater", passengers: "6", luggage: "4" });
     assert.equal(result.ok, true);

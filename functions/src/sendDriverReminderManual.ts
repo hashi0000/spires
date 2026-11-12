@@ -1,7 +1,9 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { returnReminderTarget } from "./bookings/journeyLegs";
 import {
   extractTripDetailsFromBooking,
+  formatPickupTimeLabel,
   reminderConfigOk,
   sendDriverManualReminderEmail,
 } from "./driverReminderEmail";
@@ -33,9 +35,16 @@ export const sendDriverReminderManual = functions.https.onCall(async (data, cont
   }
 
   const booking = bookingSnap.data()!;
-  const driverId = (booking.driverId as string | undefined)?.toString().trim();
+  const leg = data?.leg === "return" ? "return" : "outbound";
+  const returnTarget = leg === "return" ? returnReminderTarget(booking) : null;
+  const driverId = leg === "return"
+    ? (returnTarget?.driverId || "")
+    : (booking.driverId as string | undefined)?.toString().trim() || "";
   if (!driverId) {
-    throw new functions.https.HttpsError("failed-precondition", "No driver assigned");
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      leg === "return" ? "Driver not confirmed" : "No driver assigned"
+    );
   }
 
   const driverSnap = await admin.firestore().collection("drivers").doc(driverId).get();
@@ -49,7 +58,16 @@ export const sendDriverReminderManual = functions.https.onCall(async (data, cont
     throw new functions.https.HttpsError("failed-precondition", "Driver has no email");
   }
 
-  const trip = extractTripDetailsFromBooking(booking);
+  const trip = leg === "return" && returnTarget
+    ? {
+        pickupTime: formatPickupTimeLabel(returnTarget.pickupMs),
+        pickup: returnTarget.pickup,
+        dropoff: returnTarget.dropoff,
+        passengerName: String(booking.hirerName || booking.name || "—"),
+        stops: "",
+        returnSummary: "Return. The fare is for the whole booking.",
+      }
+    : extractTripDetailsFromBooking(booking);
   if (!trip) {
     throw new functions.https.HttpsError("failed-precondition", "Booking has no valid pickup time.");
   }

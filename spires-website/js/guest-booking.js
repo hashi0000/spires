@@ -17,6 +17,8 @@
   var status = document.getElementById("booking-status");
   var result = document.getElementById("booking-result");
   var termsError = document.getElementById("terms-agreement-error");
+  var heardAbout = document.getElementById("heard-about");
+  var heardAboutDetail = document.getElementById("heard-about-detail");
 
   function today() {
     var now = new Date();
@@ -69,6 +71,11 @@
   if (journey) journey.addEventListener("change", function () { toggleJourney(); toggleAirport(); });
   if (airport) airport.addEventListener("change", toggleAirport);
   if (returnAirport) returnAirport.addEventListener("change", toggleAirport);
+  function toggleHeardAbout() {
+    show(heardAboutDetail, Boolean(heardAbout && heardAbout.value === "other"));
+  }
+  if (heardAbout) heardAbout.addEventListener("change", toggleHeardAbout);
+  toggleHeardAbout();
   Array.prototype.forEach.call(form.querySelectorAll("input[name='vehicleType']"), function (input) {
     input.addEventListener("change", syncPassengers);
   });
@@ -210,6 +217,8 @@
       luggage: data.get("luggage"),
       paymentMethod: data.get("paymentMethod"),
       message: data.get("message"),
+      heardAbout: data.get("heardAbout") || "",
+      heardAboutDetail: heardAbout && heardAbout.value === "other" ? (data.get("heardAboutDetail") || "") : "",
       airportCollection: airport && airport.checked,
       flightNumber: data.get("flightNumber") || "",
       terminal: data.get("terminal") || "",

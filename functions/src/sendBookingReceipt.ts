@@ -19,6 +19,7 @@ import {
 } from "./airportWaitingPolicy";
 import { confirmationTermsParagraph } from "./terms/bookingTerms";
 import { emailJourneyText } from "./bookings/journeyStops";
+import { heardAboutLabel } from "./bookings/guestRequest";
 
 type EmailDocType =
   | "confirmation"
@@ -190,6 +191,7 @@ export async function notifyAdminNewBookingRequest(
               : ""
           }</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${escapeHtml(pay)}</td></tr>
+          ${heardAboutLabel(booking.heardAbout, booking.heardAboutDetail) ? `<tr><td style="padding:4px 8px;font-weight:600;">Heard about us</td><td style="padding:4px 8px;">${escapeHtml(heardAboutLabel(booking.heardAbout, booking.heardAboutDetail))}</td></tr>` : ""}
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${escapeHtml(n.flightNumber)}${n.terminal ? ` · Terminal ${escapeHtml(n.terminal)}` : ""}</td></tr>` : ""}
           ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${escapeHtml(booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime ? `Pickup time now set for ${booking.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}` : `${n.returnPickupLocation || ""} → ${n.returnDestination || ""}`)}</td></tr>` : ""}
           ${Array.isArray(booking.returnStops) && booking.returnStops.length > 2 ? `<tr><td style="padding:4px 8px;font-weight:600;">Return stops</td><td style="padding:4px 8px;">${escapeHtml(booking.returnStops.map((stop: { type?: string; address?: string; notes?: string }, index: number) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; "))}. Extra stops. Agree the fare.</td></tr>` : ""}
@@ -211,6 +213,9 @@ export async function notifyAdminNewBookingRequest(
         emailJourneyText(booking),
         `When: ${n.pickupTime}`,
         `Pay by: ${pay}`,
+        heardAboutLabel(booking.heardAbout, booking.heardAboutDetail)
+          ? `Heard about us: ${heardAboutLabel(booking.heardAbout, booking.heardAboutDetail)}`
+          : "",
       ].filter(Boolean).join("\n"),
     });
 

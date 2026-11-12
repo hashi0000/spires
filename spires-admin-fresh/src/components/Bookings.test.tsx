@@ -63,7 +63,7 @@ test('updates the selected jobs and leaves an unaccepted quote unchanged', async
   await waitFor(() => expect(screen.getByText(/left unchanged/)).toBeTruthy());
   const updates = (applyBulkJobUpdates as jest.Mock).mock.calls[0][1];
   expect(updates).toEqual([{ id: 'SP1', patch: { status: 'confirmed', adminStatus: 'confirmed', customerStatus: 'confirmed' } }]);
-  expect(screen.getByText(/SP9: Record customer acceptance/)).toBeTruthy();
+  expect(screen.getByText(/SP9: Open the booking and set the status to Confirmed/)).toBeTruthy();
 });
 
 test('changes one payment status without rewriting the fare', async () => {
@@ -73,4 +73,41 @@ test('changes one payment status without rewriting the fare', async () => {
   fireEvent.change(screen.getByRole('combobox', { name: 'Payment status for SP1' }), { target: { value: 'paid' } });
   await waitFor(() => expect(screen.getByText(/amount already received is unchanged/)).toBeTruthy());
   expect((applyBulkJobUpdates as jest.Mock).mock.calls[0][1]).toEqual([{ id: 'SP1', patch: { paymentStatus: 'paid' } }]);
+});
+
+test('shows one future return when the outbound is already completed', () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date('2026-11-12T12:00:00Z'));
+  const row: Booking = {
+    id: 'sp355017',
+    bookingNumber: 'SP355017',
+    hirerName: 'Customer',
+    hirerPhone: '07000000000',
+    hirerAddress: '',
+    pickupLocation: '10 Beech Crescent OX5 1DN',
+    destination: 'London Heathrow Terminal 2',
+    pickupTime: '2026-10-30T17:25:00Z',
+    dateTime: '2026-10-30T17:25:00Z',
+    bookingMethod: 'telephone',
+    status: 'completed',
+    bookingType: 'return',
+    returnPickupTime: '2026-11-15T19:05:00Z',
+    returnPickupLocation: 'London Heathrow Terminal 2',
+    returnDestination: '10 Beech Crescent OX5 1DN',
+    actualFare: 180,
+    paymentStatus: 'paid',
+    amountReceivedPence: 18000,
+  };
+  try {
+    render(<Bookings bookings={[row]} drivers={[]} vehicles={[]} {...callbacks} />);
+    expect(screen.getAllByText(/SP355017/)).toHaveLength(1);
+    expect(screen.getByText(/Return: London Heathrow Terminal 2 → 10 Beech Crescent OX5 1DN/)).toBeTruthy();
+    expect(screen.getByText('Needs review')).toBeTruthy();
+    expect(screen.getByText('Driver not confirmed')).toBeTruthy();
+    expect(screen.getAllByText('£180.00').filter((element) => element.tagName === 'TD')).toHaveLength(1);
+    expect(screen.getByText('The fare is for the whole booking.')).toBeTruthy();
+    expect(screen.queryByText('10 Beech Crescent OX5 1DN → London Heathrow Terminal 2')).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
 });

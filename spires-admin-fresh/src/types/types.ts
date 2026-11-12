@@ -89,11 +89,17 @@ export interface Booking {
   destinationPlace?: { label: string; placeId?: string; postcode?: string; latitude?: number | null; longitude?: number | null; premise?: string } | null;
   flightNumber?: string;
   driverId?: string;
+  /** Driver for the return leg. Empty means the return driver is not confirmed. */
+  returnDriverId?: string;
   vehicleId?: string;
   subContract?: string;
   status: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
   /** Workflow status shown to staff when it differs from the stored customer status. */
   adminStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  /** Set when the outbound is completed separately from the return. Missing on older records. */
+  outboundStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled' | 'needs_review';
+  /** Set when the return is confirmed separately from the outbound. Missing means it still follows the booking status. */
+  returnStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled' | 'needs_review';
   quoteAcceptanceSubstatus?: '' | 'awaiting_payment';
   notes?: string;
   allocatedTime?: string;
@@ -115,6 +121,8 @@ export interface Booking {
   /** Outbound/primary leg is an airport collection (not merely an airport drop-off). */
   airportCollection?: boolean;
   returnPickupTime?: string;
+  returnDateTime?: string;
+  returnTrip?: boolean;
   returnPickupLocation?: string;
   returnDestination?: string;
   returnAirportCollection?: boolean;
@@ -145,6 +153,9 @@ export interface Booking {
   termsAcceptanceRecordedAt?: Date | string | { toDate?: () => Date; seconds?: number };
   termsAcceptanceRecordedBy?: string;
   termsAcceptanceNote?: string;
+  /** Answer from the website booking form. Missing when the customer left it blank. */
+  heardAbout?: string;
+  heardAboutDetail?: string;
 }
 
 // Extended booking interface for form handling

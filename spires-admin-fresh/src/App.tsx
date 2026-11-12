@@ -29,6 +29,7 @@ import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
 import BookingModal from './components/BookingModal';
+import ReturnJourneyPreview from './components/ReturnJourneyPreview';
 import './styles.css';
 
 const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
@@ -138,6 +139,14 @@ const App: React.FC = () => {
       console.error('Error signing out:', error);
     }
   };
+
+  if (
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('returnPreview') === '1'
+  ) {
+    return <ReturnJourneyPreview />;
+  }
 
   if (authLoading) {
     return <Loading />;

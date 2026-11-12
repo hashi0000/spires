@@ -44,7 +44,7 @@ test("keeps the existing dashboard and adds marketing performance for an admin",
 
   expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Upcoming jobs" })).toBeTruthy();
-  expect(screen.getByText("Active bookings in the next 7 days (pending, confirmed, or allocated)")).toBeTruthy();
+  expect(screen.getByText("Each journey in the next 7 days. A return is listed on its own pickup time.")).toBeTruthy();
   expect(screen.getByText("No upcoming jobs in the next week.")).toBeTruthy();
   expect(screen.getByText("Active Drivers")).toBeTruthy();
   expect(screen.getByText("Active Drivers").parentElement?.textContent).toContain("2/3");
@@ -178,4 +178,48 @@ test("shows before and after performance once an administrator confirms the star
   expect(screen.getByRole("heading", { name: "Incomplete records in the before and after comparison" })).toBeTruthy();
   expect(screen.getByText(/no recorded source/)).toBeTruthy();
   expect(screen.getAllByText(/no creation time/).length).toBeGreaterThan(0);
+});
+
+test("lists a future return once when the outbound is already completed", () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date("2026-11-12T12:00:00Z"));
+  const row = booking({
+    id: "sp355017",
+    bookingNumber: "SP355017",
+    status: "completed",
+    bookingType: "return",
+    pickupTime: "2026-10-30T17:25:00Z",
+    dateTime: "2026-10-30T17:25:00Z",
+    pickupLocation: "10 Beech Crescent OX5 1DN",
+    destination: "London Heathrow Terminal 2",
+    returnPickupTime: "2026-11-15T19:05:00Z",
+    returnPickupLocation: "London Heathrow Terminal 2",
+    returnDestination: "10 Beech Crescent OX5 1DN",
+    actualFare: 180,
+    paymentStatus: "paid",
+    amountReceivedPence: 18000,
+  });
+  render(
+    <Dashboard
+      activeDriversCount={1}
+      availableVehiclesCount={1}
+      totalBookings={1}
+      todaysBookingsCount={0}
+      pendingCustomerBookingsCount={0}
+      bookings={[row]}
+      desktopRemindersEnabled={false}
+      onDesktopRemindersChange={() => undefined}
+    />
+  );
+  try {
+    expect(screen.getAllByText(/SP355017/)).toHaveLength(1);
+    expect(screen.getByText(/· Return/)).toBeTruthy();
+    expect(screen.getByText("London Heathrow Terminal 2 → 10 Beech Crescent OX5 1DN")).toBeTruthy();
+    expect(screen.getByText("Needs review")).toBeTruthy();
+    expect(screen.getByText("Driver not confirmed")).toBeTruthy();
+    expect(screen.queryByText("10 Beech Crescent OX5 1DN → London Heathrow Terminal 2")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Returns to review" })).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
 });

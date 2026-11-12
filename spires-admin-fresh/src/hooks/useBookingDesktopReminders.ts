@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { Booking } from '../types/types';
-import { getBookingPickupDate, isActiveBookingStatus } from '../utils/bookingSchedule';
+import { getUpcomingBookings } from '../utils/bookingSchedule';
 
 const WITHIN_MS = 60 * 60 * 1000;
 
-function sessionKey(bookingId: string | undefined): string {
-  return `spires_pickup_reminder_${bookingId || 'unknown'}`;
+function sessionKey(bookingId: string | undefined, leg: string): string {
+  return `spires_pickup_reminder_${bookingId || 'unknown'}_${leg}`;
 }
 
 export function useBookingDesktopReminders(enabled: boolean, bookings: Booking[]): void {
@@ -16,24 +16,21 @@ export function useBookingDesktopReminders(enabled: boolean, bookings: Booking[]
 
     const run = () => {
       if (Notification.permission !== 'granted') return;
-      const now = Date.now();
-      for (const booking of bookings) {
-        if (!isActiveBookingStatus(booking.status)) continue;
-        const pickupAt = getBookingPickupDate(booking);
-        if (!pickupAt) continue;
-        const ms = pickupAt.getTime() - now;
-        if (ms <= 0 || ms > WITHIN_MS) continue;
-        const key = sessionKey(booking.id);
+      const due = getUpcomingBookings(bookings, new Date(), { withinMs: WITHIN_MS });
+      for (const item of due) {
+        const key = sessionKey(item.booking.id, item.leg);
         if (sessionStorage.getItem(key)) continue;
-        const title = `Pickup in the next hour · ${booking.bookingNumber}`;
-        const body = [booking.pickupLocation, booking.destination]
+        const title = item.leg === 'return'
+          ? `Return in the next hour · ${item.booking.bookingNumber}`
+          : `Pickup in the next hour · ${item.booking.bookingNumber}`;
+        const body = [item.pickupLocation, item.destination]
           .map((s) => (s || '').trim())
           .filter(Boolean)
           .join(' → ');
         try {
           new Notification(title, {
             body: body || 'Open the admin app for details.',
-            tag: booking.id || booking.bookingNumber
+            tag: `${item.booking.id || item.booking.bookingNumber}-${item.leg}`
           });
           sessionStorage.setItem(key, '1');
         } catch {

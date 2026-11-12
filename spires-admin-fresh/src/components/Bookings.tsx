@@ -8,6 +8,7 @@ import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMap
 import { db, functions } from '../utils/firebase';
 import { planBulkJobUpdate, type BulkJobChanges } from '../utils/bulkBookingEdit';
 import { describeStops, hasExtraStops, normaliseStops, openReturnSummary } from '../utils/journeyStops';
+import { journeyLegs, legsForQuickView, type JourneyLeg } from '../utils/journeyLegs';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
@@ -23,12 +24,6 @@ function londonDay(value?: string | Date | null): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
-
-function shiftDay(day: string, days: number): string {
-  const [year, month, date] = day.split('-').map(Number);
-  const next = new Date(Date.UTC(year, month - 1, date + days));
-  return next.toISOString().slice(0, 10);
 }
 
 function londonWhen(value?: string | Date | null): string {
@@ -159,21 +154,23 @@ const Bookings: React.FC<BookingsProps> = ({
       return [b.bookingNumber, b.hirerName, b.hirerPhone, row.hirerEmail, row.email, b.pickupLocation, b.destination]
         .some(value => String(value || '').toLowerCase().includes(query));
     });
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(b => new Date(b.pickupTime) >= fromDate);
-    }
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(b => new Date(b.pickupTime) <= toDate);
-    }
-    if (selectedMonth) {
-      const [year, month] = selectedMonth.split('-');
-      filtered = filtered.filter(b => {
-        const bookingDate = new Date(b.pickupTime);
-        return bookingDate.getFullYear() === parseInt(year) && bookingDate.getMonth() === parseInt(month) - 1;
+    if (dateFrom || dateTo || selectedMonth) {
+      const fromDate = dateFrom ? new Date(dateFrom) : null;
+      if (fromDate) fromDate.setHours(0, 0, 0, 0);
+      const toDate = dateTo ? new Date(dateTo) : null;
+      if (toDate) toDate.setHours(23, 59, 59, 999);
+      const [year, month] = selectedMonth ? selectedMonth.split('-').map(Number) : [];
+      filtered = filtered.filter((booking) => {
+        const times = journeyLegs(booking)
+          .map((leg) => leg.pickupAt)
+          .filter((value): value is Date => value instanceof Date);
+        const instants = times.length ? times : [new Date(booking.pickupTime || booking.dateTime)].filter((value) => !Number.isNaN(value.getTime()));
+        return instants.some((instant) => {
+          if (fromDate && instant < fromDate) return false;
+          if (toDate && instant > toDate) return false;
+          if (selectedMonth && (instant.getFullYear() !== year || instant.getMonth() !== month - 1)) return false;
+          return true;
+        });
       });
     }
     if (statusFilter !== 'all') {
@@ -188,16 +185,15 @@ const Bookings: React.FC<BookingsProps> = ({
       filtered = filtered.filter(b => !isCustomerBooking(b));
     }
     const today = londonDay(new Date());
-    const tomorrow = shiftDay(today, 1);
+    const now = new Date();
     if (quickView !== 'all') {
       filtered = filtered.filter((booking) => {
         const day = londonDay(booking.pickupTime || booking.dateTime);
-        const workflow = effectiveWorkflowStatus(booking);
-        if (quickView === 'today') return day === today && workflow !== 'cancelled';
-        if (quickView === 'tomorrow') return day === tomorrow && workflow !== 'cancelled';
-        if (quickView === 'upcoming') return isPendingIncomingRequest(booking) || (day >= today && workflow !== 'cancelled' && workflow !== 'completed');
+        if (quickView === 'today') return legsForQuickView(booking, 'today', now).length > 0;
+        if (quickView === 'tomorrow') return legsForQuickView(booking, 'tomorrow', now).length > 0;
+        if (quickView === 'upcoming') return isPendingIncomingRequest(booking) || legsForQuickView(booking, 'upcoming', now).length > 0;
         if (quickView === 'past') return day !== '' && day < today;
-        if (quickView === 'unassigned') return !booking.driverId && workflow !== 'cancelled' && workflow !== 'completed';
+        if (quickView === 'unassigned') return legsForQuickView(booking, 'unassigned', now).length > 0;
         if (quickView === 'awaiting_payment') {
           return booking.paymentStatus === 'pending' || booking.paymentStatus === 'partial' || booking.quoteAcceptanceSubstatus === 'awaiting_payment';
         }
@@ -220,6 +216,37 @@ const Bookings: React.FC<BookingsProps> = ({
       return nearestFirst ? aTime - bTime : bTime - aTime;
     });
   }, [filteredBookings, quickView]);
+
+  const shownRows = useMemo(() => {
+    const now = new Date();
+    const expand = quickView === 'today' || quickView === 'tomorrow' || quickView === 'upcoming' || quickView === 'unassigned';
+    const rows: { booking: Booking; leg: JourneyLeg | null }[] = [];
+    for (const booking of sortedBookings) {
+      if (!expand) {
+        rows.push({ booking, leg: null });
+        continue;
+      }
+      const matches = legsForQuickView(booking, quickView, now);
+      if (matches.length === 0 && quickView === 'upcoming' && isPendingIncomingRequest(booking)) {
+        rows.push({ booking, leg: journeyLegs(booking, now)[0] || null });
+        continue;
+      }
+      matches.forEach((leg) => rows.push({ booking, leg }));
+    }
+    if (quickView === 'upcoming' || quickView === 'today' || quickView === 'tomorrow') {
+      rows.sort((a, b) => {
+        if (quickView === 'upcoming') {
+          const aPending = isPendingIncomingRequest(a.booking);
+          const bPending = isPendingIncomingRequest(b.booking);
+          if (aPending !== bPending) return aPending ? -1 : 1;
+        }
+        const aTime = a.leg?.pickupAt?.getTime() || new Date(a.booking.pickupTime || a.booking.dateTime || 0).getTime();
+        const bTime = b.leg?.pickupAt?.getTime() || new Date(b.booking.pickupTime || b.booking.dateTime || 0).getTime();
+        return aTime - bTime;
+      });
+    }
+    return rows;
+  }, [sortedBookings, quickView]);
 
   const accountingSummary = useMemo(() => {
     const completed = filteredBookings.filter(b => b.status === 'completed');
@@ -439,12 +466,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     }
   };
 
-  const handleSendDriverReminder = async (booking: Booking) => {
-    if (!booking.driverId) {
-      window.alert('No driver assigned');
+  const handleSendDriverReminder = async (booking: Booking, leg?: JourneyLeg | null) => {
+    const driverId = leg ? leg.driverId : booking.driverId;
+    if (!driverId) {
+      window.alert(leg?.leg === 'return' ? 'Driver not confirmed' : 'No driver assigned');
       return;
     }
-    const driver = drivers.find(d => d.id === booking.driverId);
+    const driver = drivers.find(d => d.id === driverId);
     if (!driver?.email?.trim()) {
       window.alert('Driver has no email');
       return;
@@ -452,7 +480,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     if (!booking.id) return;
     setSendingDriverReminderId(booking.id);
     try {
-      const result = await sendDriverReminderManualCallable({ bookingId: booking.id });
+      const result = await sendDriverReminderManualCallable({ bookingId: booking.id, leg: leg?.leg || 'outbound' });
       const data = result.data as { success?: boolean };
       if (data?.success) {
         window.alert('Reminder sent successfully');
@@ -746,36 +774,51 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedBookings.map((booking) => {
-                    const driver = drivers.find(d => d.id === booking.driverId);
+                  {shownRows.map(({ booking, leg }) => {
                     const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                     const ext = booking as ExtendedBooking;
                     const receivedPence = Number(booking.amountReceivedPence || 0);
                     const balancePence = Math.max(0, Math.round((booking.actualFare || 0) * 100) - receivedPence);
                     const workflow = effectiveWorkflowStatus(booking);
+                    const shownStatus = leg?.needsReview ? 'needs_review' : (leg?.status || workflow);
+                    const driverId = leg ? leg.driverId : (booking.driverId || '');
+                    const driver = drivers.find(d => d.id === driverId);
+                    const when = leg?.pickupAt || booking.pickupTime || booking.dateTime;
+                    const routeFrom = leg?.pickupLocation || booking.pickupLocation;
+                    const routeTo = leg?.destination || booking.destination;
+                    const rowKey = `${booking.id || booking.bookingNumber}-${leg?.leg || 'booking'}`;
                     const nextAction = workflow === 'pending' ? 'Prepare quote'
                       : workflow === 'awaiting_customer_confirmation' ? (booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Record deposit or payment' : 'Review quote and acceptance')
-                      : workflow === 'confirmed' && !booking.driverId ? 'Assign driver' : 'Open booking';
-                    const routeOpen = openRouteId === booking.id;
+                      : shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId ? 'Assign driver' : 'Open booking';
+                    const routeOpen = openRouteId === rowKey;
                     const returnJourney = isReturnBooking(booking);
-                    const unassigned = !driver && workflow !== 'cancelled' && workflow !== 'completed';
+                    const unassigned = !driverId && shownStatus !== 'cancelled' && shownStatus !== 'completed';
+                    const badgeLabel = shownStatus === 'needs_review' ? 'Needs review' : workflowStatusLabel(shownStatus);
+                    const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);
+                    const driverLabel = driver?.name || (leg?.leg === 'return' ? 'Driver not confirmed' : 'Unassigned');
                     return (
-                      <tr key={booking.id} className={unassigned ? 'is-unassigned' : undefined}>
+                      <tr key={rowKey} className={unassigned ? 'is-unassigned' : undefined}>
                         <td>
                           <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
                         </td>
-                        <td>{londonWhen(booking.pickupTime || booking.dateTime)}</td>
+                        <td>{londonWhen(when)}</td>
                         <td>
                           <div className="booking-customer">{booking.hirerName}</div>
-                          <div className="booking-ref">{booking.bookingNumber}</div>
+                          <div className="booking-ref">{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</div>
                         </td>
                         <td className="booking-route-cell">
-                          <div className={`booking-route${routeOpen ? ' is-open' : ''}`}>{booking.pickupLocation} → {booking.destination}</div>
-                          <button type="button" className="booking-route-toggle" aria-expanded={routeOpen} onClick={() => setOpenRouteId(routeOpen ? null : booking.id || null)}>
+                          <div className={`booking-route${routeOpen ? ' is-open' : ''}`}>{leg?.leg === 'return' ? 'Return: ' : leg?.leg === 'outbound' ? 'Outbound: ' : ''}{routeFrom} → {routeTo}</div>
+                          <button type="button" className="booking-route-toggle" aria-expanded={routeOpen} onClick={() => setOpenRouteId(routeOpen ? null : rowKey)}>
                             {routeOpen ? 'Hide full address' : 'Full address'}
                           </button>
-                          {hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p className="booking-legs">{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
-                          {returnJourney ? (
+                          {leg?.leg !== 'return' && hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p className="booking-legs">{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
+                          {leg?.leg === 'return' ? (
+                            <div className="booking-legs">
+                              {leg.needsReview ? <p>Needs review. The return was not marked completed.</p> : null}
+                              <p>The fare is for the whole booking.</p>
+                            </div>
+                          ) : null}
+                          {!leg && returnJourney ? (
                             <div className="booking-legs">
                               <p><span>Outbound</span> {londonWhen(booking.pickupTime)}</p>
                               <p>{booking.pickupLocation} → {booking.destination}</p>
@@ -788,7 +831,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </td>
                         <td>{formatVehicleTypeLabel(ext.vehicleType)}{ext.passengers ? ` · ${ext.passengers}` : ''}</td>
                         <td>{booking.actualFare != null ? `£${Number(booking.actualFare).toFixed(2)}` : 'Not set'}{hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <div className="booking-failed">Extra stops. Agree the fare.</div> : null}</td>
-                        <td><span className={`badge ${workflowBadgeClass(workflow)}`}>{workflowStatusLabel(workflow)}</span></td>
+                        <td><span className={`badge ${badgeClass}`}>{badgeLabel}</span></td>
                         <td>
                           <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
                           <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
@@ -800,14 +843,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           {receivedPence > 0 && balancePence > 0 ? <div className="booking-balance">Received £{(receivedPence / 100).toFixed(2)} · Remaining £{(balancePence / 100).toFixed(2)}</div> : null}
                           {booking.quoteEmailStatus === 'failed' ? <p role="status" className="booking-failed">Quote email failed. Open booking to retry.</p> : null}
                         </td>
-                        <td className={unassigned ? 'booking-unassigned' : undefined}>{driver?.name || 'Unassigned'}{vehicle?.registration ? ` · ${vehicle.registration}` : ''}</td>
+                        <td className={unassigned ? 'booking-unassigned' : undefined}>{driverLabel}{vehicle?.registration ? ` · ${vehicle.registration}` : ''}</td>
                         <td>
                           <div className="booking-card-actions">
                             <button type="button" onClick={() => openBooking(booking)} className="btn btn-primary btn-sm"><Edit3 className="h-4 w-4" />{nextAction}</button>
                             <details className="booking-more-actions">
                               <summary className="btn btn-secondary btn-sm">More actions</summary>
                               <div className="booking-actions-menu">
-                                <button type="button" onClick={() => handleSendDriverReminder(booking)} className="btn btn-secondary btn-sm" aria-label="Send Driver Reminder" disabled={sendingDriverReminderId === booking.id}><Mail className="h-4 w-4" />{sendingDriverReminderId === booking.id ? 'Sending…' : 'Send Driver Reminder'}</button>
+                                <button type="button" onClick={() => handleSendDriverReminder(booking, leg)} className="btn btn-secondary btn-sm" aria-label="Send Driver Reminder" disabled={sendingDriverReminderId === booking.id}><Mail className="h-4 w-4" />{sendingDriverReminderId === booking.id ? 'Sending…' : 'Send Driver Reminder'}</button>
                                 <button type="button" onClick={() => onCreateReturnBooking(booking)} className="btn btn-secondary btn-sm" aria-label="Add return journey to this booking"><ArrowLeftRight className="h-4 w-4" /> Add return</button>
                                 <button type="button" onClick={() => onDuplicateBooking(booking)} className="btn btn-secondary btn-sm"> <Copy className="h-4 w-4" /> Duplicate</button>
                                 <button type="button" onClick={() => onGeneratePDF(booking)} className="btn btn-success btn-sm"><Download className="h-4 w-4" /> Download PDF</button>
@@ -825,33 +868,43 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             </div>
             ) : (
             <div className="booking-mobile-list">
-              {sortedBookings.map((booking) => {
-                const driver = drivers.find(d => d.id === booking.driverId);
+              {shownRows.map(({ booking, leg }) => {
                 const ext = booking as ExtendedBooking;
                 const workflow = effectiveWorkflowStatus(booking);
+                const shownStatus = leg?.needsReview ? 'needs_review' : (leg?.status || workflow);
+                const driverId = leg ? leg.driverId : (booking.driverId || '');
+                const driver = drivers.find(d => d.id === driverId);
+                const when = leg?.pickupAt || booking.pickupTime || booking.dateTime;
+                const routeFrom = leg?.pickupLocation || booking.pickupLocation;
+                const routeTo = leg?.destination || booking.destination;
+                const rowKey = `${booking.id || booking.bookingNumber}-${leg?.leg || 'booking'}`;
                 const nextAction = workflow === 'pending' ? 'Prepare quote'
                   : workflow === 'awaiting_customer_confirmation' ? (booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Record deposit or payment' : 'Review quote and acceptance')
-                  : workflow === 'confirmed' && !booking.driverId ? 'Assign driver' : 'Open booking';
+                  : shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId ? 'Assign driver' : 'Open booking';
                 const returnJourney = isReturnBooking(booking);
+                const badgeLabel = shownStatus === 'needs_review' ? 'Needs review' : workflowStatusLabel(shownStatus);
+                const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);
+                const driverLabel = driver?.name || (leg?.leg === 'return' ? 'Driver not confirmed' : 'Unassigned');
                 return (
-                  <div key={booking.id} className="booking-mobile-card">
+                  <div key={rowKey} className="booking-mobile-card">
                     <label className="booking-mobile-select">
                       <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
                       Select
                     </label>
                     <details>
                     <summary>
-                      <span>{londonWhen(booking.pickupTime || booking.dateTime)}</span>
+                      <span>{londonWhen(when)}</span>
                       <strong>{booking.hirerName}</strong>
-                      <span>{booking.pickupLocation} → {booking.destination}</span>
-                      <span className={`badge ${workflowBadgeClass(workflow)}`}>{workflowStatusLabel(workflow)}</span>
+                      <span>{leg?.leg === 'return' ? 'Return: ' : ''}{routeFrom} → {routeTo}</span>
+                      <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
                       <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
-                      <span>{driver?.name || 'Unassigned'}</span>
+                      <span>{driverLabel}</span>
                     </summary>
                     <div className="booking-mobile-body">
-                      <p>{booking.bookingNumber}</p>
-                      {hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p>{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
-                      {returnJourney ? <p>{ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} The fare is for the whole booking.</p> : null}
+                      <p>{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</p>
+                      {leg?.needsReview ? <p>Needs review. The return was not marked completed.</p> : null}
+                      {leg?.leg !== 'return' && hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p>{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
+                      {leg?.leg === 'return' || (!leg && returnJourney) ? <p>{leg?.leg === 'return' ? `${routeFrom} → ${routeTo}.` : ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} The fare is for the whole booking.</p> : null}
                       {hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
                       <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
                         <option value="pending">Unpaid</option>
@@ -863,7 +916,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                       <details className="booking-more-actions">
                         <summary className="btn btn-secondary btn-sm">More actions</summary>
                         <div className="booking-actions-menu">
-                          <button type="button" onClick={() => handleSendDriverReminder(booking)} className="btn btn-secondary btn-sm" aria-label="Send Driver Reminder">Send Driver Reminder</button>
+                          <button type="button" onClick={() => handleSendDriverReminder(booking, leg)} className="btn btn-secondary btn-sm" aria-label="Send Driver Reminder">Send Driver Reminder</button>
                           <button type="button" onClick={() => onCreateReturnBooking(booking)} className="btn btn-secondary btn-sm" aria-label="Add return journey to this booking">Add return</button>
                           <button type="button" onClick={() => onDuplicateBooking(booking)} className="btn btn-secondary btn-sm">Duplicate</button>
                           <button type="button" onClick={() => onGeneratePDF(booking)} className="btn btn-success btn-sm">Download PDF</button>
