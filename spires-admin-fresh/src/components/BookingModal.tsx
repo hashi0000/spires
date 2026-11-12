@@ -532,8 +532,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
     } else {
       delete bookingData.customerReportedSource;
     }
-    if (formData.enquiryAt) {
-      bookingData.enquiryAt = fromDatetimeLocalValue(formData.enquiryAt);
+    const enquiryLocal = typeof formData.enquiryAt === "string" ? formData.enquiryAt.trim() : "";
+    if (enquiryLocal) {
+      bookingData.enquiryAt = fromDatetimeLocalValue(enquiryLocal);
     } else {
       delete bookingData.enquiryAt;
     }
@@ -927,7 +928,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry date and time</label>
               <input
                 type="datetime-local"
-                value={formData.enquiryAt || ''}
+                value={typeof formData.enquiryAt === "string" ? formData.enquiryAt : ""}
                 onChange={(e) => setFormData({ ...formData, enquiryAt: e.target.value })}
                 className="form-input"
               />
