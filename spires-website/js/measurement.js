@@ -20,8 +20,12 @@
   }
   function safeLocation() {
     var params = new URLSearchParams(w.location.search), safe = new URLSearchParams();
-    // Only validated advertising identifiers are retained; never form contents, claim tokens or email.
+    // Retain only validated advertising and campaign fields; never form contents, claim tokens or email.
     ['gclid', 'gbraid', 'wbraid'].forEach(function (k) { var v = params.get(k); if (v && /^[A-Za-z0-9_.~-]{1,256}$/.test(v)) safe.set(k, v); });
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(function (key) {
+      var value = cleanCampaign(params.get(key));
+      if (value) safe.set(key, value);
+    });
     return w.location.origin + cleanPath() + (safe.toString() ? '?' + safe.toString() : '');
   }
   function safePath(pathname) {
@@ -95,7 +99,7 @@
   function capture() {
     if (!live || consent !== 'granted') return null;
     var saved = normalise(read(contextKey));
-    if (saved) context = saved;
+    context = saved;
     var touch = pageTouch();
     if (!context) context = { capturedAt: touch.capturedAt, expiresAt: touch.capturedAt + 30 * 86400000, first: touch, latest: touch };
     else if (nonDirect(touch)) {
@@ -113,7 +117,7 @@
     if (loaded) return;
     loaded = true;
     raw('js', new Date());
-    raw('config', id, { page_location: safeLocation(), page_referrer: safeReferrer(), page_title: w.location.hostname === 'customer.spires-taxis.com' ? 'Spires Customer Portal' : d.title, allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: true });
+    raw('config', id, { page_location: safeLocation(), page_referrer: safeReferrer(), page_title: w.location.hostname === 'customer.spires-taxis.com' ? 'Spires Customer Portal' : d.title, cookie_domain: 'spires-taxis.com', allow_google_signals: false, allow_ad_personalization_signals: false, send_page_view: true });
     var s = d.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id; d.head.appendChild(s);
   }
   function choose(value) {

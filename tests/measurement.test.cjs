@@ -3,12 +3,12 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const code = fs.readFileSync('spires-website/js/measurement.js','utf8');
-function browser(host='www.spires-taxis.com', choice='', referrer='', route='') {
- const cookies = new Map(), events={}, appended=[], nodes=new Map(), storage=new Map();
+function browser(host='www.spires-taxis.com', choice='', referrer='', route='', options={}) {
+ const cookies = options.cookies || new Map(), events={}, appended=[], nodes=new Map(), storage=new Map();
  if(choice) cookies.set('spires_measurement_consent_v1',encodeURIComponent(JSON.stringify({value:choice,at:Date.now()})));
  const doc={readyState:'complete', title:'Airport transfers', referrer, head:{appendChild(el){appended.push(el)}},body:{appendChild(el){appended.push(el);nodes.set(el.id,el)},getAttribute(name){return name==='data-wa-route'?route:''}},getElementById(id){return nodes.get(id)},addEventListener(n,fn){events[n]=fn},createElement(tag){return {tag,children:[],style:{},setAttribute(){},appendChild(el){this.children.push(el)},remove(){nodes.delete(this.id)}}}};
  Object.defineProperty(doc,'cookie',{get(){return [...cookies].map(([k,v])=>k+'='+v).join('; ')},set(v){const [p,...attrs]=v.split(';');const at=p.indexOf('=');if(attrs.some(a=>/Max-Age=0$/.test(a.trim())))cookies.delete(p.slice(0,at));else cookies.set(p.slice(0,at),p.slice(at+1))}});
- const win={location:{protocol:'https:',hostname:host,origin:'https://'+host,pathname:'/claim',search:'?t=SECRET&email=private@example.com&gclid=click123'},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout,clearTimeout};
+ const win={location:{protocol:'https:',hostname:host,origin:'https://'+host,pathname:'/claim',search:options.search === undefined ? '?t=SECRET&email=private@example.com&gclid=click123' : options.search},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout,clearTimeout};
  vm.runInNewContext(code,{window:win,document:doc,URL,URLSearchParams,Date,Promise});
  return {win,doc,appended,cookies,events,nodes};
 }
@@ -67,3 +67,63 @@ test('a saved enquiry can be a contact, a quote or a booking request, once',()=>
 });
 test('portal and marketing tracker copies stay identical',()=>assert.equal(code,fs.readFileSync('customer-app/public/measurement.js','utf8')));
 test('all marketing pages use a single bootstrap, not the old tag',()=>{const cp=require('node:child_process');const names=cp.execFileSync('git',['ls-files','spires-website/*.html','spires-website/**/*.html'],{encoding:'utf8'}).trim().split('\n');for(const name of names){const html=fs.readFileSync(name,'utf8');assert.equal(html.includes('googletagmanager.com/gtag/js'),false,name);assert.ok((html.match(/src="\/js\/measurement.js"/g)||[]).length<=1,name)}});
+
+
+test('GA4 sees validated campaign tags while private URL parameters stay out',()=>{
+ const b=browser('www.spires-taxis.com','granted','','',{search:'?utm_source=google&utm_medium=cpc&utm_campaign=spires_us_heathrow_oxford_test&utm_content=arrival&email=private@example.com&t=SECRET'});
+ const config=b.win.dataLayer.find(r=>r[0]==='config')[2];
+ const url=new URL(config.page_location);
+ assert.equal(url.searchParams.get('utm_source'),'google');
+ assert.equal(url.searchParams.get('utm_medium'),'cpc');
+ assert.equal(url.searchParams.get('utm_campaign'),'spires_us_heathrow_oxford_test');
+ assert.equal(url.searchParams.get('utm_content'),'arrival');
+ assert.equal(url.searchParams.has('email'),false);
+ assert.equal(url.searchParams.has('t'),false);
+ assert.equal(config.cookie_domain,'spires-taxis.com');
+});
+
+test('invalid campaign fields cannot expose contact details to GA4',()=>{
+ const b=browser('www.spires-taxis.com','granted','','',{search:'?utm_source=private@example.com&utm_campaign=07700900000&utm_term=https://private.example'});
+ const url=new URL(b.win.dataLayer.find(r=>r[0]==='config')[2].page_location);
+ assert.equal(url.search,'');
+});
+
+test('consented campaign attribution survives website to signed in portal navigation',async()=>{
+ const web=browser('www.spires-taxis.com','granted','','',{search:'?gclid=validClick&utm_source=google&utm_medium=cpc&utm_campaign=heathrow_arrivals'});
+ const portal=browser('customer.spires-taxis.com','','https://www.spires-taxis.com/heathrow-to-oxford-taxi','',{cookies:web.cookies,search:''});
+ const attribution=await portal.win.SpiresMeasurement.attribution();
+ assert.equal(attribution.gclid,'validClick');
+ assert.equal(attribution.utmCampaign,'heathrow_arrivals');
+ assert.equal(attribution.latest.utmSource,'google');
+ assert.equal(attribution.referrerHost,undefined);
+ portal.win.SpiresMeasurement.lead('savedPortal','portal');
+ assert.equal(portal.win.dataLayer.filter(r=>r[1]==='generate_lead').length,1);
+});
+
+test('organic search survives internal navigation without being labelled paid',async()=>{
+ const web=browser('www.spires-taxis.com','granted','https://www.google.be/search','',{search:''});
+ const portal=browser('customer.spires-taxis.com','','https://www.spires-taxis.com/','',{cookies:web.cookies,search:''});
+ const attribution=await portal.win.SpiresMeasurement.attribution();
+ assert.equal(attribution.referrerHost,'www.google.be');
+ assert.equal(attribution.gclid,undefined);
+});
+
+test('a rejected choice shared with the portal prevents tracking there too',async()=>{
+ const web=browser('www.spires-taxis.com','denied','','',{search:'?gclid=validClick'});
+ const portal=browser('customer.spires-taxis.com','','https://www.spires-taxis.com/','',{cookies:web.cookies,search:''});
+ assert.equal(await portal.win.SpiresMeasurement.attribution(),null);
+ portal.win.SpiresMeasurement.lead('notMeasured','portal');
+ assert.equal(portal.appended.some(el=>el.tag==='script'),false);
+ assert.equal(portal.win.dataLayer.some(r=>r[0]==='event'),false);
+});
+
+
+test('expired in-memory attribution cannot survive an expired shared cookie',async()=>{
+ const b=browser('www.spires-taxis.com','granted','','',{search:'?gclid=oldClick'});
+ const saved=JSON.parse(decodeURIComponent(b.cookies.get('spires_measurement_context_v1')));
+ saved.expiresAt=Date.now()-1;
+ b.cookies.set('spires_measurement_context_v1',encodeURIComponent(JSON.stringify(saved)));
+ b.win.location.search='';
+ const result=await b.win.SpiresMeasurement.attribution();
+ assert.equal(result.gclid,undefined);
+});
