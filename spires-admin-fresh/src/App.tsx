@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from './utils/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from './utils/firebase';
 
 import { Driver, Vehicle, Booking, ExtendedBooking } from './types/types';
 import { useDrivers, useVehicles, useBookings } from './hooks/useFirebase';
@@ -11,8 +12,6 @@ import { isPendingIncomingRequest } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
 import { isAdminEmail } from './utils/staffAccess';
-import { advertisingPreviewBookings } from './utils/advertisingResults';
-
 import Login from './components/Login';
 import Header from './components/Header';
 import Navigation from './components/Navigation';
@@ -61,6 +60,8 @@ const App: React.FC = () => {
   const [desktopRemindersEnabled, setDesktopRemindersEnabled] = useState(() =>
     typeof window !== 'undefined' && localStorage.getItem(DESKTOP_REMINDERS_KEY) === 'true'
   );
+  const [advertisingStartedOn, setAdvertisingStartedOn] = useState<string | null>(null);
+  const [advertisingStartConfirmed, setAdvertisingStartConfirmed] = useState(false);
   const [headerNow, setHeaderNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -70,6 +71,24 @@ const App: React.FC = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user || !isAdminEmail(user.email)) {
+      setAdvertisingStartedOn(null);
+      setAdvertisingStartConfirmed(false);
+      return undefined;
+    }
+    return onSnapshot(doc(db, 'marketingSpendSettings', 'manual'), (snapshot) => {
+      const data = snapshot.data();
+      const started = data?.advertisingStartedOn;
+      const recorded = typeof started === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(started) ? started : null;
+      setAdvertisingStartedOn(recorded);
+      setAdvertisingStartConfirmed(recorded !== null && data?.advertisingStartConfirmed === true);
+    }, () => {
+      setAdvertisingStartedOn(null);
+      setAdvertisingStartConfirmed(false);
+    });
+  }, [user]);
 
   useEffect(() => {
     const id = window.setInterval(() => setHeaderNow(new Date()), 60 * 1000);
@@ -124,18 +143,8 @@ const App: React.FC = () => {
     return <Loading />;
   }
 
-  if (!user && !(process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).has("advertisingPreview"))) {
-    return <Login onLoginSuccess={() => {}} />;
-  }
-
   if (!user) {
-    return (
-      <div className="admin-shell">
-        <main className="admin-main">
-          <AdvertisingResults bookings={advertisingPreviewBookings} previewMode />
-        </main>
-      </div>
-    );
+    return <Login onLoginSuccess={() => {}} />;
   }
 
   const activeDrivers = driversHook.getActiveDrivers();
@@ -405,6 +414,10 @@ const App: React.FC = () => {
             bookings={bookingsHook.bookings}
             desktopRemindersEnabled={desktopRemindersEnabled}
             onDesktopRemindersChange={handleDesktopRemindersChange}
+            showMarketingPerformance={isAdminEmail(user.email)}
+            onOpenAdvertising={() => setActiveTab('advertising')}
+            advertisingStartedOn={advertisingStartedOn}
+            advertisingStartConfirmed={advertisingStartConfirmed}
           />
         );
       case 'drivers':

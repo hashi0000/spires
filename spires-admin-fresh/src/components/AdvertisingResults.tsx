@@ -5,14 +5,27 @@ import { db, functions } from "../utils/firebase";
 import { isAdminEmail } from "../utils/staffAccess";
 import {
   ADVERTISING_BUDGET_LABEL,
+  ADDITIONAL_BOOKINGS_NOTE,
+  RESULTS_CONTEXT_NOTE,
   AdvertisingBookingInput,
   AdvertisingReport,
+  COMPARISON_OBJECTIVE,
   JobCostInput,
   SpendEntryInput,
+  advertisingDateRange,
   buildAdvertisingReport,
   currentLondonMonth,
+  bookingPaceChange,
+  beforeAdsBookingsPerDay,
+  afterAdsBookingsPerDay,
   formatGbp,
+  formatPace,
+  formatRate,
+  formatReturn,
+  interpretAttribution,
 } from "../utils/advertisingResults";
+import { ComparisonBars, growthComparisonItems, paceComparisonItems } from "./ComparisonBars";
+import { BookingFrequencyChart } from "./BookingFrequencyChart";
 
 const SOURCE_OPTIONS: Array<[string, string]> = [
   ["", "Not recorded"],
@@ -58,9 +71,12 @@ export function AdvertisingResultsView({
   message = "",
   saving = false,
   manualIsComplete = false,
+  advertisingStartedOn = null,
+  advertisingStartConfirmed = false,
   connectionNote = "",
   onDates,
   onManualComplete,
+  onSaveStartDate,
   onAddSpend,
   onSaveSource,
   onSaveCost,
@@ -71,9 +87,12 @@ export function AdvertisingResultsView({
   message?: string;
   saving?: boolean;
   manualIsComplete?: boolean;
+  advertisingStartedOn?: string | null;
+  advertisingStartConfirmed?: boolean;
   connectionNote?: string;
   onDates: (from: string, to: string, dateBasis: "journey" | "enquiry") => void;
   onManualComplete: (value: boolean) => void;
+  onSaveStartDate: (date: string) => void;
   onAddSpend: (date: string, pounds: string, note: string) => void;
   onSaveSource: (id: string, source: string, channel: "telephone" | "whatsapp") => void;
   onSaveCost: (id: string, field: keyof JobCostInput, pounds: string) => void;
@@ -81,7 +100,13 @@ export function AdvertisingResultsView({
   const [spendDate, setSpendDate] = useState(report.to);
   const [spendPounds, setSpendPounds] = useState("");
   const [spendNote, setSpendNote] = useState("");
-  const figures = [report.quoted, report.netPayments, report.manualSpend, report.adsSpend, report.advertisingSpend, report.contribution, report.costPerConfirmed, report.costPerCompletedPaid, report.costs.driver, report.costs.fuel, report.costs.parking, report.costs.airport, report.costs.paymentFees];
+  const [startDate, setStartDate] = useState(advertisingStartedOn || "");
+  useEffect(() => {
+    setStartDate(advertisingStartedOn || "");
+  }, [advertisingStartedOn]);
+  const today = advertisingDateRange("today");
+  const lastSeven = advertisingDateRange("last_7");
+  const figures = [report.costPerConfirmed, report.contribution, report.quoted, report.netPayments, report.manualSpend, report.adsSpend, report.advertisingSpend, report.costPerCompletedPaid, report.costs.driver, report.costs.fuel, report.costs.parking, report.costs.airport, report.costs.paymentFees];
 
   return (
     <section className="advertising-results">
@@ -96,6 +121,10 @@ export function AdvertisingResultsView({
       {message ? <p className="advertising-results__message">{message}</p> : null}
 
       <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
+        <div className="advertising-results__presets" role="group" aria-label="Date shortcuts">
+          <button type="button" className={report.from === today.from && report.to === today.to ? "is-active" : ""} aria-pressed={report.from === today.from && report.to === today.to} onClick={() => onDates(today.from, today.to, report.dateBasis)}>Today</button>
+          <button type="button" className={report.from === lastSeven.from && report.to === lastSeven.to ? "is-active" : ""} aria-pressed={report.from === lastSeven.from && report.to === lastSeven.to} onClick={() => onDates(lastSeven.from, lastSeven.to, report.dateBasis)}>Last 7 days</button>
+        </div>
         <label>From
           <input className="form-input" type="date" value={report.from} onChange={(event) => onDates(event.target.value, report.to, report.dateBasis)} />
         </label>
@@ -110,6 +139,68 @@ export function AdvertisingResultsView({
         </label>
       </form>
 
+      <section className="advertising-results__panel">
+        <h2>Selected period against the days before it</h2>
+        <p>Revenue per day: {report.selectedPace.days === 0 ? "not calculated" : formatGbp(report.revenuePerDay.pence)}. Average booking value: {report.averageBookingValue.pence === null && (report.selectedPace.days === 0 || report.selectedPace.confirmed === 0) ? "not calculated" : formatGbp(report.averageBookingValue.pence)}. Confirmed booking rate: {report.confirmedRate === null ? "not calculated" : formatRate(report.confirmedRate)}.</p>
+        {report.selectedPace.days === 0 ? <p>This period has no finished day, so bookings a day are not calculated.</p> : (
+          <>
+            <p>Earlier period, {report.earlierPace.from} to {report.earlierPace.to}: {formatPace(report.earlierPace.bookingsPerDay)} confirmed bookings a day.</p>
+            <p>Finished days, {report.selectedPace.from} to {report.selectedPace.to}: {formatPace(report.selectedPace.bookingsPerDay)} confirmed bookings a day.</p>
+          </>
+        )}
+        <p>{bookingPaceChange(report.earlierPace.bookingsPerDay, report.selectedPace.bookingsPerDay)}. This compares confirmed bookings on finished days. The current day is not finished, so it is left out of this comparison.</p>
+        {report.selectedPace.days > 0 ? <ComparisonBars earlierName="Earlier" laterName="Finished days" items={paceComparisonItems(report.earlierPace, report.selectedPace)} /> : null}
+        <BookingFrequencyChart points={report.frequency} dateLabel={report.dateBasis === "enquiry" ? "enquiry date" : "journey date"} startDate={advertisingStartConfirmed ? advertisingStartedOn : null} frequencyChange={report.frequencyChange} revenuePerDayChange={report.revenuePerDayChange} averageBookingValueChange={report.averageBookingValueChange} confirmedBookingRateChange={report.confirmedBookingRateChange} />
+        <p>{report.revenuePerDay.detail} {report.averageBookingValue.detail} {report.confirmedRateLabel} The earlier period is the same number of days immediately before the dates selected.</p>
+        <p>This comparison is calculated from the stored bookings. Historical bookings are not modified merely to produce a comparison.</p>
+        <p>{report.reportingBasis}</p>
+        <p>{ADDITIONAL_BOOKINGS_NOTE}</p>
+        <p>{RESULTS_CONTEXT_NOTE}</p>
+        <h2>Objective</h2>
+        <p>{COMPARISON_OBJECTIVE}</p>
+        <h2>Google Ads start date</h2>
+        <p>{advertisingStartedOn ? `Google Ads start date: ${advertisingStartedOn}. ${advertisingStartConfirmed ? "An administrator has confirmed this date." : "An administrator has not confirmed this date."}` : "No Google Ads start date is recorded."} Historical Google Ads campaign data is not available, so the first date of impressions or spend cannot be identified. A stored Google click is not used as this date, the dates selected above are not used as this date, and a campaign creation date is not used as this date.</p>
+        <p>An administrator can confirm this date or change it. Booking records are not changed.</p>
+        <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
+          <label>Google Ads start date
+            <input className="form-input" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} disabled={preview || saving} />
+          </label>
+          <button className="btn btn-primary" type="button" disabled={preview || saving || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || (Boolean(advertisingStartedOn) && (startDate !== advertisingStartedOn || advertisingStartConfirmed))} onClick={() => onSaveStartDate(startDate)}>Confirm Google Ads start date</button>
+          <button className="btn btn-secondary" type="button" disabled={preview || saving || !advertisingStartedOn || startDate === advertisingStartedOn || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)} onClick={() => onSaveStartDate(startDate)}>Change Google Ads start date</button>
+        </form>
+        <h2>Overall business growth after advertising started</h2>
+        <p>This comparison is separate from bookings directly attributed to Google Ads, bookings from other sources, and bookings with unknown attribution. It uses the stored bookings before and after the confirmed Google Ads start date. A booking without a Google click still counts here. {ADDITIONAL_BOOKINGS_NOTE}</p>
+        <h2>{report.businessGrowth.label}</h2>
+        {report.businessGrowth.before && report.businessGrowth.after ? (
+          <>
+            <h3>Before</h3>
+            <p>{beforeAdsBookingsPerDay(report.businessGrowth.before.days, report.businessGrowth.before.bookingsPerDay)}</p>
+            <p>{report.businessGrowth.before.summary}</p>
+            <h3>After</h3>
+            <p>{afterAdsBookingsPerDay(report.businessGrowth.after.days, report.businessGrowth.after.bookingsPerDay)}</p>
+            <p>{bookingPaceChange(report.businessGrowth.before.bookingsPerDay, report.businessGrowth.after.bookingsPerDay)}</p>
+            <p>{report.businessGrowth.after.summary}</p>
+            <ComparisonBars earlierName="Before" laterName="After" items={growthComparisonItems(report.businessGrowth.before, report.businessGrowth.after)} />
+          </>
+        ) : null}
+        <p>{report.businessGrowth.text}. {report.businessGrowth.detail}</p>
+        {report.businessGrowth.limitations.length > 0 ? (
+          <>
+            <h3>Incomplete records in the before and after comparison</h3>
+            <p>Where a historical booking record in these periods is incomplete, the limitation is shown here. The missing parts stay missing.</p>
+            {report.businessGrowth.limitations.map((line) => <p key={line}>{line}</p>)}
+          </>
+        ) : null}
+      </section>
+
+      {report.limitations.length > 0 ? (
+        <section className="advertising-results__panel">
+          <h2>Incomplete historical records</h2>
+          <p>Where a historical booking record is incomplete, the limitation is shown here. The missing parts stay missing. Historical bookings are not modified merely to produce a comparison.</p>
+          {report.limitations.map((line) => <p key={line}>{line}</p>)}
+        </section>
+      ) : null}
+
       <div className="advertising-results__counts">
         <article><span>Enquiries</span><strong>{report.enquiries}</strong></article>
         <article><span>Confirmed bookings</span><strong>{report.confirmed}</strong></article>
@@ -118,7 +209,17 @@ export function AdvertisingResultsView({
       </div>
 
       <div className="advertising-results__figures">
-        {figures.map((row) => (
+        <article>
+          <h2>{report.costPerConfirmed.label}</h2>
+          <p className="advertising-results__amount">{formatGbp(report.costPerConfirmed.pence)}</p>
+          <p>{report.costPerConfirmed.detail}</p>
+        </article>
+        <article>
+          <h2>{report.returnOnSpend.label}</h2>
+          <p className="advertising-results__amount">{formatReturn(report.returnOnSpend.ratio)}</p>
+          <p>{report.returnOnSpend.detail}</p>
+        </article>
+        {figures.filter((row) => row !== report.costPerConfirmed).map((row) => (
           <article key={row.label}>
             <h2>{row.label}</h2>
             <p className="advertising-results__amount">{formatGbp(row.pence)}</p>
@@ -128,11 +229,56 @@ export function AdvertisingResultsView({
       </div>
 
       <section className="advertising-results__panel">
-        <h2>Attribution coverage</h2>
-        <p>{report.attribution.trackedGoogleAds} tracked Google Ads, {report.attribution.customerReported} customer reported, {report.attribution.unknown} unknown, from {report.attribution.included} included bookings.</p>
-        <p>{report.attribution.telephoneWithoutSource} telephone and {report.attribution.whatsappWithoutSource} WhatsApp bookings have no recorded source.</p>
+        <h2>Attribution</h2>
+        <p>Clearly distinguish between bookings directly attributed to Google Ads, bookings from other sources, and bookings with unknown attribution. A confirmed, allocated or completed booking is counted in only one of these. A cancellation or an enquiry is not included in these counts. Overall business growth after advertising started is a separate comparison. It is not one of those attribution counts.</p>
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>{report.directAds.label}</h2>
+        <p>A booking is directly attributed to Google Ads only when it has a consented Google click id that has not expired. A customer who said Google Ads is counted under bookings from other sources. A cancellation or an enquiry is not included in this count. The current day is left out.</p>
+        <p className="advertising-results__amount">{report.selectedPace.days === 0 ? "not calculated" : report.directAds.confirmed}</p>
+        <p>{report.directAds.detail}</p>
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>{report.otherSources.label}</h2>
+        <p>A booking is from another source when the customer reported where it came from, including a customer who said Google Ads, the website, a repeat booking, a recommendation, or another source. That report is not a stored Google click. A cancellation or an enquiry is not included in this count. The current day is left out.</p>
+        <p className="advertising-results__amount">{report.selectedPace.days === 0 ? "not calculated" : report.otherSources.confirmed}</p>
+        <p>{report.otherSources.detail}</p>
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>{report.unknownAttribution.label}</h2>
+        <p>A booking has unknown attribution when no source was recorded. It stays unknown. It is not counted as a Google Ads booking or as a customer reported source. A cancellation or an enquiry is not included in this count. The current day is left out.</p>
+        <p className="advertising-results__amount">{report.selectedPace.days === 0 ? "not calculated" : report.unknownAttribution.confirmed}</p>
+        <p>{report.unknownAttribution.detail}</p>
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>Attribution and interpretation</h2>
+        {interpretAttribution({
+          trackedGoogleAds: report.attribution.trackedGoogleAds,
+          customerReported: report.attribution.customerReported,
+          unknown: report.attribution.unknown,
+          included: report.attribution.included,
+          telephoneWithoutSource: report.attribution.telephoneWithoutSource,
+          whatsappWithoutSource: report.attribution.whatsappWithoutSource,
+          earlierPerDay: report.earlierPace.bookingsPerDay,
+          selectedPerDay: report.selectedPace.bookingsPerDay,
+          finished: report.selectedPace.days > 0,
+          leavesOutCurrentDay: report.from <= (report.selectedPace.to || report.from) && report.to > report.selectedPace.to,
+        }).map((line) => <p key={line}>{line}</p>)}
         <p>{report.unpaidConfirmed} confirmed {report.unpaidConfirmed === 1 ? "booking has" : "bookings have"} no recorded payment. Those fares are not counted as money received.</p>
-        <p>Tracked means a consented Google click id was stored with the booking. A customer saying the enquiry came from an advert is recorded separately. An unknown source stays unknown.</p>
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>Historical data integrity</h2>
+        <p>These figures use the existing Firebase booking records, as they were stored. Opening this page does not change a booking, a recorded price, a recorded payment, or stored attribution.</p>
+        <p>A comparison is calculated from the stored bookings. Historical bookings are not modified merely to produce a comparison.</p>
+        <p>A booking with no recorded source stays unknown. This page does not fill in a source for an older booking.</p>
+        <p>A customer reported source or a journey cost saved here is stored as a separate note. The original booking record is left unchanged.</p>
+        <p>The stored creation time is reliable as the time the booking record was saved. It is not reliable as the customer enquiry time, because a booking can be saved after the journey. Enquiry date uses that stored time. A journey date is not substituted for a booking creation date. A booking with no creation time is left out of an enquiry date report. A creation time is not used in place of a missing journey date.</p>
+        {report.dateBasis === "enquiry" && report.excluded.missingCreationDate > 0 ? <p>{report.excluded.missingCreationDate} {report.excluded.missingCreationDate === 1 ? "booking has" : "bookings have"} no creation time, so {report.excluded.missingCreationDate === 1 ? "it is" : "they are"} left out of this enquiry date report.</p> : null}
       </section>
 
       <ResultsTable title="Airport route" rows={report.byRoute} />
@@ -189,7 +335,7 @@ export function AdvertisingResultsView({
 
       <section className="advertising-results__panel">
         <h2>Telephone and WhatsApp sources</h2>
-        <p>Record what the customer said. This does not mark the booking as tracked advertising.</p>
+        <p>Record what the customer said. This does not mark the booking as tracked advertising, and it does not change the original booking record.</p>
         {report.sourcePrompts.length === 0 ? <p>No telephone or WhatsApp bookings in this period.</p> : (
           <div className="advertising-results__table-wrap">
             <table>
@@ -309,6 +455,8 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const [spend, setSpend] = useState<SpendEntryInput[]>([]);
   const [notes, setNotes] = useState<Record<string, NoteRecord>>({});
   const [manualIsComplete, setManualIsComplete] = useState(false);
+  const [advertisingStartedOn, setAdvertisingStartedOn] = useState<string | null>(null);
+  const [advertisingStartConfirmed, setAdvertisingStartConfirmed] = useState(false);
   const [adsConnected, setAdsConnected] = useState(false);
   const [adsReason, setAdsReason] = useState(previewMode
     ? "Google Ads is not connected. No advertising credentials are available to the server."
@@ -337,7 +485,12 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       setNotes(next);
     }, () => undefined);
     const settingsUnsub = onSnapshot(doc(db, "marketingSpendSettings", "manual"), (snapshot) => {
-      setManualIsComplete(snapshot.data()?.treatManualAsFullSpend === true);
+      const data = snapshot.data();
+      const started = data?.advertisingStartedOn;
+      const recorded = typeof started === "string" && /^\d{4}-\d{2}-\d{2}$/.test(started) ? started : null;
+      setManualIsComplete(data?.treatManualAsFullSpend === true);
+      setAdvertisingStartedOn(recorded);
+      setAdvertisingStartConfirmed(recorded !== null && data?.advertisingStartConfirmed === true);
     }, () => undefined);
     const deliveryUnsub = onSnapshot(collection(db, "marketingConversions"), (snapshot) => {
       setDeliveries(snapshot.docs.map((row) => {
@@ -370,8 +523,8 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   }, [previewMode]);
 
   const report = useMemo(() => buildAdvertisingReport(withNotes(bookings, notes), {
-    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected, adsSpendPence: null,
-  }), [bookings, notes, from, to, dateBasis, spend, manualIsComplete, adsConnected]);
+    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected, adsSpendPence: null, advertisingStartedOn, advertisingStartConfirmed,
+  }), [bookings, notes, from, to, dateBasis, spend, manualIsComplete, adsConnected, advertisingStartedOn, advertisingStartConfirmed]);
 
   if (!previewMode && !isAdminEmail(email)) {
     return <section className="advertising-results"><h1>Advertising results</h1><p>This page is only for admin accounts.</p></section>;
@@ -398,6 +551,8 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       connectionNote={adsReason}
       saving={saving}
       manualIsComplete={manualIsComplete}
+      advertisingStartedOn={advertisingStartedOn}
+      advertisingStartConfirmed={advertisingStartConfirmed}
       onDates={(nextFrom, nextTo, nextBasis) => { setFrom(nextFrom); setTo(nextTo); setDateBasis(nextBasis); }}
       onManualComplete={async (value) => {
         setManualIsComplete(value);
@@ -406,6 +561,32 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
           await setDoc(doc(db, "marketingSpendSettings", "manual"), { treatManualAsFullSpend: value, updatedAt: serverTimestamp(), updatedBy: email || "" }, { merge: true });
         } catch {
           setMessage("The spend setting was not saved. Admin rules for these records are not available until they are deployed.");
+        }
+      }}
+      onSaveStartDate={async (date) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          setMessage("Enter the Google Ads start date.");
+          return;
+        }
+        const changed = advertisingStartedOn !== null && advertisingStartedOn !== date;
+        setAdvertisingStartedOn(date);
+        setAdvertisingStartConfirmed(true);
+        if (previewMode) return;
+        setSaving(true);
+        try {
+          await setDoc(doc(db, "marketingSpendSettings", "manual"), {
+            advertisingStartedOn: date,
+            advertisingStartConfirmed: true,
+            updatedAt: serverTimestamp(),
+            updatedBy: email || "",
+          }, { merge: true });
+          setMessage(changed
+            ? "Google Ads start date changed. Booking records were not changed."
+            : "Google Ads start date confirmed. Booking records were not changed.");
+        } catch {
+          setMessage("The Google Ads start date was not saved. Admin rules for these records are not available until they are deployed.");
+        } finally {
+          setSaving(false);
         }
       }}
       onAddSpend={async (date, pounds, note) => {

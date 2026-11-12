@@ -2142,6 +2142,9 @@ header.admin-header,
 .advertising-results__budget, .advertising-results__banner, .advertising-results__message { font-weight: 700; }
 .advertising-results__banner { background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 0.75rem 1rem; }
 .advertising-results__filters, .advertising-results__spend, .advertising-results__costs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+.advertising-results__presets { display: flex; gap: 0.4rem; }
+.advertising-results__presets button { background: #fff; border: 1px solid #c5ced8; color: #002147; border-radius: 8px; padding: 0.45rem 0.7rem; font-weight: 700; cursor: pointer; }
+.advertising-results__presets button.is-active { background: #002147; color: #fff; }
 .advertising-results label { display: grid; gap: 0.3rem; font-size: 0.8125rem; font-weight: 700; }
 .advertising-results__counts, .advertising-results__figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem; }
 .advertising-results__counts span, .advertising-results__figures h2 { font-size: 0.8125rem; }
@@ -2151,6 +2154,7 @@ header.admin-header,
 .advertising-results table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .advertising-results th, .advertising-results td { text-align: left; padding: 0.45rem; border-bottom: 1px solid #e6ebf0; vertical-align: top; }
 .advertising-results__footer { font-size: 0.8125rem; color: #334155; }
+.frequency-chart__table { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media (max-width: 900px) {
   .booking-drawer .modal-content { max-width: none; width: 100%; }

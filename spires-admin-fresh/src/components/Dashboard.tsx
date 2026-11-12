@@ -7,6 +7,19 @@ import {
   formatTimeUntil,
   getUpcomingBookings
 } from '../utils/bookingSchedule';
+import {
+  bookingPaceChange,
+  beforeAdsBookingsPerDay,
+  afterAdsBookingsPerDay,
+  buildAdvertisingReport,
+  ADDITIONAL_BOOKINGS_NOTE,
+  RESULTS_CONTEXT_NOTE,
+  COMPARISON_OBJECTIVE,
+  currentLondonMonth,
+  formatPace,
+} from '../utils/advertisingResults';
+import { ComparisonBars, growthComparisonItems } from './ComparisonBars';
+import { BookingFrequencyChart } from './BookingFrequencyChart';
 
 interface DashboardProps {
   activeDriversCount: number;
@@ -17,6 +30,10 @@ interface DashboardProps {
   bookings: Booking[];
   desktopRemindersEnabled: boolean;
   onDesktopRemindersChange: (enabled: boolean) => void | Promise<void>;
+  showMarketingPerformance?: boolean;
+  onOpenAdvertising?: () => void;
+  advertisingStartedOn?: string | null;
+  advertisingStartConfirmed?: boolean;
 }
 
 const FUEL_API = 'https://www.spires-taxis.com/api/uk-fuel-prices';
@@ -47,7 +64,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   pendingCustomerBookingsCount,
   bookings,
   desktopRemindersEnabled,
-  onDesktopRemindersChange
+  onDesktopRemindersChange,
+  showMarketingPerformance = false,
+  onOpenAdvertising,
+  advertisingStartedOn = null,
+  advertisingStartConfirmed = false
 }) => {
   const [now, setNow] = useState(() => new Date());
   const [fuelInfo, setFuelInfo] = useState<{ petrol: string; diesel: string; updated: string } | null>(null);
@@ -239,8 +260,106 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {showMarketingPerformance ? (
+        <>
+          <MarketingPerformance bookings={bookings} now={now} onOpenAdvertising={onOpenAdvertising} advertisingStartedOn={advertisingStartedOn} advertisingStartConfirmed={advertisingStartConfirmed} />
+          <BeforeAfterAdvertising bookings={bookings} now={now} advertisingStartedOn={advertisingStartedOn} advertisingStartConfirmed={advertisingStartConfirmed} />
+        </>
+      ) : null}
     </div>
   );
 };
+
+function MarketingPerformance({ bookings, now, onOpenAdvertising, advertisingStartedOn = null, advertisingStartConfirmed = false }: { bookings: Booking[]; now: Date; onOpenAdvertising?: () => void; advertisingStartedOn?: string | null; advertisingStartConfirmed?: boolean }) {
+  const report = useMemo(() => {
+    const month = currentLondonMonth(now);
+    return buildAdvertisingReport(bookings, {
+      ...month,
+      dateBasis: "journey",
+      now,
+      spend: [],
+      manualSpendIsComplete: false,
+      adsConnected: false,
+      advertisingStartedOn,
+      advertisingStartConfirmed,
+    });
+  }, [bookings, now, advertisingStartedOn, advertisingStartConfirmed]);
+  const pace = bookingPaceChange(report.earlierPace.bookingsPerDay, report.selectedPace.bookingsPerDay);
+  return (
+    <section className="bg-white p-6 rounded-lg shadow">
+      <h3 className="text-lg font-medium text-gray-900">Marketing performance</h3>
+      <h4 className="text-sm font-medium text-gray-900 mt-4">Objective</h4>
+      <p className="text-sm text-gray-700 mt-1">{COMPARISON_OBJECTIVE}</p>
+      <p className="text-sm text-gray-700 mt-3">Google Ads start date: {advertisingStartedOn ? `${advertisingStartedOn}. ${advertisingStartConfirmed ? "An administrator has confirmed this date." : "An administrator has not confirmed this date."}` : "not recorded."}</p>
+      {report.selectedPace.days === 0 ? (
+        <p className="text-sm text-gray-700 mt-2">This month has no finished day, so bookings a day are not calculated.</p>
+      ) : (
+        <p className="text-sm text-gray-700 mt-2">
+          Finished days {report.selectedPace.from} to {report.selectedPace.to}: {formatPace(report.selectedPace.bookingsPerDay)} confirmed bookings a day. The previous {report.earlierPace.days} days: {formatPace(report.earlierPace.bookingsPerDay)}. {pace}.
+        </p>
+      )}
+      <p className="text-sm text-gray-700 mt-2">The current day is not finished, so it is left out of this comparison.</p>
+      <BookingFrequencyChart points={report.frequency} dateLabel="journey date" startDate={advertisingStartConfirmed ? advertisingStartedOn : null} frequencyChange={report.selectedPace.days === 0 ? "" : report.frequencyChange} revenuePerDayChange={report.selectedPace.days === 0 ? "" : report.revenuePerDayChange} averageBookingValueChange={report.selectedPace.days === 0 ? "" : report.averageBookingValueChange} confirmedBookingRateChange={report.selectedPace.days === 0 ? "" : report.confirmedBookingRateChange} />
+      {report.limitations.length > 0 ? (
+        <>
+          <h4 className="text-sm font-medium text-gray-900 mt-4">Incomplete historical records</h4>
+          <p className="text-sm text-gray-700 mt-1">Where a historical booking record is incomplete, the limitation is shown here. The missing parts stay missing.</p>
+          {report.limitations.map((line) => <p key={line} className="text-sm text-gray-700 mt-2">{line}</p>)}
+        </>
+      ) : null}
+      <p className="text-sm text-gray-700 mt-2">{report.reportingBasis}</p>
+      <p className="text-sm text-gray-700 mt-2">{RESULTS_CONTEXT_NOTE}</p>
+      <p className="text-sm text-gray-500 mt-2">This summary uses the existing Firebase booking records. Historical bookings are not modified merely to produce a comparison.</p>
+      {onOpenAdvertising ? (
+        <button type="button" className="mt-4 text-sm font-medium text-indigo-700" onClick={onOpenAdvertising}>
+          Open Advertising results
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function BeforeAfterAdvertising({ bookings, now, advertisingStartedOn = null, advertisingStartConfirmed = false }: { bookings: Booking[]; now: Date; advertisingStartedOn?: string | null; advertisingStartConfirmed?: boolean }) {
+  const report = useMemo(() => buildAdvertisingReport(bookings, {
+    ...currentLondonMonth(now),
+    dateBasis: "journey",
+    now,
+    spend: [],
+    manualSpendIsComplete: false,
+    adsConnected: false,
+    advertisingStartedOn,
+    advertisingStartConfirmed,
+  }), [bookings, now, advertisingStartedOn, advertisingStartConfirmed]);
+  const growth = report.businessGrowth;
+  return (
+    <section className="bg-white p-6 rounded-lg shadow">
+      <h3 className="text-lg font-medium text-gray-900">Before and after advertising</h3>
+      <p className="text-sm text-gray-700 mt-2">Overall business growth after advertising started is separate from bookings directly attributed to Google Ads, bookings from other sources, and bookings with unknown attribution. A booking without a Google click still counts here. {ADDITIONAL_BOOKINGS_NOTE}</p>
+      <p className="text-sm text-gray-700 mt-2">This compares the 30 days immediately before the confirmed Google Ads start date with the first 30 days after it. If fewer than 30 days after advertising started are finished, it compares those finished days with the same number of days immediately before advertising started. The current day is not finished, so it is left out. {RESULTS_CONTEXT_NOTE}</p>
+      {growth.before && growth.after ? (
+        <>
+          <h4 className="text-sm font-medium text-gray-900 mt-4">Before</h4>
+          <p className="text-sm text-gray-700 mt-1">{beforeAdsBookingsPerDay(growth.before.days, growth.before.bookingsPerDay)}</p>
+          <p className="text-sm text-gray-700 mt-1">{growth.before.summary}</p>
+          <h4 className="text-sm font-medium text-gray-900 mt-4">After</h4>
+          <p className="text-sm text-gray-700 mt-1">{afterAdsBookingsPerDay(growth.after.days, growth.after.bookingsPerDay)}</p>
+          <p className="text-sm text-gray-700 mt-1">{bookingPaceChange(growth.before.bookingsPerDay, growth.after.bookingsPerDay)}</p>
+          <p className="text-sm text-gray-700 mt-1">{growth.after.summary}</p>
+          <ComparisonBars earlierName="Before" laterName="After" items={growthComparisonItems(growth.before, growth.after)} />
+        </>
+      ) : null}
+      <p className="text-sm text-gray-700 mt-3">{growth.text}. {growth.detail}</p>
+      {growth.limitations.length > 0 ? (
+        <>
+          <h4 className="text-sm font-medium text-gray-900 mt-4">Incomplete records in the before and after comparison</h4>
+          <p className="text-sm text-gray-700 mt-1">Where a historical booking record in these periods is incomplete, the limitation is shown here. The missing parts stay missing.</p>
+          {growth.limitations.map((line) => <p key={line} className="text-sm text-gray-700 mt-2">{line}</p>)}
+        </>
+      ) : null}
+      <p className="text-sm text-gray-500 mt-2">This comparison uses the existing Firebase booking records. Historical bookings are not modified merely to produce a comparison.</p>
+    </section>
+  );
+}
 
 export default Dashboard;
