@@ -116,3 +116,14 @@ test('a rejected choice shared with the portal prevents tracking there too',asyn
  assert.equal(portal.appended.some(el=>el.tag==='script'),false);
  assert.equal(portal.win.dataLayer.some(r=>r[0]==='event'),false);
 });
+
+
+test('expired in-memory attribution cannot survive an expired shared cookie',async()=>{
+ const b=browser('www.spires-taxis.com','granted','','',{search:'?gclid=oldClick'});
+ const saved=JSON.parse(decodeURIComponent(b.cookies.get('spires_measurement_context_v1')));
+ saved.expiresAt=Date.now()-1;
+ b.cookies.set('spires_measurement_context_v1',encodeURIComponent(JSON.stringify(saved)));
+ b.win.location.search='';
+ const result=await b.win.SpiresMeasurement.attribution();
+ assert.equal(result.gclid,undefined);
+});
