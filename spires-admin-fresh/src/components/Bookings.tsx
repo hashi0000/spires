@@ -12,6 +12,7 @@ import { describeStops, hasExtraStops, normaliseStops, openReturnSummary } from 
 import { journeyLegs, legsForQuickView, type JourneyLeg } from '../utils/journeyLegs';
 import { londonExportDate, londonExportTime } from '../utils/bookingDates';
 import { buildAnalysisCsv, type AnalysisBooking } from '../utils/analysisExport';
+import { buildAccountingSummary } from '../utils/accountingSummary';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
@@ -27,6 +28,14 @@ function londonDay(value?: string | Date | null): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+function gbp(value: number | null): string {
+  return value === null ? "Unknown" : `£${value.toFixed(2)}`;
+}
+
+function missingCount(count: number, reason: string): string {
+  return count === 1 ? `1 completed job has ${reason}.` : `${count} completed jobs have ${reason}.`;
 }
 
 function londonWhen(value?: string | Date | null): string {
@@ -256,29 +265,10 @@ const Bookings: React.FC<BookingsProps> = ({
     return rows;
   }, [sortedBookings, quickView]);
 
-  const accountingSummary = useMemo(() => {
-    const completed = filteredBookings.filter(b => b.status === 'completed');
-    const fareKnown = completed.every((b) => typeof b.actualFare === "number" && Number.isFinite(b.actualFare));
-    const totalRevenue = fareKnown ? completed.reduce((sum, b) => sum + Number(b.actualFare), 0) : null;
-    const expensesMissing = completed.some((b) => !b.expenses || b.expenses.length === 0);
-    const totalExpenses = expensesMissing ? null : completed.reduce((sum, b) => sum + (b.expenses || []).reduce((eSum, e) => eSum + Number(e.amount || 0), 0), 0);
-    const receivedFor = (b: Booking): number | null => b.amountReceivedPence != null && Number.isFinite(Number(b.amountReceivedPence))
-      ? Math.max(0, Number(b.amountReceivedPence) / 100)
-      : null;
-    const paymentsKnown = completed.every((b) => receivedFor(b) !== null);
-    const paidAmount = paymentsKnown ? completed.reduce((sum, b) => sum + (receivedFor(b) || 0), 0) : null;
-    const paidBookings = completed.filter((b) => {
-      const received = receivedFor(b);
-      return received !== null && (b.actualFare == null || received >= Number(b.actualFare));
-    });
-    const unpaidBookings = completed.filter((b) => receivedFor(b) === null);
-    const driverRevenue = drivers.map(driver => {
-      const driverBookings = completed.filter(b => b.driverId === driver.id);
-      const revenue = driverBookings.reduce((sum, b) => sum + (b.actualFare || 0), 0);
-      return { driver: driver.name, revenue, bookings: driverBookings.length };
-    }).filter(d => d.bookings > 0);
-    return { totalRevenue, totalExpenses, totalBookings: completed.length, paidAmount, paidCount: paidBookings.length, unrecordedCount: unpaidBookings.length, driverRevenue };
-  }, [filteredBookings, drivers]);
+  const accountingSummary = useMemo(
+    () => buildAccountingSummary(filteredBookings, drivers),
+    [filteredBookings, drivers]
+  );
 
   const exportToCSV = () => {
     const headers = ['Booking Number', 'Booking Created Date', 'Booking Created Time', 'Pickup Date', 'Pickup Time', 'Customer Name', 'Phone', 'Booking Method', 'Pickup Location', 'Destination', 'Fare', 'Fuel Expense', 'Parking Expense', 'Payment Method', 'Payment Status', 'Driver', 'Vehicle', 'Status', 'Notes'];
@@ -698,14 +688,14 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200" style={{ marginTop: '1.5rem' }}>
         <div className="flex items-center mb-4"><DollarSign className="h-6 w-6 text-green-600 mr-2" /><h3 className="text-lg font-semibold text-gray-900">Accounting Summary</h3><span className="ml-auto text-sm text-gray-600">{filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}{selectedMonth && ` in ${new Date(selectedMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`}</span></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Quoted fares on completed jobs</p><p className="text-2xl font-bold text-green-600">{accountingSummary.totalRevenue === null ? "Unknown" : `£${accountingSummary.totalRevenue.toFixed(2)}`}</p></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Recorded expenses</p><p className="text-2xl font-bold text-red-600">{accountingSummary.totalExpenses === null ? "Unknown" : `£${accountingSummary.totalExpenses.toFixed(2)}`}</p></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Money received</p><p className="text-2xl font-bold text-blue-600">{accountingSummary.paidAmount === null ? "Unknown" : `£${accountingSummary.paidAmount.toFixed(2)}`}</p><p className="text-xs text-gray-500 mt-1">A paid flag without a recorded amount stays unknown.</p></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Quoted fares on completed jobs</p><p className="text-2xl font-bold text-green-600">{gbp(accountingSummary.totalRevenue)}</p>{accountingSummary.faresMissing > 0 && accountingSummary.totalRevenue !== null ? <p className="text-xs text-gray-500 mt-1">{missingCount(accountingSummary.faresMissing, "no quoted fare")}</p> : null}</div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Recorded expenses</p><p className="text-2xl font-bold text-red-600">{gbp(accountingSummary.totalExpenses)}</p>{accountingSummary.expensesMissing > 0 && accountingSummary.totalExpenses !== null ? <p className="text-xs text-gray-500 mt-1">{missingCount(accountingSummary.expensesMissing, "no recorded expenses")}</p> : null}</div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Money received</p><p className="text-2xl font-bold text-blue-600">{gbp(accountingSummary.paidAmount)}</p>{accountingSummary.unrecordedCount > 0 && accountingSummary.paidAmount !== null ? <p className="text-xs text-gray-500 mt-1">{missingCount(accountingSummary.unrecordedCount, "no recorded payment")}</p> : null}</div>
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Completed Jobs</p><p className="text-2xl font-bold text-gray-900">{accountingSummary.totalBookings}</p></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Payment Status</p><div className="space-y-2"><div className="flex justify-between"><span className="text-sm text-gray-600">Recorded payment ({accountingSummary.paidCount})</span><span className="text-sm font-semibold text-green-600">{accountingSummary.paidAmount === null ? "Unknown" : `£${accountingSummary.paidAmount.toFixed(2)}`}</span></div><div className="flex justify-between"><span className="text-sm text-gray-600">Payment not recorded ({accountingSummary.unrecordedCount})</span><span className="text-sm font-semibold text-red-600">Unknown</span></div></div></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Revenue by Driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">£{dr.revenue.toFixed(2)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}</div></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Payment Status</p><div className="space-y-2"><div className="flex justify-between"><span className="text-sm text-gray-600">Recorded payment ({accountingSummary.recordedCount})</span><span className="text-sm font-semibold text-green-600">{gbp(accountingSummary.paidAmount)}</span></div><div className="flex justify-between"><span className="text-sm text-gray-600">Payment not recorded ({accountingSummary.unrecordedCount})</span><span className="text-sm font-semibold text-red-600">Unknown</span></div></div></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Revenue by Driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">{gbp(dr.revenue)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}{accountingSummary.driverRevenue.some((dr) => dr.knownFares < dr.bookings) ? <p className="text-xs text-gray-500 mt-2">Jobs with no quoted fare are left out of the driver amounts.</p> : null}</div></div>
         </div>
       </div>
       </div>

@@ -30,6 +30,27 @@ beforeEach(() => {
   (applyBulkJobUpdates as jest.Mock).mockClear();
 });
 
+test('shows known completed money when other jobs have no amount', () => {
+  const priced = booking('SP1', 'Priced');
+  priced.status = 'completed';
+  priced.actualFare = 40;
+  priced.amountReceivedPence = 4000;
+  priced.driverId = 'd1';
+  const blank = booking('SP2', 'Blank');
+  blank.status = 'completed';
+  blank.actualFare = undefined;
+  blank.amountReceivedPence = undefined;
+  blank.driverId = 'd1';
+  render(<Bookings bookings={[priced, blank]} drivers={[{ id: 'd1', name: 'Wasif Nawaz', licenseNumber: '', phoneNumber: '', email: '', active: true, licenseExpiry: '' }]} vehicles={[]} {...callbacks} />);
+  fireEvent.click(screen.getByRole('button', { name: 'All bookings' }));
+  expect(screen.getAllByText('£40.00').length).toBeGreaterThan(1);
+  expect(screen.getByText('Recorded payment (1)')).toBeTruthy();
+  expect(screen.getByText('Payment not recorded (1)')).toBeTruthy();
+  expect(screen.getByText('1 completed job has no quoted fare.')).toBeTruthy();
+  expect(screen.getByText('1 completed job has no recorded payment.')).toBeTruthy();
+  expect(screen.getByText('Jobs with no quoted fare are left out of the driver amounts.')).toBeTruthy();
+});
+
 test('shows the deposit balance and gives an accepted quote a payment action', () => {
   const row = booking('SP1', 'Test Customer');
   render(<Bookings bookings={[row]} drivers={[]} vehicles={[]} {...callbacks} />);
