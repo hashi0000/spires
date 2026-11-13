@@ -5,6 +5,13 @@ const node_test_1 = require("node:test");
 const attribution_1 = require("./attribution");
 const now = 1800000000000;
 const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: now + 86400000, clientId: '123.456', gclid: 'valid-click_1', sessionId: String(Math.floor(now / 1000)), sessionCapturedAt: now };
+(0, node_test_1.test)('delivery crossing the 24 hour boundary keeps the event time but omits old session attribution', () => {
+    const at = now + 23 * 3600000;
+    const payload = (0, attribution_1.confirmationPayload)('one', { ...valid, expiresAt: now + 3 * 86400000 }, at, now + 25 * 3600000);
+    node_assert_1.strict.equal(payload.timestamp_micros, at * 1000);
+    node_assert_1.strict.equal('session_id' in payload.events[0].params, false);
+    node_assert_1.strict.equal((0, attribution_1.readAttribution)({ ...valid, consentGrantedAt: now - 10 * 86400000 }, now)?.consentGrantedAt, now - 10 * 86400000);
+});
 (0, node_test_1.test)('rejects denied, missing, stale, future and malformed attribution', () => {
     for (const value of [null, {}, { ...valid, consent: 'denied' }, { ...valid, expiresAt: now }, { ...valid, capturedAt: now + 120000 }, { ...valid, consentAt: 0 }, { ...valid, clientId: 'name@example.com', gclid: 'email@example.com' }])
         node_assert_1.strict.equal((0, attribution_1.readAttribution)(value, now), null);

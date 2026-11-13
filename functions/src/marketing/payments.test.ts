@@ -49,7 +49,7 @@ test('validation must pass before transport, and transport is not a GA4 receipt'
   assert.equal(sent.ga4Receipt, 'not_confirmed');
   assert.equal(sent.adsAttribution, 'not_confirmed');
   const retry = deliveryOutcome({ validationOk: true, httpStatus: 503, thrown: false, attempts: 1, eligible: true });
-  assert.equal(retry.status, 'pending');
+  assert.equal(retry.status, 'review_required');
   const ambiguous = deliveryOutcome({ validationOk: true, thrown: true, attempts: 1, eligible: true });
   assert.equal(ambiguous.status, 'review_required');
   const old = eligibleToSend({ consent: 'granted', occurredAt: now - 73 * 3600000, now, hasPayload: true, event: 'booking_confirmed', confirmed: true });

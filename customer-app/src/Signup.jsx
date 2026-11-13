@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth, db } from "./firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { auth, db, functions } from "./firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { claimGuestBooking, previewGuestClaim, readableAuthError } from "./guestClaim";
 import "./styles.css";
@@ -122,8 +123,16 @@ export default function Signup() {
         phone: phone.trim(),
         dateOfBirth: dateOfBirth,
         addresses: addresses,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
       });
+
+      // Measurement cannot prevent account creation or guest booking claims.
+      try {
+        const measurement = window.SpiresMeasurement;
+        if (measurement?.signup) measurement.signup(user.uid);
+        const marketingAttribution = measurement ? await measurement.attribution() : null;
+        if (marketingAttribution) await httpsCallable(functions, "recordCustomerAcquisition", { timeout: 5000 })({ marketingAttribution });
+      } catch (_) { /* Account is saved even if measurement is unavailable. */ }
 
       if (claimToken) {
         try {

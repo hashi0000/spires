@@ -62,7 +62,7 @@ function paymentChange(before, after) {
         receivedAfterPence: received,
     };
 }
-function paymentPayload(bookingId, attribution, change, at) {
+function paymentPayload(bookingId, attribution, change, at, sentAt = at) {
     if (!attribution.clientId || attribution.expiresAt <= at)
         return null;
     if (change.deltaPence <= 0 || change.deltaPence > 100000000)
@@ -78,7 +78,7 @@ function paymentPayload(bookingId, attribution, change, at) {
     };
     if (change.method)
         params.payment_method = change.method;
-    if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && at - attribution.sessionCapturedAt < attribution_1.SESSION_JOIN_MS) {
+    if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < attribution_1.SESSION_JOIN_MS) {
         params.session_id = Number(attribution.sessionId);
     }
     return {
@@ -144,7 +144,7 @@ function deliveryOutcome(input) {
         return { ...base, status: 'submitted', reason: 'Collection endpoint accepted the request. GA4 reporting is not confirmed.', validation: 'passed', transport: 'submitted' };
     }
     if ((input.httpStatus === 429 || (input.httpStatus || 0) >= 500) && input.attempts < 3) {
-        return { ...base, status: 'pending', reason: 'Temporary transport failure', validation: 'passed', transport: 'failed' };
+        return { ...base, status: 'review_required', reason: 'Collection returned an error. Receipt is unknown; inspect before replaying.', validation: 'passed', transport: 'failed' };
     }
     return { ...base, status: 'review_required', reason: 'Transport failed', validation: 'passed', transport: 'failed' };
 }

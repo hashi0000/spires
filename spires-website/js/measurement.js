@@ -7,6 +7,8 @@
   var id = 'G-RSE4NNBP64', loaded = false, consent = '', context = null;
   var consentKey = 'spires_measurement_consent_v1';
   var contextKey = 'spires_measurement_context_v1';
+  var withdrawalKey = 'spires_measurement_withdrawal_v1';
+  var listeners = [], flushing = false;
   var now = function () { return Date.now(); };
   function read(name) {
     try { var row = d.cookie.split('; ').find(function (s) { return s.indexOf(name + '=') === 0; }); return row ? JSON.parse(decodeURIComponent(row.slice(name.length + 1))) : null; } catch (_) { return null; }
@@ -94,10 +96,30 @@
     return { capturedAt: touch.capturedAt, expiresAt: saved.expiresAt, first: touch, latest: touch };
   }
   function raw() { w.dataLayer = w.dataLayer || []; w.dataLayer.push(arguments); }
+  function notifyConsent() { listeners.forEach(function(fn){try { fn(consent); } catch (_) {}}); }
+  function flushWithdrawal() {
+    var pending = read(withdrawalKey);
+    if (!live || flushing || !pending || !pending.receipt || !w.fetch) return;
+    flushing = true;
+    w.fetch('https://us-central1-spires-taxis.cloudfunctions.net/revokeMeasurementConsent', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({receipt:pending.receipt}), keepalive:true })
+      .then(function(response){if(response.ok){var current=read(withdrawalKey);if(current && current.receipt===pending.receipt)write(withdrawalKey,{},0);var status=d.getElementById('spires-withdrawal-status');if(status)status.remove();}})
+      .catch(function(){})
+      .then(function(){flushing=false;});
+  }
   // Existing page scripts may call gtag; nothing is queued or sent before consent or on previews.
-  w.gtag = function () { if (live && consent === 'granted') raw.apply(null, arguments); };
+  function allowed() {
+    var saved = read(consentKey);
+    var granted = !!(saved && saved.value === 'granted' && saved.at > 0 && saved.at <= now() && now() - saved.at < 180 * 86400000);
+    if (!granted && consent === 'granted') {
+      consent = 'denied'; context = null;
+      if (loaded) raw('consent', 'update', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+      notifyConsent();
+    }
+    return granted && consent === 'granted';
+  }
+  w.gtag = function () { if (live && allowed()) raw.apply(null, arguments); };
   function capture() {
-    if (!live || consent !== 'granted') return null;
+    if (!live || !allowed()) return null;
     var saved = normalise(read(contextKey));
     context = saved;
     var touch = pageTouch();
@@ -107,11 +129,12 @@
       context.latest = touch;
       context.expiresAt = touch.capturedAt + 30 * 86400000;
     }
+    if (!context.consentReceiptId && w.crypto && w.crypto.randomUUID) context.consentReceiptId=w.crypto.randomUUID();
     if (context) write(contextKey, context, Math.max(0, Math.floor((context.expiresAt - now()) / 1000)));
     return context;
   }
   function init() {
-    if (!live || consent !== 'granted') return;
+    if (!live || !allowed()) return;
     capture();
     raw('consent', 'update', { analytics_storage: 'granted', ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied' });
     if (loaded) return;
@@ -121,16 +144,30 @@
     var s = d.createElement('script'); s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id; d.head.appendChild(s);
   }
   function choose(value) {
+    if(value==='granted' && read(withdrawalKey)) {
+      flushWithdrawal();
+      var pendingPanel=d.getElementById('spires-measurement-choice');
+      if(pendingPanel && pendingPanel.children[0])pendingPanel.children[0].textContent='Your earlier withdrawal is still syncing. Booking works without measurement. Try allowing measurement again after you are online.';
+      return;
+    }
+    var previous = read(contextKey);
     consent = value;
     write(consentKey, { value: value, at: now() }, 180 * 86400);
     var panel = d.getElementById('spires-measurement-choice'); if (panel) panel.remove();
     if (value === 'granted') init();
     else {
+      if (previous && previous.consentReceiptId) {
+        write(withdrawalKey,{receipt:previous.consentReceiptId,at:now()},180*86400);
+        var status=d.getElementById('spires-withdrawal-status');
+        if(!status){status=d.createElement('p');status.id='spires-withdrawal-status';status.setAttribute('role','status');status.textContent='Measurement is off in this browser. Saved booking preferences will sync when you are online.';d.body.appendChild(status);}
+        flushWithdrawal();
+      }
       context = null; write(contextKey, {}, 0);
       if (loaded) raw('consent', 'update', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
       // Remove measurement cookies across both possible cookie scopes.
       d.cookie.split(';').forEach(function (part) { var name = part.trim().split('=')[0]; if (/^(_ga|_gcl)/.test(name)) { write(name, {}, 0); d.cookie = name + '=; Max-Age=0; Path=/; Secure; SameSite=Lax'; } });
     }
+    notifyConsent();
   }
   function showChoice() {
     if (!live || d.getElementById('spires-measurement-choice')) return;
@@ -143,7 +180,7 @@
   var lastClick = { key: '', at: 0 };
   var sentLead = Object.create(null);
   function lead(key, channel, type) {
-    if (!live || consent !== 'granted' || !key) return;
+    if (!live || !allowed() || !key) return;
     var id = String(key);
     if (sentLead[id]) return;
     var storageKey = 'spires_lead_' + id;
@@ -161,32 +198,44 @@
   }
   function attribution() {
     return new Promise(function (resolve) {
-      if (!live || consent !== 'granted') return resolve(null);
+      if (!live || !allowed()) return resolve(null);
       var saved = capture();
       var best = bestTouch(saved) || {};
       var result = {
-        consent: 'granted', consentAt: now(),
+        consent: 'granted', consentAt: now(), consentGrantedAt: read(consentKey).at, consentReceiptId:saved && saved.consentReceiptId,
         capturedAt: best.capturedAt || now(),
         expiresAt: (best.capturedAt || now()) + 30 * 86400000,
         first: saved && saved.first, latest: nonDirect(saved && saved.latest) ? saved.latest : (nonDirect(saved && saved.first) ? saved.first : saved && saved.first)
       };
       ['gclid', 'gbraid', 'wbraid', 'utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm', 'landingPath', 'referrerHost'].forEach(function (key) { if (best[key]) result[key] = best[key]; });
       var done = false, timer = w.setTimeout(finish, 600);
-      function finish() { if (done) return; done = true; w.clearTimeout(timer); resolve(result); }
+      function finish() { if (done) return; done = true; w.clearTimeout(timer); resolve(allowed() ? result : null); }
       w.gtag('get', id, 'client_id', function (v) { if (!done && /^\d+\.\d+$/.test(String(v))) result.clientId = String(v); w.gtag('get', id, 'session_id', function (s) { if (!done && /^\d+$/.test(String(s))) { result.sessionId = String(s); result.sessionCapturedAt = Number(s) * 1000; } finish(); }); });
     });
   }
-  w.SpiresMeasurement = { lead: lead, attribution: attribution, preferences: showChoice };
+  function signup(key) {
+    if (!live || !allowed() || !key || sentLead['signup_' + key]) return;
+    var storageKey = 'spires_signup_' + key;
+    try { if (w.sessionStorage.getItem(storageKey)) return; w.sessionStorage.setItem(storageKey, '1'); } catch (_) {}
+    sentLead['signup_' + key] = true;
+    w.gtag('event', 'sign_up', { method: 'email', page_location: w.location.origin + cleanPath() });
+  }
+  w.SpiresMeasurement = { lead: lead, signup: signup, attribution: attribution, preferences: showChoice, onConsentChange:function(fn){listeners.push(fn);fn(consent);return function(){listeners=listeners.filter(function(item){return item!==fn;});};} };
+  if (w.addEventListener) {
+    w.addEventListener('focus', function(){allowed();flushWithdrawal();});
+    w.addEventListener('online',flushWithdrawal);
+  }
   if (!live) return;
   raw('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
-  var saved = read(consentKey); consent = saved && now() - saved.at < 180 * 86400000 ? saved.value : '';
+  var saved = read(consentKey); consent = saved && saved.at > 0 && saved.at <= now() && now() - saved.at < 180 * 86400000 && ['granted', 'denied'].indexOf(saved.value) !== -1 ? saved.value : '';
   if (consent === 'granted') init();
   function ready() {
+    flushWithdrawal();
     var button = d.createElement('button'); button.type = 'button'; button.textContent = 'Cookie preferences'; button.style.cssText = 'position:fixed;bottom:4px;left:8px;z-index:9999;font:12px system-ui;background:white;color:#14243b;border:1px solid #aaa;border-radius:4px;padding:3px'; button.onclick = showChoice; d.body.appendChild(button);
     if (!consent) showChoice();
     d.addEventListener('click', function (event) {
       var a = event.target.closest && event.target.closest('a[href]');
-      if (!a || consent !== 'granted') return;
+      if (!a || !allowed()) return;
       var href = a.getAttribute('href') || '';
       var name = /^tel:/i.test(href) ? 'phone_click' : /^mailto:/i.test(href) ? 'email_click' : /^https:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(href) ? 'whatsapp_click' : '';
       if (!name) return;

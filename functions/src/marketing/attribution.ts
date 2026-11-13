@@ -13,7 +13,7 @@ export type MarketingTouch = {
 };
 
 export type Attribution = {
-  consent: 'granted'; consentAt: number; capturedAt: number; expiresAt: number;
+  consent: 'granted'; consentAt: number; consentGrantedAt?: number; consentReceiptId?: string; capturedAt: number; expiresAt: number;
   clientId?: string; sessionId?: string; sessionCapturedAt?: number;
   gclid?: string; gbraid?: string; wbraid?: string;
   first?: MarketingTouch;
@@ -98,6 +98,9 @@ export function readAttribution(input: unknown, now = Date.now()): Attribution |
   if (row.consent !== 'granted' || !Number.isFinite(capturedAt) || !Number.isFinite(expiresAt) || !Number.isFinite(consentAt)) return null;
   if (capturedAt <= 0 || capturedAt > now + 60000 || capturedAt < now - 30 * DAY || expiresAt <= now || expiresAt > capturedAt + 30 * DAY || consentAt > now + 60000 || consentAt < now - DAY) return null;
   const clean: Attribution = { consent: 'granted', capturedAt, expiresAt, consentAt };
+  if (typeof row.consentReceiptId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(row.consentReceiptId)) clean.consentReceiptId=row.consentReceiptId;
+  const grantedAt = Number(row.consentGrantedAt);
+  if (Number.isFinite(grantedAt) && grantedAt > 0 && grantedAt <= now && grantedAt >= now - 180 * DAY) clean.consentGrantedAt = grantedAt;
   if (/^\d{1,20}\.\d{1,20}$/.test(String(row.clientId || ''))) clean.clientId = String(row.clientId);
   if (/^\d{1,20}$/.test(String(row.sessionId || '')) && Number(row.sessionCapturedAt) > 0 && Number(row.sessionCapturedAt) <= now + 60000) {
     clean.sessionId = String(row.sessionId); clean.sessionCapturedAt = Number(row.sessionCapturedAt);
@@ -122,11 +125,11 @@ export function readAttribution(input: unknown, now = Date.now()): Attribution |
   return clean.clientId || clean.gclid || clean.gbraid || clean.wbraid || clean.first || clean.latest ? clean : null;
 }
 
-export function confirmationPayload(bookingId: string, attribution: Attribution, at: number) {
+export function confirmationPayload(bookingId: string, attribution: Attribution, at: number, sentAt = at) {
   if (!attribution.clientId || attribution.expiresAt <= at) return null;
   const params: Record<string, unknown> = { event_id: `booking_confirmed_${bookingId}`, engagement_time_msec: 1, booking_channel: 'online' };
   // Session attributes are only requested inside Google's 24 hour window, and the confirmation time is not moved earlier.
-  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && at - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
+  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
     params.session_id = Number(attribution.sessionId);
   }
   return { client_id: attribution.clientId, timestamp_micros: at * 1000, consent: { ad_user_data: 'GRANTED', ad_personalization: 'DENIED' }, events: [{ name: 'booking_confirmed', params }] };

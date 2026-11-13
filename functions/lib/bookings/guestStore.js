@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isGuestRateError = void 0;
 exports.firestoreGuestDb = firestoreGuestDb;
 const admin = __importStar(require("firebase-admin"));
+const consent_1 = require("../marketing/consent");
 const guestRequest_1 = require("./guestRequest");
 Object.defineProperty(exports, "isGuestRateError", { enumerable: true, get: function () { return guestRequest_1.isGuestRateError; } });
 const db = () => admin.firestore();
@@ -88,8 +89,11 @@ function firestoreGuestDb() {
                     error.code = "RATE";
                     throw error;
                 }
+                const attribution = input.record.marketingAttribution;
+                const withdrawn = attribution ? await (0, consent_1.measurementWithdrawn)(attribution, undefined, tx) : false;
                 tx.set(bookingRef, {
                     ...input.record,
+                    marketingAttribution: withdrawn ? null : (attribution || null),
                     termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 });

@@ -167,3 +167,6 @@ export { searchLocations } from "./locations/searchLocations";
 export { getJourneyStats, refreshJourneyStats, publicJourneyStats, publicJourneyMap, scheduledJourneyStats } from "./stats/publishJourneyStats";
 export { queueBookingMeasurement, deliverBookingMeasurements } from "./marketing/confirmation";
 export { readAdvertisingSpend } from "./marketing/advertisingSpend";
+export { recordCustomerAcquisition } from "./marketing/acquisition";
+export { recordBookingSource } from "./marketing/source";
+export { revokeMeasurementConsent, withdrawAccountMeasurement } from "./marketing/consent";

@@ -67,7 +67,7 @@ export function paymentChange(before: BookingRow, after: BookingRow): PaymentMea
   };
 }
 
-export function paymentPayload(bookingId: string, attribution: Attribution, change: PaymentMeasurement, at: number) {
+export function paymentPayload(bookingId: string, attribution: Attribution, change: PaymentMeasurement, at: number, sentAt = at) {
   if (!attribution.clientId || attribution.expiresAt <= at) return null;
   if (change.deltaPence <= 0 || change.deltaPence > 1_000_000_00) return null;
   const transactionId = `${change.direction === 'purchase' ? 'pay' : 'refund'}_${bookingId}_${change.entryId}`.slice(0, 100);
@@ -80,7 +80,7 @@ export function paymentPayload(bookingId: string, attribution: Attribution, chan
     engagement_time_msec: 1,
   };
   if (change.method) params.payment_method = change.method;
-  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && at - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
+  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
     params.session_id = Number(attribution.sessionId);
   }
   return {
@@ -150,7 +150,7 @@ export function deliveryOutcome(input: { validationOk: boolean; validationReason
     return { ...base, status: 'submitted', reason: 'Collection endpoint accepted the request. GA4 reporting is not confirmed.', validation: 'passed', transport: 'submitted' };
   }
   if ((input.httpStatus === 429 || (input.httpStatus || 0) >= 500) && input.attempts < 3) {
-    return { ...base, status: 'pending', reason: 'Temporary transport failure', validation: 'passed', transport: 'failed' };
+    return { ...base, status: 'review_required', reason: 'Collection returned an error. Receipt is unknown; inspect before replaying.', validation: 'passed', transport: 'failed' };
   }
   return { ...base, status: 'review_required', reason: 'Transport failed', validation: 'passed', transport: 'failed' };
 }
