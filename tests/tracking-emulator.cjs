@@ -44,7 +44,7 @@ global.fetch=async url=>{
  assert.equal((await booking.get()).data().marketingAttribution.first.utmSource,'fixture');
  let status;
  const response={set(){return this;},status(code){status=code;return this;},send(){return this;}};
- await revokeMeasurementConsent.run({method:'POST',get:()=> 'https://www.spires-taxis.com',body:{receipt},ip:'127.0.0.1'},response);
+ await revokeMeasurementConsent({method:'POST',headers:{},get:()=> 'https://www.spires-taxis.com',body:{receipt},ip:'127.0.0.1'},response);
  assert.equal(status,204);assert.equal((await booking.get()).data().marketingAttribution.consent,'denied');
  await db.collection('marketingConfig').doc('ga4').set({enabled:true});
  await deliverBookingMeasurements.run({});
@@ -65,3 +65,4 @@ global.fetch=async url=>{
  console.log('PASS: real Auth + Firestore demo journey, concurrent retries, confirmation deduplication, source history, receipt/account withdrawal, one stubbed Google delivery, and spend coverage.');
  await admin.app().delete();
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{setTimeout(()=>process.exit(process.exitCode||0),100);});
+
