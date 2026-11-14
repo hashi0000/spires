@@ -13,6 +13,8 @@ export interface AttributionTouch {
   gclid?: string;
   gbraid?: string;
   wbraid?: string;
+  utmSource?: string;
+  referrerHost?: string;
 }
 
 export interface AttributionInput {
@@ -674,6 +676,13 @@ function hasTrackedGoogleAds(booking: AdvertisingBookingInput, at: Date | null):
 
 export function sourceLabel(booking: AdvertisingBookingInput, at: Date | null = null): string {
   if (hasTrackedGoogleAds(booking, at)) return "Tracked Google Ads";
+  const attribution = booking.marketingAttribution;
+  if (attribution?.consent === 'granted') {
+    const touch = attribution.latest || attribution.first;
+    const recorded = touch?.utmSource || touch?.referrerHost;
+    // Observed evidence does not claim an ad-network match or an inferred channel.
+    if (recorded && /^[a-z0-9][a-z0-9 ._-]{0,79}$/i.test(recorded) && !/\d{6,}|@/.test(recorded)) return `Recorded source: ${recorded}`;
+  }
   const reported = REPORTED_LABELS[String(booking.staffReportedSource || "")] || REPORTED_LABELS[String(booking.customerReportedSource || "")];
   if (reported) return reported;
   const heard = HEARD_LABELS[String(booking.heardAbout || "")];
@@ -1362,7 +1371,7 @@ export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], opti
     : null;
   const adsPence: Pence = options.adsConnected ? (options.adsSpendPence === undefined ? null : options.adsSpendPence) : null;
   const advertisingSpend: Pence = options.adsConnected
-    ? (adsPence === null ? null : adsPence + (manualPence || 0))
+    ? (manualEntries.length ? (options.manualSpendIsComplete ? manualPence : null) : adsPence)
     : (options.manualSpendIsComplete && manualPence !== null ? manualPence : null);
   const costs = {
     driver: categoryRow("Driver payment", completed, "driverPaymentPence"),
@@ -1474,7 +1483,7 @@ export function buildAdvertisingReport(bookings: AdvertisingBookingInput[], opti
       "Advertising spend",
       advertisingSpend,
       spendIsFull
-        ? (options.adsConnected ? "Google Ads spend plus dated manual entries." : "Using manual entries because they were marked as the full spend for this period.")
+        ? (manualEntries.length && options.adsConnected ? "Manual entries may overlap Google Ads. They are never added to the Ads total. Only a manually confirmed full total is used; otherwise total spend stays unknown." : options.adsConnected ? "Google Ads report total for this period." : "Using manual entries because they were marked as the full spend for this period.")
         : "Unknown until Google Ads is connected, or the manual entries are marked as the full spend for this period."
     ),
     contribution: moneyRow(

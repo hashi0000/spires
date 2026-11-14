@@ -78,6 +78,8 @@ export function AdvertisingResultsView({
   advertisingStartedOn = null,
   advertisingStartConfirmed = false,
   connectionNote = "",
+  onRefreshAds,
+  refreshingAds = false,
   onDates,
   onManualComplete,
   onSaveStartDate,
@@ -97,6 +99,8 @@ export function AdvertisingResultsView({
   advertisingStartedOn?: string | null;
   advertisingStartConfirmed?: boolean;
   connectionNote?: string;
+  onRefreshAds?: () => void;
+  refreshingAds?: boolean;
   onDates: (from: string, to: string, dateBasis: "journey" | "enquiry") => void;
   onManualComplete: (value: boolean) => void;
   onSaveStartDate: (date: string) => void;
@@ -276,7 +280,7 @@ export function AdvertisingResultsView({
       />
       <BarList
         title="Manual advertising spend by week"
-        caption="Only dated manual entries are shown. Google Ads daily spend is not connected, so it is not drawn as zero."
+        caption={report.adsSpend.pence === null ? "Only dated manual entries are shown. Missing Google Ads daily spend is not drawn as zero." : "This chart shows dated manual entries. The Google Ads report total is shown separately above."}
         rows={report.manualSpendWeeks.map((week) => ({ label: `Week of ${week.weekStarting}`, text: `${formatGbp(week.amountPence)} from ${week.entries} ${week.entries === 1 ? "entry" : "entries"}`, width: week.amountPence || 0 }))}
       />
       <section className="advertising-results__panel">
@@ -407,6 +411,7 @@ export function AdvertisingResultsView({
       <section className="advertising-results__panel">
         <h2>Manual advertising spend</h2>
         <p>{connectionNote || report.adsSpend.detail}</p>
+        {onRefreshAds && <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>{refreshingAds ? "Refreshing Google Ads…" : "Refresh Google Ads spend"}</button>}
         <label className="advertising-results__check">
           <input type="checkbox" checked={manualIsComplete} onChange={(event) => onManualComplete(event.target.checked)} disabled={saving || preview} />
           Use the dated manual entries as the full advertising spend for this period
@@ -571,6 +576,10 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const [advertisingStartedOn, setAdvertisingStartedOn] = useState<string | null>(null);
   const [advertisingStartConfirmed, setAdvertisingStartConfirmed] = useState(false);
   const [adsConnected, setAdsConnected] = useState(false);
+  const [adsSpendPence, setAdsSpendPence] = useState<number | null>(null);
+  const [adsRange, setAdsRange] = useState('');
+  const [adsReload, setAdsReload] = useState(0);
+  const [refreshingAds, setRefreshingAds] = useState(false);
   const [adsReason, setAdsReason] = useState(previewMode
     ? "Google Ads is not connected. No advertising credentials are available to the server."
     : "Checking whether Google Ads can be read from the server.");
@@ -620,14 +629,6 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
         };
       }));
     }, () => setDeliveries([]));
-    httpsCallable(functions, "readAdvertisingSpend")({}).then((result) => {
-      const data = result.data as { connected?: boolean; reason?: string };
-      setAdsConnected(data.connected === true);
-      setAdsReason(data.reason || "Google Ads is not connected.");
-    }).catch(() => {
-      setAdsConnected(false);
-      setAdsReason("Google Ads is not connected. No advertising credentials are available to the server, and the read has not been deployed.");
-    });
     return () => {
       spendUnsub();
       notesUnsub();
@@ -635,6 +636,20 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       deliveryUnsub();
     };
   }, [previewMode]);
+
+  useEffect(() => {
+    if (previewMode || !isAdminEmail(email)) return;
+    let active=true;
+    setAdsConnected(false); setAdsSpendPence(null);
+    httpsCallable(functions,'readAdvertisingSpend')({from,to}).then(result=>{
+      if (!active) return;
+      const data=result.data as {available?:boolean;spendPence?:number;reason?:string};
+      const available=data.available===true && Number.isSafeInteger(data.spendPence) && Number(data.spendPence)>=0;
+      setAdsRange(`${from}|${to}`);setAdsConnected(available);setAdsSpendPence(available?data.spendPence!:null);
+      setAdsReason(data.reason || 'Google Ads spend is unknown.');
+    }).catch(()=>{if(active){setAdsConnected(false);setAdsReason('Google Ads spend could not be loaded.');}});
+    return ()=>{active=false;};
+  },[previewMode,email,from,to,adsReload]);
 
   const noted = useMemo(() => withNotes(bookings, notes), [bookings, notes]);
   const filterChoices = useMemo(() => ({
@@ -650,8 +665,8 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     return true;
   }), [noted, reportFilters]);
   const report = useMemo(() => buildAdvertisingReport(filteredBookings, {
-    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected, adsSpendPence: null, advertisingStartedOn, advertisingStartConfirmed,
-  }), [filteredBookings, from, to, dateBasis, spend, manualIsComplete, adsConnected, advertisingStartedOn, advertisingStartConfirmed]);
+    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected: adsConnected && adsRange===`${from}|${to}`, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed,
+  }), [filteredBookings, from, to, dateBasis, spend, manualIsComplete, adsConnected, adsRange, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed]);
 
   if (!previewMode && !isAdminEmail(email)) {
     return <section className="advertising-results"><h1>Advertising results</h1><p>This page is only for admin accounts.</p></section>;
@@ -676,6 +691,18 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       preview={previewMode}
       message={message}
       connectionNote={adsReason}
+      refreshingAds={refreshingAds}
+      onRefreshAds={async () => {
+        if (previewMode || refreshingAds) return;
+        setRefreshingAds(true);
+        try {
+          await httpsCallable(functions, 'refreshAdvertisingSpend', { timeout: 180000 })({});
+          setAdsReload(value => value + 1);
+          setMessage('Google Ads spend refreshed. Today remains incomplete until tomorrow.');
+        } catch {
+          setMessage('Google Ads refresh failed. Existing spend figures were kept.');
+        } finally { setRefreshingAds(false); }
+      }}
       saving={saving}
       manualIsComplete={manualIsComplete}
       advertisingStartedOn={advertisingStartedOn}
@@ -743,7 +770,12 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       reportFilters={reportFilters}
       filterChoices={filterChoices}
       onReportFilters={setReportFilters}
-      onSaveSource={(id, source, channel) => { void saveNote(id, { staffReportedSource: source, enquiryChannel: channel }); }}
+      onSaveSource={(id, source, channel) => {
+        setSaving(true); setMessage('');
+        void httpsCallable(functions, 'recordBookingSource')({ bookingId:id, source, channel })
+          .catch(() => setMessage('The source was not saved. The source history service must be deployed and admin access is required.'))
+          .finally(() => setSaving(false));
+      }}
       onSaveCost={(id, field, pounds) => {
         const amount = poundsToPence(pounds);
         if (amount === null) {

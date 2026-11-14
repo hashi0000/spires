@@ -3,6 +3,13 @@ import { test } from 'node:test';
 import { readAttribution, confirmationPayload } from './attribution';
 const now = 1800000000000;
 const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: now + 86400000, clientId: '123.456', gclid: 'valid-click_1', sessionId: String(Math.floor(now / 1000)), sessionCapturedAt: now };
+test('delivery crossing the 24 hour boundary keeps the event time but omits old session attribution', () => {
+  const at = now + 23 * 3600000;
+  const payload = confirmationPayload('one', {...valid, expiresAt:now+3*86400000} as any, at, now+25*3600000)!;
+  assert.equal(payload.timestamp_micros,at*1000);
+  assert.equal('session_id' in payload.events[0].params,false);
+  assert.equal(readAttribution({...valid,consentGrantedAt:now-10*86400000},now)?.consentGrantedAt,now-10*86400000);
+});
 test('rejects denied, missing, stale, future and malformed attribution', () => {
   for (const value of [null, {}, {...valid, consent:'denied'}, {...valid, expiresAt:now}, {...valid, capturedAt:now+120000}, {...valid, consentAt:0}, {...valid, clientId:'name@example.com', gclid:'email@example.com'}]) assert.equal(readAttribution(value, now), null);
 });

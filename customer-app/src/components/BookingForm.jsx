@@ -136,6 +136,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const submitLock = useRef(false);
+  const submissionId = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -278,7 +279,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
 
     try {
       const marketingAttribution = window.SpiresMeasurement ? await window.SpiresMeasurement.attribution().catch(() => null) : null;
+      if (!submissionId.current) submissionId.current = window.crypto.randomUUID();
       const result = await createCustomerBooking({
+        submissionId: submissionId.current,
         marketingAttribution,
         name: user.displayName || user.email?.split("@")[0] || "Customer",
         phone: formData.phone || "",
@@ -315,6 +318,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       });
 
       try { recordPortalLead(window.SpiresMeasurement, result.data); } catch (_) { /* Measurement must not interrupt a saved booking. */ }
+      submissionId.current = null;
       onBookingCreated();
     } catch (err) {
       console.error("Error creating booking:", err);

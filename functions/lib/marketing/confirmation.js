@@ -41,6 +41,8 @@ const quoteWorkflow_1 = require("../quotes/quoteWorkflow");
 const rules_1 = require("../international/rules");
 const attribution_1 = require("./attribution");
 const payments_1 = require("./payments");
+const eventTime_1 = require("./eventTime");
+const consent_1 = require("./consent");
 const apiSecret = (0, params_1.defineSecret)('SPIRES_GA4_API_SECRET');
 const MEASUREMENT_ID = 'G-RSE4NNBP64';
 const db = () => admin.firestore();
@@ -65,7 +67,8 @@ exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).fir
     if ((0, rules_1.measurementStream)(after) !== 'taxis')
         return;
     const bookingId = context.params.bookingId;
-    const at = Date.now();
+    const writeAt = change.after.updateTime?.toMillis() || Date.parse(context.timestamp);
+    const at = (0, eventTime_1.measurementEventTime)(after.confirmedAt, writeAt);
     if ((0, quoteWorkflow_1.isWorkflowConfirmed)(after) && !(change.before.exists && (0, quoteWorkflow_1.isWorkflowConfirmed)(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
         const attribution = (0, attribution_1.readAttribution)(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
         if (attribution && attribution.expiresAt > at) {
@@ -85,7 +88,7 @@ exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).fir
         bookingId,
         event: changeInPayment.direction,
         attribution,
-        occurredAt: at,
+        occurredAt: writeAt,
         valuePence: changeInPayment.deltaPence,
         currency: 'GBP',
         paymentKind: changeInPayment.kind,
@@ -104,8 +107,10 @@ async function postMeasurement(secret, path, payload) {
 }
 function payloadFor(row) {
     const attribution = row.attribution;
+    if (!attribution || typeof attribution !== 'object')
+        return null;
     if (row.event === 'booking_confirmed')
-        return (0, attribution_1.confirmationPayload)(String(row.bookingId), attribution, Number(row.occurredAt));
+        return (0, attribution_1.confirmationPayload)(String(row.bookingId), attribution, Number(row.occurredAt), Date.now());
     const change = {
         direction: row.event === 'refund' ? 'refund' : 'purchase',
         deltaPence: Number(row.valuePence) || 0,
@@ -115,7 +120,7 @@ function payloadFor(row) {
         farePence: 0,
         receivedAfterPence: Number(row.receivedAfterPence) || 0,
     };
-    return (0, payments_1.paymentPayload)(String(row.bookingId), attribution, change, Number(row.occurredAt));
+    return (0, payments_1.paymentPayload)(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now());
 }
 /** Scheduled delivery stays off until marketingConfig/ga4.enabled is set after a real debug validation. */
 exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], timeoutSeconds: 120 }).pubsub.schedule('every 15 minutes').onRun(async () => {
@@ -146,13 +151,14 @@ exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], t
             continue;
         const booking = await db().collection('bookings').doc(String(claimed.bookingId)).get();
         const current = booking.data();
+        const withdrawn = await (0, consent_1.measurementWithdrawn)(claimed.attribution, current?.uid);
         const payload = payloadFor(claimed);
         const paymentStillThere = claimed.event !== 'purchase'
             || Math.max(0, Math.round(Number(current?.amountReceivedPence) || 0)) >= Number(claimed.receivedAfterPence || 0);
         const eligibility = !current || !paymentStillThere
             ? { ok: false, reason: 'Booking payment or record changed before delivery' }
             : (0, payments_1.eligibleToSend)({
-                consent: current.marketingAttribution?.consent,
+                consent: withdrawn ? 'denied' : current.marketingAttribution?.consent,
                 occurredAt: Number(claimed.occurredAt),
                 now: Date.now(),
                 hasPayload: Boolean(payload),
@@ -181,6 +187,10 @@ exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], t
         }
         if (!validation.ok) {
             await row.ref.update((0, payments_1.deliveryOutcome)({ validationOk: false, validationReason: validation.reason, thrown: false, attempts: attempts + 1, eligible: true }));
+            continue;
+        }
+        if (await (0, consent_1.measurementWithdrawn)(claimed.attribution, current?.uid)) {
+            await row.ref.update((0, payments_1.deliveryOutcome)({ validationOk: true, thrown: false, attempts: attempts + 1, eligible: false, eligibilityReason: 'Consent withdrawn before collection' }));
             continue;
         }
         try {

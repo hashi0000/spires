@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = void 0;
 const attribution_1 = require("../marketing/attribution");
+const submission_1 = require("../bookings/submission");
+const consent_1 = require("../marketing/consent");
 const crypto_1 = require("crypto");
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions/v1"));
@@ -120,10 +122,19 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         }
     }
     const passengers = Number(data?.passengers) || 1;
-    const ref = db().collection("bookings").doc();
+    let submission;
+    try {
+        submission = (0, submission_1.customerSubmission)(context.auth.uid, data || {});
+    }
+    catch {
+        throw httpsError('invalid-argument', 'Invalid submission identifier.');
+    }
+    const { bookingId, fingerprint } = submission;
+    const ref = bookingId ? db().collection("bookings").doc(bookingId) : db().collection("bookings").doc();
     const email = str(context.auth.token.email);
-    await ref.set({
+    const record = {
         uid: context.auth.uid,
+        submissionFingerprint: fingerprint,
         name: str(data?.name) || email.split("@")[0] || "Customer",
         email,
         phone: str(data?.phone),
@@ -169,12 +180,25 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
         acceptanceMethod: "customer_portal",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    const duplicate = await db().runTransaction(async (tx) => {
+        const existing = await tx.get(ref);
+        if (existing.exists) {
+            if (existing.data()?.submissionFingerprint !== fingerprint)
+                throw httpsError('failed-precondition', 'This request was already saved with different details. Review your existing booking before making another request.');
+            return true;
+        }
+        if (record.marketingAttribution && await (0, consent_1.measurementWithdrawn)(record.marketingAttribution, context.auth.uid, tx))
+            record.marketingAttribution = null;
+        tx.create(ref, record);
+        tx.create(ref.collection('audit').doc('terms_accepted'), {
+            action: 'terms_accepted', actor: email || context.auth.uid,
+            at: admin.firestore.FieldValue.serverTimestamp(),
+            termsVersion: decision.version, acceptanceMethod: 'customer_portal',
+        });
+        return false;
     });
-    await audit(ref.id, "terms_accepted", email || context.auth.uid, {
-        termsVersion: decision.version,
-        acceptanceMethod: "customer_portal",
-    });
-    return { ok: true, bookingId: ref.id };
+    return { ok: true, bookingId: ref.id, duplicate };
 });
 exports.recordStaffTermsAcceptance = functions.https.onCall(async (data, context) => {
     const actor = requireAdmin(context);

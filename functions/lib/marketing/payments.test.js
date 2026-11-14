@@ -44,7 +44,7 @@ const attribution = { consent: 'granted', consentAt: now, capturedAt: now, expir
     node_assert_1.strict.equal(sent.ga4Receipt, 'not_confirmed');
     node_assert_1.strict.equal(sent.adsAttribution, 'not_confirmed');
     const retry = (0, payments_1.deliveryOutcome)({ validationOk: true, httpStatus: 503, thrown: false, attempts: 1, eligible: true });
-    node_assert_1.strict.equal(retry.status, 'pending');
+    node_assert_1.strict.equal(retry.status, 'review_required');
     const ambiguous = (0, payments_1.deliveryOutcome)({ validationOk: true, thrown: true, attempts: 1, eligible: true });
     node_assert_1.strict.equal(ambiguous.status, 'review_required');
     const old = (0, payments_1.eligibleToSend)({ consent: 'granted', occurredAt: now - 73 * 3600000, now, hasPayload: true, event: 'booking_confirmed', confirmed: true });

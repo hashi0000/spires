@@ -35,20 +35,27 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readAdvertisingSpend = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
+const admin = __importStar(require("firebase-admin"));
+const spendSnapshot_1 = require("./spendSnapshot");
 const ADMIN_EMAILS = ["spirestaxis24@gmail.com", "hashim@spires.com"];
 /**
  * Read only advertising spend check.
- * No Google Ads credentials are stored, so this does not call Google Ads and cannot change a campaign or budget.
+ * Reads dated, server-imported reports. This does not call Google Ads or change campaigns or budgets.
  * Customer details are not accepted or returned.
  */
-exports.readAdvertisingSpend = functions.https.onCall((_data, context) => {
+exports.readAdvertisingSpend = functions.https.onCall(async (data, context) => {
     const email = String(context.auth?.token?.email || "").toLowerCase();
     if (!ADMIN_EMAILS.includes(email)) {
         throw new functions.https.HttpsError("permission-denied", "Admin only.");
     }
-    return {
-        connected: false,
-        reason: "Google Ads credentials are not configured on the server.",
-        budgetChanged: false,
-    };
+    const from = String(data?.from || ''), to = String(data?.to || '');
+    const validation = (0, spendSnapshot_1.spendSnapshotTotal)(from, to, []);
+    if (validation.reason.startsWith('Select'))
+        return { ...validation, connected: false, budgetChanged: false };
+    const snapshots = await admin.firestore().collection('marketingAdsDaily').where('date', '>=', from).where('date', '<=', to).get();
+    const rows = snapshots.docs.map(doc => {
+        const row = doc.data();
+        return { date: row.date, accountId: row.accountId, currency: row.currency, costMicros: row.costMicros, retrievedAtMs: row.retrievedAt?.toMillis?.() || 0, provenance: row.provenance, reportingTimezone: row.reportingTimezone, completeDay: row.completeDay };
+    });
+    return { ...(0, spendSnapshot_1.spendSnapshotTotal)(from, to, rows), connected: false, budgetChanged: false };
 });

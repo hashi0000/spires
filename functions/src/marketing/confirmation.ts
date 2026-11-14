@@ -5,6 +5,8 @@ import { isWorkflowConfirmed } from '../quotes/quoteWorkflow';
 import { measurementStream } from '../international/rules';
 import { confirmationPayload, readAttribution, type Attribution } from './attribution';
 import { deliveryOutcome, eligibleToSend, interpretValidation, paymentChange, paymentPayload, type PaymentMeasurement } from './payments';
+import { measurementEventTime } from './eventTime';
+import { measurementWithdrawn } from './consent';
 
 const apiSecret = defineSecret('SPIRES_GA4_API_SECRET');
 const MEASUREMENT_ID = 'G-RSE4NNBP64';
@@ -30,7 +32,8 @@ export const queueBookingMeasurement = functions.runWith({ failurePolicy: true }
   const before = change.before.data() || {};
   if (measurementStream(after) !== 'taxis') return;
   const bookingId = context.params.bookingId;
-  const at = Date.now();
+  const writeAt = change.after.updateTime?.toMillis() || Date.parse(context.timestamp);
+  const at = measurementEventTime(after.confirmedAt, writeAt);
   if (isWorkflowConfirmed(after) && !(change.before.exists && isWorkflowConfirmed(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
     const attribution = readAttribution(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
     if (attribution && attribution.expiresAt > at) {
@@ -47,7 +50,7 @@ export const queueBookingMeasurement = functions.runWith({ failurePolicy: true }
     bookingId,
     event: changeInPayment.direction,
     attribution,
-    occurredAt: at,
+    occurredAt: writeAt,
     valuePence: changeInPayment.deltaPence,
     currency: 'GBP',
     paymentKind: changeInPayment.kind,
@@ -68,7 +71,8 @@ async function postMeasurement(secret: string, path: 'debug/mp/collect' | 'mp/co
 
 function payloadFor(row: FirebaseFirestore.DocumentData) {
   const attribution = row.attribution as Attribution;
-  if (row.event === 'booking_confirmed') return confirmationPayload(String(row.bookingId), attribution, Number(row.occurredAt));
+  if(!attribution || typeof attribution!=='object')return null;
+  if (row.event === 'booking_confirmed') return confirmationPayload(String(row.bookingId), attribution, Number(row.occurredAt), Date.now());
   const change: PaymentMeasurement = {
     direction: row.event === 'refund' ? 'refund' : 'purchase',
     deltaPence: Number(row.valuePence) || 0,
@@ -78,7 +82,7 @@ function payloadFor(row: FirebaseFirestore.DocumentData) {
     farePence: 0,
     receivedAfterPence: Number(row.receivedAfterPence) || 0,
   };
-  return paymentPayload(String(row.bookingId), attribution, change, Number(row.occurredAt));
+  return paymentPayload(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now());
 }
 
 /** Scheduled delivery stays off until marketingConfig/ga4.enabled is set after a real debug validation. */
@@ -106,13 +110,14 @@ export const deliverBookingMeasurements = functions.runWith({ secrets: [apiSecre
     if (!claimed) continue;
     const booking = await db().collection('bookings').doc(String(claimed.bookingId)).get();
     const current = booking.data();
+    const withdrawn = await measurementWithdrawn(claimed.attribution, current?.uid);
     const payload = payloadFor(claimed);
     const paymentStillThere = claimed.event !== 'purchase'
       || Math.max(0, Math.round(Number(current?.amountReceivedPence) || 0)) >= Number(claimed.receivedAfterPence || 0);
     const eligibility = !current || !paymentStillThere
       ? { ok: false, reason: 'Booking payment or record changed before delivery' }
       : eligibleToSend({
-          consent: current.marketingAttribution?.consent,
+          consent: withdrawn ? 'denied' : current.marketingAttribution?.consent,
           occurredAt: Number(claimed.occurredAt),
           now: Date.now(),
           hasPayload: Boolean(payload),
@@ -139,6 +144,10 @@ export const deliverBookingMeasurements = functions.runWith({ secrets: [apiSecre
     }
     if (!validation.ok) {
       await row.ref.update(deliveryOutcome({ validationOk: false, validationReason: validation.reason, thrown: false, attempts: attempts + 1, eligible: true }));
+      continue;
+    }
+    if (await measurementWithdrawn(claimed.attribution, current?.uid)) {
+      await row.ref.update(deliveryOutcome({validationOk:true,thrown:false,attempts:attempts+1,eligible:false,eligibilityReason:'Consent withdrawn before collection'}));
       continue;
     }
     try {
