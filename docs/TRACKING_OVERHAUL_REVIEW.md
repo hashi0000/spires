@@ -36,6 +36,8 @@ Public fares, waiting policy, Google Ads settings/budgets and SPIRES_INTERNATION
 
 Browser VM tests exercise consent gating, cross-subdomain capture, click/lead/signup deduplication, offline withdrawal and sanitization. Server tests cover attribution, timestamps, idempotency, transport outcomes, withdrawal and spend completeness. A local transaction-backed simulation covers the callable journey. Signup UI and admin reporting regression tests are included. A disposable real Firebase emulator test is supplied separately; record its actual result in the private audit. Local production builds use existing dependencies with caches redirected into the review copy.
 
+The real Auth/Firestore integration test passed on 14 November 2026 using the disposable demo project, with Google collection stubbed. On this Windows host, Java required TCP fallback because Unix-domain socket connection failed: setting `jdk.net.unixdomain.tmpdir` to a nonexistent directory let Java fall back to loopback TCP. This setting applies only to the local test process. No production booking or customer notification is created by that test. The test exercises account retries, guest persistence, payment/confirmation outbox deduplication, source audit, withdrawal and spend coverage. Actual GA4 receipt and Ads attribution remain separate production verification steps.
+
 Google's session attribution timing requirements: https://developers.google.com/analytics/devguides/collection/protocol/ga4/use-cases
 ICO cookie guidance: https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guide-to-pecr/cookies-and-similar-technologies/
 

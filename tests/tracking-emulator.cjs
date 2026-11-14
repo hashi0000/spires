@@ -12,6 +12,8 @@ const {recordBookingSource}=require('../functions/lib/marketing/source');
 const {queueBookingMeasurement,deliverBookingMeasurements}=require('../functions/lib/marketing/confirmation');
 const {revokeMeasurementConsent,withdrawAccountMeasurement}=require('../functions/lib/marketing/consent');
 const {readAdvertisingSpend}=require('../functions/lib/marketing/advertisingSpend');
+const {prepareGuestBooking,commitGuestBooking}=require('../functions/lib/bookings/guestRequest');
+const {firestoreGuestDb}=require('../functions/lib/bookings/guestStore');
 let collected=0,validated=0;
 global.fetch=async url=>{
  if(String(url).startsWith('https://www.google-analytics.com/debug/mp/collect')){validated++;return new Response(JSON.stringify({validationMessages:[]}));}
@@ -56,13 +58,30 @@ global.fetch=async url=>{
  await queueBookingMeasurement.run({before:nextBefore,after:await nextRef.get()},{params:{bookingId:next.bookingId},timestamp:new Date().toISOString()});
  await deliverBookingMeasurements.run({});await deliverBookingMeasurements.run({});
  assert.equal(collected,1);assert.equal(validated,1);
+ const unpaid=await nextRef.get();
+ await nextRef.update({actualFare:92,amountReceivedPence:2000,paymentEntries:[{clientRequestId:'fixture-deposit',amountPence:2000,method:'cash'}]});
+ const paid=await nextRef.get();
+ await queueBookingMeasurement.run({before:unpaid,after:paid},{params:{bookingId:next.bookingId},timestamp:new Date().toISOString()});
+ await queueBookingMeasurement.run({before:unpaid,after:paid},{params:{bookingId:next.bookingId},timestamp:new Date().toISOString()});
+ const purchases=await db.collection('marketingConversions').where('bookingId','==',next.bookingId).where('event','==','purchase').get();
+ assert.equal(purchases.size,1);assert.equal(purchases.docs[0].data().valuePence,2000);
+ await deliverBookingMeasurements.run({});await deliverBookingMeasurements.run({});
+ assert.equal(collected,2);assert.equal(validated,2);
  await withdrawAccountMeasurement.run({},context);
  assert.equal((await nextRef.get()).data().marketingAttribution.consent,'denied');
  assert.equal((await acquisition.ref.get()).data().marketingAttribution.consent,'denied');
+ const guestBody={name:'Fixture Guest',phone:'07700900000',pickup:'Fixture Oxford',destination:'Fixture Airport',date:'2026-11-16',time:'09:00',vehicleType:'standard',passengers:'1',luggage:'1',bookingType:'one_way',termsAccepted:true,termsVersion:'2026-10-25',submissionId:'fixture-'+randomUUID(),marketingAttribution:attribution};
+ const prepared=prepareGuestBooking(guestBody,{now:Date.now(),todayYmd:'2026-11-14',bookingNumber:'FIXTUREGUEST',claimToken:null});
+ assert.equal(prepared.ok,true);
+ const guestOptions={now:Date.now(),ipHash:'fixture-ip',bookingId:'fixture-'+randomUUID()};
+ const guest=await commitGuestBooking(firestoreGuestDb(),prepared,guestOptions);
+ const guestRetry=await commitGuestBooking(firestoreGuestDb(),prepared,{...guestOptions,bookingId:'fixture-unused'});
+ assert.equal(guest.ok,true);assert.equal(guestRetry.duplicate,true);assert.equal(guestRetry.bookingId,guest.bookingId);
+ assert.equal((await db.collection('bookings').doc(guest.bookingId).get()).data().marketingAttribution,null);
  await db.collection('marketingAdsDaily').doc('fixture').set({date:'2026-11-10',accountId:'7328566496',currency:'GBP',costMicros:10520000,retrievedAt:admin.firestore.FieldValue.serverTimestamp(),provenance:'supermetrics_google_ads',reportingTimezone:'Europe/London',completeDay:true});
  assert.equal((await readAdvertisingSpend.run({from:'2026-11-10',to:'2026-11-10'},staff)).spendPence,1052);
  assert.equal((await readAdvertisingSpend.run({from:'2026-11-10',to:'2026-11-11'},staff)).available,false);
- console.log('PASS: real Auth + Firestore demo journey, concurrent retries, confirmation deduplication, source history, receipt/account withdrawal, one stubbed Google delivery, and spend coverage.');
+ console.log('PASS: real Auth + Firestore demo journey, concurrent account retries, guest retry and withdrawn attribution, confirmation/payment deduplication, source history, receipt/account withdrawal, stubbed Google deliveries, and spend coverage.');
  await admin.app().delete();
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{setTimeout(()=>process.exit(process.exitCode||0),100);});
 
