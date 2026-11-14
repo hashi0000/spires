@@ -17,7 +17,7 @@ function spendSnapshotTotal(from, to, rows, now = Date.now()) {
         const date = new Date(at).toISOString().slice(0, 10);
         const matches = rows.filter(row => row.date === date);
         const row = matches[0];
-        if (matches.length !== 1 || row.completeDay !== true || row.accountId !== '7328566496' || row.currency !== 'GBP' || row.reportingTimezone !== 'Europe/London' || row.provenance !== 'supermetrics_google_ads' || !Number.isSafeInteger(row.costMicros) || row.costMicros < 0 || !Number.isFinite(row.retrievedAtMs) || row.retrievedAtMs > now || now - row.retrievedAtMs > 48 * 3600000) {
+        if (matches.length !== 1 || row.completeDay !== true || row.accountId !== '7328566496' || row.currency !== 'GBP' || row.reportingTimezone !== 'Europe/London' || !['supermetrics_google_ads', 'google_ads_api'].includes(row.provenance) || !Number.isSafeInteger(row.costMicros) || row.costMicros < 0 || !Number.isFinite(row.retrievedAtMs) || row.retrievedAtMs > now || now - row.retrievedAtMs > 48 * 3600000) {
             return { available: false, reason: 'A recent verified Google Ads snapshot is missing for one or more selected days. Spend is unknown.' };
         }
         micros += row.costMicros;
@@ -25,5 +25,6 @@ function spendSnapshotTotal(from, to, rows, now = Date.now()) {
     }
     if (!Number.isSafeInteger(micros))
         return { available: false, reason: 'The spend total is outside the supported range.' };
-    return { available: true, spendPence: Math.round(micros / 10000), retrievedAtMs: oldest, reason: 'Google Ads snapshot via Supermetrics, in GBP. This is an imported report, not a live server connection. Snapshots expire after 48 hours.' };
+    const automatic = rows.filter(row => row.date >= String(from) && row.date <= String(to)).every(row => row.provenance === 'google_ads_api');
+    return { available: true, spendPence: Math.round(micros / 10000), retrievedAtMs: oldest, reason: automatic ? `Google Ads account report in GBP, refreshed automatically every 6 hours. Oldest selected daily report: ${new Date(oldest).toISOString()}. Current-day spend is excluded.` : 'Google Ads snapshot via Supermetrics, in GBP. This is an imported report, not a live server connection. Snapshots expire after 48 hours.' };
 }

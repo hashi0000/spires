@@ -170,3 +170,4 @@ export { readAdvertisingSpend } from "./marketing/advertisingSpend";
 export { recordCustomerAcquisition } from "./marketing/acquisition";
 export { recordBookingSource } from "./marketing/source";
 export { revokeMeasurementConsent, withdrawAccountMeasurement } from "./marketing/consent";
+export { scheduledAdvertisingSpend, refreshAdvertisingSpend } from './marketing/googleAdsSync';

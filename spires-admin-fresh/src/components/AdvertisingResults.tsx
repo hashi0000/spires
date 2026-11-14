@@ -78,6 +78,8 @@ export function AdvertisingResultsView({
   advertisingStartedOn = null,
   advertisingStartConfirmed = false,
   connectionNote = "",
+  onRefreshAds,
+  refreshingAds = false,
   onDates,
   onManualComplete,
   onSaveStartDate,
@@ -97,6 +99,8 @@ export function AdvertisingResultsView({
   advertisingStartedOn?: string | null;
   advertisingStartConfirmed?: boolean;
   connectionNote?: string;
+  onRefreshAds?: () => void;
+  refreshingAds?: boolean;
   onDates: (from: string, to: string, dateBasis: "journey" | "enquiry") => void;
   onManualComplete: (value: boolean) => void;
   onSaveStartDate: (date: string) => void;
@@ -407,6 +411,7 @@ export function AdvertisingResultsView({
       <section className="advertising-results__panel">
         <h2>Manual advertising spend</h2>
         <p>{connectionNote || report.adsSpend.detail}</p>
+        {onRefreshAds && <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>{refreshingAds ? "Refreshing Google Ads…" : "Refresh Google Ads spend"}</button>}
         <label className="advertising-results__check">
           <input type="checkbox" checked={manualIsComplete} onChange={(event) => onManualComplete(event.target.checked)} disabled={saving || preview} />
           Use the dated manual entries as the full advertising spend for this period
@@ -573,6 +578,8 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const [adsConnected, setAdsConnected] = useState(false);
   const [adsSpendPence, setAdsSpendPence] = useState<number | null>(null);
   const [adsRange, setAdsRange] = useState('');
+  const [adsReload, setAdsReload] = useState(0);
+  const [refreshingAds, setRefreshingAds] = useState(false);
   const [adsReason, setAdsReason] = useState(previewMode
     ? "Google Ads is not connected. No advertising credentials are available to the server."
     : "Checking whether Google Ads can be read from the server.");
@@ -642,7 +649,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       setAdsReason(data.reason || 'Google Ads spend is unknown.');
     }).catch(()=>{if(active){setAdsConnected(false);setAdsReason('Google Ads spend could not be loaded.');}});
     return ()=>{active=false;};
-  },[previewMode,email,from,to]);
+  },[previewMode,email,from,to,adsReload]);
 
   const noted = useMemo(() => withNotes(bookings, notes), [bookings, notes]);
   const filterChoices = useMemo(() => ({
@@ -684,6 +691,18 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
       preview={previewMode}
       message={message}
       connectionNote={adsReason}
+      refreshingAds={refreshingAds}
+      onRefreshAds={async () => {
+        if (previewMode || refreshingAds) return;
+        setRefreshingAds(true);
+        try {
+          await httpsCallable(functions, 'refreshAdvertisingSpend', { timeout: 180000 })({});
+          setAdsReload(value => value + 1);
+          setMessage('Google Ads spend refreshed. Today remains incomplete until tomorrow.');
+        } catch {
+          setMessage('Google Ads refresh failed. Existing spend figures were kept.');
+        } finally { setRefreshingAds(false); }
+      }}
       saving={saving}
       manualIsComplete={manualIsComplete}
       advertisingStartedOn={advertisingStartedOn}
