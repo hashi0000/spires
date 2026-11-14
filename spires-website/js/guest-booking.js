@@ -218,14 +218,6 @@
       paymentMethod: data.get("paymentMethod"),
       message: data.get("message"),
       heardAbout: data.get("heardAbout") || "",
-      websiteEnquiryRef: (function () {
-        try {
-          var ref = sessionStorage.getItem("spires_website_enquiry_ref") || "";
-          return /^ST-[A-Z0-9]{6}$/.test(ref) ? ref : "";
-        } catch (e) {
-          return "";
-        }
-      })(),
       heardAboutDetail: heardAbout && heardAbout.value === "other" ? (data.get("heardAboutDetail") || "") : "",
       airportCollection: airport && airport.checked,
       flightNumber: data.get("flightNumber") || "",

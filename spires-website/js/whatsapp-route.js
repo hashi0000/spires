@@ -129,31 +129,6 @@
     return "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeWhatsAppText(message);
   }
 
-  function websiteEnquiryRef() {
-    var key = "spires_website_enquiry_ref";
-    try {
-      var existing = sessionStorage.getItem(key) || "";
-      if (/^ST-[A-Z0-9]{6}$/.test(existing)) return existing;
-      var alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      var values = new Uint32Array(6);
-      if (typeof crypto !== "undefined" && crypto.getRandomValues) crypto.getRandomValues(values);
-      var body = "";
-      for (var i = 0; i < 6; i++) body += alphabet[(values[i] || Math.floor(Math.random() * alphabet.length)) % alphabet.length];
-      var ref = "ST-" + body;
-      sessionStorage.setItem(key, ref);
-      return ref;
-    } catch (error) {
-      return "";
-    }
-  }
-
-  function withWebsiteReference(message, ref) {
-    if (!message) return "";
-    if (!/^ST-[A-Z0-9]{6}$/.test(String(ref || ""))) return message;
-    if (message.indexOf("gclid=") !== -1 || message.indexOf("Website reference:") !== -1) return message;
-    return message + "\n\nWebsite reference: " + ref;
-  }
-
   function hrefForRoute(routeId) {
     return whatsappHref(enquiryMessage(routeId));
   }
@@ -205,16 +180,6 @@
   function applyToDocument(doc) {
     var href = hrefFromDocument(doc);
     if (!href) return 0;
-    var ref = websiteEnquiryRef();
-    if (ref) {
-      try {
-        var message = new URL(href).searchParams.get("text") || "";
-        var next = whatsappHref(withWebsiteReference(message, ref));
-        if (next) href = next;
-      } catch (error) {
-        href = hrefFromDocument(doc);
-      }
-    }
     return applyHref(doc, href);
   }
 
@@ -242,7 +207,6 @@
     ROUTES: ROUTES,
     ROUTE_FILES: ROUTE_FILES,
     enquiryMessage: enquiryMessage,
-    withWebsiteReference: withWebsiteReference,
     enquiryMessageFromConfig: enquiryMessageFromConfig,
     whatsappHref: whatsappHref,
     hrefForRoute: hrefForRoute,
