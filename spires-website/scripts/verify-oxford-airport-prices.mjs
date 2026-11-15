@@ -181,7 +181,7 @@ assert(homeFares.includes(">£138 <span>one way</span>"), "homepage Abingdon 8 S
 assert(homeFares.includes(">£110 <span>one way</span>"), "homepage Didcot or Bicester Heathrow one way");
 assert(homeFares.includes(">£108 <span>one way</span>"), "homepage Witney Heathrow one way");
 
-assert(ctx.window.SPIRES_EXECUTIVE_SERVICE_ENABLED === false, "executive flag must stay off");
+assert(ctx.window.SPIRES_EXECUTIVE_SERVICE_ENABLED === true, "executive flag must be on");
 const executiveFares = {
   oxford: [150, 290],
   abingdon: [165, 320],
@@ -202,8 +202,9 @@ for (const [originId, prices] of Object.entries(executiveFares)) {
   assert(otherAirport.rows.includes("£" + regional[originId].routes.gatwick.standardCar.oneWay), originId + " Gatwick Standard fare unchanged");
 }
 const plainTable = ctx.window.SPIRES_renderFareBlock("oxford");
-assert(!plainTable.headRow.includes("Executive Car"), "default fare table has no Executive column");
-assert(!plainTable.rows.includes('data-label="Executive Car one way"'), "default Oxford table does not print the Executive fare");
+assert(plainTable.headRow.includes("Executive Car one way"), "default fare table shows the Executive column");
+assert(plainTable.rows.includes("£150") && plainTable.rows.includes("£290"), "default Oxford table prints the Executive fare");
+assert(plainTable.rows.includes("£92") && plainTable.rows.includes("£180"), "default Oxford Standard fare stays £92 / £180");
 const reviewTable = ctx.window.SPIRES_renderFareBlock("oxford", null, { executive: true });
 assert(reviewTable.headRow.includes("Executive Car one way"), "review table adds Executive columns");
 assert(reviewTable.rows.includes("£150"), "review table shows Oxford Executive one way");

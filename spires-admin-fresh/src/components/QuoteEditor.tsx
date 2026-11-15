@@ -202,7 +202,7 @@ export default function QuoteEditor({ bookingId, form, onChange, onWorkflowStatu
             <input className="form-input" inputMode="decimal" value={form.depositAmount || ""} onChange={(e) => onChange({ depositAmount: e.target.value })} />
           </label>
         ) : null}
-        <label className="text-sm">Payment link (optional)
+        <label className="text-sm">Shift4 payment link (optional)
           <input className="form-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="https://" />
         </label>
       </div>
@@ -239,6 +239,7 @@ export default function QuoteEditor({ bookingId, form, onChange, onWorkflowStatu
       {error ? <p role="alert" className="text-sm mt-2" style={{ color: "#b91c1c" }}>{error}</p> : null}
       {message ? <p role="status" className="text-sm mt-2" style={{ color: "#166534" }}>{message}</p> : null}
 
+      <p className="text-sm mt-3">Save draft does not email anyone. Send quote emails {booking?.email || booking?.hirerEmail || "the address on this booking, once one is saved"}.</p>
       <div className="flex flex-wrap gap-2 mt-3">
         <button type="button" className="btn btn-secondary" disabled={Boolean(busy)} onClick={() => run("draft", async () => {
           const fare = fareValue();

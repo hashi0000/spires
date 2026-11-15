@@ -74,5 +74,6 @@ assert.equal(shown("collect").collect.text, "Collect £45.00 on this leg.");
 assert.equal(shown("collect").collect.text.includes("180"), false);
 assert.equal(shown("done").remaining, "Completed");
 assert.equal(shown("done").overdue, false);
+assert.equal(hub.nextJourney(sample.bookings.filter((row) => row.id === "exec"), now, ""), null);
 
 console.log("driver hub presentation ok");

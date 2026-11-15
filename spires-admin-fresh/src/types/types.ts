@@ -180,6 +180,12 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   /** When set (e.g. admin-entered), used for emailing PDFs alongside `email`. */
   hirerEmail?: string;
   passengers?: number;
+  luggage?: number | string;
+  landingTime?: string;
+  returnTerminal?: string;
+  returnLandingTime?: string;
+  paymentLinkUrl?: string;
+  airportDropOff?: boolean;
   customerStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
   returnTrip?: boolean;
   returnDateTime?: string;

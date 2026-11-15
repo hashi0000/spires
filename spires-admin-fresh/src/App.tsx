@@ -48,7 +48,7 @@ const PAGE_TITLES: Record<string, string> = {
   'spires-share': 'Spires Share',
   'link-bookings': 'Maintenance: link bookings',
   advertising: 'Advertising results',
-  communications: 'Offers and customer communications',
+  communications: 'Offers and Messages',
 };
 
 function initialAdminTab(): string {

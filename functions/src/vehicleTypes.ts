@@ -18,8 +18,9 @@ export function executiveRequestNote(booking: {
   executiveAvailability?: string | null;
 }): string {
   if (booking.vehicleType !== "executive") return "";
+  const partner = "A partner operator may provide the car. Executive Car is the vehicle category, not an allocated car.";
   if (booking.executiveAvailability === "accepted") {
-    return "Executive Car. Availability has been accepted. This document follows the booking status shown.";
+    return `Executive Car. Availability has been accepted. This document follows the booking status shown. ${partner}`;
   }
-  return "Executive Car request. Awaiting availability confirmation. This is not a confirmed booking and no vehicle is reserved.";
+  return `Executive Car request. Awaiting availability confirmation. This is not a confirmed booking and no vehicle is reserved. ${partner}`;
 }

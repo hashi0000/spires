@@ -39,8 +39,11 @@ function textOf(journey) {
 
 export function classifyExecutiveJourney(journey) {
   const text = textOf(journey || {});
-  if (OTHER_AIRPORT.test(text) || !HEATHROW.test(text)) {
+  if (!HEATHROW.test(text)) {
     return { ok: false, error: "Executive Car is only available for Heathrow transfers." };
+  }
+  if (OTHER_AIRPORT.test(text)) {
+    return { ok: true, fareStatus: "quote_required", proposed: null };
   }
   const specific = SPECIFIC.filter((row) => row[1].test(text)).map((row) => row[0]);
   const area = specific.length === 1 ? specific[0] : specific.length === 0 && /\boxford\b/i.test(text) ? "oxford" : null;

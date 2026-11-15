@@ -514,6 +514,9 @@ const FamilyJobs: React.FC<Props> = ({
                 </label>
               ))}
             </fieldset>
+            {draft.vehicleType === "executive" ? (
+              <p>Executive Car is the category requested for a Heathrow transfer. It is not an allocated car. A partner operator may provide it, and the request waits for availability confirmation.</p>
+            ) : null}
             <button type="button" className="family-jobs-more" onClick={() => setMoreDetails((open) => !open)}>
               {moreDetails ? "Hide extra details" : "More details"}
             </button>

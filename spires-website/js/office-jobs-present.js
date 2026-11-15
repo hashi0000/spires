@@ -416,7 +416,8 @@
           && !legCompleted(job.booking, job.leg)
           && job.pickup
           && job.pickup >= startOfDay(now)
-          && job.pickup.getTime() >= now.getTime() - 6 * 60 * 60 * 1000;
+          && job.pickup.getTime() >= now.getTime() - 6 * 60 * 60 * 1000
+          && !(job.booking.vehicleType === "executive" && job.booking.executiveAvailability !== "accepted");
       })
       .sort(function (a, b) { return (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0); })[0] || null;
   }

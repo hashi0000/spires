@@ -1,11 +1,8 @@
 /**
  * Executive Heathrow transfers.
  *
- * EXECUTIVE_SERVICE_ENABLED is the single launch switch. Keep it false until
- * supplier availability, these rates, and the inclusions below are confirmed.
- *
- * LAUNCH BLOCKER: partner terms must cover these existing airport inclusions
- * before the flag is turned on:
+ * EXECUTIVE_SERVICE_ENABLED is the launch switch. It is on.
+ * Published fares use the existing airport inclusions:
  * - the standard airport pickup or drop-off charge, included in the published fare
  * - flight monitoring for airport collections
  * - 50 minutes waiting from the actual landing time, then £10 per additional
@@ -15,10 +12,13 @@
  * Fares match spires-website/js/airport-prices.js. Do not keep a second price list.
  */
 
-export const EXECUTIVE_SERVICE_ENABLED = false;
+export const EXECUTIVE_SERVICE_ENABLED = true;
 
 export const EXECUTIVE_CUSTOMER_WORDING =
-  "Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation.";
+  "Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation.";
+
+export const EXECUTIVE_PARTNER_NOTE =
+  "A partner operator may provide the car. Executive Car is the vehicle category. It is not an allocated car, and it does not promise a particular model, luggage space, or extra services.";
 
 export const EXECUTIVE_COMMERCE_MESSAGE =
   "This Executive Heathrow request is awaiting availability confirmation. Accept the request before sending a quote, taking payment, or confirming the booking.";
@@ -115,8 +115,18 @@ export function executiveJourneyText(input: ExecutiveJourneyInput): string {
 
 export function classifyExecutiveJourney(input: ExecutiveJourneyInput): ExecutiveClassification {
   const text = executiveJourneyText(input);
-  if (OTHER_AIRPORT.test(text) || !HEATHROW.test(text)) {
+  if (!HEATHROW.test(text)) {
     return { ok: false, error: EXECUTIVE_HEATHROW_ONLY_MESSAGE };
+  }
+  if (OTHER_AIRPORT.test(text)) {
+    return {
+      ok: true,
+      airport: "heathrow",
+      area: null,
+      fareStatus: "quote_required",
+      oneWay: null,
+      returnFare: null,
+    };
   }
   const specific = SPECIFIC_AREAS.filter((area) => area.pattern.test(text)).map((area) => area.id);
   const area: ExecutiveAreaId | null =

@@ -24,7 +24,7 @@ import { paymentLinkAllowlist, validatePaymentLinkUrl } from "./paymentLink";
 import { nextReceivedPence, paymentPosition } from "./fareMath";
 import { bankTransferDetailsPlainText, isBankTransferMethod } from "../bankDetails";
 import { quoteCustomerTerms, withoutExpiredSignupOffer } from "../offers/messages";
-import { EXECUTIVE_COMMERCE_MESSAGE, executiveCommerceBlocked } from "./executiveService";
+import { EXECUTIVE_COMMERCE_MESSAGE, EXECUTIVE_CUSTOMER_WORDING, EXECUTIVE_PARTNER_NOTE, executiveCommerceBlocked, isExecutiveVehicle } from "./executiveService";
 import { bookingRevisionDecision, nextBookingRevision } from "../bookings/bookingRevision";
 import {
   bookingMatchesStatusFilter,
@@ -803,6 +803,7 @@ type AcceptanceMail = {
   bookingId: string;
   version: number;
   international: boolean;
+  vehicleNote: string;
 };
 
 async function applyAcceptance(
@@ -864,6 +865,9 @@ async function applyAcceptance(
         bookingId: ref.id,
         version: issued,
         international: booking.brand === "spires_international",
+        vehicleNote: isExecutiveVehicle(str(booking.vehicleType))
+          ? `${EXECUTIVE_CUSTOMER_WORDING} ${EXECUTIVE_PARTNER_NOTE}`
+          : "",
       };
     }
     return { decision, mail };
@@ -886,6 +890,7 @@ async function applyAcceptance(
           customerName: row.name,
           confirmed: row.confirmed,
           finalFare: row.final,
+          vehicleNote: row.vehicleNote,
         }),
         kind: "acceptance_customer",
       });

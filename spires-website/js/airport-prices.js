@@ -48,12 +48,8 @@
     },
   };
 
-  /**
-   * Single public launch switch. Keep false until supplier availability,
-   * these rates, and partner terms for the existing airport inclusions are confirmed.
-   * Localhost can review the full implementation. Production hosts cannot.
-   */
-  var EXECUTIVE_SERVICE_ENABLED = false;
+  /** Public launch switch. Executive Heathrow transfers are open. */
+  var EXECUTIVE_SERVICE_ENABLED = true;
 
   var EXECUTIVE_FARES = {
     oxford: { oneWay: 150, return: 290 },
@@ -606,8 +602,11 @@
 
   function classifyExecutiveJourney(journey) {
     var text = executiveJourneyText(journey || {});
-    if (OTHER_AIRPORT.test(text) || !HEATHROW.test(text)) {
+    if (!HEATHROW.test(text)) {
       return { ok: false, error: "Executive Car is only available for Heathrow transfers." };
+    }
+    if (OTHER_AIRPORT.test(text)) {
+      return { ok: true, airport: "heathrow", area: null, fareStatus: "quote_required", oneWay: null, returnFare: null };
     }
     var specific = [];
     for (var i = 0; i < SPECIFIC_AREAS.length; i++) {
@@ -665,6 +664,7 @@
 
   function mountExecutivePriceCard() {
     if (!executiveReviewEnabled()) return;
+    if (typeof location === "undefined" || !location || !document || typeof document.querySelector !== "function") return;
     var path = String(location.pathname || "").replace(/\.html$/, "").replace(/\/$/, "") || "/";
     var area = null;
     if (
@@ -697,8 +697,9 @@
       '<p class="price-save">Save ' +
       formatMoney(prices.oneWay * 2 - prices.return) +
       " on a return</p>" +
-      '<p class="price-option__meta">Per vehicle. Advance booking required.</p>' +
-      "<p>Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation. Tell us the passengers and luggage. Suitability is confirmed before acceptance.</p>" +
+      '<p class="price-option__meta">Per vehicle, either direction. Advance booking required.</p>' +
+      "<p>Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation.</p>" +
+      "<p>A partner operator may provide the car. Executive Car is the vehicle category. It is not an allocated car, and it does not promise a particular model, luggage space, or extra services.</p>" +
       '<p><a href="/executive-heathrow-transfers">Executive Heathrow transfers</a></p>';
     host.appendChild(article);
   }
@@ -732,7 +733,9 @@
     fillOriginCopy();
     syncExecutiveVisibility();
     mountExecutivePriceCard();
-    document.dispatchEvent(new Event("spires-prices-ready"));
+    if (typeof Event === "function" && document && typeof document.dispatchEvent === "function") {
+      document.dispatchEvent(new Event("spires-prices-ready"));
+    }
   }
 
   window.SPIRES_EXECUTIVE_SERVICE_ENABLED = EXECUTIVE_SERVICE_ENABLED;

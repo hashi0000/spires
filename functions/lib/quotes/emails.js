@@ -15,6 +15,7 @@ exports.moneyOrZero = moneyOrZero;
 const crypto_1 = require("crypto");
 const driverReminderEmail_1 = require("../driverReminderEmail");
 const halfTerm_1 = require("./halfTerm");
+const executiveService_1 = require("./executiveService");
 exports.QUOTE_PAGE_ORIGIN = "https://www.spires-taxis.com/quote";
 exports.EMAIL_CONFIG_HELP = "Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions. Do not invent a password.";
 function assertEmailConfigured() {
@@ -54,7 +55,8 @@ function quoteEmailHtml(model) {
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">Your quote is ready</h1>
     <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(model.customerName || "Customer")},</p>
     <p><strong>This is a quote, not a confirmed booking.</strong> Booking reference <strong>${(0, driverReminderEmail_1.escapeHtml)(model.bookingNumber)}</strong>.</p>
-    <p>Vehicle: ${(0, driverReminderEmail_1.escapeHtml)(model.vehicleLabel)}</p>
+    <p>Vehicle category: ${(0, driverReminderEmail_1.escapeHtml)(model.vehicleLabel)}</p>
+    ${model.vehicleLabel === "Executive Car" ? `<p>${(0, driverReminderEmail_1.escapeHtml)(executiveService_1.EXECUTIVE_CUSTOMER_WORDING)}</p><p>${(0, driverReminderEmail_1.escapeHtml)(executiveService_1.EXECUTIVE_PARTNER_NOTE)}</p>` : ""}
     <p>Outbound: ${(0, driverReminderEmail_1.escapeHtml)(model.outbound)}</p>
     ${model.returnLeg ? `<p>Return: ${(0, driverReminderEmail_1.escapeHtml)(model.returnLeg)}</p>` : ""}
     <p>Normal fare ${(0, driverReminderEmail_1.escapeHtml)(model.normalFare)}<br>
@@ -90,10 +92,12 @@ function acceptanceCustomerHtml(input) {
     const body = input.confirmed
         ? `Your booking ${(0, driverReminderEmail_1.escapeHtml)(input.bookingNumber)} is confirmed. Final total ${(0, driverReminderEmail_1.escapeHtml)(input.finalFare)}.`
         : `Your quote ${(0, driverReminderEmail_1.escapeHtml)(input.bookingNumber)} is accepted and is awaiting payment. Your booking will be confirmed once payment has been received. Final total ${(0, driverReminderEmail_1.escapeHtml)(input.finalFare)}.`;
+    const vehicle = input.vehicleNote ? `<p>${(0, driverReminderEmail_1.escapeHtml)(input.vehicleNote)}</p>` : "";
     return shell(`
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">${input.confirmed ? "Booking confirmed" : "Quote accepted"}</h1>
     <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(input.customerName || "Customer")},</p>
     <p>${body}</p>
+    ${vehicle}
   `);
 }
 function guestRequestEmailHtml(input) {
@@ -104,7 +108,8 @@ function guestRequestEmailHtml(input) {
         ? "<p>We also have your phone number, and our team can call you.</p>"
         : "<p>We will use this email address to reply. We do not send a text message for this request.</p>";
     const executive = input.executive
-        ? `<p><strong>Executive Car request for a Heathrow transfer.</strong> Mercedes E Class or equivalent. Advance booking required. Subject to availability and booking confirmation.</p>
+        ? `<p><strong>Executive Car request for a Heathrow transfer.</strong> ${(0, driverReminderEmail_1.escapeHtml)(executiveService_1.EXECUTIVE_CUSTOMER_WORDING)}</p>
+    <p>${(0, driverReminderEmail_1.escapeHtml)(executiveService_1.EXECUTIVE_PARTNER_NOTE)}</p>
     <p>This is a request, not a confirmed booking. No vehicle is reserved, and we will not take payment until we confirm availability.${input.proposedFare ? ` The published fare for this area is ${(0, driverReminderEmail_1.escapeHtml)(input.proposedFare)}. It is not agreed until we confirm availability.` : " Where there is no published Executive fare, we will send an individual fixed quote after we confirm availability."}</p>
     <p>Tell us if the passenger or luggage details change. We confirm the car is suitable before we accept the booking.</p>`
         : `<p><strong>This is not a confirmed booking yet.</strong> We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>`;

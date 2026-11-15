@@ -837,6 +837,9 @@ async function applyAcceptance(ref, input) {
                 bookingId: ref.id,
                 version: issued,
                 international: booking.brand === "spires_international",
+                vehicleNote: (0, executiveService_1.isExecutiveVehicle)(str(booking.vehicleType))
+                    ? `${executiveService_1.EXECUTIVE_CUSTOMER_WORDING} ${executiveService_1.EXECUTIVE_PARTNER_NOTE}`
+                    : "",
             };
         }
         return { decision, mail };
@@ -859,6 +862,7 @@ async function applyAcceptance(ref, input) {
                     customerName: row.name,
                     confirmed: row.confirmed,
                     finalFare: row.final,
+                    vehicleNote: row.vehicleNote,
                 }),
                 kind: "acceptance_customer",
             });

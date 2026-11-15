@@ -2179,7 +2179,12 @@ header.admin-header,
 .advertising-results__footer { font-size: 0.8125rem; color: #334155; }
 .frequency-chart__table { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
+.comms-layout { display: grid; grid-template-columns: 220px 1fr; gap: 1rem; align-items: start; }
+.comms-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.comms-preview { width: 100%; height: 420px; border: 1px solid #e4e9ef; background: #fff; }
+
 @media (max-width: 900px) {
   .booking-drawer .modal-content { max-width: none; width: 100%; }
   .advertising-results__header { flex-direction: column; }
+  .comms-layout { grid-template-columns: 1fr; }
 }

@@ -2,11 +2,8 @@
 /**
  * Executive Heathrow transfers.
  *
- * EXECUTIVE_SERVICE_ENABLED is the single launch switch. Keep it false until
- * supplier availability, these rates, and the inclusions below are confirmed.
- *
- * LAUNCH BLOCKER: partner terms must cover these existing airport inclusions
- * before the flag is turned on:
+ * EXECUTIVE_SERVICE_ENABLED is the launch switch. It is on.
+ * Published fares use the existing airport inclusions:
  * - the standard airport pickup or drop-off charge, included in the published fare
  * - flight monitoring for airport collections
  * - 50 minutes waiting from the actual landing time, then £10 per additional
@@ -16,7 +13,7 @@
  * Fares match spires-website/js/airport-prices.js. Do not keep a second price list.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EXECUTIVE_AREAS = exports.EXECUTIVE_PASSENGER_LIMIT = exports.EXECUTIVE_PASSENGER_MESSAGE = exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE = exports.EXECUTIVE_NOT_OPEN_MESSAGE = exports.EXECUTIVE_COMMERCE_MESSAGE = exports.EXECUTIVE_CUSTOMER_WORDING = exports.EXECUTIVE_SERVICE_ENABLED = void 0;
+exports.EXECUTIVE_AREAS = exports.EXECUTIVE_PASSENGER_LIMIT = exports.EXECUTIVE_PASSENGER_MESSAGE = exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE = exports.EXECUTIVE_NOT_OPEN_MESSAGE = exports.EXECUTIVE_COMMERCE_MESSAGE = exports.EXECUTIVE_PARTNER_NOTE = exports.EXECUTIVE_CUSTOMER_WORDING = exports.EXECUTIVE_SERVICE_ENABLED = void 0;
 exports.executiveServiceEnabled = executiveServiceEnabled;
 exports.isExecutiveVehicle = isExecutiveVehicle;
 exports.executiveCommerceBlocked = executiveCommerceBlocked;
@@ -24,8 +21,9 @@ exports.executiveJourneyText = executiveJourneyText;
 exports.classifyExecutiveJourney = classifyExecutiveJourney;
 exports.proposedExecutiveFare = proposedExecutiveFare;
 exports.assessExecutiveBooking = assessExecutiveBooking;
-exports.EXECUTIVE_SERVICE_ENABLED = false;
-exports.EXECUTIVE_CUSTOMER_WORDING = "Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation.";
+exports.EXECUTIVE_SERVICE_ENABLED = true;
+exports.EXECUTIVE_CUSTOMER_WORDING = "Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation.";
+exports.EXECUTIVE_PARTNER_NOTE = "A partner operator may provide the car. Executive Car is the vehicle category. It is not an allocated car, and it does not promise a particular model, luggage space, or extra services.";
 exports.EXECUTIVE_COMMERCE_MESSAGE = "This Executive Heathrow request is awaiting availability confirmation. Accept the request before sending a quote, taking payment, or confirming the booking.";
 exports.EXECUTIVE_NOT_OPEN_MESSAGE = "Executive Car is not open for booking yet.";
 exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE = "Executive Car is only available for Heathrow transfers.";
@@ -80,8 +78,18 @@ function executiveJourneyText(input) {
 }
 function classifyExecutiveJourney(input) {
     const text = executiveJourneyText(input);
-    if (OTHER_AIRPORT.test(text) || !HEATHROW.test(text)) {
+    if (!HEATHROW.test(text)) {
         return { ok: false, error: exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE };
+    }
+    if (OTHER_AIRPORT.test(text)) {
+        return {
+            ok: true,
+            airport: "heathrow",
+            area: null,
+            fareStatus: "quote_required",
+            oneWay: null,
+            returnFare: null,
+        };
     }
     const specific = SPECIFIC_AREAS.filter((area) => area.pattern.test(text)).map((area) => area.id);
     const area = specific.length === 1 ? specific[0] : specific.length === 0 && /\boxford\b/i.test(text) ? "oxford" : null;

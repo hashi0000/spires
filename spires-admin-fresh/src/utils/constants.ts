@@ -8,7 +8,7 @@ export const navigation = [
   { id: 'drivers', name: 'Drivers', icon: Users, quiet: false, adminOnly: false },
   { id: 'vehicles', name: 'Vehicles', icon: Car, quiet: false, adminOnly: false },
   { id: 'advertising', name: 'Advertising results', icon: TrendingUp, quiet: true, adminOnly: true },
-  { id: 'communications', name: 'Offers and messages', icon: Mail, quiet: true, adminOnly: true },
+  { id: 'communications', name: 'Offers and Messages', icon: Mail, quiet: true, adminOnly: true },
   { id: 'invoices', name: 'Invoices', icon: DollarSign, quiet: true, adminOnly: false },
   { id: 'school-invoices', name: 'School invoices', icon: Receipt, quiet: true },
   { id: 'spires-share', name: 'Spires Share', icon: Share2, quiet: true },
@@ -30,7 +30,7 @@ export const paymentMethods = [
   { value: 'bank transfer' as const, label: '🏦 Bank Transfer' },
   { value: 'account' as const, label: '📋 Account Customer' },
   { value: 'tbc' as const, label: 'TBC' },
-  { value: 'undecided' as const, label: 'Not decided yet' }
+  { value: 'undecided' as const, label: 'Not yet agreed' }
 ];
 
 // Import the working PDF generator

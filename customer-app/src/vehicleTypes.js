@@ -45,7 +45,7 @@ export function maxPassengersForVehicle(type) {
   return 4;
 }
 
-export const EXECUTIVE_SERVICE_ENABLED = false;
+export const EXECUTIVE_SERVICE_ENABLED = true;
 
 export function executiveServicePublic() {
   if (EXECUTIVE_SERVICE_ENABLED) return true;

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "crypto";
 import { ADMIN_EMAIL, escapeHtml, getTransporter, mailFrom, reminderConfigOk } from "../driverReminderEmail";
 import { formatPence } from "./halfTerm";
+import { EXECUTIVE_CUSTOMER_WORDING, EXECUTIVE_PARTNER_NOTE } from "./executiveService";
 
 export const QUOTE_PAGE_ORIGIN = "https://www.spires-taxis.com/quote";
 
@@ -67,7 +68,8 @@ export function quoteEmailHtml(model: QuoteEmailModel): string {
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">Your quote is ready</h1>
     <p>Dear ${escapeHtml(model.customerName || "Customer")},</p>
     <p><strong>This is a quote, not a confirmed booking.</strong> Booking reference <strong>${escapeHtml(model.bookingNumber)}</strong>.</p>
-    <p>Vehicle: ${escapeHtml(model.vehicleLabel)}</p>
+    <p>Vehicle category: ${escapeHtml(model.vehicleLabel)}</p>
+    ${model.vehicleLabel === "Executive Car" ? `<p>${escapeHtml(EXECUTIVE_CUSTOMER_WORDING)}</p><p>${escapeHtml(EXECUTIVE_PARTNER_NOTE)}</p>` : ""}
     <p>Outbound: ${escapeHtml(model.outbound)}</p>
     ${model.returnLeg ? `<p>Return: ${escapeHtml(model.returnLeg)}</p>` : ""}
     <p>Normal fare ${escapeHtml(model.normalFare)}<br>
@@ -115,14 +117,17 @@ export function acceptanceCustomerHtml(input: {
   customerName: string;
   confirmed: boolean;
   finalFare: string;
+  vehicleNote?: string;
 }): string {
   const body = input.confirmed
     ? `Your booking ${escapeHtml(input.bookingNumber)} is confirmed. Final total ${escapeHtml(input.finalFare)}.`
     : `Your quote ${escapeHtml(input.bookingNumber)} is accepted and is awaiting payment. Your booking will be confirmed once payment has been received. Final total ${escapeHtml(input.finalFare)}.`;
+  const vehicle = input.vehicleNote ? `<p>${escapeHtml(input.vehicleNote)}</p>` : "";
   return shell(`
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">${input.confirmed ? "Booking confirmed" : "Quote accepted"}</h1>
     <p>Dear ${escapeHtml(input.customerName || "Customer")},</p>
     <p>${body}</p>
+    ${vehicle}
   `);
 }
 
@@ -141,7 +146,8 @@ export function guestRequestEmailHtml(input: {
     ? "<p>We also have your phone number, and our team can call you.</p>"
     : "<p>We will use this email address to reply. We do not send a text message for this request.</p>";
   const executive = input.executive
-    ? `<p><strong>Executive Car request for a Heathrow transfer.</strong> Mercedes E Class or equivalent. Advance booking required. Subject to availability and booking confirmation.</p>
+    ? `<p><strong>Executive Car request for a Heathrow transfer.</strong> ${escapeHtml(EXECUTIVE_CUSTOMER_WORDING)}</p>
+    <p>${escapeHtml(EXECUTIVE_PARTNER_NOTE)}</p>
     <p>This is a request, not a confirmed booking. No vehicle is reserved, and we will not take payment until we confirm availability.${input.proposedFare ? ` The published fare for this area is ${escapeHtml(input.proposedFare)}. It is not agreed until we confirm availability.` : " Where there is no published Executive fare, we will send an individual fixed quote after we confirm availability."}</p>
     <p>Tell us if the passenger or luggage details change. We confirm the car is suitable before we accept the booking.</p>`
     : `<p><strong>This is not a confirmed booking yet.</strong> We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>`;

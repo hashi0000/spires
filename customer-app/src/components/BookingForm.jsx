@@ -739,7 +739,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             </div>
             <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
             {formData.vehicleType === "executive" && (
-              <p className="vehicle-disclaimer">Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation. Tell us the passengers and luggage. We confirm the car is suitable before we accept the booking. Sending this form does not confirm a vehicle or take payment.</p>
+              <p className="vehicle-disclaimer">Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation. A partner operator may provide the car. Executive Car is the vehicle category, not an allocated car. Sending this form does not confirm a vehicle or take payment.</p>
             )}
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
