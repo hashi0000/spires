@@ -127,13 +127,13 @@
     const done = legCompleted(job.booking, job.leg);
     if (view === "completed") return done;
     if (done) return false;
-    if (!job.pickup) return view === "upcoming" || view === "today";
-    if (job.pickup < startOfDay(now) && (view === "today" || view === "upcoming")) return true;
     const today = startOfDay(now);
     const tomorrow = addDays(today, 1);
+    if (!job.pickup) return view === "upcoming";
+    if (job.pickup < today) return false;
     if (view === "today") return job.pickup >= today && job.pickup < tomorrow;
     if (view === "tomorrow") return job.pickup >= tomorrow && job.pickup < addDays(tomorrow, 1);
-    return job.pickup >= today || job.pickup < today;
+    return job.pickup >= today;
   }
 
   function matchesDriver(job, driverFilter) {
@@ -146,6 +146,7 @@
   function timePhrase(pickup, now) {
     if (!pickup) return "Pickup time not recorded";
     const mins = Math.round((pickup.getTime() - now.getTime()) / 60000);
+    if (mins < -360) return "Pickup time has passed";
     if (mins < -1) return "Overdue";
     if (mins <= 0) return "Due now";
     if (mins < 60) return "In " + mins + " minutes";
@@ -341,7 +342,8 @@
     const vague = vagueCollection(booking, job.leg);
     const unresolved = pickupUnresolved(job.pickupLocation) || !job.pickupRecorded;
     const done = legCompleted(booking, job.leg);
-    const overdue = !done && Boolean(job.pickup && job.pickup.getTime() < now.getTime() - 60000);
+    const lateMinutes = job.pickup ? Math.round((now.getTime() - job.pickup.getTime()) / 60000) : 0;
+    const overdue = !done && lateMinutes > 1 && lateMinutes <= 360 && job.pickup >= startOfDay(now);
     const badges = [];
     if (!driverId) badges.push({ code: "info", text: "Unassigned" });
     if (!registration) badges.push({ code: "attention", text: "No vehicle recorded" });
@@ -409,7 +411,13 @@
     return bookings
       .filter(function (row) { return !isCancelled(row); })
       .flatMap(expandJobs)
-      .filter(function (job) { return matchesDriver(job, driverFilter) && !legCompleted(job.booking, job.leg); })
+      .filter(function (job) {
+        return matchesDriver(job, driverFilter)
+          && !legCompleted(job.booking, job.leg)
+          && job.pickup
+          && job.pickup >= startOfDay(now)
+          && job.pickup.getTime() >= now.getTime() - 6 * 60 * 60 * 1000;
+      })
       .sort(function (a, b) { return (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0); })[0] || null;
   }
 
@@ -451,8 +459,8 @@
           id: "overdue",
           bookingNumber: "SYN-LATE",
           status: "confirmed",
-          pickupTime: "2026-11-14T08:00:00",
-          dateTime: "2026-11-14T08:00:00",
+          pickupTime: "2026-11-15T14:00:00",
+          dateTime: "2026-11-15T14:00:00",
           pickupLocation: "TBC",
           destination: "Oxford Station",
           driverId: "sam",
@@ -464,6 +472,22 @@
           notes: "as discussed",
           paymentStatus: "pending",
           actualFare: 30,
+        },
+        {
+          id: "archive",
+          bookingNumber: "SYN-OLD",
+          status: "confirmed",
+          pickupTime: "2026-11-01T09:00:00",
+          dateTime: "2026-11-01T09:00:00",
+          pickupLocation: "Oxford",
+          destination: "Didcot",
+          driverId: "sam",
+          vehicleType: "standard",
+          passengers: 1,
+          luggage: 1,
+          hirerName: "Old Example",
+          hirerPhone: "07700900002",
+          paymentStatus: "pending",
         },
         {
           id: "standard",

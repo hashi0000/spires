@@ -32,6 +32,9 @@ assert.equal(shown("overdue").passengers, "Passengers unknown");
 assert.equal(shown("overdue").luggage, "Luggage unknown");
 assert.equal(shown("overdue").collect.text, "Confirm the amount with the office.");
 assert.equal(hub.selectJobs(sample.bookings, "completed", now, "").some((row) => row.booking.id === "overdue"), false);
+assert.equal(hub.selectJobs(sample.bookings, "today", now, "").some((row) => row.booking.id === "archive"), false);
+assert.equal(hub.selectJobs(sample.bookings, "upcoming", now, "").some((row) => row.booking.id === "archive"), false);
+assert.equal(hub.nextJourney(sample.bookings, now, "").booking.id === "archive", false);
 assert.equal(hub.selectJobs(sample.bookings, "completed", now, "").some((row) => row.booking.id === "done"), true);
 
 const standard = shown("standard");
