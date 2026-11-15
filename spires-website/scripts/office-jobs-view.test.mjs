@@ -2,36 +2,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 
-const source = fs.readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "../js/office-jobs.js"),
-  "utf8"
-);
-
-function take(name) {
-  const start = source.indexOf("function " + name);
-  assert.notEqual(start, -1, name);
-  let depth = 0;
-  let seen = false;
-  for (let i = source.indexOf("{", start); i < source.length; i += 1) {
-    if (source[i] === "{") {
-      depth += 1;
-      seen = true;
-    } else if (source[i] === "}") {
-      depth -= 1;
-      if (seen && depth === 0) return source.slice(start, i + 1);
-    }
-  }
-  throw new Error("Could not read " + name);
-}
-
-const isCompleted = new Function("return " + take("isCompleted"))();
-const hasReturn = new Function("textOf", "return " + take("hasReturn"))(function (booking, keys) {
-  for (const key of keys) {
-    if (typeof booking[key] === "string" && booking[key].trim()) return booking[key].trim();
-  }
-  return "";
-});
+const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const context = { globalThis: {} };
+vm.runInNewContext(fs.readFileSync(path.join(root, "js/office-jobs-present.js"), "utf8"), context);
+const hub = context.globalThis.SpiresDriverHub;
+const page = fs.readFileSync(path.join(root, "js/office-jobs.js"), "utf8");
 
 const completedOpenReturn = {
   status: "completed",
@@ -44,9 +21,10 @@ const completedOpenReturn = {
   returnDateTime: "",
 };
 
-assert.equal(isCompleted(completedOpenReturn), true);
-assert.equal(isCompleted({ status: "paid", adminStatus: "paid", customerStatus: "paid" }), false);
-assert.equal(hasReturn(completedOpenReturn), true);
-assert.match(source, /view === "completed" \|\| !isCompleted\(row\)/);
-assert.match(source, /!isCancelled\(row\) && !isCompleted\(row\)/);
+assert.equal(hub.isCompleted(completedOpenReturn), true);
+assert.equal(hub.isCompleted({ status: "paid", adminStatus: "paid", customerStatus: "paid" }), false);
+assert.equal(hub.hasReturn(completedOpenReturn), true);
+assert.match(page, /revision: Number\(existing\.revision \|\| 0\) \+ 1/);
+assert.match(page, /source: "family"/);
+assert.equal(page.includes("outstandingPence"), false);
 console.log("office jobs completed filter ok");

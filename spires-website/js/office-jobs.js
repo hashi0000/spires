@@ -1,5 +1,7 @@
 (function () {
   const localPage = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+  const preview = localPage && new URLSearchParams(location.search).get("preview") === "1";
+  const Hub = function () { return window.SpiresDriverHub; };
   const firebaseConfig = localPage
     ? {
         apiKey: "demo-key",
@@ -27,17 +29,24 @@
     { value: "multiple", label: "Multiple vehicles" },
   ];
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-  if (localPage) {
-    auth.useEmulator("http://127.0.0.1:9099");
-    db.useEmulator("127.0.0.1", 8080);
-    firebase.app().functions("us-central1").useEmulator("127.0.0.1", 5001);
+  let auth = null;
+  let db = null;
+  let unlock = null;
+  let pushKey = null;
+  let savePush = null;
+  if (!preview) {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    if (localPage) {
+      auth.useEmulator("http://127.0.0.1:9099");
+      db.useEmulator("127.0.0.1", 8080);
+      firebase.app().functions("us-central1").useEmulator("127.0.0.1", 5001);
+    }
+    unlock = firebase.app().functions("us-central1").httpsCallable("unlockFamilyJobs");
+    pushKey = firebase.app().functions("us-central1").httpsCallable("familyPushPublicKey");
+    savePush = firebase.app().functions("us-central1").httpsCallable("saveFamilyPushSubscription");
   }
-  const unlock = firebase.app().functions("us-central1").httpsCallable("unlockFamilyJobs");
-  const pushKey = firebase.app().functions("us-central1").httpsCallable("familyPushPublicKey");
-  const savePush = firebase.app().functions("us-central1").httpsCallable("saveFamilyPushSubscription");
 
   const pinScreen = document.getElementById("pin-screen");
   const appScreen = document.getElementById("app-screen");
@@ -46,6 +55,8 @@
   const pinError = document.getElementById("pin-error");
   const pinSubmit = document.getElementById("pin-submit");
   const jobList = document.getElementById("job-list");
+  const driverFilterEl = document.getElementById("driver-filter");
+  const connectionEl = document.getElementById("connection");
   const nextJobEl = document.getElementById("next-job");
   const emptyEl = document.getElementById("app-empty");
   const errorEl = document.getElementById("app-error");
@@ -58,11 +69,17 @@
   const sheetCard = document.getElementById("sheet-card");
 
   let bookings = [];
+  let drivers = [];
+  let vehicles = [];
   let view = "today";
+  let driverFilter = sessionStorage.getItem("spires_driver_hub_filter") || "";
   let unsub = null;
   let editingId = null;
   let loaded = false;
   let saving = false;
+  let lastUpdate = null;
+  let offline = false;
+  let nowFn = function () { return new Date(); };
 
   function show(el, on) {
     el.hidden = !on;
@@ -318,67 +335,120 @@
     return '<p class="job-notes">Open return.' + set + " For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.</p>";
   }
 
-  function cardMarkup(job, prominent) {
-    const booking = job.booking;
-    const party = partyLine(booking);
-    const notes = notesLine(booking);
+  function lists() {
+    return { drivers: drivers, vehicles: vehicles };
+  }
+
+  function paintConnection() {
+    if (!connectionEl) return;
+    if (preview) {
+      connectionEl.textContent = "Preview. Synthetic records. Not live bookings.";
+      return;
+    }
+    const when = lastUpdate
+      ? lastUpdate.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      : "";
+    if (offline) {
+      connectionEl.textContent = lastUpdate ? "Offline. Last successful update " + when + "." : "Offline. No successful update yet.";
+      return;
+    }
+    connectionEl.textContent = lastUpdate ? "Live. Last successful update " + when + "." : "Checking the connection";
+  }
+
+  function paintDriverFilter() {
+    if (!driverFilterEl) return;
+    const current = driverFilter;
+    const options = [{ value: "", label: "All drivers" }, { value: "unassigned", label: "Unassigned" }];
+    drivers.slice().sort(function (a, b) { return String(a.name || "").localeCompare(String(b.name || "")); }).forEach(function (driver) {
+      if (driver && driver.id) options.push({ value: driver.id, label: driver.name || "Unnamed driver" });
+    });
+    driverFilterEl.innerHTML = options.map(function (row) {
+      return '<option value="' + escapeHtml(row.value) + '"' + (row.value === current ? " selected" : "") + ">" + escapeHtml(row.label) + "</option>";
+    }).join("");
+  }
+
+  function badgeMarkup(badges) {
+    if (!badges.length) return "";
+    return '<div class="badges">' + badges.map(function (badge) {
+      return '<span class="badge badge-' + badge.code + '">' + escapeHtml(badge.text) + "</span>";
+    }).join("") + "</div>";
+  }
+
+  function cardBody(viewModel, prominent) {
     return (
-      (prominent ? '<p class="next-kicker">Next job</p>' : "") +
-      '<div class="job-when">' + escapeHtml(formatWhen(job.pickup)) + "</div>" +
-      (hasReturn(booking) ? '<div class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</div>" : "") +
-      '<div class="job-route">' + escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</div>" +
-      stopMarkup(booking, job.leg) +
-      openReturnMarkup(booking, job) +
-      '<div class="job-meta">' + escapeHtml(vehicleLabel(booking.vehicleType)) + " · " + escapeHtml(statusLabel(booking)) +
-      (party ? " · " + escapeHtml(party) : "") + "</div>" +
-      (notes ? '<p class="job-notes">' + escapeHtml(notes) + "</p>" : "")
+      (prominent ? '<p class="next-kicker">' + escapeHtml(Hub().nextTitle(driverFilter)) + "</p>" : "") +
+      (viewModel.legLabel ? '<p class="meta">' + escapeHtml(viewModel.legLabel) + "</p>" : "") +
+      '<p class="' + (prominent ? "next-time" : "job-time") + '"><strong>' + escapeHtml(viewModel.time) + "</strong></p>" +
+      (prominent ? '<p class="next-date">' + escapeHtml(viewModel.date) + "</p>" : "") +
+      '<p class="next-remain' + (viewModel.overdue ? " is-overdue" : "") + '">' + escapeHtml(viewModel.remaining) + "</p>" +
+      '<p class="place"><span>Pickup</span><strong>' + escapeHtml(viewModel.pickup) + "</strong></p>" +
+      '<p class="place"><span>Destination</span><strong>' + escapeHtml(viewModel.destination) + "</strong></p>" +
+      '<p class="who"><strong>' + escapeHtml(viewModel.driverName) + "</strong> · " + escapeHtml(viewModel.registration) + "</p>" +
+      '<p class="meta">' + escapeHtml(viewModel.category) + " · " + escapeHtml(viewModel.passengers) + " · " + escapeHtml(viewModel.luggage) +
+      (viewModel.extraStops ? " · " + escapeHtml(viewModel.extraStops) : "") + "</p>" +
+      '<p class="state">' + escapeHtml(viewModel.allocation.label) + "</p>" +
+      badgeMarkup(viewModel.badges) +
+      (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
+      (viewModel.summary ? '<p class="summary">' + escapeHtml(viewModel.summary) + "</p>" : "") +
+      (prominent ? "" : '<p class="job-open">Open job</p>')
     );
   }
 
   function renderList() {
-    const upcoming = nextJob();
-    const rows = visibleJobs().filter((job) => !(view === "today" && upcoming && job.booking.id === upcoming.booking.id && job.leg === upcoming.leg));
-    jobList.innerHTML = "";
-    if (view === "today") {
-      nextJobEl.hidden = false;
-      if (!loaded) {
-        nextJobEl.innerHTML = "";
-      } else if (!upcoming) {
-        nextJobEl.innerHTML = '<div class="next-empty"><strong>No jobs assigned.</strong><p>New jobs appear here when they are added.</p></div>';
-      } else {
-        nextJobEl.innerHTML = "";
-        const hero = document.createElement("button");
-        hero.type = "button";
-        hero.className = "next-card";
-        hero.innerHTML = cardMarkup(upcoming, true);
-        hero.addEventListener("click", () => openDetail(upcoming));
-        nextJobEl.appendChild(hero);
-      }
-    } else {
-      nextJobEl.hidden = true;
+    paintConnection();
+    paintDriverFilter();
+    const now = nowFn();
+    const upcoming = loaded ? Hub().nextJourney(bookings, now, driverFilter) : null;
+    const rows = loaded
+      ? Hub().selectJobs(bookings, view, now, driverFilter).filter(function (job) {
+        return !(upcoming && job.booking.id === upcoming.booking.id && job.leg === upcoming.leg);
+      })
+      : [];
+    nextJobEl.hidden = false;
+    nextJobEl.innerHTML = "";
+    if (!loaded) {
       nextJobEl.innerHTML = "";
+    } else if (!upcoming) {
+      nextJobEl.innerHTML = '<div class="empty"><strong>' + escapeHtml(Hub().nextTitle(driverFilter)) + '</strong><p>No unfinished journey matches this driver.</p></div>';
+    } else {
+      const hero = document.createElement("article");
+      hero.className = "next-card";
+      hero.innerHTML = cardBody(Hub().presentJob(upcoming, lists(), now), true);
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "btn btn-primary";
+      open.textContent = "Open job";
+      open.addEventListener("click", function () { openDetail(upcoming); });
+      hero.appendChild(open);
+      nextJobEl.appendChild(hero);
     }
+    const groups = Hub().groupJobs(rows, now);
+    jobList.innerHTML = "";
+    groups.forEach(function (group) {
+      const section = document.createElement("section");
+      const heading = document.createElement("h2");
+      heading.className = "day-label";
+      heading.textContent = group.label;
+      section.appendChild(heading);
+      group.jobs.forEach(function (job) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "job-card";
+        button.innerHTML = cardBody(Hub().presentJob(job, lists(), now), false);
+        button.addEventListener("click", function () { openDetail(job); });
+        section.appendChild(button);
+      });
+      jobList.appendChild(section);
+    });
     const emptyCopy = {
       today: "Nothing else today.",
       tomorrow: "No jobs tomorrow.",
-      upcoming: "No upcoming jobs.",
+      upcoming: "No other upcoming jobs.",
       completed: "No completed jobs.",
     };
-    emptyEl.textContent = rows.length === 0 && view === "today" && !upcoming
-      ? "No jobs assigned."
-      : emptyCopy[view] || "No jobs in this view.";
+    emptyEl.textContent = !upcoming && rows.length === 0 ? "No jobs in this view." : (emptyCopy[view] || "No jobs in this view.");
     show(loadingEl, !loaded);
-    show(emptyEl, loaded && rows.length === 0 && !(view === "today" && upcoming));
-    rows.forEach((job) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "job-card" + (job.leg === "return" ? " is-return" : "") + (view === "completed" ? " is-completed" : "");
-      button.innerHTML = cardMarkup(job, false);
-      button.addEventListener("click", () => openDetail(job));
-      item.appendChild(button);
-      jobList.appendChild(item);
-    });
+    show(emptyEl, loaded && rows.length === 0);
   }
 
   function escapeHtml(value) {
@@ -445,42 +515,56 @@
 
   function openDetail(job) {
     const booking = job.booking;
-    const charge = chargeFor(booking, job.leg);
-    const phone = textOf(booking, ["hirerPhone", "phone"]);
+    const viewModel = Hub().presentJob(job, lists(), nowFn());
+    const phone = viewModel.phone;
     const call = telHref(phone);
-    const stopText = (function () {
-      const stops = job.leg === "return" ? booking.returnStops : booking.stops;
-      if (!Array.isArray(stops) || stops.length < 3) return "";
-      return "\n" + stops.map(function (stop, index) {
-        return (index + 1) + ". " + (stop.type === "dropoff" ? "Drop off" : "Pickup") + ": " + (stop.address || "");
-      }).join("; ") + ". Extra stops. Agree the fare.";
-    })();
-    const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || "") + "\n" + (job.pickupLocation || "") + " to " + (job.destination || "") + stopText);
-    const place = job.leg === "return" ? null : booking.pickupPlace;
-    const navigate = mapsHref(job.pickupLocation, place);
-    const party = partyLine(booking);
-    const notes = notesLine(booking);
+    const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || "") + "\n" + viewModel.pickup + " to " + viewModel.destination);
+    const place = job.leg === "return" ? booking.returnPickupPlace : booking.pickupPlace;
+    const navigate = mapsHref(job.pickupRecorded ? job.pickupLocation : "", place);
+    const flight = viewModel.flight
+      ? "<p>Flight " + escapeHtml(viewModel.flight.flight) + "</p><p>Terminal " + escapeHtml(viewModel.flight.terminal) + "</p>" +
+        (viewModel.landingNote ? "<p>" + escapeHtml(viewModel.landingNote) + "</p>" : "") +
+        "<p>Driver pickup " + escapeHtml(viewModel.time) + " on " + escapeHtml(viewModel.date) + ".</p>"
+      : "";
+    const notes = viewModel.notes.length
+      ? viewModel.notes.map(function (row) {
+        return "<p><strong>" + escapeHtml(row.label) + "</strong></p><p>" + escapeHtml(row.text) + "</p>";
+      }).join("")
+      : "<p>No driver notes recorded.</p>";
     sheetCard.innerHTML =
-      "<h2>" + escapeHtml(formatWhen(job.pickup)) + "</h2>" +
-      '<p class="job-status">' + escapeHtml(statusLabel(booking)) + "</p>" +
-      (hasReturn(booking) ? '<p class="job-leg">' + (job.leg === "return" ? "Return" : "Outbound") + "</p>" : "") +
-      '<div class="detail-block"><h3>Journey</h3><p class="job-route">' +
-      escapeHtml(job.pickupLocation) + " to " + escapeHtml(job.destination) + "</p>" +
-      stopMarkup(booking, job.leg) +
-      openReturnMarkup(booking, job) +
-      "<p>" + escapeHtml(vehicleLabel(booking.vehicleType)) + (party ? " · " + escapeHtml(party) : "") + "</p></div>" +
-      (notes ? '<div class="detail-block"><h3>Collection notes</h3><p class="job-notes">' + escapeHtml(notes) + "</p></div>" : "") +
-      '<div class="detail-block"><h3>Customer</h3><p>' + escapeHtml(textOf(booking, ["hirerName", "name"]) || "Name not recorded") + "</p>" +
-      (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</div>" +
-      '<div class="detail-block"><h3>Collect</h3><p class="job-charge job-charge--' + charge.kind + '">' + escapeHtml(charge.text) + "</p></div>" +
+      (viewModel.legLabel ? '<p class="meta">' + escapeHtml(viewModel.legLabel) + "</p>" : "") +
+      "<h2>" + escapeHtml(viewModel.time) + "</h2>" +
+      "<p>" + escapeHtml(viewModel.date) + "</p>" +
+      '<p class="next-remain' + (viewModel.overdue ? " is-overdue" : "") + '">' + escapeHtml(viewModel.remaining) + "</p>" +
+      '<p class="state">' + escapeHtml(viewModel.allocation.label) + "</p>" +
+      (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
       '<div class="actions">' +
       (navigate ? '<a class="btn btn-primary" href="' + navigate + '" target="_blank" rel="noreferrer">Navigate</a>' : "") +
       (call ? '<a class="btn" href="' + call + '">Call</a>' : "") +
       (wa ? '<a class="btn" href="' + wa + '" target="_blank" rel="noreferrer">WhatsApp</a>' : "") +
-      '<button type="button" class="btn" id="edit-job">Edit</button>' +
-      '<button type="button" class="btn btn-danger" id="cancel-job">Cancel job</button>' +
       '<button type="button" class="btn" id="close-detail">Close</button>' +
       "</div>" +
+      '<p class="next-action"><strong>Next: </strong>' + escapeHtml(viewModel.nextAction) + "</p>" +
+      '<section class="detail-block"><h3>Journey and stops</h3><ol class="stops">' +
+      viewModel.stops.map(function (stop) {
+        return "<li><strong>" + escapeHtml(stop.role) + "</strong><br>" + escapeHtml(stop.address) +
+          (stop.note ? "<br>" + escapeHtml(stop.note) : "") + "</li>";
+      }).join("") +
+      "</ol></section>" +
+      '<section class="detail-block"><h3>Driver and vehicle</h3><p>Driver: ' + escapeHtml(viewModel.driverName) + "</p><p>Actual vehicle: " +
+      escapeHtml(viewModel.registration) + "</p><p>Requested category: " + escapeHtml(viewModel.category) + "</p><p>" +
+      escapeHtml(viewModel.passengers) + " · " + escapeHtml(viewModel.luggage) + "</p></section>" +
+      '<section class="detail-block"><h3>Customer</h3><p>' + escapeHtml(viewModel.customer) + "</p>" +
+      (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</section>" +
+      '<section class="detail-block"><h3>Collection and payment</h3>' + flight +
+      "<p>" + escapeHtml(viewModel.collect.text) + "</p></section>" +
+      '<section class="detail-block"><h3>Driver notes</h3>' +
+      (viewModel.summary ? "<p>" + escapeHtml(viewModel.summary) + "</p>" : "") +
+      notes + "</section>" +
+      '<details class="more-actions"><summary>More actions</summary><div class="actions">' +
+      '<button type="button" class="btn" id="edit-job">Edit</button>' +
+      '<button type="button" class="btn btn-danger" id="cancel-job">Cancel job</button>' +
+      "</div></details>" +
       '<p id="detail-error" class="error" hidden></p>';
     show(sheet, true);
     document.getElementById("close-detail").onclick = closeSheet;
@@ -564,7 +648,7 @@
       escapeHtml(draft.actualFare || "") +
       '"></label>' +
       (booking && booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted"
-        ? '<p class="job-notes">Executive Car request. Awaiting availability confirmation. Do not treat this as a confirmed vehicle.</p>'
+        ? '<p class="job-notes">Executive Car is the category requested for a Heathrow transfer. It is not an allocated car. A partner operator may provide it. This request is awaiting availability confirmation.</p>'
         : "") +
       '<fieldset class="vehicle"><legend>Vehicle</legend>' +
       (draft.vehicleType === "executive" ? VEHICLES.concat([{ value: "executive", label: "Executive Car" }]) : VEHICLES).map(
@@ -702,11 +786,20 @@
       show(statusEl, true);
       closeSheet();
     } catch (error) {
-      setError(err, error.message || "Could not save.");
+      setError(err, "Could not save. Your changes are still on this screen.");
       if (submit) submit.disabled = false;
     } finally {
       saving = false;
     }
+  }
+
+  function listenDirectory(name, assign) {
+    db.collection(name).onSnapshot(function (snap) {
+      assign(snap.docs.map(function (doc) { return Object.assign({ id: doc.id }, doc.data()); }));
+      if (loaded) renderList();
+    }, function () {
+      if (loaded) renderList();
+    });
   }
 
   function listenBookings() {
@@ -715,6 +808,8 @@
       (snap) => {
         bookings = snap.docs.map((doc) => Object.assign({ id: doc.id }, doc.data()));
         loaded = true;
+        lastUpdate = new Date();
+        offline = false;
         setError(errorEl, "");
         show(retryEl, false);
         renderList();
@@ -727,7 +822,8 @@
           showApp(false);
           return;
         }
-        setError(errorEl, "Could not load jobs. Check the connection and try again.");
+        offline = true;
+        setError(errorEl, lastUpdate ? "Could not update. Showing the last successful load." : "Could not load jobs. Check the connection and try again.");
         show(retryEl, true);
         show(loadingEl, false);
       }
@@ -774,7 +870,7 @@
     document.querySelectorAll("[data-view]").forEach((row) => {
       const active = row.getAttribute("data-view") === view;
       row.classList.toggle("is-active", active);
-      if (row.closest(".bottom-nav")) row.setAttribute("aria-current", active ? "page" : "false");
+      row.setAttribute("aria-current", active ? "page" : "false");
     });
     renderList();
   }
@@ -790,8 +886,36 @@
   });
 
   document.getElementById("add-job").addEventListener("click", () => openForm(null));
+  if (driverFilterEl) {
+    driverFilterEl.addEventListener("change", function () {
+      driverFilter = driverFilterEl.value;
+      sessionStorage.setItem("spires_driver_hub_filter", driverFilter);
+      renderList();
+    });
+  }
+  window.addEventListener("offline", function () {
+    offline = true;
+    paintConnection();
+  });
+  window.addEventListener("online", function () {
+    offline = false;
+    paintConnection();
+  });
 
-  auth.onAuthStateChanged(async (user) => {
+  function bootPreview() {
+    const sample = Hub().previewBundle();
+    bookings = sample.bookings;
+    drivers = sample.drivers;
+    vehicles = sample.vehicles;
+    nowFn = function () { return sample.now; };
+    loaded = true;
+    showApp(true);
+    setView("upcoming");
+  }
+
+  if (preview) {
+    bootPreview();
+  } else auth.onAuthStateChanged(async (user) => {
     if (!user) {
       if (unsub) unsub();
       showApp(false);
@@ -805,6 +929,8 @@
       }
       showApp(true);
       listenBookings();
+      listenDirectory("drivers", function (rows) { drivers = rows; });
+      listenDirectory("vehicles", function (rows) { vehicles = rows; });
       preparePush();
     } catch {
       await auth.signOut();
@@ -858,13 +984,13 @@
     if (!pushAllow) return;
     if (iosPhone() && !standaloneApp()) {
       show(pushAllow, false);
-      setPushNote("On an iPhone, add Family jobs to the home screen first. Alerts can then arrive when the app is closed.");
+      setPushNote("On an iPhone, add Spires Driver Hub to the home screen first. Alerts can then arrive when the app is closed.");
       return;
     }
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (Notification.permission === "denied") {
       show(pushAllow, false);
-      setPushNote("Job alerts are blocked on this phone. Allow notifications for Spires Jobs in the phone settings.");
+      setPushNote("Job alerts are blocked on this phone. Allow notifications for Spires Driver Hub in the phone settings.");
       savePush({ subscription: null }).catch(function () { return undefined; });
       return;
     }
@@ -898,7 +1024,7 @@
     });
   }
 
-  if ("serviceWorker" in navigator) {
+  if (!preview && "serviceWorker" in navigator) {
     navigator.serviceWorker.register("/office-jobs-sw.js", { scope: "/office-jobs" }).catch(() => undefined);
   }
 })();

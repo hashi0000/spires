@@ -12,14 +12,14 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let payload = { title: "Family jobs", body: "Open Spires Jobs.", tag: "family-job", url: "/office-jobs" };
+  let payload = { title: "Spires Driver Hub", body: "Open Spires Driver Hub.", tag: "family-job", url: "/office-jobs" };
   try {
     if (event.data) payload = Object.assign(payload, event.data.json());
   } catch (error) {
-    payload.body = "Open Spires Jobs.";
+    payload.body = "Open Spires Driver Hub.";
   }
-  event.waitUntil(self.registration.showNotification(payload.title || "Family jobs", {
-    body: payload.body || "Open Spires Jobs.",
+  event.waitUntil(self.registration.showNotification(payload.title || "Spires Driver Hub", {
+    body: payload.body || "Open Spires Driver Hub.",
     icon: "/images/office-jobs-192.png",
     badge: "/images/office-jobs-192.png",
     tag: payload.tag || "family-job",
