@@ -13,6 +13,7 @@ export type SchoolInvoiceVault = {
   routes: SchoolContractRoute[];
   invoices: GeneratedSchoolInvoice[];
   seq: Record<string, number>;
+  revision: number;
 };
 
 const LOCAL_SUPPLIER = "spires_school_invoice_supplier";
@@ -50,15 +51,8 @@ function localLegacyVault(): SchoolInvoiceVault | null {
     routes: Array.isArray(routes) ? routes : [],
     invoices: Array.isArray(invoices) ? invoices : [],
     seq: seq && typeof seq === "object" ? seq : {},
+    revision: 0,
   };
-}
-
-function clearLocalLegacy(): void {
-  localStorage.removeItem(LOCAL_SUPPLIER);
-  localStorage.removeItem(LOCAL_ROUTES);
-  localStorage.removeItem(LOCAL_HISTORY);
-  localStorage.removeItem(LOCAL_SEQ);
-  localStorage.setItem(LOCAL_MIGRATED, "1");
 }
 
 function normaliseVault(raw: unknown): SchoolInvoiceVault {
@@ -72,6 +66,9 @@ function normaliseVault(raw: unknown): SchoolInvoiceVault {
     routes: Array.isArray(row.routes) ? row.routes : [],
     invoices: Array.isArray(row.invoices) ? row.invoices : [],
     seq: row.seq && typeof row.seq === "object" ? row.seq : {},
+    revision: Number.isInteger(Number((row as { revision?: unknown }).revision))
+      ? Number((row as { revision?: unknown }).revision)
+      : 0,
   };
 }
 
@@ -79,40 +76,59 @@ export async function loadSchoolInvoiceVault(): Promise<SchoolInvoiceVault> {
   try {
     const res = await getVault({});
     const data = res.data as { empty?: boolean; payload?: unknown };
-    let vault = normaliseVault(data?.payload);
+    const vault = normaliseVault(data?.payload);
+    if (!data?.empty) return vault;
     const legacy = localLegacyVault();
-    if (data?.empty && legacy) {
-      vault = {
-        supplier: { ...vault.supplier, ...legacy.supplier },
-        routes: legacy.routes.length ? legacy.routes : vault.routes,
-        invoices: legacy.invoices.length ? legacy.invoices : vault.invoices,
-        seq: { ...vault.seq, ...legacy.seq },
-      };
-      await persistSchoolInvoiceVault(vault);
-      clearLocalLegacy();
-    } else if (legacy) {
-      clearLocalLegacy();
-    }
-    return vault;
+    if (!legacy) return vault;
+    return {
+      supplier: { ...vault.supplier, ...legacy.supplier },
+      routes: legacy.routes.length ? legacy.routes : vault.routes,
+      invoices: legacy.invoices.length ? legacy.invoices : vault.invoices,
+      seq: { ...vault.seq, ...legacy.seq },
+      revision: 0,
+    };
   } catch (err) {
     throw new Error(getCallableErrorMessage(err));
   }
 }
 
-export async function persistSchoolInvoiceVault(vault: SchoolInvoiceVault): Promise<void> {
+export async function persistSchoolInvoiceVault(vault: SchoolInvoiceVault): Promise<{ revision: number; assigned: { id: string; invoiceNumber: string }[] }> {
   try {
-    await saveVaultFn({
+    const save = await saveVaultFn({
       payload: {
         version: 1,
         supplier: vault.supplier,
         routes: vault.routes,
-        invoices: vault.invoices.slice(0, 100),
+        invoices: vault.invoices,
         seq: vault.seq,
+        expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0,
       },
     });
+    const saved = save.data as { revision?: number; assigned?: { id: string; invoiceNumber: string }[] };
+    return {
+      revision: Number.isInteger(saved?.revision) ? Number(saved.revision) : (vault.revision ?? 0) + 1,
+      assigned: Array.isArray(saved?.assigned) ? saved.assigned : [],
+    };
   } catch (err) {
     throw new Error(getCallableErrorMessage(err));
   }
+}
+
+export function applyAssignedInvoiceNumbers<T extends { id: string; invoiceNumber: string; needsServerNumber?: boolean; numberPrefix?: string; numberPeriod?: string }>(
+  invoices: T[],
+  assigned: { id: string; invoiceNumber: string }[]
+): T[] {
+  if (!assigned.length) return invoices;
+  const byId = new Map(assigned.map((item) => [item.id, item.invoiceNumber]));
+  return invoices.map((row) => {
+    const invoiceNumber = byId.get(row.id);
+    if (!invoiceNumber) return row;
+    const copy = { ...row, invoiceNumber };
+    delete copy.needsServerNumber;
+    delete copy.numberPrefix;
+    delete copy.numberPeriod;
+    return copy;
+  });
 }
 
 export function allocateInvoiceNumber(

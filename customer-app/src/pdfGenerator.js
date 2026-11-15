@@ -109,7 +109,8 @@ export const generateBookingPDF = (
     : "#";
   const callLink = customerPhone ? `tel:${customerPhone}` : "#";
 
-  const documentTitle = getDocumentTitle(type);
+  const executivePending = booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted";
+  const documentTitle = executivePending ? "Booking request — not confirmed" : getDocumentTitle(type);
   const documentTitleUpper = documentTitle.toUpperCase();
   const stopListMarkup = (stops) => {
     if (!Array.isArray(stops) || stops.length < 3) return "";
@@ -650,6 +651,10 @@ export const generateBookingPDF = (
                             <span class="detail-value">${formatVehicleTypeLabel(booking.vehicleType)}${
                               vehicleClassExamples(booking.vehicleType)
                                 ? `<br><span style="font-size:0.82rem;color:#5c6570;font-weight:400;">${vehicleClassExamples(booking.vehicleType)}</span>`
+                                : ""
+                            }${
+                              booking.vehicleType === "executive"
+                                ? `<br><span style="font-size:0.82rem;color:#002147;font-weight:600;">${booking.executiveAvailability === "accepted" ? "Executive Car accepted." : "Executive Car request. Awaiting availability confirmation. This is not a confirmed booking."}</span>`
                                 : ""
                             }</span>
                         </div>

@@ -37,7 +37,39 @@
       capacity: "Up to 8 passengers",
       maxPassengers: 8,
     },
+    executive: {
+      id: "executive",
+      bookingValue: "executive",
+      name: "Executive Car",
+      examples: "Mercedes E Class or equivalent",
+      tableExamples: "Mercedes E Class or&nbsp;equivalent",
+      capacity: "Passengers and luggage confirmed before acceptance",
+      maxPassengers: null,
+    },
   };
+
+  /**
+   * Single public launch switch. Keep false until supplier availability,
+   * these rates, and partner terms for the existing airport inclusions are confirmed.
+   * Localhost can review the full implementation. Production hosts cannot.
+   */
+  var EXECUTIVE_SERVICE_ENABLED = false;
+
+  var EXECUTIVE_FARES = {
+    oxford: { oneWay: 150, return: 290 },
+    abingdon: { oneWay: 165, return: 320 },
+    didcot: { oneWay: 170, return: 330 },
+    bicester: { oneWay: 170, return: 330 },
+    witney: { oneWay: 170, return: 330 },
+  };
+
+  var EXECUTIVE_UNAVAILABLE = { oneWay: null, return: null, available: false };
+
+  function executivePrice(areaId) {
+    var fare = EXECUTIVE_FARES[areaId];
+    if (!fare) return EXECUTIVE_UNAVAILABLE;
+    return { oneWay: fare.oneWay, return: fare.return, available: true };
+  }
 
   var VEHICLE_DISCLAIMER =
     "Vehicle models are examples only and may vary depending on availability and booking requirements. Luggage capacity depends on passenger numbers. Please tell us about large or additional luggage when booking.";
@@ -85,6 +117,7 @@
         featured: true,
         standardCar: { oneWay: 92, return: 180 },
         vito: { oneWay: 120, return: 235 },
+        executive: executivePrice("oxford"),
       },
       gatwick: {
         id: "gatwick",
@@ -94,6 +127,7 @@
         published: true,
         standardCar: { oneWay: 140, return: 270 },
         vito: { oneWay: 175, return: 340 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       stansted: {
         id: "stansted",
@@ -103,6 +137,7 @@
         published: true,
         standardCar: { oneWay: 150, return: 290 },
         vito: { oneWay: 185, return: 360 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       luton: {
         id: "luton",
@@ -112,6 +147,7 @@
         published: true,
         standardCar: { oneWay: 105, return: 205 },
         vito: { oneWay: 130, return: 255 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       birmingham: {
         id: "birmingham",
@@ -121,6 +157,7 @@
         published: true,
         standardCar: { oneWay: 110, return: 215 },
         vito: { oneWay: 145, return: 280 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       londonCity: {
         id: "londonCity",
@@ -130,6 +167,7 @@
         published: true,
         standardCar: { oneWay: 150, return: 290 },
         vito: { oneWay: 190, return: 370 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       bristol: {
         id: "bristol",
@@ -139,6 +177,7 @@
         published: true,
         standardCar: { oneWay: 165, return: 320 },
         vito: { oneWay: 205, return: 400 },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
       eastMidlands: {
         id: "eastMidlands",
@@ -147,6 +186,7 @@
         published: false,
         standardCar: { oneWay: null, return: null },
         vito: { oneWay: null, return: null },
+        executive: EXECUTIVE_UNAVAILABLE,
       },
     },
   };
@@ -161,7 +201,7 @@
       name: "Abingdon",
       page: "/abingdon-airport-transfers#airport-fares",
       routes: {
-        heathrow: { name: "Heathrow", standardCar: { oneWay: 105, return: 205 }, vito: { oneWay: 138, return: 270 } },
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 105, return: 205 }, vito: { oneWay: 138, return: 270 }, executive: executivePrice("abingdon") },
         gatwick: { name: "Gatwick", standardCar: { oneWay: 150, return: 295 }, vito: { oneWay: 190, return: 375 } },
         stansted: { name: "Stansted", standardCar: { oneWay: 160, return: 315 }, vito: { oneWay: 195, return: 380 } },
         luton: { name: "Luton", standardCar: { oneWay: 115, return: 225 }, vito: { oneWay: 150, return: 290 } },
@@ -172,7 +212,7 @@
       name: "Didcot",
       page: "/didcot-airport-transfers#airport-fares",
       routes: {
-        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 216 }, vito: { oneWay: 140, return: 275 } },
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 216 }, vito: { oneWay: 140, return: 275 }, executive: executivePrice("didcot") },
         gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 310 }, vito: { oneWay: 205, return: 400 } },
         stansted: { name: "Stansted", standardCar: { oneWay: 175, return: 340 }, vito: { oneWay: 215, return: 420 } },
         luton: { name: "Luton", standardCar: { oneWay: 130, return: 255 }, vito: { oneWay: 160, return: 310 } },
@@ -183,7 +223,7 @@
       name: "Bicester",
       page: "/bicester-airport-transfers#airport-fares",
       routes: {
-        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 205 }, vito: { oneWay: 140, return: 275 } },
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 110, return: 205 }, vito: { oneWay: 140, return: 275 }, executive: executivePrice("bicester") },
         gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 290 }, vito: { oneWay: 200, return: 290 } },
         stansted: { name: "Stansted", standardCar: { oneWay: 165, return: 320 }, vito: { oneWay: 210, return: 410 } },
         luton: { name: "Luton", standardCar: { oneWay: 110, return: 215 }, vito: { oneWay: 142, return: 280 } },
@@ -194,7 +234,7 @@
       name: "Witney",
       page: "/witney-airport-transfers#airport-fares",
       routes: {
-        heathrow: { name: "Heathrow", standardCar: { oneWay: 108, return: 212 }, vito: { oneWay: 140, return: 275 } },
+        heathrow: { name: "Heathrow", standardCar: { oneWay: 108, return: 212 }, vito: { oneWay: 140, return: 275 }, executive: executivePrice("witney") },
         gatwick: { name: "Gatwick", standardCar: { oneWay: 160, return: 315 }, vito: { oneWay: 205, return: 395 } },
         stansted: { name: "Stansted", standardCar: { oneWay: 172, return: 334 }, vito: { oneWay: 210, return: 410 } },
         luton: { name: "Luton", standardCar: { oneWay: 125, return: 240 }, vito: { oneWay: 155, return: 300 } },
@@ -424,6 +464,7 @@
           published: true,
           standardCar: regionalRoute.standardCar,
           vito: regionalRoute.vito,
+          executive: regionalRoute.executive || EXECUTIVE_UNAVAILABLE,
         });
       }
     }
@@ -435,7 +476,31 @@
     return filtered;
   }
 
-  function fareHeadRow() {
+  function fareStatusHtml(label, text) {
+    return '<td data-label="' + label + '"><span class="fare-amount">' + text + "</span></td>";
+  }
+
+  function executiveReviewEnabled() {
+    if (EXECUTIVE_SERVICE_ENABLED) return true;
+    try {
+      if (typeof location === "undefined" || !location || !location.hostname) return false;
+      var host = String(location.hostname || "");
+      var local = host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "";
+      if (!local) return false;
+      if (typeof URLSearchParams !== "undefined" && new URLSearchParams(location.search).get("executive") === "0") return false;
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function showExecutiveColumns(options) {
+    if (options && options.executive === true) return true;
+    if (options && options.executive === false) return false;
+    return executiveReviewEnabled();
+  }
+
+  function fareHeadRow(showExecutive) {
     return (
       "<tr>" +
       '<th scope="col">Airport</th>' +
@@ -447,12 +512,31 @@
       VEHICLE_CLASSES.vito.tableExamples +
       "</span></th>" +
       '<th scope="col">8 Seater return</th>' +
+      (showExecutive
+        ? '<th scope="col">Executive Car one way<span class="th-sub">' +
+          VEHICLE_CLASSES.executive.tableExamples +
+          "</span></th>" +
+          '<th scope="col">Executive Car return</th>'
+        : "") +
       "</tr>"
     );
   }
 
-  function renderFareBlock(originId, onlyId) {
+  function executiveCells(route) {
+    var prices = route && route.executive;
+    if (!prices || prices.available === false || !isFiniteNumber(prices.oneWay)) {
+      return (
+        fareStatusHtml("Executive Car one way", "Not available") +
+        fareStatusHtml("Executive Car return", "Not available")
+      );
+    }
+    var labelled = labelledPrices(prices, "Executive Car one way", "Executive Car return");
+    return fareOneWayHtml(labelled) + fareReturnHtml(labelled);
+  }
+
+  function renderFareBlock(originId, onlyId, options) {
     var routes = routesForOrigin(originId, onlyId);
+    var showExecutive = showExecutiveColumns(options);
     var rows = [];
     for (var i = 0; i < routes.length; i++) {
       var route = routes[i];
@@ -469,10 +553,11 @@
           fareReturnHtml(standard) +
           fareOneWayHtml(eight) +
           fareReturnHtml(eight) +
+          (showExecutive ? executiveCells(route) : "") +
           "</tr>"
       );
     }
-    return { headRow: fareHeadRow(), rows: rows.join("") };
+    return { headRow: fareHeadRow(showExecutive), rows: rows.join(""), executive: showExecutive };
   }
 
   function fillFareTables() {
@@ -487,7 +572,135 @@
       var body = el.querySelector("[data-spires-fare-body]");
       if (head) head.innerHTML = rendered.headRow;
       if (body) body.innerHTML = rendered.rows;
+      var table = el.querySelector("table");
+      if (table) table.classList.toggle("airport-fare-table--executive", rendered.executive === true);
     }
+  }
+
+  var OTHER_AIRPORT = /\b(gatwick|stansted|luton|birmingham airport|bristol airport|london city(?: airport)?|east midlands|london oxford airport|lgw|stn|ltn|bhx|brs|lcy|ema)\b/i;
+  var HEATHROW = /\b(heathrow|lhr)\b/i;
+  var SPECIFIC_AREAS = [
+    { id: "abingdon", pattern: /\babingdon\b/i },
+    { id: "didcot", pattern: /\bdidcot\b/i },
+    { id: "bicester", pattern: /\bbicester\b/i },
+    { id: "witney", pattern: /\bwitney\b/i },
+  ];
+
+  function executiveJourneyText(journey) {
+    var parts = [];
+    function add(value) {
+      if (!value) return;
+      if (typeof value === "string") parts.push(value);
+      else if (value.address) parts.push(value.address);
+    }
+    add(journey && journey.pickup);
+    add(journey && journey.destination);
+    add(journey && journey.returnPickup);
+    add(journey && journey.returnDestination);
+    var stops = (journey && journey.stops) || [];
+    var returnStops = (journey && journey.returnStops) || [];
+    for (var i = 0; i < stops.length; i++) add(stops[i]);
+    for (var j = 0; j < returnStops.length; j++) add(returnStops[j]);
+    return parts.join("\n");
+  }
+
+  function classifyExecutiveJourney(journey) {
+    var text = executiveJourneyText(journey || {});
+    if (OTHER_AIRPORT.test(text) || !HEATHROW.test(text)) {
+      return { ok: false, error: "Executive Car is only available for Heathrow transfers." };
+    }
+    var specific = [];
+    for (var i = 0; i < SPECIFIC_AREAS.length; i++) {
+      if (SPECIFIC_AREAS[i].pattern.test(text)) specific.push(SPECIFIC_AREAS[i].id);
+    }
+    var area = specific.length === 1 ? specific[0] : specific.length === 0 && /\boxford\b/i.test(text) ? "oxford" : null;
+    if (!area) {
+      return { ok: true, airport: "heathrow", area: null, fareStatus: "quote_required", oneWay: null, returnFare: null };
+    }
+    var prices = EXECUTIVE_FARES[area];
+    return {
+      ok: true,
+      airport: "heathrow",
+      area: area,
+      fareStatus: "published",
+      oneWay: prices.oneWay,
+      returnFare: prices.return,
+    };
+  }
+
+  function executiveIconSvg() {
+    return (
+      '<svg class="executive-icon" viewBox="0 0 64 32" width="64" height="32" aria-hidden="true">' +
+      '<path d="M8 20h48M14 20l4-7h20l8 7" fill="none" stroke="#002147" stroke-width="1.6" stroke-linejoin="round"/>' +
+      '<circle cx="20" cy="22" r="3" fill="none" stroke="#b8956a" stroke-width="1.6"/>' +
+      '<circle cx="46" cy="22" r="3" fill="none" stroke="#b8956a" stroke-width="1.6"/>' +
+      "</svg>"
+    );
+  }
+
+  function syncExecutiveVisibility() {
+    var on = executiveReviewEnabled();
+    var blocks = document.querySelectorAll("[data-executive-block]");
+    for (var i = 0; i < blocks.length; i++) blocks[i].hidden = !on;
+    var held = document.querySelectorAll("[data-executive-held]");
+    for (var j = 0; j < held.length; j++) held[j].hidden = on;
+    if (!on) return;
+    var navLinks = document.querySelectorAll('a[data-nav="heathrow"]');
+    for (var n = 0; n < navLinks.length; n++) {
+      var item = navLinks[n].parentNode;
+      if (!item || !item.parentNode || item.parentNode.querySelector('a[data-nav="executive"]')) continue;
+      var li = document.createElement("li");
+      var anchor = document.createElement("a");
+      anchor.href = "/executive-heathrow-transfers";
+      anchor.setAttribute("data-nav", "executive");
+      if (navLinks[n].querySelector(".site-nav__name")) {
+        anchor.innerHTML = '<span class="site-nav__name">Executive Heathrow</span>';
+      } else {
+        anchor.textContent = "Executive Heathrow";
+      }
+      li.appendChild(anchor);
+      item.parentNode.insertBefore(li, item.nextSibling);
+    }
+  }
+
+  function mountExecutivePriceCard() {
+    if (!executiveReviewEnabled()) return;
+    var path = String(location.pathname || "").replace(/\.html$/, "").replace(/\/$/, "") || "/";
+    var area = null;
+    if (
+      path === "/oxford-to-heathrow-taxi" ||
+      path === "/heathrow-to-oxford-taxi" ||
+      path === "/heathrow-airport-taxis" ||
+      path === "/oxfordshire-to-heathrow-airport-transfers"
+    ) {
+      area = "oxford";
+    } else if (path === "/abingdon-airport-transfers") area = "abingdon";
+    else if (path === "/didcot-airport-transfers") area = "didcot";
+    else if (path === "/bicester-airport-transfers") area = "bicester";
+    else if (path === "/witney-airport-transfers") area = "witney";
+    var host = document.querySelector(".price-options");
+    if (!area || !host || host.querySelector("[data-executive-option]")) return;
+    var prices = area === "oxford" ? getRoute("heathrow").executive : REGIONAL[area].routes.heathrow.executive;
+    var article = document.createElement("article");
+    article.className = "price-option executive-card";
+    article.setAttribute("data-executive-option", area);
+    article.innerHTML =
+      executiveIconSvg() +
+      "<h3>Executive Car</h3>" +
+      '<p class="price-option__examples">Mercedes E Class or equivalent</p>' +
+      '<p class="price-option__amount"><span class="fare-amount">' +
+      formatMoney(prices.oneWay) +
+      '</span> <span class="price-option__unit">one way</span></p>' +
+      '<p class="price-option__amount price-option__amount--secondary"><span class="fare-amount">' +
+      formatMoney(prices.return) +
+      '</span> <span class="price-option__unit">return</span></p>' +
+      '<p class="price-save">Save ' +
+      formatMoney(prices.oneWay * 2 - prices.return) +
+      " on a return</p>" +
+      '<p class="price-option__meta">Per vehicle. Advance booking required.</p>' +
+      "<p>Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation. Tell us the passengers and luggage. Suitability is confirmed before acceptance.</p>" +
+      '<p><a href="/executive-heathrow-transfers">Executive Heathrow transfers</a></p>';
+    host.appendChild(article);
   }
 
   function fillCalculatedSavings() {
@@ -517,8 +730,15 @@
     fillSavingNote();
     fillIncludedList();
     fillOriginCopy();
+    syncExecutiveVisibility();
+    mountExecutivePriceCard();
+    document.dispatchEvent(new Event("spires-prices-ready"));
   }
 
+  window.SPIRES_EXECUTIVE_SERVICE_ENABLED = EXECUTIVE_SERVICE_ENABLED;
+  window.SPIRES_EXECUTIVE_FARES = EXECUTIVE_FARES;
+  window.SPIRES_executiveServiceEnabled = executiveReviewEnabled;
+  window.SPIRES_classifyExecutive = classifyExecutiveJourney;
   window.SPIRES_VEHICLE_CLASSES = VEHICLE_CLASSES;
   window.SPIRES_VEHICLE_DISCLAIMER = VEHICLE_DISCLAIMER;
   window.SPIRES_AIRPORT_PRICES = DATA;

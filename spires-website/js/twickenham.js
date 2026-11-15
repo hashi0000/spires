@@ -3,7 +3,9 @@
   var form = document.getElementById("twickenham-form");
   if (!form || !fixtures.length) return;
 
-  var endpoint = "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
+  var endpoint = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:5001/demo-spires/us-central1/submitWebsiteQuote"
+    : "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
   var officePhone = "07776 897772";
   var contactMessage = "Please provide a phone number or email address so we can respond to your request. You can also call us on " + officePhone + ".";
   var destination = "Allianz Stadium, Twickenham";

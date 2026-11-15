@@ -51,16 +51,51 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    function familyOperationalKeys() {
+      return [
+        'bookingNumber', 'dateTime', 'pickupTime', 'pickupLocation', 'destination',
+        'hirerName', 'hirerPhone', 'hirerAddress', 'bookingMethod', 'bookingType',
+        'vehicleType', 'status', 'flightNumber', 'notes', 'source',
+        'createdByEmail', 'createdByUid', 'updatedByEmail', 'updatedByUid',
+        'driverId', 'vehicleId', 'returnDriverId', 'returnVehicleId', 'allocatedTime', 'actualFare', 'cancelledAt', 'cancelledByEmail',
+        'cancelledByUid', 'customerStatus', 'createdAt', 'updatedAt', 'revision'
+      ];
+    }
+
     match /bookings/{bookingId} {
-      // Office emails and PIN-authorised family devices — shared live calendar
-      allow read, write: if isStaff() || isFamilyDevice();
+      // Office accounts keep the full booking record.
+      allow read: if isStaff() || isFamilyDevice();
+      allow create: if isStaff() && request.resource.data.revision == 1;
+      allow update: if isStaff()
+        && request.resource.data.revision == resource.data.get('revision', 0) + 1;
+      allow delete: if isStaff();
+
+      // Family phones can read the shared calendar and change the journey they operate.
+      // They cannot write payment ledger, ownership, quote, acceptance or audit fields.
+      allow create: if isFamilyDevice()
+        && request.resource.data.source == 'family'
+        && request.resource.data.revision == 1
+        && request.resource.data.keys().hasOnly(familyOperationalKeys());
+      allow update: if isFamilyDevice()
+        && request.resource.data.revision == resource.data.get('revision', 0) + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(familyOperationalKeys())
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['actualFare'])
+          || resource.data.source == 'family'
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['customerStatus'])
+          || (request.resource.data.status == 'cancelled' && request.resource.data.customerStatus == 'cancelled')
+        );
 
       // Customer app — own bookings only. Customers cannot set payment, quote or promotion fields.
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
       allow create: if isAuthenticated()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'pending'
-        && !request.resource.data.keys().hasAny(['createdByFunction', 'promotion', 'issuedQuote', 'quoteIssuedVersion', 'quoteAcceptedVersion', 'paymentLinkUrl', 'amountReceivedPence', 'termsAcceptanceRecordedAt', 'termsAcceptanceRecordedBy', 'termsAcceptanceNote', 'brand', 'fareApproved', 'internationalFarePence'])
+        && !request.resource.data.keys().hasAny(['createdByFunction', 'promotion', 'issuedQuote', 'quoteIssuedVersion', 'quoteAcceptedVersion', 'paymentLinkUrl', 'amountReceivedPence', 'termsAcceptanceRecordedAt', 'termsAcceptanceRecordedBy', 'termsAcceptanceNote', 'brand', 'fareApproved', 'internationalFarePence', 'executiveAvailability', 'proposedFarePounds'])
+        && (!('vehicleType' in request.resource.data) || request.resource.data.vehicleType != 'executive')
+        && (!('serviceType' in request.resource.data) || request.resource.data.serviceType != 'executive')
         && request.resource.data.termsAccepted == true
         && request.resource.data.termsVersion == '2026-10-25'
         && request.resource.data.acceptanceMethod == 'customer_portal'
@@ -70,13 +105,16 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid
         && resource.data.status == 'pending'
         && request.resource.data.uid == resource.data.uid
+        && (!('vehicleType' in request.resource.data) || request.resource.data.vehicleType != 'executive' || resource.data.vehicleType == 'executive')
+        && (!('serviceType' in request.resource.data) || request.resource.data.serviceType != 'executive' || resource.data.serviceType == 'executive')
+        && request.resource.data.revision == resource.data.get('revision', 0) + 1
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'phone', 'pickup', 'destination', 'dateTime', 'passengers', 'luggage',
           'specialRequirements', 'notes', 'flightNumber', 'terminal', 'vehicleType',
           'bookingType', 'returnTrip', 'returnDateTime', 'returnPickupTime',
           'returnPickupLocation', 'returnDestination', 'airportCollection',
           'returnAirportCollection', 'returnFlightNumber', 'paymentMethod', 'updatedAt',
-          'name', 'email'
+          'name', 'email', 'revision'
         ]);
       allow delete: if false;
 
@@ -98,12 +136,12 @@ service cloud.firestore {
     }
 
     match /drivers/{driverId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || isFamilyDevice();
       allow write: if isAdmin();
     }
 
     match /vehicles/{vehicleId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || isFamilyDevice();
       allow write: if isAdmin();
     }
 
@@ -165,6 +203,10 @@ service cloud.firestore {
     match /marketingConversions/{conversionId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    match /stripePaymentClaims/{paymentIntentId} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

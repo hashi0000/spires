@@ -237,7 +237,8 @@ async function book(db, opts) {
         const shareHtml = node_fs_1.default.readFileSync(node_path_1.default.join(websiteRoot, "share.html"), "utf8");
         const robots = node_fs_1.default.readFileSync(node_path_1.default.join(websiteRoot, "robots.txt"), "utf8");
         strict_1.default.doesNotMatch(generator, /locPath === '\/share'/);
-        strict_1.default.match(generator, /path\.join\(root, 'share'\)/);
+        strict_1.default.match(generator, /function listPublicHtml/);
+        strict_1.default.doesNotMatch(generator, /SKIP_FILES[\s\S]*share\.html/);
         strict_1.default.match(shareHtml, /<meta name="robots" content="index, follow">/);
         strict_1.default.match(shareHtml, /rel="canonical" href="https:\/\/www\.spires-taxis\.com\/share"/);
         strict_1.default.doesNotMatch(shareHtml, /noindex/);

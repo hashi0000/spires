@@ -260,15 +260,12 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
           {selectedIds.length >= 2 && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openMergeModal}>
               <GitMerge className="h-4 w-4" style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
-              Merge {selectedIds.length} profiles…
+              Maintenance: merge {selectedIds.length} profiles…
             </button>
           )}
         </div>
         <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: '#4b5563' }}>
-          Profiles come from <strong>bookings</strong> (uid → email → phone). <strong>Click column headers</strong> to
-          sort (source order: App → Email → Phone → One-off). Filter by source, then tick rows to{' '}
-          <strong>Merge</strong> when the same person split across rows. Open a row to edit contacts for the whole group
-          or edit a single booking in the full editor.
+          Profiles come from bookings, matched by account, then email, then phone. A shared name is not enough to merge anyone. Tick rows only when you have checked they are the same person, then use Maintenance: merge profiles. Open a row to edit contacts or a single booking.
         </p>
 
         {pendingAppBookings.length > 0 && (

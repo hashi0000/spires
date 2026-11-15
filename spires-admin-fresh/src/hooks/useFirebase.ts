@@ -215,6 +215,7 @@ export const useVehicles = () => {
 export const useBookings = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState("");
 
   useEffect(() => {
     return subscribeWhenAuthenticated(
@@ -233,16 +234,21 @@ export const useBookings = () => {
               return normalizeBooking(data);
             }) as Booking[];
             setBookings(bookingsData);
+            setBookingsError("");
             setLoading(false);
           },
           (error) => {
-            console.error('Error fetching bookings:', error);
+            const denied = error?.code === "permission-denied" || error?.code === "unauthenticated";
+            setBookingsError(denied
+              ? "The booking list was refused. This is not an empty list."
+              : "The booking list could not be loaded. The last list is still on screen.");
             setLoading(false);
           }
         );
       },
       () => {
         setBookings([]);
+        setBookingsError("");
         setLoading(false);
       }
     );
@@ -308,6 +314,7 @@ export const useBookings = () => {
 
   return {
     bookings,
+    bookingsError,
     loading,
     addBooking,
     updateBooking,

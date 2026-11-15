@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const crypto_1 = require("crypto");
 const invoiceVault_1 = require("./quotes/invoiceVault");
 const VAULT_COLLECTION = "schoolInvoiceVault";
@@ -97,7 +98,7 @@ function decryptJson(ivB64, tagB64, dataB64) {
     return parsed;
 }
 function emptyPayload() {
-    return { version: 1, supplier: null, routes: [], invoices: [], seq: {} };
+    return { version: 1, supplier: null, routes: [], invoices: [], seq: {}, revision: 0 };
 }
 exports.getSchoolInvoiceVault = functions
     .runWith({ secrets: ["SCHOOL_INVOICE_ENCRYPTION_KEY"] })
@@ -130,39 +131,51 @@ exports.saveSchoolInvoiceVault = functions
         throw new functions.https.HttpsError("invalid-argument", "payload is required.");
     }
     const docRef = admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data));
-    const previous = await docRef.get();
-    let existingInvoices = [];
-    if (previous.exists) {
-        const row = previous.data() || {};
-        if (row.data && row.iv && row.tag) {
-            try {
-                existingInvoices = decryptJson(String(row.iv), String(row.tag), String(row.data)).invoices;
-            }
-            catch (err) {
-                if (err instanceof functions.https.HttpsError)
-                    throw err;
-                throw new functions.https.HttpsError("failed-precondition", "Could not read the existing invoice vault, so the paid status was not overwritten.");
+    const revision = await admin.firestore().runTransaction(async (tx) => {
+        const previous = await tx.get(docRef);
+        let existingPayload = null;
+        if (previous.exists) {
+            const row = previous.data() || {};
+            if (row.data && row.iv && row.tag) {
+                try {
+                    const decrypted = decryptJson(String(row.iv), String(row.tag), String(row.data));
+                    existingPayload = {
+                        invoices: Array.isArray(decrypted.invoices) ? decrypted.invoices : [],
+                        seq: decrypted.seq,
+                        revision: decrypted.revision,
+                    };
+                }
+                catch (err) {
+                    if (err instanceof functions.https.HttpsError)
+                        throw err;
+                    throw new functions.https.HttpsError("failed-precondition", "Could not read the existing invoice vault, so the paid status was not overwritten.");
+                }
             }
         }
-    }
-    const incomingInvoices = Array.isArray(incoming.invoices) ? incoming.invoices : [];
-    const payload = {
-        version: 1,
-        supplier: incoming.supplier ?? null,
-        routes: Array.isArray(incoming.routes) ? incoming.routes : [],
-        invoices: (0, invoiceVault_1.mergeInvoiceRecords)(existingInvoices, incomingInvoices).slice(0, 100),
-        seq: incoming.seq && typeof incoming.seq === "object" ? incoming.seq : {},
-    };
-    const sealed = encryptJson(payload);
-    await docRef.set({
-        alg: ALG,
-        v: 1,
-        iv: sealed.iv,
-        tag: sealed.tag,
-        data: sealed.data,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedBy: context.auth.uid,
-        updatedByEmail: context.auth.token.email || "",
+        const planned = (0, invoiceVault_1.planInvoiceSave)(existingPayload, incoming);
+        if (!planned.ok) {
+            throw new functions.https.HttpsError("aborted", planned.reason);
+        }
+        const payload = {
+            version: 1,
+            revision: planned.revision,
+            supplier: planned.supplier,
+            routes: planned.routes,
+            invoices: planned.invoices,
+            seq: planned.seq,
+        };
+        const sealed = encryptJson(payload);
+        tx.set(docRef, {
+            alg: ALG,
+            v: 1,
+            iv: sealed.iv,
+            tag: sealed.tag,
+            data: sealed.data,
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            updatedBy: context.auth.uid,
+            updatedByEmail: context.auth.token.email || "",
+        });
+        return { revision: planned.revision, assigned: planned.assigned };
     });
-    return { ok: true };
+    return { ok: true, revision: revision.revision, assigned: revision.assigned };
 });

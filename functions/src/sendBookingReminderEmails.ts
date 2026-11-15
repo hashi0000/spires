@@ -11,6 +11,7 @@ import {
   type DriverResolve,
 } from "./driverReminderEmail";
 import { returnReminderTarget } from "./bookings/journeyLegs";
+import { mergeBookingFields } from "./bookings/revisionWrite";
 
 const ACTIVE_STATUSES = new Set(["pending", "confirmed", "allocated"]);
 
@@ -108,7 +109,7 @@ export async function processBookingReminders(logger: typeof functions.logger): 
         stops: trip.stops,
         returnSummary: trip.returnSummary,
       });
-      await doc.ref.update({
+      await mergeBookingFields(doc.ref, {
         "reminderEmails.adminNoDriverWarningSentAt": new Date().toISOString(),
       });
       warningsSent++;
@@ -155,7 +156,7 @@ export async function processBookingReminders(logger: typeof functions.logger): 
     if (inDayWindow && !reminderFlagExists(re.driverDayBeforeSentAt)) {
       try {
         await sendAdminDriverReminderEmail(driver, trip);
-        await doc.ref.update({
+        await mergeBookingFields(doc.ref, {
           "reminderEmails.driverDayBeforeSentAt": new Date().toISOString(),
         });
         daySent++;
@@ -169,7 +170,7 @@ export async function processBookingReminders(logger: typeof functions.logger): 
     if (inHourWindow && !reminderFlagExists(re.driverHourBeforeSentAt)) {
       try {
         await sendAdminDriverReminderEmail(driver, trip);
-        await doc.ref.update({
+        await mergeBookingFields(doc.ref, {
           "reminderEmails.driverHourBeforeSentAt": new Date().toISOString(),
         });
         hourSent++;
@@ -255,7 +256,7 @@ async function processReturnReminders(
         stops: trip.stops,
         returnSummary: trip.returnSummary,
       });
-      await doc.ref.update({ "reminderEmails.returnNoDriverWarningSentAt": new Date().toISOString() });
+      await mergeBookingFields(doc.ref, { "reminderEmails.returnNoDriverWarningSentAt": new Date().toISOString() });
       warningsSent++;
       logger.info(`Return has no confirmed driver for ${data.bookingNumber || doc.id}`);
     };
@@ -282,7 +283,7 @@ async function processReturnReminders(
     if (inDayWindow && !reminderFlagExists(re.returnDriverDayBeforeSentAt)) {
       try {
         await sendAdminDriverReminderEmail(resolved.driver, trip);
-        await doc.ref.update({ "reminderEmails.returnDriverDayBeforeSentAt": new Date().toISOString() });
+        await mergeBookingFields(doc.ref, { "reminderEmails.returnDriverDayBeforeSentAt": new Date().toISOString() });
         daySent++;
       } catch (err) {
         logger.error(`Failed return 24h reminder for ${doc.id}`, err);
@@ -292,7 +293,7 @@ async function processReturnReminders(
     if (inHourWindow && !reminderFlagExists(re.returnDriverHourBeforeSentAt)) {
       try {
         await sendAdminDriverReminderEmail(resolved.driver, trip);
-        await doc.ref.update({ "reminderEmails.returnDriverHourBeforeSentAt": new Date().toISOString() });
+        await mergeBookingFields(doc.ref, { "reminderEmails.returnDriverHourBeforeSentAt": new Date().toISOString() });
         hourSent++;
       } catch (err) {
         logger.error(`Failed return 1h reminder for ${doc.id}`, err);

@@ -3,7 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
-import { formatVehicleTypeLabel } from '../utils/vehicleTypes';
+import { executiveAwaitingAvailability, formatVehicleTypeLabel } from '../utils/vehicleTypes';
 import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMapper';
 import { brandOf } from '../utils/brand';
 import { db, functions } from '../utils/firebase';
@@ -14,10 +14,12 @@ import { londonExportDate, londonExportTime } from '../utils/bookingDates';
 import { buildAnalysisCsv, type AnalysisBooking } from '../utils/analysisExport';
 import { buildAccountingSummary } from '../utils/accountingSummary';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
+import { bookingTotalLabel, extraStopsNeedAgreement, legacyPaidWithoutAmount } from '../utils/bookingOps';
 import { generateBookingConfirmationPdfBlob } from '../utils/pdfGenerator';
 import { blobToRawBase64 } from '../utils/blobToBase64';
 import { getCallableErrorMessage } from '../utils/callableErrorMessage';
 import JourneyStatsCard from './JourneyStatsCard';
+import { QuickBookingActions } from './QuickBookingActions';
 
 type QuickView = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'past' | 'unassigned' | 'awaiting_payment';
 const FILTER_KEY = 'spires_admin_booking_filters';
@@ -114,12 +116,9 @@ const Bookings: React.FC<BookingsProps> = ({
   const [bulkDriver, setBulkDriver] = useState('');
   const [bulkVehicle, setBulkVehicle] = useState('');
   const [bulkStatus, setBulkStatus] = useState<BulkJobChanges['status']>('');
-  const [bulkPayment, setBulkPayment] = useState<BulkJobChanges['payment']>('');
   const [bulkNote, setBulkNote] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState('');
-  const [paymentSavingId, setPaymentSavingId] = useState<string | null>(null);
-  const [paymentMessage, setPaymentMessage] = useState('');
 
   useEffect(() => {
     const node = listRef.current;
@@ -266,7 +265,7 @@ const Bookings: React.FC<BookingsProps> = ({
   }, [sortedBookings, quickView]);
 
   const accountingSummary = useMemo(
-    () => buildAccountingSummary(filteredBookings, drivers),
+    () => buildAccountingSummary(filteredBookings, drivers.flatMap((driver) => driver.id ? [{ id: driver.id, name: driver.name }] : [])),
     [filteredBookings, drivers]
   );
 
@@ -530,8 +529,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
 
   const applyBulkEdit = async () => {
     if (bulkSaving || selectedBookings.length === 0) return;
-    const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, payment: bulkPayment, note: bulkNote };
-    const updates: { id: string; patch: Extract<ReturnType<typeof planBulkJobUpdate>, { ok: true }>['patch'] }[] = [];
+    const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, note: bulkNote };
+    const updates: { id: string; revision?: number; patch: Extract<ReturnType<typeof planBulkJobUpdate>, { ok: true }>['patch'] }[] = [];
     const skipped: string[] = [];
     selectedBookings.forEach((booking) => {
       const plan = planBulkJobUpdate(booking, changes, new Date().toISOString());
@@ -539,7 +538,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         skipped.push(`${booking.bookingNumber}: ${plan.reason}`);
         return;
       }
-      if (booking.id) updates.push({ id: booking.id, patch: plan.patch });
+      if (booking.id) updates.push({ id: booking.id, revision: Number((booking as { revision?: number }).revision || 0), patch: plan.patch });
     });
     setBulkSaving(true);
     try {
@@ -550,7 +549,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         setBulkDriver('');
         setBulkVehicle('');
         setBulkStatus('');
-        setBulkPayment('');
         setBulkNote('');
       }
       const updatedText = updates.length === 1 ? 'Updated 1 job.' : `Updated ${updates.length} jobs.`;
@@ -562,21 +560,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
       setBulkMessage('Could not save the selected jobs. Check the connection and try again.');
     } finally {
       setBulkSaving(false);
-    }
-  };
-
-  const changePaymentStatus = async (booking: Booking, paymentStatus: 'pending' | 'partial' | 'paid' | 'refunded') => {
-    const current = booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending';
-    if (!booking.id || paymentSavingId || paymentStatus === current) return;
-    const label = paymentStatus === 'paid' ? 'Paid' : paymentStatus === 'partial' ? 'Part paid' : paymentStatus === 'refunded' ? 'Refunded' : 'Unpaid';
-    setPaymentSavingId(booking.id);
-    try {
-      await applyBulkJobUpdates(db, [{ id: booking.id, patch: { paymentStatus } }]);
-      setPaymentMessage(`${booking.bookingNumber} payment is now ${label}. The amount already received is unchanged.`);
-    } catch {
-      setPaymentMessage(`Could not update payment for ${booking.bookingNumber}. Try again.`);
-    } finally {
-      setPaymentSavingId(null);
     }
   };
 
@@ -660,7 +643,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Select Month</label><input type="month" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setDateFrom(''); setDateTo(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Date From</label><input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setSelectedMonth(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Date To</label><input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setSelectedMonth(''); }} className="w-full px-3 py-2 border border-gray-300 rounded-md" /></div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Status</option><option value="pending">Pending</option><option value="awaiting_customer_confirmation">Awaiting customer confirmation</option><option value="confirmed">Confirmed</option><option value="allocated">Allocated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div>
+            <div><label className="block text-sm font-medium text-gray-700 mb-1">Status</label><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Status</option><option value="pending">Pending</option><option value="awaiting_customer_confirmation">Awaiting customer confirmation</option><option value="confirmed">Confirmed</option><option value="allocated">Allocated</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="needs_review">Needs review</option></select></div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label><select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="all">All Payments</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="partial">Partial</option></select></div>
             <div className="col-span-full md:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Booking source</label>
@@ -685,8 +668,8 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           </div>
         </div>
         )}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200" style={{ marginTop: '1.5rem' }}>
-        <div className="flex items-center mb-4"><DollarSign className="h-6 w-6 text-green-600 mr-2" /><h3 className="text-lg font-semibold text-gray-900">Accounting Summary</h3><span className="ml-auto text-sm text-gray-600">{filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}{selectedMonth && ` in ${new Date(selectedMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`}</span></div>
+        <details className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200" style={{ marginTop: '1.5rem' }}>
+        <summary className="flex items-center cursor-pointer"><DollarSign className="h-6 w-6 text-green-600 mr-2" /><h3 className="text-lg font-semibold text-gray-900">Accounting summary</h3><span className="ml-auto text-sm text-gray-600">{filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''}{selectedMonth && ` in ${new Date(selectedMonth).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`}</span></summary>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Quoted fares on completed jobs</p><p className="text-2xl font-bold text-green-600">{gbp(accountingSummary.totalRevenue)}</p>{accountingSummary.faresMissing > 0 && accountingSummary.totalRevenue !== null ? <p className="text-xs text-gray-500 mt-1">{missingCount(accountingSummary.faresMissing, "no quoted fare")}</p> : null}</div>
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm text-gray-600">Recorded expenses</p><p className="text-2xl font-bold text-red-600">{gbp(accountingSummary.totalExpenses)}</p>{accountingSummary.expensesMissing > 0 && accountingSummary.totalExpenses !== null ? <p className="text-xs text-gray-500 mt-1">{missingCount(accountingSummary.expensesMissing, "no recorded expenses")}</p> : null}</div>
@@ -695,10 +678,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Payment Status</p><div className="space-y-2"><div className="flex justify-between"><span className="text-sm text-gray-600">Recorded payment ({accountingSummary.recordedCount})</span><span className="text-sm font-semibold text-green-600">{gbp(accountingSummary.paidAmount)}</span></div><div className="flex justify-between"><span className="text-sm text-gray-600">Payment not recorded ({accountingSummary.unrecordedCount})</span><span className="text-sm font-semibold text-red-600">Unknown</span></div></div></div>
-          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Revenue by Driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">{gbp(dr.revenue)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}{accountingSummary.driverRevenue.some((dr) => dr.knownFares < dr.bookings) ? <p className="text-xs text-gray-500 mt-2">Jobs with no quoted fare are left out of the driver amounts.</p> : null}</div></div>
+          <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Quoted fare by driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">{gbp(dr.revenue)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}{accountingSummary.driverRevenue.some((dr) => dr.knownFares < dr.bookings) ? <p className="text-xs text-gray-500 mt-2">Jobs with no quoted fare are left out of the driver amounts.</p> : null}</div></div>
         </div>
-      </div>
-      </div>
+      </details>
       <div className="card booking-list-card" style={{ marginTop: '1.5rem' }} ref={listRef}>
         {selectedBookings.length > 0 && (
           <section className="bulk-edit" aria-label="Edit selected jobs">
@@ -721,16 +703,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 </select>
               </label>
               <label>
-                Payment status
-                <select className="form-input" value={bulkPayment} onChange={(event) => setBulkPayment(event.target.value as BulkJobChanges['payment'])} disabled={bulkSaving}>
-                  <option value="">Leave unchanged</option>
-                  <option value="pending">Unpaid</option>
-                  <option value="partial">Part paid</option>
-                  <option value="paid">Paid</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-              </label>
-              <label>
                 Job status
                 <select className="form-input" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as BulkJobChanges['status'])} disabled={bulkSaving}>
                   <option value="">Leave unchanged</option>
@@ -747,10 +719,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 <textarea className="form-input" rows={2} value={bulkNote} onChange={(event) => setBulkNote(event.target.value)} disabled={bulkSaving} />
               </label>
             </div>
-            <p className="bulk-edit-note">The fare and customer details stay on each job. Changing the payment status does not change the amount already received.</p>
+            <p className="bulk-edit-note">The fare, payment record and customer details stay on each job. Record a payment from the booking.</p>
             {bulkMessage ? <p className="bulk-edit-result" role="status">{bulkMessage}</p> : null}
             <div className="bulk-edit-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkPayment && !bulkNote.trim())}>
+              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
                 {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => { setSelectedIds([]); setBulkMessage(''); }} disabled={bulkSaving}>Clear selection</button>
@@ -775,7 +747,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           </div>
 ) : (
           <>
-            {paymentMessage ? <p className="booking-payment-result" role="status">{paymentMessage}</p> : null}
             {!compactList ? (
             <div className="booking-table-wrap">
               <table className="booking-table">
@@ -797,7 +768,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                   </tr>
                 </thead>
                 <tbody>
-                  {shownRows.map(({ booking, leg }) => {
+                  {shownRows.map(({ booking, leg }, rowIndex) => {
                     const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                     const ext = booking as ExtendedBooking;
                     const receivedPence = Number(booking.amountReceivedPence || 0);
@@ -819,6 +790,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const badgeLabel = shownStatus === 'needs_review' ? 'Needs review' : workflowStatusLabel(shownStatus);
                     const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);
                     const driverLabel = driver?.name || (leg?.leg === 'return' ? 'Driver not confirmed' : 'Unassigned');
+                    const fareAlreadyShown = shownRows.slice(0, rowIndex).some((row) => (row.booking.id || row.booking.bookingNumber) === (booking.id || booking.bookingNumber));
+                    const fareText = fareAlreadyShown ? 'Included in the booking total' : bookingTotalLabel(booking.actualFare);
+                    const stopsNeedFare = extraStopsNeedAgreement(hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)), (ext as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare === true);
+                    const unreconciled = legacyPaidWithoutAmount(booking.paymentStatus, booking.amountReceivedPence);
                     return (
                       <tr key={rowKey} className={unassigned ? 'is-unassigned' : undefined}>
                         <td>
@@ -835,11 +810,11 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                           <button type="button" className="booking-route-toggle" aria-expanded={routeOpen} onClick={() => setOpenRouteId(routeOpen ? null : rowKey)}>
                             {routeOpen ? 'Hide full address' : 'Full address'}
                           </button>
-                          {leg?.leg !== 'return' && hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p className="booking-legs">{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
+                          {leg?.leg !== 'return' && extraStopsNeedAgreement(hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)), (ext as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare === true) ? <p className="booking-legs">{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
                           {leg?.leg === 'return' ? (
                             <div className="booking-legs">
                               {leg.needsReview ? <p>Needs review. The return was not marked completed.</p> : null}
-                              <p>The fare is for the whole booking.</p>
+                              <p>Included in the booking total.</p>
                             </div>
                           ) : null}
                           {!leg && returnJourney ? (
@@ -848,22 +823,21 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                               <p>{booking.pickupLocation} → {booking.destination}</p>
                               <p><span>Return</span> {ext.openReturn ? openReturnSummary(ext) : londonWhen(ext.returnPickupTime)}</p>
                               <p>{ext.returnPickupLocation || 'Pickup not recorded'} → {ext.returnDestination || 'Destination not recorded'}</p>
-                              {hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
-                              <p>The fare is for the whole booking.</p>
+                              {extraStopsNeedAgreement(hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)), (ext as { returnExtraStopsIncludedInFare?: boolean }).returnExtraStopsIncludedInFare === true) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
+                              <p>Included in the booking total.</p>
                             </div>
                           ) : null}
                         </td>
-                        <td>{formatVehicleTypeLabel(ext.vehicleType)}{ext.passengers ? ` · ${ext.passengers}` : ''}</td>
-                        <td>{booking.actualFare != null ? `£${Number(booking.actualFare).toFixed(2)}` : 'Not set'}{hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <div className="booking-failed">Extra stops. Agree the fare.</div> : null}</td>
+                        <td>{formatVehicleTypeLabel(ext.vehicleType)}{ext.passengers ? ` · ${ext.passengers}` : ''}{executiveAwaitingAvailability(ext) ? <div className="booking-failed">Executive request — awaiting availability</div> : ext.vehicleType === 'executive' ? <div className="booking-ref">Executive accepted</div> : null}</td>
+                        <td className="booking-money">{fareText}{stopsNeedFare ? <div className="booking-failed">Extra stops. Agree the fare.</div> : null}</td>
                         <td><span className={`badge ${badgeClass}`}>{badgeLabel}</span></td>
                         <td>
                           <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
-                          <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
-                            <option value="pending">Unpaid</option>
-                            <option value="partial">Part paid</option>
-                            <option value="paid">Paid</option>
-                            <option value="refunded">Refunded</option>
-                          </select>
+                          {unreconciled ? <p className="booking-failed">Paid flag, amount not recorded.</p> : null}
+                          <details className="booking-more-actions">
+                            <summary className="btn btn-secondary btn-sm">Allocate or record payment</summary>
+                            <QuickBookingActions booking={booking} leg={leg?.leg || 'booking'} drivers={drivers} vehicles={vehicles} bookings={bookings} />
+                          </details>
                           {receivedPence > 0 && balancePence > 0 ? <div className="booking-balance">Received £{(receivedPence / 100).toFixed(2)} · Remaining £{(balancePence / 100).toFixed(2)}</div> : null}
                           {booking.quoteEmailStatus === 'failed' ? <p role="status" className="booking-failed">Quote email failed. Open booking to retry.</p> : null}
                         </td>
@@ -892,7 +866,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
             </div>
             ) : (
             <div className="booking-mobile-list">
-              {shownRows.map(({ booking, leg }) => {
+              {shownRows.map(({ booking, leg }, rowIndex) => {
                 const ext = booking as ExtendedBooking;
                 const workflow = effectiveWorkflowStatus(booking);
                 const shownStatus = leg?.needsReview ? 'needs_review' : (leg?.status || workflow);
@@ -928,14 +902,13 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                       <p>{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</p>
                       {leg?.needsReview ? <p>Needs review. The return was not marked completed.</p> : null}
                       {leg?.leg !== 'return' && hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) ? <p>{describeStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination))}. Extra stops. Agree the fare.</p> : null}
-                      {leg?.leg === 'return' || (!leg && returnJourney) ? <p>{leg?.leg === 'return' ? `${routeFrom} → ${routeTo}.` : ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} The fare is for the whole booking.</p> : null}
-                      {hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)) ? <p>{describeStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination))}. Extra stops. Agree the fare.</p> : null}
-                      <select className="booking-payment-select" aria-label={`Payment status for ${booking.bookingNumber}`} value={booking.paymentStatus === 'paid' || booking.paymentStatus === 'partial' || booking.paymentStatus === 'refunded' ? booking.paymentStatus : 'pending'} disabled={paymentSavingId === booking.id} onChange={(event) => void changePaymentStatus(booking, event.target.value as 'pending' | 'partial' | 'paid' | 'refunded')}>
-                        <option value="pending">Unpaid</option>
-                        <option value="partial">Part paid</option>
-                        <option value="paid">Paid</option>
-                        <option value="refunded">Refunded</option>
-                      </select>
+                      {leg?.leg === 'return' || (!leg && returnJourney) ? <p>{leg?.leg === 'return' ? `${routeFrom} → ${routeTo}.` : ext.openReturn ? openReturnSummary(ext) : `Return ${londonWhen(ext.returnPickupTime)}. ${ext.returnPickupLocation} → ${ext.returnDestination}.`} Included in the booking total.</p> : null}
+                      <p>{shownRows.slice(0, rowIndex).some((row) => (row.booking.id || row.booking.bookingNumber) === (booking.id || booking.bookingNumber)) ? 'Included in the booking total' : bookingTotalLabel(booking.actualFare)}</p>
+                      {legacyPaidWithoutAmount(booking.paymentStatus, booking.amountReceivedPence) ? <p>Paid flag, amount not recorded.</p> : null}
+                      <details className="booking-more-actions">
+                        <summary className="btn btn-secondary btn-sm">Allocate or record payment</summary>
+                        <QuickBookingActions booking={booking} leg={leg?.leg || 'booking'} drivers={drivers} vehicles={vehicles} bookings={bookings} />
+                      </details>
                       <button type="button" onClick={() => openBooking(booking)} className="btn btn-primary btn-sm">{nextAction}</button>
                       <details className="booking-more-actions">
                         <summary className="btn btn-secondary btn-sm">More actions</summary>
@@ -958,6 +931,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           </>
         )}
       </div>
+    </div>
     </div>
   );
 };

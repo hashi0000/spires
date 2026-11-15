@@ -1,12 +1,25 @@
 (function () {
-  const firebaseConfig = {
-    apiKey: "AIzaSyAJIrqyzPbl72e_4aGyCe2cXX1lX949T-4",
-    authDomain: "spires-taxis.firebaseapp.com",
-    projectId: "spires-taxis",
-    storageBucket: "spires-taxis.firebasestorage.app",
-    messagingSenderId: "12158743704",
-    appId: "1:12158743704:web:402ace8b3430906bf28ced",
-  };
+  const localPage = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+  const firebaseConfig = localPage
+    ? {
+        apiKey: "demo-key",
+        authDomain: "localhost",
+        projectId: "demo-spires",
+        storageBucket: "demo-spires.appspot.com",
+        messagingSenderId: "000000000000",
+        appId: "1:000000000000:web:local",
+      }
+    : {
+        apiKey: "AIzaSyAJIrqyzPbl72e_4aGyCe2cXX1lX949T-4",
+        authDomain: "spires-taxis.firebaseapp.com",
+        projectId: "spires-taxis",
+        storageBucket: "spires-taxis.firebasestorage.app",
+        messagingSenderId: "12158743704",
+        appId: "1:12158743704:web:402ace8b3430906bf28ced",
+      };
+  if (localPage && firebaseConfig.projectId.indexOf("spires-taxis") !== -1) {
+    throw new Error("Test mode refused to start because it would use the live Firebase project.");
+  }
   const DRAFT_KEY = "spires_office_jobs_draft";
   const VEHICLES = [
     { value: "standard", label: "Standard car" },
@@ -17,6 +30,11 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
+  if (localPage) {
+    auth.useEmulator("http://127.0.0.1:9099");
+    db.useEmulator("127.0.0.1", 8080);
+    firebase.app().functions("us-central1").useEmulator("127.0.0.1", 5001);
+  }
   const unlock = firebase.app().functions("us-central1").httpsCallable("unlockFamilyJobs");
   const pushKey = firebase.app().functions("us-central1").httpsCallable("familyPushPublicKey");
   const savePush = firebase.app().functions("us-central1").httpsCallable("saveFamilyPushSubscription");
@@ -90,7 +108,7 @@
 
   function isCompleted(booking) {
     return [booking.status, booking.adminStatus, booking.customerStatus].some(function (value) {
-      return value === "completed" || value === "paid";
+      return value === "completed";
     });
   }
 
@@ -161,6 +179,9 @@
   }
 
   function statusLabel(booking) {
+    if (booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted" && booking.status !== "cancelled" && booking.status !== "completed") {
+      return "Executive request";
+    }
     const status = String(booking.status || "confirmed");
     if (status === "completed") return "Completed";
     if (status === "pending") return "Pending";
@@ -209,6 +230,7 @@
   }
 
   function vehicleLabel(type) {
+    if (type === "executive") return "Executive Car";
     const match = VEHICLES.find((row) => row.value === type || (type === "8-seater" && row.value === "8_seater"));
     return match ? match.label : "Standard car";
   }
@@ -395,11 +417,13 @@
 
   function draftFromBooking(booking) {
     const pickup = pickupDate(booking) || new Date();
-    const type = booking.vehicleType === "8-seater" || booking.vehicleType === "8_seater"
-      ? "8_seater"
-      : booking.vehicleType === "multiple"
-        ? "multiple"
-        : "standard";
+    const type = booking.vehicleType === "executive"
+      ? "executive"
+      : booking.vehicleType === "8-seater" || booking.vehicleType === "8_seater"
+        ? "8_seater"
+        : booking.vehicleType === "multiple"
+          ? "multiple"
+          : "standard";
     const fare = money(booking.actualFare);
     return {
       pickupDate: ymd(pickup),
@@ -486,6 +510,7 @@
           cancelledByUid: auth.currentUser && auth.currentUser.uid,
           updatedByUid: auth.currentUser && auth.currentUser.uid,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          revision: Number(booking.revision || 0) + 1,
         };
         if (booking.uid) payload.customerStatus = "cancelled";
         await db.collection("bookings").doc(booking.id).update(payload);
@@ -538,8 +563,11 @@
       '<label>Amount to charge (£)<input name="actualFare" type="number" inputmode="decimal" min="0" step="0.01" value="' +
       escapeHtml(draft.actualFare || "") +
       '"></label>' +
+      (booking && booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted"
+        ? '<p class="job-notes">Executive Car request. Awaiting availability confirmation. Do not treat this as a confirmed vehicle.</p>'
+        : "") +
       '<fieldset class="vehicle"><legend>Vehicle</legend>' +
-      VEHICLES.map(
+      (draft.vehicleType === "executive" ? VEHICLES.concat([{ value: "executive", label: "Executive Car" }]) : VEHICLES).map(
         (row) =>
           '<label><input type="radio" name="vehicleType" value="' +
           row.value +
@@ -601,11 +629,15 @@
     const pickupIso = fromDateAndTime(draft.pickupDate, draft.pickupTime);
     const actor = auth.currentUser && auth.currentUser.uid;
     const fare = money(draft.actualFare);
-    const fareFields = fare == null ? {} : { actualFare: fare };
+    const executiveHeld = draft.vehicleType === "executive" && (!existing || existing.executiveAvailability !== "accepted");
+    const fareFields = executiveHeld || fare == null ? {} : { actualFare: fare };
     try {
       if (existing && existing.id) {
-        const nextStatus =
-          existing.status === "cancelled"
+        const nextStatus = executiveHeld
+          ? existing.status === "cancelled" || existing.status === "completed"
+            ? existing.status
+            : "pending"
+          : existing.status === "cancelled"
             ? "cancelled"
             : existing.status === "completed"
               ? "completed"
@@ -625,6 +657,7 @@
               status: nextStatus,
               updatedByUid: actor,
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              revision: Number(existing.revision || 0) + 1,
             },
             fareFields
           )
@@ -644,8 +677,16 @@
               bookingMethod: "telephone",
               bookingType: "one_way",
               vehicleType: draft.vehicleType,
-              status: "confirmed",
-              paymentStatus: "pending",
+              status: executiveHeld ? "pending" : "confirmed",
+              revision: 1,
+              ...(executiveHeld
+                ? {
+                    serviceType: "executive",
+                    executiveAvailability: "awaiting_confirmation",
+                    customerStatus: "awaiting_availability",
+                    adminStatus: "awaiting_availability",
+                  }
+                : {}),
               source: "family",
               createdByUid: actor,
               updatedByUid: actor,

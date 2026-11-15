@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Bookings from './Bookings';
 import { Booking } from '../types/types';
 import { applyBulkJobUpdates } from '../utils/applyBulkJobUpdates';
+import { commitQuickAllocation, commitQuickPayment } from '../utils/quickBookingWrite';
 
 jest.mock('../utils/applyBulkJobUpdates', () => ({
   applyBulkJobUpdates: jest.fn(() => Promise.resolve()),
@@ -13,6 +14,10 @@ jest.mock('firebase/functions', () => ({
   httpsCallable: () => () => Promise.resolve({ data: { ready: false } }),
 }));
 jest.mock('../utils/pdfGenerator', () => ({ generateBookingConfirmationPdfBlob: jest.fn() }));
+jest.mock('../utils/quickBookingWrite', () => ({
+  commitQuickAllocation: jest.fn(),
+  commitQuickPayment: jest.fn(),
+}));
 
 const booking = (id: string, name: string): Booking => ({
   id, bookingNumber: id, hirerName: name, hirerPhone: '07000000000', hirerAddress: '',
@@ -83,17 +88,32 @@ test('updates the selected jobs and leaves an unaccepted quote unchanged', async
   fireEvent.click(screen.getByRole('button', { name: 'Apply to 2 jobs' }));
   await waitFor(() => expect(screen.getByText(/left unchanged/)).toBeTruthy());
   const updates = (applyBulkJobUpdates as jest.Mock).mock.calls[0][1];
-  expect(updates).toEqual([{ id: 'SP1', patch: { status: 'confirmed', adminStatus: 'confirmed', customerStatus: 'confirmed' } }]);
+  expect(updates).toEqual([{ id: 'SP1', revision: 0, patch: { status: 'confirmed', adminStatus: 'confirmed', customerStatus: 'confirmed' } }]);
   expect(screen.getByText(/SP9: Open the booking and set the status to Confirmed/)).toBeTruthy();
 });
 
-test('changes one payment status without rewriting the fare', async () => {
+test('records a payment and a return driver without opening the booking, and keeps the selection when the save conflicts', async () => {
   const row = booking('SP1', 'Test Customer');
-  render(<Bookings bookings={[row]} drivers={[]} vehicles={[]} {...callbacks} />);
-  fireEvent.click(screen.getByRole('button', { name: 'All bookings' }));
-  fireEvent.change(screen.getByRole('combobox', { name: 'Payment status for SP1' }), { target: { value: 'paid' } });
-  await waitFor(() => expect(screen.getByText(/amount already received is unchanged/)).toBeTruthy());
-  expect((applyBulkJobUpdates as jest.Mock).mock.calls[0][1]).toEqual([{ id: 'SP1', patch: { paymentStatus: 'paid' } }]);
+  row.status = 'completed';
+  row.bookingType = 'return';
+  row.returnPickupTime = '2026-11-15T19:05:00Z';
+  row.returnPickupLocation = 'London Heathrow Terminal 2';
+  row.returnDestination = 'Oxford';
+  (commitQuickPayment as jest.Mock).mockRejectedValueOnce(new Error('This booking was saved in another session. Your edits are still on this screen. Reload the saved booking, then apply your changes again.'));
+  (commitQuickAllocation as jest.Mock).mockResolvedValueOnce(undefined);
+  render(<Bookings bookings={[row]} drivers={[{ id: 'd1', name: 'Sam', licenseNumber: '', phoneNumber: '', email: '', active: true, licenseExpiry: '' }]} vehicles={[{ id: 'v1', registration: 'AB12 CDE', make: '', model: '', year: '', color: '', available: true }]} {...callbacks} />);
+  expect(screen.getByText(/Return: London Heathrow Terminal 2/)).toBeTruthy();
+  fireEvent.click(screen.getByText('Allocate or record payment'));
+  fireEvent.change(screen.getAllByLabelText('Amount received for SP1')[0], { target: { value: '20.00' } });
+  fireEvent.click(screen.getAllByRole('button', { name: 'Record this payment' })[0]);
+  expect(await screen.findByText(/saved in another session/)).toBeTruthy();
+  expect(screen.getAllByLabelText('Amount received for SP1')[0]).toHaveValue('20.00');
+  expect(callbacks.onEditBooking).not.toHaveBeenCalled();
+  fireEvent.change(screen.getAllByLabelText('Return driver for SP1')[0], { target: { value: 'd1' } });
+  fireEvent.click(screen.getAllByRole('button', { name: 'Save return driver' })[0]);
+  expect(await screen.findByText('Return driver and vehicle saved.')).toBeTruthy();
+  expect(commitQuickAllocation).toHaveBeenCalled();
+  expect(screen.getAllByLabelText('Return driver for SP1')[0]).toHaveValue('d1');
 });
 
 test('shows one future return when the outbound is already completed', () => {
@@ -125,8 +145,8 @@ test('shows one future return when the outbound is already completed', () => {
     expect(screen.getByText(/Return: London Heathrow Terminal 2 → 10 Beech Crescent OX5 1DN/)).toBeTruthy();
     expect(screen.getByText('Needs review')).toBeTruthy();
     expect(screen.getByText('Driver not confirmed')).toBeTruthy();
-    expect(screen.getAllByText('£180.00').filter((element) => element.tagName === 'TD')).toHaveLength(1);
-    expect(screen.getByText('The fare is for the whole booking.')).toBeTruthy();
+    expect(screen.getAllByText('Booking total £180.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Included in the booking total.').length).toBeGreaterThan(0);
     expect(screen.queryByText('10 Beech Crescent OX5 1DN → London Heathrow Terminal 2')).toBeNull();
   } finally {
     jest.useRealTimers();

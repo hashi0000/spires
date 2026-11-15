@@ -101,8 +101,11 @@ for (const f of files) {
   for (const [label, re] of forbidden) {
     if (re.test(html)) issues.push(`${f}: contains forbidden phrase "${label}"`);
   }
-  if (/31 December 2025/.test(html) && f === 'offer-terms.html') {
-    issues.push(`${f}: still lists 31 December 2025 offer end date`);
+  if (f === 'offer-terms.html') {
+    if (!/This offer has been withdrawn/i.test(html)) issues.push(`${f}: must say the online airport return offer has been withdrawn`);
+    if (/Get £5 off your airport return/i.test(html) || /save £5 on the total fare/i.test(html)) {
+      issues.push(`${f}: still advertises the ended £5 signup offer`);
+    }
   }
 }
 
@@ -117,6 +120,7 @@ const requiredSitemap = [
   '/airport-transfers',
   '/heathrow-to-oxford-taxi',
   '/oxford-to-heathrow-taxi',
+  '/executive-heathrow-transfers',
   '/oxford-to-luton-taxi',
   '/oxford-to-gatwick-taxi',
   '/bicester-taxis',

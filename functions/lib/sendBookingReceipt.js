@@ -43,6 +43,7 @@ const vehicleTypes_1 = require("./vehicleTypes");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const bookingTerms_1 = require("./terms/bookingTerms");
 const journeyStops_1 = require("./bookings/journeyStops");
+const guestRequest_1 = require("./bookings/guestRequest");
 function internationalBrand(booking) {
     return booking?.brand === "spires_international";
 }
@@ -118,7 +119,7 @@ async function sendBookingReceipt(booking, type = "booking_confirmation", bookin
             functions.logger.warn(message);
             return;
         }
-        if (options?.throwOnError && !(0, driverReminderEmail_1.reminderConfigOk)()) {
+        if (options?.throwOnError && process.env.FUNCTIONS_EMULATOR !== "true" && !(0, driverReminderEmail_1.reminderConfigOk)()) {
             throw new Error("Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions.");
         }
         const pdfBuffer = await (0, pdfGenerator_1.generateBookingPDF)(normalized, type);
@@ -163,7 +164,8 @@ async function sendBookingReceipt(booking, type = "booking_confirmation", bookin
 async function notifyAdminNewBookingRequest(booking, bookingId) {
     try {
         const n = (0, bankDetails_1.normalizeBookingForEmail)(booking, bookingId);
-        const subject = `New booking request · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
+        const executiveNote = (0, vehicleTypes_1.executiveRequestNote)(booking);
+        const subject = `${executiveNote ? "Executive request" : "New booking request"} · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
         const rawPay = String(n.paymentMethod || "").trim().toLowerCase().replace(/_/g, " ");
         const pay = !n.paymentMethod
             ? "Not specified"
@@ -174,7 +176,8 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
                     : String(n.paymentMethod).replace(/_/g, " ");
         const html = `
       <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">
-        <h2 style="color:#002147;margin:0 0 12px;">New customer booking request</h2>
+        <h2 style="color:#002147;margin:0 0 12px;">${executiveNote ? "Executive Heathrow request" : "New customer booking request"}</h2>
+        ${executiveNote ? `<p style="padding:10px 12px;border:1px solid #C5A572;background:#faf8f4;"><strong>${(0, driverReminderEmail_1.escapeHtml)(executiveNote)}</strong></p>` : ""}
         <p>${booking.source === "website" || booking.guestRequest === true
             ? "A guest sent this request from the website without creating an account. It is not confirmed until you quote it and the customer accepts. Use the phone number when there is no email address."
             : "A new booking was submitted via the customer portal and needs a fare and confirmation."}</p>
@@ -191,6 +194,7 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
             ? `<br><span style="font-size:13px;color:#555;">${(0, driverReminderEmail_1.escapeHtml)((0, vehicleTypes_1.vehicleClassExamples)(n.vehicleType))}</span>`
             : ""}</td></tr>
           <tr><td style="padding:4px 8px;font-weight:600;">Pay by</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(pay)}</td></tr>
+          ${(0, guestRequest_1.heardAboutLabel)(booking.heardAbout, booking.heardAboutDetail) ? `<tr><td style="padding:4px 8px;font-weight:600;">Heard about us</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)((0, guestRequest_1.heardAboutLabel)(booking.heardAbout, booking.heardAboutDetail))}</td></tr>` : ""}
           ${n.flightNumber ? `<tr><td style="padding:4px 8px;font-weight:600;">Flight</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(n.flightNumber)}${n.terminal ? ` · Terminal ${(0, driverReminderEmail_1.escapeHtml)(n.terminal)}` : ""}</td></tr>` : ""}
           ${n.bookingType === "return" || n.returnPickupLocation ? `<tr><td style="padding:4px 8px;font-weight:600;">Return</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(booking.openReturn === true ? `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. ${booking.returnPickupTime ? `Pickup time now set for ${booking.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}` : `${n.returnPickupLocation || ""} → ${n.returnDestination || ""}`)}</td></tr>` : ""}
           ${Array.isArray(booking.returnStops) && booking.returnStops.length > 2 ? `<tr><td style="padding:4px 8px;font-weight:600;">Return stops</td><td style="padding:4px 8px;">${(0, driverReminderEmail_1.escapeHtml)(booking.returnStops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address || ""}${stop.notes ? ` (${stop.notes})` : ""}`).join("; "))}. Extra stops. Agree the fare.</td></tr>` : ""}
@@ -204,13 +208,16 @@ async function notifyAdminNewBookingRequest(booking, bookingId) {
             subject,
             html,
             text: [
-                "New customer booking request",
+                executiveNote || "New customer booking request",
                 `Customer: ${n.hirerName}`,
                 `Phone: ${n.hirerPhone}`,
                 `Email: ${n.hirerEmail}`,
                 (0, journeyStops_1.emailJourneyText)(booking),
                 `When: ${n.pickupTime}`,
                 `Pay by: ${pay}`,
+                (0, guestRequest_1.heardAboutLabel)(booking.heardAbout, booking.heardAboutDetail)
+                    ? `Heard about us: ${(0, guestRequest_1.heardAboutLabel)(booking.heardAbout, booking.heardAboutDetail)}`
+                    : "",
             ].filter(Boolean).join("\n"),
         });
         functions.logger.info(`Admin notified of new booking ${bookingId}`);

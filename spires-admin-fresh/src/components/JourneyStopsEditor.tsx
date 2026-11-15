@@ -5,9 +5,12 @@ import { describeStops, hasExtraStops, JourneyStop, newStopId } from "../utils/j
 type Props = {
   stops: JourneyStop[];
   onChange: (stops: JourneyStop[]) => void;
+  extraStopsIncluded?: boolean;
+  onExtraStopsIncluded?: (included: boolean) => void;
+  addressesRequired?: boolean;
 };
 
-const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
+const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange, extraStopsIncluded = false, onExtraStopsIncluded, addressesRequired = true }) => {
   const update = (index: number, patch: Partial<JourneyStop>) => {
     onChange(stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)));
   };
@@ -62,7 +65,7 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
             <LocationField
             label="Address"
             value={stop.address}
-            required
+            required={addressesRequired}
             onChange={(value, place) => update(index, { address: value, place: place || null })}
           />
           <label className="stop-note">
@@ -73,7 +76,13 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange }) => {
       ))}
       <button type="button" className="btn btn-secondary btn-sm" onClick={addStop}>Add a stop</button>
       <p className="stop-summary">{describeStops(stops.filter((stop) => stop.address))}</p>
-      {hasExtraStops(stops) ? <p className="stop-review">Extra stops. Agree the fare before confirming.</p> : null}
+      {hasExtraStops(stops) && !extraStopsIncluded ? <p className="stop-review">Extra stops. Agree the fare before confirming.</p> : null}
+      {hasExtraStops(stops) && onExtraStopsIncluded ? (
+        <label className="stop-note">
+          <input type="checkbox" checked={extraStopsIncluded} onChange={(event) => onExtraStopsIncluded(event.target.checked)} />
+          Extra stops are included in the agreed fare
+        </label>
+      ) : null}
     </div>
   );
 };

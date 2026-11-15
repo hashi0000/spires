@@ -2,7 +2,9 @@
   var form = document.querySelector("form.event-quote");
   if (!form) return;
 
-  var endpoint = "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
+  var endpoint = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:5001/demo-spires/us-central1/submitWebsiteQuote"
+    : "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
   var officePhone = "07776 897772";
   var journey = form.querySelector("[name='bookingType']");
   var returnFields = form.querySelector("[data-return-fields]");

@@ -382,12 +382,15 @@ export const linkBookingsToCustomer = async (
       for (const bookingId of batchIds) {
         try {
           const bookingRef = doc(db, 'bookings', bookingId);
+          const existing = await getDoc(bookingRef);
+          const revision = Number(existing.data()?.revision || 0) + 1;
           currentBatch.update(bookingRef, {
             customerId,
-            uid: customerId, // Set uid to customerId so customer app can find the booking
+            uid: customerId,
             linkedAt: Timestamp.now(),
             linkedBy,
             updatedAt: Timestamp.now(),
+            revision,
           });
           batchSuccessCount++;
         } catch (error: any) {

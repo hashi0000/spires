@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
 import {
   HALF_TERM_DISCOUNT_PENCE,
@@ -9,7 +11,7 @@ import {
   quoteTotals,
 } from "./halfTerm";
 import { londonYmd } from "./londonTime";
-import { invoiceEmailState, invoicePaidDateLabel, invoicePaymentState, mergeInvoiceRecords } from "./invoiceVault";
+import { assignServerInvoiceNumbers, invoiceEmailState, invoicePaidDateLabel, invoicePaymentState, invoiceRevisionDecision, mergeInvoiceRecords, planInvoiceSave } from "./invoiceVault";
 import { paymentLinkAllowlist, paymentStatusAfterCustomerAction, validatePaymentLinkUrl } from "./paymentLink";
 import {
   bookingMatchesStatusFilter,
@@ -218,7 +220,8 @@ describe("email jobs and status filters", () => {
   it("keeps allocated and legacy paid rows in the existing filters", () => {
     assert.equal(bookingMatchesStatusFilter({ status: "confirmed", adminStatus: "allocated" }, "allocated"), true);
     assert.equal(bookingMatchesStatusFilter({ status: "confirmed", adminStatus: "allocated" }, "confirmed"), false);
-    assert.equal(bookingMatchesStatusFilter({ status: "paid" }, "completed"), true);
+    assert.equal(bookingMatchesStatusFilter({ status: "paid" }, "completed"), false);
+    assert.equal(bookingMatchesStatusFilter({ status: "paid" }, "needs_review"), true);
     assert.equal(bookingMatchesStatusFilter({ status: "awaiting_customer_confirmation" }, "pending"), false);
     assert.equal(bookingMatchesStatusFilter({ status: "awaiting_customer_confirmation" }, "awaiting_customer_confirmation"), true);
     assert.equal(bookingMatchesStatusFilter({ status: "pending" }, "all"), true);
@@ -243,6 +246,110 @@ describe("payment links", () => {
 });
 
 describe("invoice paid state", () => {
+  it("issues the next invoice number from the stored counter and ignores a client number", () => {
+    const first = assignServerInvoiceNumbers([], [{
+      id: "draft-a",
+      needsServerNumber: true,
+      numberPrefix: "ST-INV",
+      numberPeriod: "2026-11",
+      invoiceNumber: "ST-INV-202611-999",
+    }], {});
+    assert.equal(first.assigned[0].invoiceNumber, "ST-INV-202611-001");
+    assert.equal(first.invoices[0].needsServerNumber, undefined);
+    const second = assignServerInvoiceNumbers(first.invoices, [...first.invoices, {
+      id: "draft-b",
+      needsServerNumber: true,
+      numberPrefix: "ST-INV",
+      numberPeriod: "2026-11",
+    }], first.seq);
+    assert.equal(second.assigned[0].invoiceNumber, "ST-INV-202611-002");
+    const recovered = assignServerInvoiceNumbers(second.invoices, second.invoices.map((row) => (
+      row.id === "draft-a" ? { ...row, invoiceNumber: "PENDING", needsServerNumber: true, numberPrefix: "ST-INV", numberPeriod: "2026-11" } : row
+    )), second.seq);
+    assert.equal(recovered.assigned.find((row) => row.id === "draft-a")?.invoiceNumber, "ST-INV-202611-001");
+    assert.equal(recovered.seq["ST-INV-2026-11"], 2);
+    const stale = planInvoiceSave({ invoices: first.invoices, seq: first.seq, revision: 1 }, {
+      expectedRevision: 0,
+      invoices: [{ id: "draft-c", needsServerNumber: true, numberPrefix: "ST-INV", numberPeriod: "2026-11" }],
+    });
+    assert.equal(stale.ok, false);
+  });
+
+  it("keeps a full invoice history and rejects a stale session", () => {
+    const existing = Array.from({ length: 120 }, (_, index) => ({ id: `inv-${index}`, invoiceNumber: `ST-${index}` }));
+    assert.equal(mergeInvoiceRecords(existing, existing).length, 120);
+    const first = invoiceRevisionDecision(undefined, 0);
+    assert.equal(first.ok && first.revision, 1);
+    const explicitZero = invoiceRevisionDecision(0, 0);
+    assert.equal(explicitZero.ok && explicitZero.revision, 1);
+    const omitted = invoiceRevisionDecision(undefined, undefined);
+    assert.equal(omitted.ok, false);
+    const omittedOnZero = invoiceRevisionDecision(0, undefined);
+    assert.equal(omittedOnZero.ok, false);
+    const stale = invoiceRevisionDecision(1, 0);
+    assert.equal(stale.ok, false);
+    const reloaded = invoiceRevisionDecision(1, 1);
+    assert.equal(reloaded.ok && reloaded.revision, 2);
+    const root = path.resolve(__dirname, "../..");
+    const server = fs.readFileSync(path.join(root, "src/schoolInvoiceVault.ts"), "utf8");
+    const general = fs.readFileSync(path.join(root, "../spires-admin-fresh/src/utils/generalInvoiceStorage.ts"), "utf8");
+    const school = fs.readFileSync(path.join(root, "../spires-admin-fresh/src/utils/schoolInvoiceStorage.ts"), "utf8");
+    assert.equal(server.includes("slice(0, 100)"), false);
+    assert.equal(general.includes("slice(0, 100)"), false);
+    assert.equal(school.includes("slice(0, 100)"), false);
+    assert.equal(general.includes("expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0"), true);
+    assert.equal(school.includes("expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0"), true);
+    const schoolLoad = school.slice(school.indexOf("export async function loadSchoolInvoiceVault"), school.indexOf("export async function persistSchoolInvoiceVault"));
+    assert.equal(schoolLoad.includes("persistSchoolInvoiceVault"), false);
+    assert.equal(schoolLoad.includes("saveVaultFn"), false);
+    const saveFn = server.slice(server.indexOf("export const saveSchoolInvoiceVault"));
+    const planAt = saveFn.indexOf("planInvoiceSave");
+    const rejectAt = saveFn.indexOf("if (!planned.ok)");
+    const writeAt = saveFn.indexOf("tx.set");
+    assert.equal(planAt > 0 && rejectAt > planAt && writeAt > rejectAt, true);
+  });
+
+  it("rejects an old client on a vault with no revision and lets one first save win", async () => {
+    const history = Array.from({ length: 120 }, (_, index) => ({ id: `inv-${index}`, invoiceNumber: `ST-${index}` }));
+    const legacy = { invoices: history, seq: { "ST-INV-2026-11": 3 } };
+    const before = JSON.stringify(legacy);
+    const oldClient = planInvoiceSave(legacy, { invoices: history.slice(0, 100), seq: {} });
+    assert.equal(oldClient.ok, false);
+    if (!oldClient.ok) assert.match(oldClient.reason, /Reload before saving/);
+    assert.equal(JSON.stringify(legacy), before);
+
+    let stored: { invoices: typeof history; seq: Record<string, number>; revision?: number } = {
+      invoices: history.map((row) => ({ ...row })),
+      seq: { ...legacy.seq },
+    };
+    let tail = Promise.resolve();
+    const save = (invoices: typeof history) => {
+      const turn = tail.then(() => {
+        const planned = planInvoiceSave(stored, { expectedRevision: 0, invoices, seq: stored.seq });
+        if (!planned.ok) return planned;
+        stored = {
+          invoices: planned.invoices.map((row) => ({ id: String(row.id), invoiceNumber: String(row.invoiceNumber) })),
+          seq: planned.seq,
+          revision: planned.revision,
+        };
+        return planned;
+      });
+      tail = turn.then(() => undefined, () => undefined);
+      return turn;
+    };
+    const [firstSession, secondSession] = await Promise.all([
+      save([...history, { id: "draft-a", invoiceNumber: "ST-INV-202611-901" }]),
+      save([...history, { id: "draft-b", invoiceNumber: "ST-INV-202611-902" }]),
+    ]);
+    const results = [firstSession, secondSession];
+    assert.equal(results.filter((row) => row.ok).length, 1);
+    assert.equal(results.filter((row) => !row.ok).length, 1);
+    assert.equal(stored.revision, 1);
+    assert.equal(stored.invoices.length, 121);
+    assert.equal(stored.invoices.filter((row) => history.some((item) => item.id === row.id)).length, 120);
+    assert.equal(stored.invoices.some((row) => row.id === "draft-a") === stored.invoices.some((row) => row.id === "draft-b"), false);
+  });
+
   it("keeps paidAt when a later email write omits it", () => {
     const existing = [{ id: "ST-UKG-202610-002", invoiceNumber: "ST-UKG-202610-002", paidAt: "2026-10-20T12:00:00.000Z", lines: [] }];
     const staleEmail = [{ id: "ST-UKG-202610-002", invoiceNumber: "ST-UKG-202610-002", emailedAt: "2026-10-21T09:00:00.000Z", emailedTo: "a@example.com", emailStatus: "sent" }];

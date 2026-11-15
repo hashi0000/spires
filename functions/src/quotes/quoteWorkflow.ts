@@ -122,7 +122,7 @@ type BookingWorkflow = { status?: string | null; adminStatus?: string | null; cu
 /** Main status wins. Preserve the historical confirmed/admin-allocated representation. */
 export function effectiveWorkflowStatus(data: BookingWorkflow): string {
   const primary = data.status || data.adminStatus || data.customerStatus || "pending";
-  if (primary === "paid") return "completed";
+  if (primary === "paid") return "needs_review";
   if (primary === "confirmed" && ["allocated", "completed"].includes(data.adminStatus || "")) {
     return data.adminStatus!;
   }

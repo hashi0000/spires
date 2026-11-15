@@ -15,6 +15,7 @@ import {
 } from "./bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
 import { applyStopEnds, hasExtraStops, OPEN_RETURN_NOTICE, readStops, validateStops } from "../bookings/journeyStops";
+import { assessExecutiveBooking, isExecutiveVehicle } from "../quotes/executiveService";
 
 const db = () => admin.firestore();
 
@@ -93,9 +94,25 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     }
   }
   const passengers = Number(data?.passengers) || 1;
+  const executive = isExecutiveVehicle(vehicleType)
+    ? assessExecutiveBooking({
+        passengers: Number(data?.passengers),
+        bookingType,
+        pickup: ends.pickup,
+        destination: ends.destination,
+        stops,
+        returnPickup: returnEnds.pickup,
+        returnDestination: returnEnds.destination,
+        returnStops,
+      })
+    : null;
+  if (executive && !executive.ok) throw httpsError("invalid-argument", executive.error);
+  if (vehicleType !== "standard" && vehicleType !== "8_seater" && !executive) {
+    throw httpsError("invalid-argument", "Please choose a Standard Car or an 8 Seater.");
+  }
   let submission;
   try { submission = customerSubmission(context.auth.uid, data || {}); }
-  catch { throw httpsError('invalid-argument', 'Invalid submission identifier.'); }
+  catch { throw httpsError("invalid-argument", "Invalid submission identifier."); }
   const { bookingId, fingerprint } = submission;
   const ref = bookingId ? db().collection("bookings").doc(bookingId) : db().collection("bookings").doc();
   const email = str(context.auth.token.email);
@@ -143,6 +160,10 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     flightNumber: data?.airportCollection === true ? str(data?.flightNumber) : "",
     terminal: str(data?.terminal),
     status: "pending",
+    customerStatus: "pending",
+    adminStatus: "pending",
+    revision: 1,
+    ...(executive && executive.ok ? executive.fields : {}),
     termsAccepted: true,
     termsVersion: decision.version,
     termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -164,7 +185,12 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     });
     return false;
   });
-  return { ok: true, bookingId: ref.id, duplicate };
+  return {
+    ok: true,
+    bookingId: ref.id,
+    duplicate,
+    ...(executive && executive.ok ? { serviceType: "executive", airport: "heathrow" } : {}),
+  };
 });
 
 export const recordStaffTermsAcceptance = functions.https.onCall(async (data, context) => {
@@ -194,6 +220,7 @@ export const recordStaffTermsAcceptance = functions.https.onCall(async (data, co
       termsAcceptanceRecordedBy: actor,
       termsAcceptanceNote: report.note.slice(0, 1000),
       acceptanceMethod: report.method,
+      revision: admin.firestore.FieldValue.increment(1),
     },
     { merge: true }
   );
@@ -346,6 +373,7 @@ export const acceptTermsPublic = functions.https.onRequest(async (req, res) => {
         termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
         termsAcceptanceRecordedAt: admin.firestore.FieldValue.serverTimestamp(),
         acceptanceMethod: "terms_link",
+        revision: admin.firestore.FieldValue.increment(1),
       },
       { merge: true }
     );

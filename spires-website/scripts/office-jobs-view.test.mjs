@@ -45,6 +45,7 @@ const completedOpenReturn = {
 };
 
 assert.equal(isCompleted(completedOpenReturn), true);
+assert.equal(isCompleted({ status: "paid", adminStatus: "paid", customerStatus: "paid" }), false);
 assert.equal(hasReturn(completedOpenReturn), true);
 assert.match(source, /view === "completed" \|\| !isCompleted\(row\)/);
 assert.match(source, /!isCancelled\(row\) && !isCompleted\(row\)/);

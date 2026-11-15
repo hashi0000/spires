@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db, functions } from "./firebase";
+import { auth, db, functions, localCallableUrl } from "./firebase";
 
-const QUOTE_API = "https://us-central1-spires-taxis.cloudfunctions.net/quotePublic";
+const QUOTE_API = localCallableUrl("quotePublic");
 const acceptQuote = httpsCallable(functions, "acceptQuote");
 
 function moneyFromBooking(data) {

@@ -64,7 +64,7 @@ function cancelled(data: Row): boolean {
 }
 
 function completed(data: Row): boolean {
-  return ["completed", "paid"].includes(text(data?.status)) || text(data?.adminStatus) === "completed";
+  return text(data?.status) === "completed" || text(data?.adminStatus) === "completed";
 }
 
 function pickupMs(data: Row): number | null {

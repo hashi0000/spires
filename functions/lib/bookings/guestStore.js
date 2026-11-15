@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isGuestRateError = void 0;
 exports.firestoreGuestDb = firestoreGuestDb;
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const consent_1 = require("../marketing/consent");
 const guestRequest_1 = require("./guestRequest");
 Object.defineProperty(exports, "isGuestRateError", { enumerable: true, get: function () { return guestRequest_1.isGuestRateError; } });
@@ -94,14 +95,15 @@ function firestoreGuestDb() {
                 tx.set(bookingRef, {
                     ...input.record,
                     marketingAttribution: withdrawn ? null : (attribution || null),
-                    termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    revision: 1,
+                    termsAcceptedAt: firestore_1.FieldValue.serverTimestamp(),
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
                 });
                 if (submissionRef) {
                     tx.set(submissionRef, {
                         bookingId: input.bookingId,
                         bookingNumber: input.bookingNumber,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        createdAt: firestore_1.FieldValue.serverTimestamp(),
                     });
                 }
                 tx.set(ipRef, ipNow.next);
@@ -112,7 +114,7 @@ function firestoreGuestDb() {
                         email: input.claim.email,
                         used: false,
                         expiresAt: input.claim.expiresAt,
-                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        createdAt: firestore_1.FieldValue.serverTimestamp(),
                     });
                 }
                 return { duplicate: false, bookingId: input.bookingId, bookingNumber: input.bookingNumber };

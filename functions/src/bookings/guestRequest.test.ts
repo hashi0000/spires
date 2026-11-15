@@ -243,6 +243,97 @@ describe("stops and open returns", () => {
   });
 });
 
+describe("executive Heathrow requests", () => {
+  function prepareExecutive(overrides: Record<string, unknown> = {}, enabled = true) {
+    return prepareGuestBooking(body({ vehicleType: "executive", passengers: "2", ...overrides }), {
+      now,
+      todayYmd: today,
+      bookingNumber: "SPTEST1234",
+      claimToken: { token: "claim-token", hash: "claim-hash" },
+      executiveEnabled: enabled,
+    });
+  }
+
+  it("stays closed unless the service is explicitly enabled", () => {
+    const closed = prepareExecutive({}, false);
+    assert.equal(closed.ok, false);
+    if (closed.ok) return;
+    assert.match(closed.error, /not open for booking/);
+  });
+
+  it("stores a published Oxford one way fare as a request, not a confirmed fare", () => {
+    const result = prepareExecutive();
+    assert.equal(result.ok, true);
+    if (!result.ok || result.spam) return;
+    assert.equal(result.record.status, "pending");
+    assert.equal(result.record.customerStatus, "awaiting_availability");
+    assert.equal(result.record.adminStatus, "awaiting_availability");
+    assert.equal(result.record.vehicleType, "executive");
+    assert.equal(result.record.serviceType, "executive");
+    assert.equal(result.record.airport, "heathrow");
+    assert.equal(result.record.executiveAvailability, "awaiting_confirmation");
+    assert.equal(result.record.executiveFareStatus, "published");
+    assert.equal(result.record.executiveArea, "oxford");
+    assert.equal(result.record.proposedFarePounds, 150);
+    assert.equal(result.record.actualFare, undefined);
+    assert.equal(result.record.paymentStatus, "pending");
+    assert.equal(result.record.marketingAttribution, null);
+  });
+
+  it("uses the published return total and keeps attribution", () => {
+    const result = prepareExecutive({
+      bookingType: "return",
+      returnDate: "2026-11-12",
+      returnTime: "16:00",
+      returnPickupLocation: "Heathrow Terminal 5",
+      returnDestination: "1 High Street, Oxford",
+      marketingAttribution: {
+        consent: "granted",
+        consentAt: now,
+        capturedAt: now,
+        expiresAt: now + 86400000,
+        gclid: "exec-click",
+        email: "private@example.com",
+      },
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok || result.spam) return;
+    assert.equal(result.record.proposedFarePounds, 290);
+    assert.equal(result.record.bookingType, "return");
+    const attribution = result.record.marketingAttribution as Record<string, unknown>;
+    assert.equal(attribution.gclid, "exec-click");
+    assert.equal(attribution.email, undefined);
+  });
+
+  it("quotes other Heathrow areas without inventing a fare", () => {
+    const result = prepareExecutive({ pickup: "Kidlington, Oxfordshire", destination: "Heathrow Terminal 2" });
+    assert.equal(result.ok, true);
+    if (!result.ok || result.spam) return;
+    assert.equal(result.record.executiveFareStatus, "quote_required");
+    assert.equal(result.record.executiveArea, "");
+    assert.equal("proposedFarePounds" in result.record, false);
+    assert.equal(result.record.actualFare, undefined);
+  });
+
+  it("rejects other airports and an oversized passenger count", () => {
+    const gatwick = prepareExecutive({ destination: "Gatwick Airport" });
+    assert.equal(gatwick.ok, false);
+    if (!gatwick.ok) assert.match(gatwick.error, /Heathrow/);
+    const tooMany = prepareExecutive({ passengers: "9" });
+    assert.equal(tooMany.ok, false);
+  });
+
+  it("leaves a Standard Car booking unchanged", () => {
+    const result = prepare({ vehicleType: "standard", passengers: "2" });
+    assert.equal(result.ok, true);
+    if (!result.ok || result.spam) return;
+    assert.equal(result.record.vehicleType, "standard");
+    assert.equal(result.record.adminStatus, "pending");
+    assert.equal(result.record.serviceType, undefined);
+    assert.equal(result.record.proposedFarePounds, undefined);
+  });
+});
+
 describe("guest request rate window", () => {
   it("resets after the window", () => {
     const first = nextGuestRate(null, now);

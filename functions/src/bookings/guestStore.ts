@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
-import { measurementWithdrawn } from '../marketing/consent';
-import { Attribution } from '../marketing/attribution';
+import { FieldValue } from "firebase-admin/firestore";
+import { measurementWithdrawn } from "../marketing/consent";
+import { Attribution } from "../marketing/attribution";
 import { GuestDb, isGuestRateError, nextGuestRate, RateRow } from "./guestRequest";
 
 export { isGuestRateError };
@@ -54,19 +55,20 @@ export function firestoreGuestDb(): GuestDb {
           (error as Error & { code?: string }).code = "RATE";
           throw error;
         }
-        const attribution=input.record.marketingAttribution as Attribution | null;
-        const withdrawn=attribution?await measurementWithdrawn(attribution,undefined,tx):false;
+        const attribution = input.record.marketingAttribution as Attribution | null;
+        const withdrawn = attribution ? await measurementWithdrawn(attribution, undefined, tx) : false;
         tx.set(bookingRef, {
           ...input.record,
-          marketingAttribution:withdrawn?null:(attribution || null),
-          termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          marketingAttribution: withdrawn ? null : (attribution || null),
+          revision: 1,
+          termsAcceptedAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
         });
         if (submissionRef) {
           tx.set(submissionRef, {
             bookingId: input.bookingId,
             bookingNumber: input.bookingNumber,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
           });
         }
         tx.set(ipRef, ipNow.next);
@@ -77,7 +79,7 @@ export function firestoreGuestDb(): GuestDb {
             email: input.claim.email,
             used: false,
             expiresAt: input.claim.expiresAt,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: FieldValue.serverTimestamp(),
           });
         }
         return { duplicate: false, bookingId: input.bookingId, bookingNumber: input.bookingNumber };

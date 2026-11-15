@@ -2,7 +2,9 @@
   var form = document.getElementById("booking-form");
   if (!form || form.getAttribute("data-enquiry") === "business") return;
 
-  var endpoint = "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
+  var endpoint = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+    ? "http://127.0.0.1:5001/demo-spires/us-central1/submitWebsiteQuote"
+    : "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
   var officePhone = "07776 897772";
   var contactMessage = "Please provide a phone number or email address so we can respond to your request. You can also call us on " + officePhone + ".";
   var journey = document.getElementById("journey");
@@ -38,9 +40,12 @@
 
   function syncPassengers() {
     if (!passengers) return;
-    var max = selectedVehicle() === "8_seater" ? 8 : 4;
+    var type = selectedVehicle();
+    var max = type === "8_seater" || type === "executive" ? 8 : 4;
     passengers.max = String(max);
     if (Number(passengers.value) > max) passengers.value = String(max);
+    var note = document.getElementById("executive-note");
+    if (note) note.hidden = type !== "executive";
   }
 
   function toggleJourney() {
@@ -77,8 +82,27 @@
   if (heardAbout) heardAbout.addEventListener("change", toggleHeardAbout);
   toggleHeardAbout();
   Array.prototype.forEach.call(form.querySelectorAll("input[name='vehicleType']"), function (input) {
-    input.addEventListener("change", syncPassengers);
+    input.addEventListener("change", function () {
+      syncPassengers();
+      if (input.checked && input.value === "executive" && window.SpiresMeasurement && window.SpiresMeasurement.engagement) {
+        window.SpiresMeasurement.engagement("executive_option_selected", { service_type: "executive", airport: "heathrow" });
+      }
+    });
   });
+  var requestedVehicle = "";
+  try { requestedVehicle = new URLSearchParams(window.location.search).get("vehicle") || ""; } catch (err) { requestedVehicle = ""; }
+  function applyRequestedVehicle() {
+    if (requestedVehicle !== "executive") return;
+    var executiveInput = form.querySelector("input[name='vehicleType'][value='executive']");
+    if (!executiveInput || executiveInput.closest("[hidden]") || executiveInput.checked) return;
+    executiveInput.checked = true;
+    syncPassengers();
+    if (window.SpiresMeasurement && window.SpiresMeasurement.engagement) {
+      window.SpiresMeasurement.engagement("executive_option_selected", { service_type: "executive", airport: "heathrow" });
+    }
+  }
+  applyRequestedVehicle();
+  document.addEventListener("spires-prices-ready", applyRequestedVehicle);
   toggleJourney();
   toggleAirport();
   syncPassengers();
@@ -115,12 +139,15 @@
   }
 
   function successHtml(body) {
+    body = body || {};
     var reference = escapeHtml(body.bookingNumber);
     var parts = [
       "<div class=\"guest-success\">",
       "<h2>Your booking request has been received.</h2>",
       "<p>Your reference is <strong>" + reference + "</strong>.</p>",
-      "<p>This is not a confirmed booking yet. We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>"
+      body.vehicleType === "executive"
+        ? "<p>This is an Executive Car request for a Heathrow transfer. It is not a confirmed booking. No vehicle is reserved, and we will not take payment until we confirm availability. We confirm the car is suitable for your passengers and luggage before we accept it.</p>"
+        : "<p>This is not a confirmed booking yet. We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>"
     ];
     if (body.contactBy === "phone") {
       parts.push("<p>Our team will contact you on the phone number you gave us. We do not send a text message for this request.</p>");
@@ -178,6 +205,21 @@
     if (!selectedVehicle()) {
       setStatus("Please choose a Standard Car or an 8 Seater.");
       return;
+    }
+    if (selectedVehicle() === "executive") {
+      var executiveCheck = window.SPIRES_classifyExecutive ? window.SPIRES_classifyExecutive({
+        pickup: data.get("pickup"),
+        destination: data.get("destination"),
+        bookingType: data.get("bookingType"),
+        returnPickup: data.get("returnPickupLocation"),
+        returnDestination: data.get("returnDestination"),
+        stops: window.spiresReadJourney ? (window.spiresReadJourney(form).stops || []) : [],
+        returnStops: data.get("bookingType") === "return" && window.spiresReadJourney ? (window.spiresReadJourney(form).returnStops || []) : []
+      }) : { ok: true };
+      if (executiveCheck && executiveCheck.ok === false) {
+        setStatus(executiveCheck.error || "Executive Car is only available for Heathrow transfers.");
+        return;
+      }
     }
     if (!agreed || !agreed.checked) {
       if (termsError) termsError.hidden = false;
@@ -254,7 +296,14 @@
           throw new Error((response.body && response.body.error) || "We could not save your request.");
         }
         if (!response.body.duplicate && window.SpiresMeasurement) {
-          try { window.SpiresMeasurement.lead(response.body.bookingNumber, "website", "quote"); } catch (_) { /* Saved requests must still show success. */ }
+          try {
+            window.SpiresMeasurement.lead(
+              response.body.bookingNumber,
+              "website",
+              "quote",
+              selectedVehicle() === "executive" ? { service_type: "executive", airport: "heathrow" } : null
+            );
+          } catch (_) { /* Saved requests must still show success. */ }
         }
         form.hidden = true;
         if (result) {

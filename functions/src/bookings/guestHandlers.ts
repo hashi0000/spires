@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v1";
 import { guestRequestEmailHtml, sendHtmlEmail } from "../quotes/emails";
 import { londonYmd } from "../quotes/londonTime";
@@ -17,6 +18,7 @@ import {
   prepareGuestBooking,
 } from "./guestRequest";
 import { firestoreGuestDb } from "./guestStore";
+import { nextBookingRevision } from "./bookingRevision";
 
 const db = () => admin.firestore();
 
@@ -82,6 +84,11 @@ export async function handleGuestBookingHttp(req: functions.https.Request, res: 
             bookingNumber: saved.bookingNumber,
             claimUrl,
             hasPhone: Boolean(saved.phone),
+            executive: prepared.record.vehicleType === "executive",
+            proposedFare:
+              typeof prepared.record.proposedFarePounds === "number"
+                ? `£${prepared.record.proposedFarePounds}`
+                : "",
           }),
           bccAdmin: false,
         });
@@ -98,7 +105,7 @@ export async function handleGuestBookingHttp(req: functions.https.Request, res: 
         await db().collection("bookings").doc(saved.bookingId).collection("audit").add({
           action: "terms_accepted",
           actor: saved.email || "guest",
-          at: admin.firestore.FieldValue.serverTimestamp(),
+          at: FieldValue.serverTimestamp(),
           termsVersion: "2026-10-25",
           acceptanceMethod: "website",
           guestRequest: true,
@@ -223,11 +230,11 @@ export const claimGuestBooking = functions.https.onCall(async (data, context) =>
       outcome.failure = { code: "permission-denied", message: "This request is already linked to an account." };
       return;
     }
-    if (!existingUid) tx.update(bookingRef, guestClaimPatch(uid));
+    if (!existingUid) tx.update(bookingRef, { ...guestClaimPatch(uid), revision: nextBookingRevision(booking) });
     tx.set(claimRef, {
       used: true,
       usedBy: uid,
-      usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      usedAt: FieldValue.serverTimestamp(),
     }, { merge: true });
     outcome.bookingId = decision.bookingId;
   });

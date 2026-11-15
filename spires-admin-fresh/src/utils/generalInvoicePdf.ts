@@ -56,15 +56,15 @@ function html2pdfOptions(filename: string): Record<string, unknown> {
     filename,
     image: { type: "jpeg", quality: 0.98 },
     html2canvas: {
-      scale,
+      scale: Math.min(scale, 2),
       useCORS: true,
       allowTaint: false,
       logging: false,
-      letterRendering: true,
+      letterRendering: false,
       scrollX: 0,
       scrollY: 0,
       backgroundColor: "#ffffff",
-      imageTimeout: 20000,
+      imageTimeout: 4000,
       windowWidth: A4_PX.width,
     },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
@@ -259,7 +259,6 @@ export function buildGeneralInvoiceHtml(input: GeneralInvoicePdfInput): string {
   <title>Invoice ${esc(input.invoiceNumber)}</title>
 </head>
 <body style="margin:0;padding:0;">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
   <style>
     @page { size: A4 portrait; margin: 0; }
     .booking-pdf-root,
@@ -569,11 +568,13 @@ async function withInvoicePdfDocument<T>(
     fix.textContent = CAPTURE_CSS;
     doc.body.appendChild(fix);
 
-    await new Promise<void>((r) => setTimeout(r, 900));
+    doc.querySelectorAll('link[rel="stylesheet"]').forEach((node) => node.remove());
     if (doc.fonts?.ready) {
-      await doc.fonts.ready.catch(() => undefined);
+      await Promise.race([
+        doc.fonts.ready.catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      ]);
     }
-    await new Promise<void>((r) => setTimeout(r, 500));
     await new Promise<void>((r) => {
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => r());
@@ -586,13 +587,25 @@ async function withInvoicePdfDocument<T>(
   }
 }
 
+function savePdfBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 export async function downloadGeneralInvoicePdf(input: GeneralInvoicePdfInput): Promise<void> {
-  const html = buildGeneralInvoiceHtml(input);
-  const html2pdf = (await import("html2pdf.js")).default;
   const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
-  await withInvoicePdfDocument(html, async (doc) => {
-    await html2pdf().set(html2pdfOptions(filename)).from(doc.body).save();
-  });
+  const blob = await generateGeneralInvoicePdfBlob(input);
+  if (!(blob instanceof Blob) || blob.size < 500) {
+    throw new Error("The PDF was not created.");
+  }
+  savePdfBlob(blob, filename);
 }
 
 export async function generateGeneralInvoicePdfBlob(input: GeneralInvoicePdfInput): Promise<Blob> {

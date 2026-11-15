@@ -1,7 +1,8 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto";
-import { mergeInvoiceRecords, InvoiceLike } from "./quotes/invoiceVault";
+import { planInvoiceSave, InvoiceLike } from "./quotes/invoiceVault";
 
 const VAULT_COLLECTION = "schoolInvoiceVault";
 const ALLOWED_DOCS = new Set(["workspace", "general"]);
@@ -24,6 +25,7 @@ type VaultPayload = {
   routes: unknown[];
   invoices: unknown[];
   seq: Record<string, number>;
+  revision?: number;
 };
 
 function assertAdmin(context: functions.https.CallableContext): void {
@@ -79,7 +81,7 @@ function decryptJson(ivB64: string, tagB64: string, dataB64: string): VaultPaylo
 }
 
 function emptyPayload(): VaultPayload {
-  return { version: 1, supplier: null, routes: [], invoices: [], seq: {} };
+  return { version: 1, supplier: null, routes: [], invoices: [], seq: {}, revision: 0 };
 }
 
 export const getSchoolInvoiceVault = functions
@@ -115,40 +117,52 @@ export const saveSchoolInvoiceVault = functions
     throw new functions.https.HttpsError("invalid-argument", "payload is required.");
   }
   const docRef = admin.firestore().collection(VAULT_COLLECTION).doc(requestedDocId(data));
-  const previous = await docRef.get();
-  let existingInvoices: InvoiceLike[] = [];
-  if (previous.exists) {
-    const row = previous.data() || {};
-    if (row.data && row.iv && row.tag) {
-      try {
-        existingInvoices = decryptJson(String(row.iv), String(row.tag), String(row.data)).invoices as InvoiceLike[];
-      } catch (err) {
-        if (err instanceof functions.https.HttpsError) throw err;
-        throw new functions.https.HttpsError(
-          "failed-precondition",
-          "Could not read the existing invoice vault, so the paid status was not overwritten."
-        );
+  const revision = await admin.firestore().runTransaction(async (tx) => {
+    const previous = await tx.get(docRef);
+    let existingPayload: { invoices?: InvoiceLike[]; seq?: Record<string, number>; revision?: unknown } | null = null;
+    if (previous.exists) {
+      const row = previous.data() || {};
+      if (row.data && row.iv && row.tag) {
+        try {
+          const decrypted = decryptJson(String(row.iv), String(row.tag), String(row.data));
+          existingPayload = {
+            invoices: Array.isArray(decrypted.invoices) ? decrypted.invoices as InvoiceLike[] : [],
+            seq: decrypted.seq,
+            revision: decrypted.revision,
+          };
+        } catch (err) {
+          if (err instanceof functions.https.HttpsError) throw err;
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "Could not read the existing invoice vault, so the paid status was not overwritten."
+          );
+        }
       }
     }
-  }
-  const incomingInvoices = Array.isArray(incoming.invoices) ? (incoming.invoices as InvoiceLike[]) : [];
-  const payload: VaultPayload = {
-    version: 1,
-    supplier: incoming.supplier ?? null,
-    routes: Array.isArray(incoming.routes) ? incoming.routes : [],
-    invoices: mergeInvoiceRecords(existingInvoices, incomingInvoices).slice(0, 100),
-    seq: incoming.seq && typeof incoming.seq === "object" ? incoming.seq : {},
-  };
-  const sealed = encryptJson(payload);
-  await docRef.set({
-    alg: ALG,
-    v: 1,
-    iv: sealed.iv,
-    tag: sealed.tag,
-    data: sealed.data,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedBy: context.auth!.uid,
-    updatedByEmail: context.auth!.token.email || "",
+    const planned = planInvoiceSave(existingPayload, incoming);
+    if (!planned.ok) {
+      throw new functions.https.HttpsError("aborted", planned.reason);
+    }
+    const payload: VaultPayload = {
+      version: 1,
+      revision: planned.revision,
+      supplier: planned.supplier,
+      routes: planned.routes,
+      invoices: planned.invoices,
+      seq: planned.seq,
+    };
+    const sealed = encryptJson(payload);
+    tx.set(docRef, {
+      alg: ALG,
+      v: 1,
+      iv: sealed.iv,
+      tag: sealed.tag,
+      data: sealed.data,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: context.auth!.uid,
+      updatedByEmail: context.auth!.token.email || "",
+    });
+    return { revision: planned.revision, assigned: planned.assigned };
   });
-  return { ok: true as const };
+  return { ok: true as const, revision: revision.revision, assigned: revision.assigned };
 });

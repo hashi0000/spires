@@ -1,7 +1,11 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { randomUUID } from "crypto";
 import Stripe from "stripe";
 import { cardReceiptPatch } from "./marketing/payments";
+import { clientAmountMatchesPayable, paymentClaimAllows, serverPayablePence } from "./paymentAmount";
+import { paymentAttemptPlan } from "./paymentAttempt";
+import { nextBookingRevision } from "./bookings/bookingRevision";
 
 /** Lazy init: never call `functions.config()` at module load (Firebase deploy analysis times out). */
 let stripeSingleton: Stripe | null = null;
@@ -11,6 +15,9 @@ function getStripe(): Stripe {
     if (!secretKey) {
       throw new Error("Stripe secret key not configured");
     }
+    if (process.env.FUNCTIONS_EMULATOR === "true" && String(secretKey).startsWith("sk_live")) {
+      throw new Error("The emulator refused a live Stripe key.");
+    }
     stripeSingleton = new Stripe(secretKey, {
       apiVersion: "2023-10-16",
     });
@@ -18,25 +25,72 @@ function getStripe(): Stripe {
   return stripeSingleton;
 }
 
+export type CardReceiptIntent = {
+  id: string;
+  amount: number;
+  amount_received?: number | null;
+  currency: string;
+  latest_charge?: string | null;
+  metadata?: { bookingId?: string; userId?: string };
+};
+
 /** Records the verified Stripe amount once. A deposit stays part paid and is not stored as the full fare. */
-async function recordCardReceipt(bookingId: string, paymentIntent: Stripe.PaymentIntent) {
+export async function commitCardReceipt(
+  db: admin.firestore.Firestore,
+  bookingId: string,
+  paymentIntent: CardReceiptIntent,
+  atIso = new Date().toISOString()
+): Promise<"credited" | "duplicate" | "rejected"> {
   const amountPence = paymentIntent.amount_received || paymentIntent.amount;
-  if (!Number.isInteger(amountPence) || amountPence <= 0 || paymentIntent.currency !== "gbp") return;
-  const ref = admin.firestore().collection("bookings").doc(bookingId);
-  await admin.firestore().runTransaction(async (tx) => {
+  if (!Number.isInteger(amountPence) || amountPence <= 0 || paymentIntent.currency !== "gbp") return "rejected";
+  const metadataBookingId = String(paymentIntent.metadata?.bookingId || "");
+  if (!metadataBookingId || metadataBookingId !== bookingId) return "rejected";
+  const ref = db.collection("bookings").doc(bookingId);
+  const claimRef = db.collection("stripePaymentClaims").doc(paymentIntent.id);
+  return db.runTransaction(async (tx) => {
+    const claimSnap = await tx.get(claimRef);
+    const claimedBookingId = claimSnap.exists ? String(claimSnap.data()?.bookingId || "") : "";
+    if (!paymentClaimAllows(claimedBookingId, bookingId)) return "rejected" as const;
     const snap = await tx.get(ref);
-    if (!snap.exists) return;
-    const patch = cardReceiptPatch(snap.data() || {}, {
+    if (!snap.exists) return "rejected" as const;
+    const booking = snap.data() || {};
+    const accountId = String(paymentIntent.metadata?.userId || "");
+    if (booking.uid && accountId && booking.uid !== accountId) return "rejected" as const;
+    const patch = cardReceiptPatch(booking, {
       paymentIntentId: paymentIntent.id,
       amountPence,
       chargeId: typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : "",
-    }, new Date().toISOString());
-    if (!patch) return;
+    }, atIso);
+    if (!patch) return "duplicate" as const;
+    const now = admin.firestore.FieldValue.serverTimestamp();
     tx.set(ref, {
       ...patch,
-      paidAt: patch.paymentStatus === "paid" ? admin.firestore.FieldValue.serverTimestamp() : admin.firestore.FieldValue.delete(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      revision: nextBookingRevision(booking),
+      paidAt: patch.paymentStatus === "paid" ? now : admin.firestore.FieldValue.delete(),
+      updatedAt: now,
     }, { merge: true });
+    tx.set(claimRef, {
+      bookingId,
+      paymentIntentId: paymentIntent.id,
+      amountPence,
+      updatedAt: now,
+    }, { merge: true });
+    return "credited" as const;
+  });
+}
+
+async function recordCardReceipt(bookingId: string, paymentIntent: Stripe.PaymentIntent) {
+  const charge = paymentIntent.latest_charge;
+  await commitCardReceipt(admin.firestore(), bookingId, {
+    id: paymentIntent.id,
+    amount: paymentIntent.amount,
+    amount_received: paymentIntent.amount_received,
+    currency: paymentIntent.currency,
+    latest_charge: typeof charge === "string" ? charge : null,
+    metadata: {
+      bookingId: paymentIntent.metadata?.bookingId,
+      userId: paymentIntent.metadata?.userId,
+    },
   });
 }
 /**
@@ -44,8 +98,17 @@ async function recordCardReceipt(bookingId: string, paymentIntent: Stripe.Paymen
  * This is called from the frontend when user clicks "Pay Now"
  */
 export const createPaymentIntent = functions.https.onCall(async (data, context) => {
-  // Check if Stripe is initialized
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "User must be authenticated to create payment"
+    );
+  }
+
   const secretKey = functions.config().stripe?.secret_key;
+  if (process.env.FUNCTIONS_EMULATOR === "true" && String(secretKey || "").startsWith("sk_live")) {
+    throw new functions.https.HttpsError("failed-precondition", "The emulator refused a live Stripe key.");
+  }
   if (!secretKey) {
     console.error("STRIPE_SECRET_KEY not configured");
     throw new functions.https.HttpsError(
@@ -54,19 +117,8 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
     );
   }
 
-  // Verify user is authenticated
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "User must be authenticated to create payment"
-    );
-  }
-
   const { bookingId, amount } = data;
 
-  console.log("createPaymentIntent called with:", { bookingId, amount, userId: context.auth.uid });
-
-  // Validate bookingId exists
   if (!bookingId || typeof bookingId !== "string") {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -74,26 +126,6 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
     );
   }
 
-  // Validate amount exists and is numeric
-  if (!amount) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "amount is required"
-    );
-  }
-
-  // Convert amount to number, handling strings with currency symbols
-  const amountString = String(amount).replace(/[£$€,\s]/g, "");
-  const amountNumber = parseFloat(amountString);
-
-  if (isNaN(amountNumber) || amountNumber <= 0) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Amount must be a valid positive number"
-    );
-  }
-
-  // Verify the booking exists and belongs to the user
   const bookingRef = admin.firestore().collection("bookings").doc(bookingId);
   const bookingDoc = await bookingRef.get();
 
@@ -107,7 +139,6 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
     throw new functions.https.HttpsError("not-found", "Booking data not found");
   }
 
-  // Verify booking belongs to the authenticated user
   if (booking.uid !== context.auth.uid) {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -115,54 +146,38 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
     );
   }
 
-  // Check if already paid
-  if (booking.paymentStatus === "paid") {
-    throw new functions.https.HttpsError(
-      "already-exists",
-      "This booking has already been paid"
-    );
+  const payable = serverPayablePence(booking);
+  if (!payable.ok) {
+    throw new functions.https.HttpsError("failed-precondition", payable.reason);
   }
-
-  if (booking.brand === "spires_international") {
+  if (!clientAmountMatchesPayable(payable.pence, amount)) {
     throw new functions.https.HttpsError(
       "failed-precondition",
-      "Spires International payments are not taken through this payment call."
-    );
-  }
-
-  // Convert amount to pence (Stripe uses smallest currency unit)
-  const amountInPence = Math.round(amountNumber * 100);
-
-  if (amountInPence < 50) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Amount must be at least £0.50"
+      "The amount on this screen is out of date. Reload the booking and try again."
     );
   }
 
   try {
     const stripe = getStripe();
+    const attempt = paymentAttemptPlan({ ...booking, id: bookingId }, payable.pence, randomUUID());
+    const paymentIntent = attempt.action === "reuse"
+      ? await stripe.paymentIntents.retrieve(attempt.paymentIntentId)
+      : await stripe.paymentIntents.create({
+        amount: payable.pence,
+        currency: "gbp",
+        metadata: {
+          bookingId,
+          userId: context.auth.uid,
+        },
+        description: `Spires Taxis booking ${booking.bookingNumber || bookingId}`,
+      }, { idempotencyKey: attempt.idempotencyKey });
 
-    console.log("Creating Stripe payment intent with amount:", amountInPence);
-
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInPence,
-      currency: "gbp",
-      metadata: {
-        bookingId: bookingId,
-        userId: context.auth.uid,
-        customerName: booking?.name || "Customer",
-      },
-      description: `Payment for booking ${bookingId}`,
-    });
-
-    console.log("Payment intent created:", paymentIntent.id);
-
-    // Update booking with payment intent ID
     await bookingRef.update({
-      stripePaymentIntentId: paymentIntent.id,
-      paymentStatus: "processing",
+      openStripePaymentIntentId: paymentIntent.id,
+      openStripePaymentAmountPence: payable.pence,
+      openStripePaymentNonce: attempt.action === "create" ? attempt.nonce : booking.openStripePaymentNonce || "",
+      revision: nextBookingRevision(booking),
+      ...(booking.paymentStatus === "partial" ? {} : { paymentStatus: "processing" }),
     });
 
     return {
@@ -170,32 +185,9 @@ export const createPaymentIntent = functions.https.onCall(async (data, context) 
       paymentIntentId: paymentIntent.id,
     };
   } catch (error: any) {
-    console.error("FULL STRIPE ERROR:", JSON.stringify(error, null, 2));
-    console.error("Error creating payment intent:", error);
-    console.error("Error type:", error?.type);
-    console.error("Error code:", error?.code);
-    console.error("Error message:", error?.message);
-    
-    // Provide more specific error messages
-    let errorMessage = "Failed to create payment intent";
-    if (error?.type === "StripeAuthenticationError") {
-      errorMessage = "Invalid Stripe API key. Please check configuration.";
-    } else if (error?.type === "StripeAPIError") {
-      errorMessage = `Stripe API error: ${error.message}`;
-    } else if (error?.message) {
-      errorMessage = error.message;
-    }
-
-    throw new functions.https.HttpsError(
-      "internal",
-      errorMessage,
-      {
-        type: error?.type,
-        code: error?.code,
-        message: error?.message,
-        fullError: JSON.stringify(error, null, 2),
-      }
-    );
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("createPaymentIntent failed");
+    throw new functions.https.HttpsError("internal", "Failed to create payment intent");
   }
 });
 
@@ -245,7 +237,13 @@ export const confirmPayment = functions.https.onCall(async (data, context) => {
     if (paymentIntent.status !== "succeeded") {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        `Payment not succeeded. Status: ${paymentIntent.status}`
+        "Payment not succeeded"
+      );
+    }
+    if (paymentIntent.metadata?.bookingId !== bookingId || paymentIntent.metadata?.userId !== context.auth.uid) {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "This payment does not belong to this booking."
       );
     }
 
@@ -256,13 +254,9 @@ export const confirmPayment = functions.https.onCall(async (data, context) => {
       message: "Payment confirmed successfully",
     };
   } catch (error: any) {
-    console.error("FULL STRIPE ERROR:", JSON.stringify(error, null, 2));
-    console.error("Error confirming payment:", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "Failed to confirm payment",
-      error?.message || "Unknown error"
-    );
+    if (error instanceof functions.https.HttpsError) throw error;
+    console.error("confirmPayment failed");
+    throw new functions.https.HttpsError("internal", "Failed to confirm payment");
   }
 });
 

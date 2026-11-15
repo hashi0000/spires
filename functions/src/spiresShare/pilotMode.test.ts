@@ -286,7 +286,8 @@ describe("pilot sitemap and email defaults", () => {
     const shareHtml = fs.readFileSync(path.join(websiteRoot, "share.html"), "utf8");
     const robots = fs.readFileSync(path.join(websiteRoot, "robots.txt"), "utf8");
     assert.doesNotMatch(generator, /locPath === '\/share'/);
-    assert.match(generator, /path\.join\(root, 'share'\)/);
+    assert.match(generator, /function listPublicHtml/);
+    assert.doesNotMatch(generator, /SKIP_FILES[\s\S]*share\.html/);
     assert.match(shareHtml, /<meta name="robots" content="index, follow">/);
     assert.match(shareHtml, /rel="canonical" href="https:\/\/www\.spires-taxis\.com\/share"/);
     assert.doesNotMatch(shareHtml, /noindex/);

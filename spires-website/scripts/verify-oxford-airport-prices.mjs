@@ -181,6 +181,46 @@ assert(homeFares.includes(">£138 <span>one way</span>"), "homepage Abingdon 8 S
 assert(homeFares.includes(">£110 <span>one way</span>"), "homepage Didcot or Bicester Heathrow one way");
 assert(homeFares.includes(">£108 <span>one way</span>"), "homepage Witney Heathrow one way");
 
+assert(ctx.window.SPIRES_EXECUTIVE_SERVICE_ENABLED === false, "executive flag must stay off");
+const executiveFares = {
+  oxford: [150, 290],
+  abingdon: [165, 320],
+  didcot: [170, 330],
+  bicester: [170, 330],
+  witney: [170, 330],
+};
+assert(data.routes.heathrow.executive.oneWay === 150, "Oxford executive one way");
+assert(data.routes.heathrow.executive.return === 290, "Oxford executive return");
+assert(data.routes.gatwick.executive.available === false, "Oxford Gatwick executive stays unavailable");
+for (const [originId, prices] of Object.entries(executiveFares)) {
+  if (originId === "oxford") continue;
+  const route = regional[originId].routes.heathrow;
+  assert(route.executive.oneWay === prices[0], originId + " executive one way");
+  assert(route.executive.return === prices[1], originId + " executive return");
+  const otherAirport = ctx.window.SPIRES_renderFareBlock(originId, "gatwick", { executive: true });
+  assert(otherAirport.rows.includes("Not available"), originId + " Gatwick executive unavailable");
+  assert(otherAirport.rows.includes("£" + regional[originId].routes.gatwick.standardCar.oneWay), originId + " Gatwick Standard fare unchanged");
+}
+const plainTable = ctx.window.SPIRES_renderFareBlock("oxford");
+assert(!plainTable.headRow.includes("Executive Car"), "default fare table has no Executive column");
+assert(!plainTable.rows.includes('data-label="Executive Car one way"'), "default Oxford table does not print the Executive fare");
+const reviewTable = ctx.window.SPIRES_renderFareBlock("oxford", null, { executive: true });
+assert(reviewTable.headRow.includes("Executive Car one way"), "review table adds Executive columns");
+assert(reviewTable.rows.includes("£150"), "review table shows Oxford Executive one way");
+assert(reviewTable.rows.includes("£290"), "review table shows Oxford Executive return");
+assert(reviewTable.rows.includes("Not available"), "non-Heathrow Executive cells stay unavailable");
+const abingdonReview = ctx.window.SPIRES_renderFareBlock("abingdon", "heathrow", { executive: true });
+assert(abingdonReview.rows.includes("£165") && abingdonReview.rows.includes("£320"), "Abingdon Executive review fares");
+assert(abingdonReview.rows.includes("£105") && abingdonReview.rows.includes("£205"), "Abingdon Standard fares stay in the review table");
+const page = readFileSync(join(website, "executive-heathrow-transfers.html"), "utf8");
+assert(page.includes("£150") && page.includes("£290"), "executive page Oxford fares");
+assert(page.includes("£165") && page.includes("£320"), "executive page Abingdon fares");
+assert((page.match(/£170/g) || []).length >= 3 && (page.match(/£330/g) || []).length >= 3, "executive page Didcot, Bicester and Witney fares");
+assert(page.includes("Advance booking required. Subject to availability and booking confirmation."), "executive customer wording");
+assert(page.includes("data-executive-block"), "executive page can be held");
+assert(!page.includes("whatsapp-route.js"), "executive WhatsApp message must not be rewritten");
+assert(page.includes("One%20way%20or%20return"), "executive WhatsApp prompt");
+
 if (failures.length) {
   console.error("FAILED:\n" + failures.map((f) => " - " + f).join("\n"));
   process.exit(1);

@@ -3,6 +3,7 @@ import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc } from "fi
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../utils/firebase";
 import { isAdminEmail } from "../utils/staffAccess";
+import { reconciliationItems } from "../utils/bookingOps";
 import {
   ADVERTISING_BUDGET_LABEL,
   ADDITIONAL_BOOKINGS_NOTE,
@@ -569,7 +570,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const initial = previewMode ? { from: "2026-11-01", to: "2026-11-30" } : currentLondonMonth();
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
-  const [dateBasis, setDateBasis] = useState<"journey" | "enquiry">("journey");
+  const [dateBasis, setDateBasis] = useState<"journey" | "enquiry">("enquiry");
   const [spend, setSpend] = useState<SpendEntryInput[]>([]);
   const [notes, setNotes] = useState<Record<string, NoteRecord>>({});
   const [manualIsComplete, setManualIsComplete] = useState(false);
@@ -684,7 +685,18 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     }
   };
 
+  const queue = reconciliationItems(bookings);
   return (
+    <>
+    {queue.length > 0 ? (
+      <section className="card" style={{ marginBottom: "1rem" }}>
+        <h3 className="card-title">Reconciliation queue</h3>
+        <p>Unknown amounts stay unknown. Open the booking to record the missing fare, payment, supplier cost, or source.</p>
+        <ul>
+          {queue.map((item) => <li key={`${item.bookingNumber}-${item.kind}`}>{item.bookingNumber}: {item.detail}</li>)}
+        </ul>
+      </section>
+    ) : null}
     <AdvertisingResultsView
       report={report}
       deliveries={deliveries}
@@ -785,6 +797,7 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
         void saveNote(id, { [field]: amount });
       }}
     />
+    </>
   );
 };
 

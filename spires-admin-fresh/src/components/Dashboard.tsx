@@ -21,6 +21,7 @@ import {
 } from '../utils/advertisingResults';
 import { ComparisonBars, growthComparisonItems } from './ComparisonBars';
 import { BookingFrequencyChart } from './BookingFrequencyChart';
+import { WelcomeReview } from './WelcomeReview';
 
 interface DashboardProps {
   activeDriversCount: number;
@@ -113,6 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+      <WelcomeReview />
       
       {pendingCustomerBookingsCount > 0 && (
         <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg">
@@ -214,7 +216,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Users className="h-8 w-8 text-blue-600" />
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Active Drivers</p>
-              <p className="text-2xl font-bold text-gray-900">{activeDriversCount}/3</p>
+              <p className="text-2xl font-bold text-gray-900">{activeDriversCount}</p>
             </div>
           </div>
         </div>
@@ -223,7 +225,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex items-center">
             <Car className="h-8 w-8 text-green-600" />
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Available Vehicles</p>
+              <p className="text-sm font-medium text-gray-600">Vehicles on fleet</p>
               <p className="text-2xl font-bold text-gray-900">{availableVehiclesCount}</p>
             </div>
           </div>
@@ -268,20 +270,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Oxford City Council Compliance</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Records on file</h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Operator License Status</span>
-            <span className="text-sm text-green-600">✓ Active</span>
+            <span className="text-sm text-gray-600">Active drivers recorded</span>
+            <span className="text-sm text-gray-900">{activeDriversCount}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Active Driver Count</span>
-            <span className="text-sm text-green-600">{activeDriversCount}/3 Compliant</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Record Keeping</span>
-            <span className="text-sm text-green-600">✓ 12 Month Retention</span>
-          </div>
+          <p className="text-sm text-gray-600">This count is not a licence check. Operator licence, MOT and insurance status are not confirmed from this number.</p>
         </div>
       </div>
 
@@ -300,7 +295,7 @@ function MarketingPerformance({ bookings, now, onOpenAdvertising, advertisingSta
     const month = currentLondonMonth(now);
     return buildAdvertisingReport(bookings, {
       ...month,
-      dateBasis: "journey",
+      dateBasis: "enquiry",
       now,
       spend: [],
       manualSpendIsComplete: false,
@@ -347,7 +342,7 @@ function MarketingPerformance({ bookings, now, onOpenAdvertising, advertisingSta
 function BeforeAfterAdvertising({ bookings, now, advertisingStartedOn = null, advertisingStartConfirmed = false }: { bookings: Booking[]; now: Date; advertisingStartedOn?: string | null; advertisingStartConfirmed?: boolean }) {
   const report = useMemo(() => buildAdvertisingReport(bookings, {
     ...currentLondonMonth(now),
-    dateBasis: "journey",
+    dateBasis: "enquiry",
     now,
     spend: [],
     manualSpendIsComplete: false,

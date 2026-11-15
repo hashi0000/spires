@@ -3,13 +3,16 @@ import type { BulkPatch } from './bulkBookingEdit';
 
 export async function applyBulkJobUpdates(
   db: Firestore,
-  updates: { id: string; patch: BulkPatch }[]
+  updates: { id: string; revision?: number; patch: BulkPatch }[]
 ): Promise<void> {
   const chunkSize = 400;
   for (let start = 0; start < updates.length; start += chunkSize) {
     const batch = writeBatch(db);
     updates.slice(start, start + chunkSize).forEach((item) => {
-      const data: Record<string, unknown> = { updatedAt: serverTimestamp() };
+      const data: Record<string, unknown> = {
+        updatedAt: serverTimestamp(),
+        revision: Number(item.revision || 0) + 1,
+      };
       if (item.patch.driverId === null) data.driverId = deleteField();
       else if (item.patch.driverId) data.driverId = item.patch.driverId;
       if (item.patch.vehicleId === null) data.vehicleId = deleteField();

@@ -11,12 +11,14 @@ exports.decideHalfTermPromotion = decideHalfTermPromotion;
 exports.poundsToPence = poundsToPence;
 exports.formatPence = formatPence;
 exports.quoteTotals = quoteTotals;
+const catalog_1 = require("../offers/catalog");
 const londonTime_1 = require("./londonTime");
-/** 2026 half term only. Do not treat these dates as an annual rule. */
+/** 2026 half term only. Dates and the amount come from the offer catalog. */
+const HALF_TERM_OFFER = (0, catalog_1.offerById)("half-term-2026");
 exports.HALF_TERM_CODE = "HALFTERM";
-exports.HALF_TERM_DISCOUNT_PENCE = 500;
-exports.HALF_TERM_START_YMD = "2026-10-25";
-exports.HALF_TERM_LAST_YMD = "2026-11-02";
+exports.HALF_TERM_DISCOUNT_PENCE = HALF_TERM_OFFER.discountPence || 0;
+exports.HALF_TERM_START_YMD = HALF_TERM_OFFER.startsOn || "";
+exports.HALF_TERM_LAST_YMD = HALF_TERM_OFFER.endsOn || "";
 const AIRPORT_TEXT = /\b(heathrow|gatwick|stansted|luton|birmingham airport|bristol airport|london city|lhr|lgw|stn|ltn|bhx|brs|lcy|airport)\b/i;
 function isHalfTermRequestWindow(ms) {
     const ymd = (0, londonTime_1.londonYmd)(ms);

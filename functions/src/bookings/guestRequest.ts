@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "crypto";
 import { onlineTermsAcceptance } from "../terms/bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
 import { applyStopEnds, hasExtraStops, OPEN_RETURN_NOTICE, readStops, validateStops } from "./journeyStops";
+import { assessExecutiveBooking } from "../quotes/executiveService";
 
 export const OFFICE_PHONE = "07776 897772";
 export const CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
@@ -167,7 +168,13 @@ export function nextGuestRate(
 
 export function prepareGuestBooking(
   body: Record<string, unknown>,
-  options: { now: number; todayYmd: string; bookingNumber: string; claimToken?: { token: string; hash: string } | null }
+  options: {
+    now: number;
+    todayYmd: string;
+    bookingNumber: string;
+    claimToken?: { token: string; hash: string } | null;
+    executiveEnabled?: boolean;
+  }
 ): GuestPrepareResult {
   if (str(body._gotcha)) return { ok: true, spam: true };
 
@@ -202,20 +209,36 @@ export function prepareGuestBooking(
   const dateTime = `${date}T${time}`;
 
   const vehicleType = str(body.vehicleType);
-  if (vehicleType !== "standard" && vehicleType !== "8_seater") {
-    return { ok: false, error: "Please choose a Standard Car or an 8 Seater." };
-  }
-  const maxPassengers = vehicleType === "8_seater" ? 8 : 4;
   const rawPassengers = str(body.passengers);
   const passengers = rawPassengers ? Number(rawPassengers) : 1;
-  if (!Number.isInteger(passengers) || passengers < 1 || passengers > maxPassengers) {
-    return {
-      ok: false,
-      error:
-        vehicleType === "8_seater"
-          ? "An 8 Seater can take up to 8 passengers."
-          : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups.",
-    };
+  let executiveFields: Record<string, unknown> = {};
+  if (vehicleType === "executive") {
+    const decision = assessExecutiveBooking({
+      enabled: options.executiveEnabled,
+      passengers,
+      bookingType: str(body.bookingType),
+      pickup: ends.pickup,
+      destination: ends.destination,
+      stops,
+      returnPickup: str(body.returnPickupLocation),
+      returnDestination: str(body.returnDestination),
+      returnStops: str(body.bookingType) === "return" ? readStops(body, "returnStops", str(body.returnPickupLocation), str(body.returnDestination)) : [],
+    });
+    if (!decision.ok) return { ok: false, error: decision.error };
+    executiveFields = decision.fields;
+  } else if (vehicleType !== "standard" && vehicleType !== "8_seater") {
+    return { ok: false, error: "Please choose a Standard Car or an 8 Seater." };
+  } else {
+    const maxPassengers = vehicleType === "8_seater" ? 8 : 4;
+    if (!Number.isInteger(passengers) || passengers < 1 || passengers > maxPassengers) {
+      return {
+        ok: false,
+        error:
+          vehicleType === "8_seater"
+            ? "An 8 Seater can take up to 8 passengers."
+            : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups.",
+      };
+    }
   }
   const rawLuggage = str(body.luggage);
   const luggage = rawLuggage ? Number(rawLuggage) : 0;
@@ -327,6 +350,7 @@ export function prepareGuestBooking(
     status: "pending",
     customerStatus: "pending",
     adminStatus: "pending",
+    ...executiveFields,
     depositRequired: false,
     depositStatus: "not_required",
     termsAccepted: true,

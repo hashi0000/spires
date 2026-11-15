@@ -21,7 +21,7 @@ function millis(value: unknown): number | null {
 }
 
 function storedStatus(value: unknown): string {
-  if (value === "paid") return "completed";
+  if (value === "paid") return "needs_review";
   return text(value);
 }
 
@@ -42,7 +42,7 @@ export function returnReminderTarget(data: Record<string, unknown>): ReturnRemin
   const overall = storedStatus(data.status) || storedStatus(data.adminStatus);
   if (explicit === "completed" || explicit === "cancelled") return null;
   if (!explicit && overall === "cancelled") return null;
-  const needsReview = explicit === "needs_review" || (!explicit && (overall === "completed" || overall === "paid"));
+  const needsReview = explicit === "needs_review" || (!explicit && (overall === "completed" || overall === "needs_review"));
   const pickup = text(data.returnPickupLocation) || text(data.destination) || "—";
   const dropoff = text(data.returnDestination) || text(data.pickupLocation) || text(data.pickup) || "—";
   if (needsReview) {

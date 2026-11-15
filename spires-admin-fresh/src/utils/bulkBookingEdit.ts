@@ -83,7 +83,7 @@ export function planBulkJobUpdate(booking: BulkJobRecord, changes: BulkJobChange
   }
 
   if (payment && payment !== (booking.paymentStatus || 'pending')) {
-    patch.paymentStatus = payment;
+    return { ok: false, reason: 'Payment status follows recorded payments. Open the booking and record a payment, refund, or reconciliation. The amount already received stays as it is.' };
   }
 
   if (note) {

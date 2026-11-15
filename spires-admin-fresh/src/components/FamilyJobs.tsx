@@ -11,6 +11,7 @@ import { generateSpiresBookingNumber } from "../utils/bookingNumber";
 import { CustomerProfile } from "../utils/customerSuggestions";
 import {
   FAMILY_VEHICLE_OPTIONS,
+  familyVehicleChoices,
   FamilyJobDraft,
   FamilyJobView,
   buildFamilyCancelPayload,
@@ -290,6 +291,7 @@ const FamilyJobs: React.FC<Props> = ({
               {option.label}
             </option>
           ))}
+          <option value="executive">Executive Car</option>
         </select>
       </div>
 
@@ -500,7 +502,7 @@ const FamilyJobs: React.FC<Props> = ({
             </label>
             <fieldset>
               <legend>Vehicle required</legend>
-              {FAMILY_VEHICLE_OPTIONS.map((option) => (
+              {familyVehicleChoices(draft.vehicleType).map((option) => (
                 <label key={option.value} className="family-jobs-radio">
                   <input
                     type="radio"
@@ -540,18 +542,7 @@ const FamilyJobs: React.FC<Props> = ({
                     placeholder="Optional"
                   />
                 </label>
-                <label>
-                  Payment status
-                  <select
-                    value={draft.paymentStatus}
-                    onChange={(e) => updateDraft({ paymentStatus: e.target.value as FamilyJobDraft["paymentStatus"] })}
-                  >
-                    <option value="">Not set</option>
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="partial">Partial</option>
-                  </select>
-                </label>
+                <p>Payment is recorded on the office booking. This phone does not change the amount received.</p>
                 <label>
                   Flight number
                   <input value={draft.flightNumber} onChange={(e) => updateDraft({ flightNumber: e.target.value })} />

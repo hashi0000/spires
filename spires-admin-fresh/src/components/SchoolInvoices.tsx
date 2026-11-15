@@ -24,7 +24,7 @@ import {
   GeneratedSchoolInvoice,
 } from "../utils/schoolInvoiceTypes";
 import {
-  allocateInvoiceNumber,
+  applyAssignedInvoiceNumbers,
   loadSchoolInvoiceVault,
   persistSchoolInvoiceVault,
   rebuildInvoiceSeq,
@@ -89,11 +89,14 @@ const SchoolInvoices: React.FC = () => {
   }, []);
 
   const persist = async (next: SchoolInvoiceVault) => {
-    await persistSchoolInvoiceVault(next);
-    setVault(next);
+    const saved = await persistSchoolInvoiceVault(next);
+    const invoices = applyAssignedInvoiceNumbers(next.invoices, saved.assigned);
+    const stored = { ...next, invoices, revision: saved.revision };
+    setVault(stored);
     setSupplier(next.supplier);
     setRoutes(next.routes);
-    setHistory(next.invoices);
+    setHistory(invoices);
+    return stored;
   };
 
   const timetableRow = getTimetableRow(serviceMonth);
@@ -222,22 +225,12 @@ const SchoolInvoices: React.FC = () => {
       return;
     }
     setBusy(true);
+    let draftId = "";
     try {
-      const allocated = allocateInvoiceNumber(vault, supplier.invoicePrefix.trim() || "ST-OCC", serviceMonth);
-      const invoiceNumber = allocated.invoiceNumber;
-      await downloadSchoolInvoicePdf({
-        invoiceNumber,
-        invoiceDate,
-        kind,
-        serviceMonth,
-        lines: usable,
-        notes: notes.trim(),
-        draft,
-        supplier,
-      });
+      draftId = `draft_${Date.now()}`;
       const record = {
-        id: invoiceNumber,
-        invoiceNumber,
+        id: draftId,
+        invoiceNumber: "PENDING",
         invoiceDate,
         kind,
         serviceMonth,
@@ -245,19 +238,57 @@ const SchoolInvoices: React.FC = () => {
         notes: notes.trim(),
         createdAt: new Date().toISOString(),
         draft,
+        needsServerNumber: true,
+        numberPrefix: supplier.invoicePrefix.trim() || "ST-OCC",
+        numberPeriod: serviceMonth,
       };
-      await persist({
-        ...allocated.vault,
+      const stored = await persist({
+        ...vault,
         supplier,
         routes,
         invoices: [record, ...history],
       });
+      const issued = stored.invoices.find((row) => row.id === draftId);
+      if (!issued || issued.invoiceNumber === "PENDING") {
+        throw new Error("The server did not issue an invoice number. The PDF was not downloaded.");
+      }
+      await downloadSchoolInvoicePdf({
+        invoiceNumber: issued.invoiceNumber,
+        invoiceDate,
+        kind,
+        serviceMonth,
+        lines: usable,
+        notes: notes.trim(),
+        draft,
+        supplier,
+      });
       setStatus(
         draft
-          ? `Draft PDF ${invoiceNumber} downloaded. Do not email it until ${formatUkDate(earliest)}.`
-          : `PDF ${invoiceNumber} downloaded. Email it to ${OCC_FINANCE_EMAIL}.`
+          ? `Draft PDF ${issued.invoiceNumber} downloaded. Do not email it until ${formatUkDate(earliest)}.`
+          : `PDF ${issued.invoiceNumber} downloaded. Email it to ${OCC_FINANCE_EMAIL}.`
       );
     } catch (err) {
+      try {
+        const loaded = await loadSchoolInvoiceVault();
+        const recovered = loaded.invoices.find((row) => row.id === draftId && row.invoiceNumber && row.invoiceNumber !== "PENDING");
+        if (recovered) {
+          await downloadSchoolInvoicePdf({
+            invoiceNumber: recovered.invoiceNumber,
+            invoiceDate,
+            kind,
+            serviceMonth,
+            lines: usable,
+            notes: notes.trim(),
+            draft,
+            supplier,
+          });
+          setVault(loaded);
+          setStatus(`Invoice ${recovered.invoiceNumber} was already saved. The same PDF was downloaded again.`);
+          return;
+        }
+      } catch {
+        /* The original error is shown below. */
+      }
       setError(err instanceof Error ? err.message : "Could not generate the PDF.");
     } finally {
       setBusy(false);
@@ -275,7 +306,7 @@ const SchoolInvoices: React.FC = () => {
     try {
       const invoices = history.filter((row) => row.id !== id);
       await persist({ ...vault, supplier, routes, invoices, seq: rebuildInvoiceSeq(invoices) });
-      setStatus(`${invoiceNumber} removed. The next PDF can reuse that number if it was the latest.`);
+      setStatus(`${invoiceNumber} removed. The next PDF gets a new number. Deleted numbers are not reused.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete invoice.");
     } finally {
@@ -626,7 +657,7 @@ const SchoolInvoices: React.FC = () => {
             </button>
           </div>
           <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-            Use the download button to get the PDF again with the current headed paper. Deleting a record does not recall an email already sent to the Council.
+            Use the download button to get the PDF again. Deleting a record does not recall an email already sent to the Council. Nothing on this screen is sent to the Council.
           </p>
           <ul className="text-sm space-y-2">
             {history.map((row) => (

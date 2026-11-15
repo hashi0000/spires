@@ -100,7 +100,7 @@ function shouldMoveToConfirmedAfterPayment(input) {
 function effectiveWorkflowStatus(data) {
     const primary = data.status || data.adminStatus || data.customerStatus || "pending";
     if (primary === "paid")
-        return "completed";
+        return "needs_review";
     if (primary === "confirmed" && ["allocated", "completed"].includes(data.adminStatus || "")) {
         return data.adminStatus;
     }

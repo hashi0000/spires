@@ -20,6 +20,7 @@ export interface JourneyLeg {
   destination: string;
   status: JourneyLegStatus;
   driverId: string;
+  vehicleId: string;
   needsReview: boolean;
 }
 
@@ -29,6 +30,7 @@ type LegBooking = Booking & {
   outboundStatus?: string;
   returnStatus?: string;
   returnDriverId?: string;
+  returnVehicleId?: string;
   returnDateTime?: string;
   returnTrip?: boolean;
   customerStatus?: string;
@@ -69,7 +71,7 @@ function parseWhen(value?: string | null): Date | null {
 }
 
 export function readLegStatus(value: unknown): JourneyLegStatus | null {
-  if (value === "paid") return "completed";
+  if (value === "paid") return "needs_review";
   if (typeof value === "string" && LEG_STATUSES.has(value as JourneyLegStatus)) {
     return value as JourneyLegStatus;
   }
@@ -115,6 +117,7 @@ export function journeyLegs(booking: Booking, now: Date = new Date()): JourneyLe
     destination: text(row.destination),
     status: explicitOutbound || overall,
     driverId: text(row.driverId),
+    vehicleId: text(row.vehicleId),
     needsReview: false,
   };
   if (!hasTimedReturn(row)) return [outbound];
@@ -150,6 +153,7 @@ export function journeyLegs(booking: Booking, now: Date = new Date()): JourneyLe
       destination: text(row.returnDestination) || text(row.pickupLocation),
       status: returnStatus,
       driverId,
+      vehicleId: text(row.returnVehicleId),
       needsReview,
     },
   ];
@@ -197,22 +201,22 @@ export function applyRequestedLegStatus<T extends LegBooking>(previous: Booking 
   const previousStatus = previous ? String(previous.status || "") : "";
   const nextStatus = String(next.status || "");
   const wasCompleted = previous
-    ? effectiveWorkflowStatus(previous) === "completed" || previousStatus === "completed" || previousStatus === "paid"
+    ? effectiveWorkflowStatus(previous) === "completed" || previousStatus === "completed"
     : false;
-  const markingCompleted = (nextStatus === "completed" || nextStatus === "paid") && !wasCompleted;
+  const markingCompleted = nextStatus === "completed" && !wasCompleted;
   if (!markingCompleted && !returnChoice && !outboundChoice) return next;
 
   const outboundStatus: JourneyLegStatus = markingCompleted
     ? "completed"
     : outboundChoice || (wasCompleted ? "completed" : readLegStatus(nextStatus) || "confirmed");
   const returnStatus: JourneyLegStatus = returnChoice || (markingCompleted ? "needs_review" : readLegStatus(nextStatus) || "confirmed");
-  let status: Booking["status"] = nextStatus === "paid" ? "completed" : next.status;
+  let status: Booking["status"] = next.status;
   if (resolved(outboundStatus) && resolved(returnStatus)) {
     status = outboundStatus === "cancelled" && returnStatus === "cancelled" ? "cancelled" : "completed";
-  } else if (markingCompleted || nextStatus === "completed" || nextStatus === "paid") {
+  } else if (markingCompleted || nextStatus === "completed") {
     status = text(next.driverId) || text(next.returnDriverId) ? "allocated" : "confirmed";
   }
-  const customerStatus = next.customerStatus === "completed" || next.customerStatus === "paid" ? status : next.customerStatus;
+  const customerStatus = next.customerStatus === "completed" ? status : next.customerStatus;
   return {
     ...next,
     outboundStatus,

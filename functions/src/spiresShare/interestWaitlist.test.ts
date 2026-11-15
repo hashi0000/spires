@@ -298,13 +298,15 @@ describe("Spires Share interest groups and waitlist", () => {
     const db = new InMemoryShareDb();
     const journey = createPilotJourney(db, { travelDate: "2026-10-12", departureTime: "14:00", customerVisible: true });
     await fillHeathrow(db, journey.id, 5, "Race");
-    addWaitlist(db, journey.id, { ...contact("First"), passengers: 1, termsAccepted: true });
-    addWaitlist(db, journey.id, { ...contact("Second"), passengers: 1, termsAccepted: true });
-    cancelReservation(db, [...db.bookings.values()][0].id);
+    addWaitlist(db, journey.id, { ...contact("First"), passengers: 1, termsAccepted: true, nowIso: "2026-10-01T10:00:00.000Z" });
+    addWaitlist(db, journey.id, { ...contact("Second"), passengers: 1, termsAccepted: true, nowIso: "2026-10-01T10:05:00.000Z" });
+    const now = "2026-10-11T12:00:00.000Z";
+    cancelReservation(db, [...db.bookings.values()][0].id, now);
     const offered = [...db.waitlist.values()].find((row) => row.status === "OFFERED");
+    assert.equal(offered?.email, "first@example.com");
     const results = await Promise.allSettled([
-      claimWaitlistPlace(db, offered!.id, "uid_First"),
-      claimWaitlistPlace(db, offered!.id, "uid_First"),
+      claimWaitlistPlace(db, offered!.id, offered!.uid, "2026-10-11T12:05:00.000Z"),
+      claimWaitlistPlace(db, offered!.id, offered!.uid, "2026-10-11T12:05:00.000Z"),
     ]);
     const fulfilled = results.filter((row) => row.status === "fulfilled");
     const rejected = results.filter((row) => row.status === "rejected");
@@ -397,7 +399,12 @@ describe("Spires Share interest groups and waitlist", () => {
     const result = cancelReservation(db, paid.id, "2026-10-11T08:00:00.000Z");
     assert.equal(result.journeyStillConfirmed, true);
     assert.equal(db.journeys.get(journey.id)?.status, "CONFIRMED");
-    const claimed = await claimWaitlistPlace(db, [...db.waitlist.values()].find((row) => row.status === "OFFERED")!.id, "uid_Wait");
+    const claimed = await claimWaitlistPlace(
+      db,
+      [...db.waitlist.values()].find((row) => row.status === "OFFERED")!.id,
+      "uid_Wait",
+      "2026-10-11T08:05:00.000Z"
+    );
     assert.equal(db.journeys.get(journey.id)?.status, "CONFIRMED");
     assert.equal(claimed.booking.reservationStatus, "PAYMENT_PENDING");
   });

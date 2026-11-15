@@ -7,8 +7,10 @@ import { SPIRES_BANK_DETAILS, isBankTransferMethod } from "../bankDetails";
 import {
   VEHICLE_TYPES,
   VEHICLE_ALLOCATION_DISCLAIMER,
+  executiveServicePublic,
   maxPassengersForVehicle,
 } from "../vehicleTypes";
+import { classifyExecutiveJourney } from "../executiveService";
 import {
   airportWaitingWebsiteBody,
 } from "../airportWaitingPolicy";
@@ -240,8 +242,33 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     const passengers = parseInt(formData.passengers, 10) || 1;
+    if (formData.vehicleType === "executive") {
+      const executiveJourney = classifyExecutiveJourney({
+        pickup: formData.pickup,
+        destination: formData.destination,
+        bookingType: formData.bookingType,
+        returnPickup: formData.returnPickupLocation,
+        returnDestination: formData.returnDestination,
+        stops: buildStops(formData.pickup, formData.destination, formData.pickupPlace, formData.destinationPlace, formData.middleStops),
+        returnStops: formData.bookingType === "return"
+          ? buildStops(formData.returnPickupLocation, formData.returnDestination, null, null, formData.returnMiddleStops)
+          : [],
+      });
+      if (!executiveJourney.ok) {
+        setError(executiveJourney.error);
+        setSubmitting(false);
+        submitLock.current = false;
+        return;
+      }
+      if (passengers < 1 || passengers > 8) {
+        setError("Enter the number of passengers travelling, from 1 to 8. We confirm that an Executive Car is suitable before we accept the booking.");
+        setSubmitting(false);
+        submitLock.current = false;
+        return;
+      }
+    }
     const maxPax = maxPassengersForVehicle(formData.vehicleType);
-    if (passengers > maxPax) {
+    if (formData.vehicleType !== "executive" && passengers > maxPax) {
       setError(
         formData.vehicleType === "8_seater"
           ? "An 8 Seater can take up to 8 passengers."
@@ -677,7 +704,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
               Vehicle class *
             </span>
             <div className="vehicle-picker" role="radiogroup" aria-label="Vehicle class">
-              {VEHICLE_TYPES.map((opt) => {
+              {(executiveServicePublic() ? VEHICLE_TYPES : VEHICLE_TYPES.filter((opt) => opt.value !== "executive")).map((opt) => {
                 const selected = formData.vehicleType === opt.value;
                 return (
                   <label
@@ -698,6 +725,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                           vehicleType: opt.value,
                           passengers: String(Math.min(pax, maxPax)),
                         });
+                        if (opt.value === "executive" && window.SpiresMeasurement && window.SpiresMeasurement.engagement) {
+                          window.SpiresMeasurement.engagement("executive_option_selected", { service_type: "executive", airport: "heathrow" });
+                        }
                       }}
                     />
                     <span className="vehicle-picker__name">{opt.label}</span>
@@ -708,6 +738,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
               })}
             </div>
             <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
+            {formData.vehicleType === "executive" && (
+              <p className="vehicle-disclaimer">Executive Heathrow transfers. Advance booking required. Subject to availability and booking confirmation. Tell us the passengers and luggage. We confirm the car is suitable before we accept the booking. Sending this form does not confirm a vehicle or take payment.</p>
+            )}
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>
                 Groups over 4 need the 8 Seater.

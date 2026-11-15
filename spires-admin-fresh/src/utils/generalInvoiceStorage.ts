@@ -16,6 +16,7 @@ export type GeneralInvoiceVault = {
   clients: SavedInvoiceClient[];
   invoices: GeneratedGeneralInvoice[];
   seq: Record<string, number>;
+  revision: number;
 };
 
 const VAULT_DOC = "general";
@@ -91,6 +92,9 @@ function normaliseVault(raw: unknown): GeneralInvoiceVault {
     clients: normaliseClients(row.clients ?? row.routes),
     invoices: Array.isArray(row.invoices) ? (row.invoices as GeneratedGeneralInvoice[]) : [],
     seq: row.seq && typeof row.seq === "object" ? row.seq : {},
+    revision: Number.isInteger(Number((row as { revision?: unknown }).revision))
+      ? Number((row as { revision?: unknown }).revision)
+      : 0,
   };
 }
 
@@ -99,7 +103,7 @@ export async function loadGeneralInvoiceVault(): Promise<GeneralInvoiceVault> {
     const res = await getVault({ docId: VAULT_DOC });
     const data = res.data as { empty?: boolean; payload?: unknown };
     if (!data?.empty && looksLikeSchoolVault(data?.payload)) {
-      return { supplier: supplierFromUnknown(data?.payload), clients: [], invoices: [], seq: {} };
+      return { supplier: supplierFromUnknown(data?.payload), clients: [], invoices: [], seq: {}, revision: 0 };
     }
     const vault = normaliseVault(data?.payload);
     if (data?.empty) {
@@ -120,7 +124,7 @@ export async function loadGeneralInvoiceVault(): Promise<GeneralInvoiceVault> {
   }
 }
 
-export async function persistGeneralInvoiceVault(vault: GeneralInvoiceVault): Promise<void> {
+export async function persistGeneralInvoiceVault(vault: GeneralInvoiceVault): Promise<{ revision: number; assigned: { id: string; invoiceNumber: string }[] }> {
   try {
     const current = await getVault({ docId: VAULT_DOC });
     const data = current.data as { empty?: boolean; payload?: unknown };
@@ -129,19 +133,42 @@ export async function persistGeneralInvoiceVault(vault: GeneralInvoiceVault): Pr
         "General invoices need an updated Firebase function deploy. Saving now would mix them with school invoices."
       );
     }
-    await saveVaultFn({
+    const save = await saveVaultFn({
       docId: VAULT_DOC,
       payload: {
         version: 1,
         supplier: vault.supplier,
         routes: vault.clients,
-        invoices: vault.invoices.slice(0, 100),
+        invoices: vault.invoices,
         seq: vault.seq,
+        expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0,
       },
     });
+    const saved = save.data as { revision?: number; assigned?: { id: string; invoiceNumber: string }[] };
+    return {
+      revision: Number.isInteger(saved?.revision) ? Number(saved.revision) : (vault.revision ?? 0) + 1,
+      assigned: Array.isArray(saved?.assigned) ? saved.assigned : [],
+    };
   } catch (err) {
     throw new Error(getCallableErrorMessage(err));
   }
+}
+
+export function applyAssignedInvoiceNumbers<T extends { id: string; invoiceNumber: string; needsServerNumber?: boolean; numberPrefix?: string; numberPeriod?: string }>(
+  invoices: T[],
+  assigned: { id: string; invoiceNumber: string }[]
+): T[] {
+  if (!assigned.length) return invoices;
+  const byId = new Map(assigned.map((item) => [item.id, item.invoiceNumber]));
+  return invoices.map((row) => {
+    const invoiceNumber = byId.get(row.id);
+    if (!invoiceNumber) return row;
+    const copy = { ...row, invoiceNumber };
+    delete copy.needsServerNumber;
+    delete copy.numberPrefix;
+    delete copy.numberPeriod;
+    return copy;
+  });
 }
 
 export function allocateGeneralInvoiceNumber(

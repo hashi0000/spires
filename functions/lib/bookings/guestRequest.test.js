@@ -114,6 +114,25 @@ class MemoryGuestDb {
         strict_1.default.equal(result.error, guestRequest_1.CONTACT_REQUIRED_MESSAGE);
         strict_1.default.match(result.error, /07776 897772/);
     });
+    (0, node_test_1.it)("stores how the customer heard about us and ignores an unknown answer", () => {
+        const chosen = prepare({ heardAbout: "google", heardAboutDetail: "should not be kept" });
+        strict_1.default.equal(chosen.ok, true);
+        if (!chosen.ok || chosen.spam)
+            return;
+        strict_1.default.equal(chosen.record.heardAbout, "google");
+        strict_1.default.equal(chosen.record.heardAboutDetail, "");
+        const other = prepare({ heardAbout: "other", heardAboutDetail: "  Hotel card  " });
+        strict_1.default.equal(other.ok, true);
+        if (!other.ok || other.spam)
+            return;
+        strict_1.default.equal(other.record.heardAbout, "other");
+        strict_1.default.equal(other.record.heardAboutDetail, "Hotel card");
+        const blank = prepare({ heardAbout: "billboard" });
+        strict_1.default.equal(blank.ok, true);
+        if (!blank.ok || blank.spam)
+            return;
+        strict_1.default.equal(blank.record.heardAbout, undefined);
+    });
     (0, node_test_1.it)("keeps a request pending and does not invent a login", () => {
         const result = prepare({ vehicleType: "8_seater", passengers: "6", luggage: "4" });
         strict_1.default.equal(result.ok, true);
@@ -208,6 +227,108 @@ class MemoryGuestDb {
         strict_1.default.equal(result.record.extraStops, true);
         strict_1.default.equal(String(result.record.openReturnNotice).includes("outside Oxford"), true);
         strict_1.default.equal(String(result.record.returnPickupTime).includes("00:00"), false);
+    });
+    (0, node_test_1.it)("stores an opaque website reference and drops anything else", () => {
+        const kept = prepare({ websiteEnquiryRef: "ST-AB23CD" });
+        strict_1.default.equal(kept.ok, true);
+        if (!kept.ok || kept.spam)
+            return;
+        strict_1.default.equal(kept.record.websiteEnquiryRef, "ST-AB23CD");
+        const dropped = prepare({ websiteEnquiryRef: "gclid=abc" });
+        strict_1.default.equal(dropped.ok, true);
+        if (!dropped.ok || dropped.spam)
+            return;
+        strict_1.default.equal(dropped.record.websiteEnquiryRef, undefined);
+    });
+});
+(0, node_test_1.describe)("executive Heathrow requests", () => {
+    function prepareExecutive(overrides = {}, enabled = true) {
+        return (0, guestRequest_1.prepareGuestBooking)(body({ vehicleType: "executive", passengers: "2", ...overrides }), {
+            now,
+            todayYmd: today,
+            bookingNumber: "SPTEST1234",
+            claimToken: { token: "claim-token", hash: "claim-hash" },
+            executiveEnabled: enabled,
+        });
+    }
+    (0, node_test_1.it)("stays closed unless the service is explicitly enabled", () => {
+        const closed = prepareExecutive({}, false);
+        strict_1.default.equal(closed.ok, false);
+        if (closed.ok)
+            return;
+        strict_1.default.match(closed.error, /not open for booking/);
+    });
+    (0, node_test_1.it)("stores a published Oxford one way fare as a request, not a confirmed fare", () => {
+        const result = prepareExecutive();
+        strict_1.default.equal(result.ok, true);
+        if (!result.ok || result.spam)
+            return;
+        strict_1.default.equal(result.record.status, "pending");
+        strict_1.default.equal(result.record.customerStatus, "awaiting_availability");
+        strict_1.default.equal(result.record.adminStatus, "awaiting_availability");
+        strict_1.default.equal(result.record.vehicleType, "executive");
+        strict_1.default.equal(result.record.serviceType, "executive");
+        strict_1.default.equal(result.record.airport, "heathrow");
+        strict_1.default.equal(result.record.executiveAvailability, "awaiting_confirmation");
+        strict_1.default.equal(result.record.executiveFareStatus, "published");
+        strict_1.default.equal(result.record.executiveArea, "oxford");
+        strict_1.default.equal(result.record.proposedFarePounds, 150);
+        strict_1.default.equal(result.record.actualFare, undefined);
+        strict_1.default.equal(result.record.paymentStatus, "pending");
+        strict_1.default.equal(result.record.marketingAttribution, null);
+    });
+    (0, node_test_1.it)("uses the published return total and keeps attribution", () => {
+        const result = prepareExecutive({
+            bookingType: "return",
+            returnDate: "2026-11-12",
+            returnTime: "16:00",
+            returnPickupLocation: "Heathrow Terminal 5",
+            returnDestination: "1 High Street, Oxford",
+            marketingAttribution: {
+                consent: "granted",
+                consentAt: now,
+                capturedAt: now,
+                expiresAt: now + 86400000,
+                gclid: "exec-click",
+                email: "private@example.com",
+            },
+        });
+        strict_1.default.equal(result.ok, true);
+        if (!result.ok || result.spam)
+            return;
+        strict_1.default.equal(result.record.proposedFarePounds, 290);
+        strict_1.default.equal(result.record.bookingType, "return");
+        const attribution = result.record.marketingAttribution;
+        strict_1.default.equal(attribution.gclid, "exec-click");
+        strict_1.default.equal(attribution.email, undefined);
+    });
+    (0, node_test_1.it)("quotes other Heathrow areas without inventing a fare", () => {
+        const result = prepareExecutive({ pickup: "Kidlington, Oxfordshire", destination: "Heathrow Terminal 2" });
+        strict_1.default.equal(result.ok, true);
+        if (!result.ok || result.spam)
+            return;
+        strict_1.default.equal(result.record.executiveFareStatus, "quote_required");
+        strict_1.default.equal(result.record.executiveArea, "");
+        strict_1.default.equal("proposedFarePounds" in result.record, false);
+        strict_1.default.equal(result.record.actualFare, undefined);
+    });
+    (0, node_test_1.it)("rejects other airports and an oversized passenger count", () => {
+        const gatwick = prepareExecutive({ destination: "Gatwick Airport" });
+        strict_1.default.equal(gatwick.ok, false);
+        if (!gatwick.ok)
+            strict_1.default.match(gatwick.error, /Heathrow/);
+        const tooMany = prepareExecutive({ passengers: "9" });
+        strict_1.default.equal(tooMany.ok, false);
+    });
+    (0, node_test_1.it)("leaves a Standard Car booking unchanged", () => {
+        const result = prepare({ vehicleType: "standard", passengers: "2" });
+        strict_1.default.equal(result.ok, true);
+        if (!result.ok || result.spam)
+            return;
+        strict_1.default.equal(result.record.vehicleType, "standard");
+        strict_1.default.equal(result.record.adminStatus, "pending");
+        strict_1.default.equal(result.record.serviceType, undefined);
+        strict_1.default.equal(result.record.proposedFarePounds, undefined);
     });
 });
 (0, node_test_1.describe)("guest request rate window", () => {

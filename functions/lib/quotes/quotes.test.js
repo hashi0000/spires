@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const strict_1 = __importDefault(require("node:assert/strict"));
+const node_fs_1 = __importDefault(require("node:fs"));
+const node_path_1 = __importDefault(require("node:path"));
 const node_test_1 = require("node:test");
 const halfTerm_1 = require("./halfTerm");
 const londonTime_1 = require("./londonTime");
@@ -179,7 +181,8 @@ const airportReturn = {
     (0, node_test_1.it)("keeps allocated and legacy paid rows in the existing filters", () => {
         strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "confirmed", adminStatus: "allocated" }, "allocated"), true);
         strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "confirmed", adminStatus: "allocated" }, "confirmed"), false);
-        strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "paid" }, "completed"), true);
+        strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "paid" }, "completed"), false);
+        strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "paid" }, "needs_review"), true);
         strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "awaiting_customer_confirmation" }, "pending"), false);
         strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "awaiting_customer_confirmation" }, "awaiting_customer_confirmation"), true);
         strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status: "pending" }, "all"), true);
@@ -198,6 +201,106 @@ const airportReturn = {
     });
 });
 (0, node_test_1.describe)("invoice paid state", () => {
+    (0, node_test_1.it)("issues the next invoice number from the stored counter and ignores a client number", () => {
+        const first = (0, invoiceVault_1.assignServerInvoiceNumbers)([], [{
+                id: "draft-a",
+                needsServerNumber: true,
+                numberPrefix: "ST-INV",
+                numberPeriod: "2026-11",
+                invoiceNumber: "ST-INV-202611-999",
+            }], {});
+        strict_1.default.equal(first.assigned[0].invoiceNumber, "ST-INV-202611-001");
+        strict_1.default.equal(first.invoices[0].needsServerNumber, undefined);
+        const second = (0, invoiceVault_1.assignServerInvoiceNumbers)(first.invoices, [...first.invoices, {
+                id: "draft-b",
+                needsServerNumber: true,
+                numberPrefix: "ST-INV",
+                numberPeriod: "2026-11",
+            }], first.seq);
+        strict_1.default.equal(second.assigned[0].invoiceNumber, "ST-INV-202611-002");
+        const recovered = (0, invoiceVault_1.assignServerInvoiceNumbers)(second.invoices, second.invoices.map((row) => (row.id === "draft-a" ? { ...row, invoiceNumber: "PENDING", needsServerNumber: true, numberPrefix: "ST-INV", numberPeriod: "2026-11" } : row)), second.seq);
+        strict_1.default.equal(recovered.assigned.find((row) => row.id === "draft-a")?.invoiceNumber, "ST-INV-202611-001");
+        strict_1.default.equal(recovered.seq["ST-INV-2026-11"], 2);
+        const stale = (0, invoiceVault_1.planInvoiceSave)({ invoices: first.invoices, seq: first.seq, revision: 1 }, {
+            expectedRevision: 0,
+            invoices: [{ id: "draft-c", needsServerNumber: true, numberPrefix: "ST-INV", numberPeriod: "2026-11" }],
+        });
+        strict_1.default.equal(stale.ok, false);
+    });
+    (0, node_test_1.it)("keeps a full invoice history and rejects a stale session", () => {
+        const existing = Array.from({ length: 120 }, (_, index) => ({ id: `inv-${index}`, invoiceNumber: `ST-${index}` }));
+        strict_1.default.equal((0, invoiceVault_1.mergeInvoiceRecords)(existing, existing).length, 120);
+        const first = (0, invoiceVault_1.invoiceRevisionDecision)(undefined, 0);
+        strict_1.default.equal(first.ok && first.revision, 1);
+        const explicitZero = (0, invoiceVault_1.invoiceRevisionDecision)(0, 0);
+        strict_1.default.equal(explicitZero.ok && explicitZero.revision, 1);
+        const omitted = (0, invoiceVault_1.invoiceRevisionDecision)(undefined, undefined);
+        strict_1.default.equal(omitted.ok, false);
+        const omittedOnZero = (0, invoiceVault_1.invoiceRevisionDecision)(0, undefined);
+        strict_1.default.equal(omittedOnZero.ok, false);
+        const stale = (0, invoiceVault_1.invoiceRevisionDecision)(1, 0);
+        strict_1.default.equal(stale.ok, false);
+        const reloaded = (0, invoiceVault_1.invoiceRevisionDecision)(1, 1);
+        strict_1.default.equal(reloaded.ok && reloaded.revision, 2);
+        const root = node_path_1.default.resolve(__dirname, "../..");
+        const server = node_fs_1.default.readFileSync(node_path_1.default.join(root, "src/schoolInvoiceVault.ts"), "utf8");
+        const general = node_fs_1.default.readFileSync(node_path_1.default.join(root, "../spires-admin-fresh/src/utils/generalInvoiceStorage.ts"), "utf8");
+        const school = node_fs_1.default.readFileSync(node_path_1.default.join(root, "../spires-admin-fresh/src/utils/schoolInvoiceStorage.ts"), "utf8");
+        strict_1.default.equal(server.includes("slice(0, 100)"), false);
+        strict_1.default.equal(general.includes("slice(0, 100)"), false);
+        strict_1.default.equal(school.includes("slice(0, 100)"), false);
+        strict_1.default.equal(general.includes("expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0"), true);
+        strict_1.default.equal(school.includes("expectedRevision: Number.isInteger(vault.revision) ? vault.revision : 0"), true);
+        const schoolLoad = school.slice(school.indexOf("export async function loadSchoolInvoiceVault"), school.indexOf("export async function persistSchoolInvoiceVault"));
+        strict_1.default.equal(schoolLoad.includes("persistSchoolInvoiceVault"), false);
+        strict_1.default.equal(schoolLoad.includes("saveVaultFn"), false);
+        const saveFn = server.slice(server.indexOf("export const saveSchoolInvoiceVault"));
+        const planAt = saveFn.indexOf("planInvoiceSave");
+        const rejectAt = saveFn.indexOf("if (!planned.ok)");
+        const writeAt = saveFn.indexOf("tx.set");
+        strict_1.default.equal(planAt > 0 && rejectAt > planAt && writeAt > rejectAt, true);
+    });
+    (0, node_test_1.it)("rejects an old client on a vault with no revision and lets one first save win", async () => {
+        const history = Array.from({ length: 120 }, (_, index) => ({ id: `inv-${index}`, invoiceNumber: `ST-${index}` }));
+        const legacy = { invoices: history, seq: { "ST-INV-2026-11": 3 } };
+        const before = JSON.stringify(legacy);
+        const oldClient = (0, invoiceVault_1.planInvoiceSave)(legacy, { invoices: history.slice(0, 100), seq: {} });
+        strict_1.default.equal(oldClient.ok, false);
+        if (!oldClient.ok)
+            strict_1.default.match(oldClient.reason, /Reload before saving/);
+        strict_1.default.equal(JSON.stringify(legacy), before);
+        let stored = {
+            invoices: history.map((row) => ({ ...row })),
+            seq: { ...legacy.seq },
+        };
+        let tail = Promise.resolve();
+        const save = (invoices) => {
+            const turn = tail.then(() => {
+                const planned = (0, invoiceVault_1.planInvoiceSave)(stored, { expectedRevision: 0, invoices, seq: stored.seq });
+                if (!planned.ok)
+                    return planned;
+                stored = {
+                    invoices: planned.invoices.map((row) => ({ id: String(row.id), invoiceNumber: String(row.invoiceNumber) })),
+                    seq: planned.seq,
+                    revision: planned.revision,
+                };
+                return planned;
+            });
+            tail = turn.then(() => undefined, () => undefined);
+            return turn;
+        };
+        const [firstSession, secondSession] = await Promise.all([
+            save([...history, { id: "draft-a", invoiceNumber: "ST-INV-202611-901" }]),
+            save([...history, { id: "draft-b", invoiceNumber: "ST-INV-202611-902" }]),
+        ]);
+        const results = [firstSession, secondSession];
+        strict_1.default.equal(results.filter((row) => row.ok).length, 1);
+        strict_1.default.equal(results.filter((row) => !row.ok).length, 1);
+        strict_1.default.equal(stored.revision, 1);
+        strict_1.default.equal(stored.invoices.length, 121);
+        strict_1.default.equal(stored.invoices.filter((row) => history.some((item) => item.id === row.id)).length, 120);
+        strict_1.default.equal(stored.invoices.some((row) => row.id === "draft-a") === stored.invoices.some((row) => row.id === "draft-b"), false);
+    });
     (0, node_test_1.it)("keeps paidAt when a later email write omits it", () => {
         const existing = [{ id: "ST-UKG-202610-002", invoiceNumber: "ST-UKG-202610-002", paidAt: "2026-10-20T12:00:00.000Z", lines: [] }];
         const staleEmail = [{ id: "ST-UKG-202610-002", invoiceNumber: "ST-UKG-202610-002", emailedAt: "2026-10-21T09:00:00.000Z", emailedTo: "a@example.com", emailStatus: "sent" }];

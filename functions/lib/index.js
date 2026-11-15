@@ -34,9 +34,10 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.internationalPreview = exports.guestClaimPreview = exports.claimGuestBooking = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.scheduledFamilyJobPush = exports.onFamilyJobPush = exports.saveFamilyPushSubscription = exports.familyPushPublicKey = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
-exports.refreshAdvertisingSpend = exports.scheduledAdvertisingSpend = exports.withdrawAccountMeasurement = exports.revokeMeasurementConsent = exports.recordBookingSource = exports.recordCustomerAcquisition = exports.readAdvertisingSpend = exports.deliverBookingMeasurements = exports.queueBookingMeasurement = exports.scheduledJourneyStats = exports.publicJourneyMap = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = void 0;
+exports.reviewWelcomeEmail = exports.refreshAdvertisingSpend = exports.scheduledAdvertisingSpend = exports.withdrawAccountMeasurement = exports.revokeMeasurementConsent = exports.recordBookingSource = exports.recordCustomerAcquisition = exports.readAdvertisingSpend = exports.deliverBookingMeasurements = exports.queueBookingMeasurement = exports.scheduledJourneyStats = exports.publicJourneyMap = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
 const sendWelcomeEmail_1 = require("./sendWelcomeEmail");
 const sendBookingReminderEmails_1 = require("./sendBookingReminderEmails");
@@ -121,17 +122,19 @@ exports.onBookingWrite = functions.firestore
                 subject: "Your Spires Taxis payment receipt",
                 html: "",
                 status: "queued",
-                queuedAt: admin.firestore.FieldValue.serverTimestamp(),
+                queuedAt: firestore_1.FieldValue.serverTimestamp(),
             });
         }
     }
 });
 // Send welcome email when a new customer signs up
-exports.onCustomerCreate = functions.firestore
+exports.onCustomerCreate = functions
+    .runWith({ failurePolicy: true })
+    .firestore
     .document("customers/{customerId}")
     .onCreate(async (snapshot) => {
     const customerData = snapshot.data();
-    await (0, sendWelcomeEmail_1.sendWelcomeEmail)(customerData);
+    await (0, sendWelcomeEmail_1.sendWelcomeEmail)(snapshot.id, customerData);
 });
 /** ~24h and ~1h before pickup; uses same SMTP config as welcome email (functions.config().email / .smtp) */
 exports.scheduledBookingReminderEmails = functions
@@ -201,3 +204,5 @@ Object.defineProperty(exports, "withdrawAccountMeasurement", { enumerable: true,
 var googleAdsSync_1 = require("./marketing/googleAdsSync");
 Object.defineProperty(exports, "scheduledAdvertisingSpend", { enumerable: true, get: function () { return googleAdsSync_1.scheduledAdvertisingSpend; } });
 Object.defineProperty(exports, "refreshAdvertisingSpend", { enumerable: true, get: function () { return googleAdsSync_1.refreshAdvertisingSpend; } });
+var welcomeReview_1 = require("./offers/welcomeReview");
+Object.defineProperty(exports, "reviewWelcomeEmail", { enumerable: true, get: function () { return welcomeReview_1.reviewWelcomeEmail; } });

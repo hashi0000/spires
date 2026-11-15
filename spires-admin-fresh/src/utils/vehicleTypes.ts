@@ -1,12 +1,14 @@
 export const VEHICLE_TYPE_OPTIONS = [
   { value: 'standard' as const, label: 'Standard Car (up to 4)', examples: 'Toyota RAV4 / Corolla or similar' },
   { value: '8_seater' as const, label: '8 Seater (up to 8)', examples: 'Mercedes Vito or similar' },
+  { value: 'executive' as const, label: 'Executive Car (Heathrow request)', examples: 'Mercedes E Class or equivalent' },
 ];
 
-export type VehicleTypeOption = 'standard' | '8_seater';
+export type VehicleTypeOption = 'standard' | '8_seater' | 'executive';
 
 export function formatVehicleTypeLabel(type?: string | null): string {
   if (!type) return 'Not specified';
+  if (type === 'executive') return 'Executive Car';
   if (type === '8_seater' || type === '8-seater') return '8 Seater';
   if (type === 'standard') return 'Standard Car';
   if (type === 'multiple') return 'Multiple vehicles';
@@ -14,7 +16,15 @@ export function formatVehicleTypeLabel(type?: string | null): string {
 }
 
 export function vehicleClassExamples(type?: string | null): string {
+  if (type === 'executive') return 'Mercedes E Class or equivalent';
   if (type === 'standard') return 'Toyota RAV4 / Corolla or similar';
   if (type === '8_seater' || type === '8-seater') return 'Mercedes Vito or similar';
   return '';
+}
+
+export function executiveAwaitingAvailability(booking: {
+  vehicleType?: string | null;
+  executiveAvailability?: string | null;
+}): boolean {
+  return booking.vehicleType === 'executive' && booking.executiveAvailability !== 'accepted';
 }

@@ -206,6 +206,17 @@ export default function QuoteEditor({ bookingId, form, onChange, onWorkflowStatu
           <input className="form-input" value={paymentLink} onChange={(e) => setPaymentLink(e.target.value)} placeholder="https://" />
         </label>
       </div>
+      {booking?.vehicleType === "executive" && booking?.executiveAvailability !== "accepted" ? (
+        <p className="text-sm mb-3" style={{ padding: "0.75rem", border: "1px solid #C5A572", background: "#faf8f4" }}>
+          Executive Car request. Awaiting availability confirmation. This is not a confirmed booking.
+          {booking.executiveFareStatus === "quote_required"
+            ? " There is no published fare for this pickup. Agree an individual fixed quote after you accept availability."
+            : booking.proposedFarePounds
+              ? ` Published fare for this area: £${Number(booking.proposedFarePounds).toFixed(0)}. It is not agreed until you accept availability and send a quote.`
+              : ""}
+          {" "}Do not send a quote, request payment, or record payment until availability is accepted on the booking.
+        </p>
+      ) : null}
       <details className="quote-section">
         <summary>Fare guidance</summary>
         <p className="text-xs text-gray-600">Published airport prices are for Oxford only. Quote Abingdon, Kidlington, Witney, Bicester, Didcot and other towns separately. Do not change a fare that has already been agreed.</p>

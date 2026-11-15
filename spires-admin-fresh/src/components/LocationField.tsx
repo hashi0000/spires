@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
+import { localCallableUrl } from "../utils/firebase";
 
 export type SelectedPlace = {
   label: string;
@@ -11,7 +12,7 @@ export type SelectedPlace = {
 
 type Suggestion = SelectedPlace & { id: string; needsProperty: boolean };
 
-const ENDPOINT = "https://us-central1-spires-taxis.cloudfunctions.net/searchLocations";
+const ENDPOINT = localCallableUrl("searchLocations");
 
 type Props = {
   label: string;

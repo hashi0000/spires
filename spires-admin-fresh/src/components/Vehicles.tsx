@@ -18,6 +18,19 @@ function sortVehicles(vehicles: Vehicle[]): Vehicle[] {
   });
 }
 
+function storedDateReview(vehicle: Vehicle): string {
+  const dated = (
+    [
+      ['MOT', vehicle.compliance?.motExpiry],
+      ['insurance', vehicle.compliance?.insuranceExpiry],
+      ['PH licence', vehicle.compliance?.phLicenceExpiry],
+      ['road tax', vehicle.compliance?.taxExpiry],
+    ] as const
+  ).filter(([, value]) => getExpiryStatus(value) === 'expired').map(([label]) => label);
+  if (!dated.length) return '';
+  return `Stored ${dated.join(', ')} date needs review`;
+}
+
 function formatExpiry(value?: string): string {
   if (!value) return 'Not set';
   const d = new Date(value);
@@ -124,8 +137,11 @@ const Vehicles: React.FC<VehiclesProps> = ({
                           : 'vehicle-plate__status--off'
                       }`}
                     >
-                      {vehicle.available ? 'Available' : 'Off fleet'}
+                      {vehicle.available ? 'On fleet' : 'Off fleet'}
                     </span>
+                    {storedDateReview(vehicle) ? (
+                      <span className="vehicle-plate__status vehicle-plate__status--off">{storedDateReview(vehicle)}</span>
+                    ) : null}
                   </div>
 
                   <div className="vehicle-card-body">

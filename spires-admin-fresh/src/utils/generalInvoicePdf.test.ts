@@ -24,6 +24,12 @@ function pdfInput(invoiceDate: string, dueDate: string): GeneralInvoicePdfInput 
 }
 
 describe("invoice PDF payment wording", () => {
+  test("does not wait on a remote font stylesheet", () => {
+    const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-20"));
+    expect(html).not.toContain("fonts.googleapis.com");
+    expect(html).not.toContain("fonts.gstatic.com");
+  });
+
   test("same-day due date shows Due on receipt, not a contradictory due date", () => {
     const html = buildGeneralInvoiceHtml(pdfInput("2026-09-20", "2026-09-20"));
     expect(html).toContain("Payment terms");

@@ -25,6 +25,7 @@ import SchoolInvoices from './components/SchoolInvoices';
 import GeneralInvoices from './components/GeneralInvoices';
 import SpiresShareAdmin from './components/SpiresShareAdmin';
 import AdvertisingResults from './components/AdvertisingResults';
+import CustomerCommunications from './components/CustomerCommunications';
 import Loading from './components/Loading';
 import DriverModal from './components/DriverModal';
 import VehicleModal from './components/VehicleModal';
@@ -45,8 +46,9 @@ const PAGE_TITLES: Record<string, string> = {
   invoices: 'Invoices',
   'school-invoices': 'School invoices',
   'spires-share': 'Spires Share',
-  'link-bookings': 'Link Bookings',
+  'link-bookings': 'Maintenance: link bookings',
   advertising: 'Advertising results',
+  communications: 'Offers and customer communications',
 };
 
 function initialAdminTab(): string {
@@ -273,7 +275,7 @@ const App: React.FC = () => {
         setEditingItem(null);
         return;
       }
-      await bookingsHook.addBooking(booking);
+      await bookingsHook.addBooking({ ...booking, revision: 1 });
       setShowBookingModal(false);
       setEditingItem(null);
     } catch (error) {
@@ -301,9 +303,9 @@ const App: React.FC = () => {
   const handleSaveBookingDirect = async (booking: any) => {
     try {
       if (booking.id) {
-        await bookingsHook.updateBooking(booking.id, booking);
+        await bookingsHook.updateBooking(booking.id, { ...booking, revision: Number(booking.revision || 0) + 1 });
       } else {
-        await bookingsHook.addBooking(booking);
+        await bookingsHook.addBooking({ ...booking, revision: 1 });
       }
     } catch (error) {
       console.error('Failed to save booking:', error);
@@ -483,7 +485,7 @@ const App: React.FC = () => {
           />
         );
       case 'invoices':
-        return <GeneralInvoices />;
+        return <GeneralInvoices bookings={bookingsHook.bookings} />;
       case 'school-invoices':
         return <SchoolInvoices />;
       case 'spires-share':
@@ -492,6 +494,8 @@ const App: React.FC = () => {
         return <LinkBookings />;
       case 'advertising':
         return <AdvertisingResults bookings={bookingsHook.bookings} email={user.email} />;
+      case 'communications':
+        return <CustomerCommunications />;
       default:
         return <div>Page not found</div>;
     }
@@ -517,6 +521,9 @@ const App: React.FC = () => {
         onOpenMenu={() => setNavOpen(true)}
       />
       <main className="admin-main">
+        {bookingsHook.bookingsError ? (
+          <p className="bg-red-50 border border-red-200 text-red-800 p-3 rounded mb-4" role="alert">{bookingsHook.bookingsError}</p>
+        ) : null}
         {renderContent()}
       </main>
       <footer className="admin-footer">

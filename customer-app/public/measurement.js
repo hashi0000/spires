@@ -179,7 +179,14 @@
   }
   var lastClick = { key: '', at: 0 };
   var sentLead = Object.create(null);
-  function lead(key, channel, type) {
+  function safeExtra(extra) {
+    var out = {};
+    if (!extra || typeof extra !== 'object') return out;
+    if (extra.service_type === 'executive') out.service_type = 'executive';
+    if (extra.airport === 'heathrow') out.airport = 'heathrow';
+    return out;
+  }
+  function lead(key, channel, type, extra) {
     if (!live || !allowed() || !key) return;
     var id = String(key);
     if (sentLead[id]) return;
@@ -188,7 +195,20 @@
     var kind = type === 'contact' || type === 'quote' || type === 'booking_request' ? type : (channel === 'portal' ? 'booking_request' : channel === 'contact' ? 'contact' : 'quote');
     sentLead[id] = true;
     try { w.sessionStorage.setItem(storageKey, '1'); } catch (_) {}
-    w.gtag('event', 'generate_lead', { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: w.location.origin + cleanPath() });
+    var params = { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: w.location.origin + cleanPath() };
+    var more = safeExtra(extra);
+    if (more.service_type) params.service_type = more.service_type;
+    if (more.airport) params.airport = more.airport;
+    w.gtag('event', 'generate_lead', params);
+  }
+  function engagement(name, extra) {
+    if (!live || !allowed()) return;
+    if (name !== 'executive_option_selected' && name !== 'executive_whatsapp_click') return;
+    var params = { transport_type: 'beacon', page_location: w.location.origin + cleanPath() };
+    var more = safeExtra(extra);
+    if (more.service_type) params.service_type = more.service_type;
+    if (more.airport) params.airport = more.airport;
+    w.gtag('event', name, params);
   }
   function bestTouch(saved) {
     if (!saved) return null;
@@ -220,7 +240,7 @@
     sentLead['signup_' + key] = true;
     w.gtag('event', 'sign_up', { method: 'email', page_location: w.location.origin + cleanPath() });
   }
-  w.SpiresMeasurement = { lead: lead, signup: signup, attribution: attribution, preferences: showChoice, onConsentChange:function(fn){listeners.push(fn);fn(consent);return function(){listeners=listeners.filter(function(item){return item!==fn;});};} };
+  w.SpiresMeasurement = { lead: lead, signup: signup, attribution: attribution, preferences: showChoice, engagement: engagement, onConsentChange:function(fn){listeners.push(fn);fn(consent);return function(){listeners=listeners.filter(function(item){return item!==fn;});};} };
   if (w.addEventListener) {
     w.addEventListener('focus', function(){allowed();flushWithdrawal();});
     w.addEventListener('online',flushWithdrawal);
@@ -245,7 +265,10 @@
       var params = { transport_type: 'beacon', page_location: w.location.origin + cleanPath() };
       var route = d.body && d.body.getAttribute && d.body.getAttribute('data-wa-route');
       if (route && /^[a-z0-9-]{1,64}$/.test(route)) params.airport_route = route;
+      if (a.getAttribute('data-service-type') === 'executive') params.service_type = 'executive';
+      if (a.getAttribute('data-airport') === 'heathrow') params.airport = 'heathrow';
       w.gtag('event', name, params);
+      if (name === 'whatsapp_click' && params.service_type === 'executive') w.gtag('event', 'executive_whatsapp_click', params);
     });
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', ready); else ready();

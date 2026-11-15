@@ -67,7 +67,10 @@
     if (button) button.disabled = true;
     Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
       payload.marketingAttribution = attribution;
-      return fetch("https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote", {
+      var quoteEndpoint = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+        ? "http://127.0.0.1:5001/demo-spires/us-central1/submitWebsiteQuote"
+        : "https://us-central1-spires-taxis.cloudfunctions.net/submitWebsiteQuote";
+      return fetch(quoteEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

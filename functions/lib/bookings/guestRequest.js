@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GUEST_RATE_MESSAGE = exports.GUEST_CLAIM_ORIGIN = exports.GUEST_CLAIM_TTL_MS = exports.GUEST_RATE_WINDOW_MS = exports.GUEST_RATE_LIMIT = exports.CONTACT_REQUIRED_MESSAGE = exports.CONTACT_HELPER = exports.OFFICE_PHONE = void 0;
+exports.HEARD_ABOUT_LABELS = exports.GUEST_RATE_MESSAGE = exports.GUEST_CLAIM_ORIGIN = exports.GUEST_CLAIM_TTL_MS = exports.GUEST_RATE_WINDOW_MS = exports.GUEST_RATE_LIMIT = exports.CONTACT_REQUIRED_MESSAGE = exports.CONTACT_HELPER = exports.OFFICE_PHONE = void 0;
 exports.isGuestRateError = isGuestRateError;
+exports.heardAboutLabel = heardAboutLabel;
 exports.normaliseGuestEmail = normaliseGuestEmail;
 exports.normaliseGuestPhone = normaliseGuestPhone;
 exports.hashGuestKey = hashGuestKey;
@@ -18,6 +19,7 @@ const crypto_1 = require("crypto");
 const bookingTerms_1 = require("../terms/bookingTerms");
 const placeRecord_1 = require("../locations/placeRecord");
 const journeyStops_1 = require("./journeyStops");
+const executiveService_1 = require("../quotes/executiveService");
 exports.OFFICE_PHONE = "07776 897772";
 exports.CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
 exports.CONTACT_REQUIRED_MESSAGE = `${exports.CONTACT_HELPER} You can also call us on ${exports.OFFICE_PHONE}.`;
@@ -44,6 +46,23 @@ function parsePlace(value) {
 }
 function str(value) {
     return typeof value === "string" ? value.trim() : "";
+}
+exports.HEARD_ABOUT_LABELS = {
+    google: "Google",
+    facebook: "Facebook",
+    instagram: "Instagram",
+    friend_or_family: "Friend or family",
+    used_before: "Used us before",
+    website: "Your website",
+    other: "Other",
+};
+function heardAboutLabel(code, detail) {
+    const key = str(code);
+    const label = exports.HEARD_ABOUT_LABELS[key];
+    if (!label)
+        return "";
+    const extra = str(detail).replace(/\s+/g, " ").slice(0, 80);
+    return key === "other" && extra ? `${label}: ${extra}` : label;
 }
 function flag(value) {
     return value === true || value === "true" || value === "yes" || value === "on";
@@ -135,19 +154,38 @@ function prepareGuestBooking(body, options) {
         return { ok: false, error: "Choose a travel date that is today or later." };
     const dateTime = `${date}T${time}`;
     const vehicleType = str(body.vehicleType);
-    if (vehicleType !== "standard" && vehicleType !== "8_seater") {
-        return { ok: false, error: "Please choose a Standard Car or an 8 Seater." };
-    }
-    const maxPassengers = vehicleType === "8_seater" ? 8 : 4;
     const rawPassengers = str(body.passengers);
     const passengers = rawPassengers ? Number(rawPassengers) : 1;
-    if (!Number.isInteger(passengers) || passengers < 1 || passengers > maxPassengers) {
-        return {
-            ok: false,
-            error: vehicleType === "8_seater"
-                ? "An 8 Seater can take up to 8 passengers."
-                : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups.",
-        };
+    let executiveFields = {};
+    if (vehicleType === "executive") {
+        const decision = (0, executiveService_1.assessExecutiveBooking)({
+            enabled: options.executiveEnabled,
+            passengers,
+            bookingType: str(body.bookingType),
+            pickup: ends.pickup,
+            destination: ends.destination,
+            stops,
+            returnPickup: str(body.returnPickupLocation),
+            returnDestination: str(body.returnDestination),
+            returnStops: str(body.bookingType) === "return" ? (0, journeyStops_1.readStops)(body, "returnStops", str(body.returnPickupLocation), str(body.returnDestination)) : [],
+        });
+        if (!decision.ok)
+            return { ok: false, error: decision.error };
+        executiveFields = decision.fields;
+    }
+    else if (vehicleType !== "standard" && vehicleType !== "8_seater") {
+        return { ok: false, error: "Please choose a Standard Car or an 8 Seater." };
+    }
+    else {
+        const maxPassengers = vehicleType === "8_seater" ? 8 : 4;
+        if (!Number.isInteger(passengers) || passengers < 1 || passengers > maxPassengers) {
+            return {
+                ok: false,
+                error: vehicleType === "8_seater"
+                    ? "An 8 Seater can take up to 8 passengers."
+                    : "A Standard Car can take up to 4 passengers. Please choose the 8 Seater for larger groups.",
+            };
+        }
     }
     const rawLuggage = str(body.luggage);
     const luggage = rawLuggage ? Number(rawLuggage) : 0;
@@ -193,6 +231,10 @@ function prepareGuestBooking(body, options) {
     const paymentRaw = str(body.paymentMethod).toLowerCase();
     const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
     const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
+    const websiteEnquiryRef = /^ST-[A-Z0-9]{6}$/.test(str(body.websiteEnquiryRef)) ? str(body.websiteEnquiryRef) : "";
+    const heardCode = str(body.heardAbout);
+    const heardAbout = exports.HEARD_ABOUT_LABELS[heardCode] ? heardCode : "";
+    const heardAboutDetail = heardAbout === "other" ? str(body.heardAboutDetail).replace(/\s+/g, " ").slice(0, 80) : "";
     const contactBy = email && phone ? "both" : email ? "email" : "phone";
     const submissionId = SUBMISSION_PATTERN.test(str(body.submissionId)) ? str(body.submissionId) : "";
     const claim = email
@@ -254,11 +296,14 @@ function prepareGuestBooking(body, options) {
         status: "pending",
         customerStatus: "pending",
         adminStatus: "pending",
+        ...executiveFields,
         depositRequired: false,
         depositStatus: "not_required",
         termsAccepted: true,
         termsVersion: terms.version,
         acceptanceMethod: "website",
+        ...(heardAbout ? { heardAbout, heardAboutDetail } : {}),
+        ...(websiteEnquiryRef ? { websiteEnquiryRef } : {}),
     };
     return {
         ok: true,

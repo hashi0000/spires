@@ -50,6 +50,25 @@ export function hasExtraStops(stops: JourneyStop[]): boolean {
   return stops.length > 2;
 }
 
+const ITINERARY_FIELDS = [
+  "stops",
+  "returnStops",
+  "pickupLocation",
+  "destination",
+  "pickup",
+  "returnPickupLocation",
+  "returnDestination",
+  "extraStops",
+] as const;
+
+/** A cancellation keeps the stored outbound and return routes. */
+export function keepStoredItinerary(update: Record<string, unknown>, stored: Record<string, unknown>): void {
+  for (const key of ITINERARY_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(stored, key) || stored[key] === undefined) delete update[key];
+    else update[key] = stored[key];
+  }
+}
+
 export function describeStops(stops: JourneyStop[]): string {
   return stops
     .map((stop, index) => `${index + 1}. ${stop.type === "pickup" ? "Pickup" : "Drop off"}: ${stop.address}${stop.notes ? ` (${stop.notes})` : ""}`)

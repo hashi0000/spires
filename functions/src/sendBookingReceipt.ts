@@ -12,7 +12,7 @@ import {
   isBankTransferMethod,
   normalizeBookingForEmail,
 } from "./bankDetails";
-import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
+import { executiveRequestNote, formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
   airportWaitingDisclaimerBody,
   bookingHasAirportCollection,
@@ -121,7 +121,7 @@ export async function sendBookingReceipt(
       functions.logger.warn(message);
       return;
     }
-    if (options?.throwOnError && !reminderConfigOk()) {
+    if (options?.throwOnError && process.env.FUNCTIONS_EMULATOR !== "true" && !reminderConfigOk()) {
       throw new Error(
         "Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions."
       );
@@ -176,7 +176,8 @@ export async function notifyAdminNewBookingRequest(
 ) {
   try {
     const n = normalizeBookingForEmail(booking, bookingId);
-    const subject = `New booking request · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
+    const executiveNote = executiveRequestNote(booking);
+    const subject = `${executiveNote ? "Executive request" : "New booking request"} · ${n.hirerName} · ${n.pickupTime || "time TBC"}`;
     const rawPay = String(n.paymentMethod || "").trim().toLowerCase().replace(/_/g, " ");
     const pay = !n.paymentMethod
       ? "Not specified"
@@ -188,7 +189,8 @@ export async function notifyAdminNewBookingRequest(
 
     const html = `
       <div style="font-family:sans-serif;font-size:15px;color:#222;line-height:1.5;">
-        <h2 style="color:#002147;margin:0 0 12px;">New customer booking request</h2>
+        <h2 style="color:#002147;margin:0 0 12px;">${executiveNote ? "Executive Heathrow request" : "New customer booking request"}</h2>
+        ${executiveNote ? `<p style="padding:10px 12px;border:1px solid #C5A572;background:#faf8f4;"><strong>${escapeHtml(executiveNote)}</strong></p>` : ""}
         <p>${
           booking.source === "website" || booking.guestRequest === true
             ? "A guest sent this request from the website without creating an account. It is not confirmed until you quote it and the customer accepts. Use the phone number when there is no email address."
@@ -226,7 +228,7 @@ export async function notifyAdminNewBookingRequest(
       subject,
       html,
       text: [
-        "New customer booking request",
+        executiveNote || "New customer booking request",
         `Customer: ${n.hirerName}`,
         `Phone: ${n.hirerPhone}`,
         `Email: ${n.hirerEmail}`,

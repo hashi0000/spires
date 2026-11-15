@@ -92,6 +92,9 @@ export function invoicePaymentInstruction(method?: string | null): string {
 export type GeneratedGeneralInvoice = {
   id: string;
   invoiceNumber: string;
+  needsServerNumber?: boolean;
+  numberPrefix?: string;
+  numberPeriod?: string;
   invoiceDate: string;
   dueDate: string;
   paymentTerms: InvoicePaymentTerms;
@@ -110,6 +113,7 @@ export type GeneratedGeneralInvoice = {
   paidAt?: string | null;
   emailStatus?: "not_sent" | "queued" | "sent" | "failed";
   emailError?: string;
+  issuedSupplier?: InvoiceSupplierDetails;
 };
 
 export function isInvoicePaid(row?: { paidAt?: string | null } | null): boolean {

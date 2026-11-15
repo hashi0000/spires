@@ -45,6 +45,9 @@ export type GeneratedSchoolInvoice = {
   notes: string;
   createdAt: string;
   draft: boolean;
+  needsServerNumber?: boolean;
+  numberPrefix?: string;
+  numberPeriod?: string;
 };
 
 export const DEFAULT_SUPPLIER_DETAILS: SchoolSupplierDetails = {

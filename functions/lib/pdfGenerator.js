@@ -291,7 +291,10 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
     const doc = new pdfkit_1.default({ size: "A4", margin: 0, compress: false });
     const buffers = [];
     doc.on("data", (chunk) => buffers.push(chunk));
-    const docTitle = documentTitleMap[type] || "Booking Confirmation";
+    const executiveNote = (0, vehicleTypes_1.executiveRequestNote)(booking);
+    const docTitle = executiveNote && booking.executiveAvailability !== "accepted"
+        ? "Booking request — not confirmed"
+        : documentTitleMap[type] || "Booking Confirmation";
     const bookingNumber = String(booking.bookingNumber || "");
     const pageW = doc.page.width;
     const contentW = pageW - PAGE_MARGIN * 2;
@@ -381,6 +384,12 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
                     align: "right",
                 });
                 cy += 14;
+            }
+            if (executiveNote) {
+                doc.fillColor("#002147").font("Helvetica").fontSize(8).text(executiveNote, leftX + BOX_PAD, cy, {
+                    width: contentW - BOX_PAD * 2,
+                });
+                cy = doc.y + 6;
             }
         }
         if (booking.passengers) {

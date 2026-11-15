@@ -36,11 +36,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.claimGuestBooking = exports.guestClaimPreview = void 0;
 exports.handleGuestBookingHttp = handleGuestBookingHttp;
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions/v1"));
 const emails_1 = require("../quotes/emails");
 const londonTime_1 = require("../quotes/londonTime");
 const guestRequest_1 = require("./guestRequest");
 const guestStore_1 = require("./guestStore");
+const bookingRevision_1 = require("./bookingRevision");
 const db = () => admin.firestore();
 function str(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -101,6 +103,10 @@ async function handleGuestBookingHttp(req, res) {
                         bookingNumber: saved.bookingNumber,
                         claimUrl,
                         hasPhone: Boolean(saved.phone),
+                        executive: prepared.record.vehicleType === "executive",
+                        proposedFare: typeof prepared.record.proposedFarePounds === "number"
+                            ? `£${prepared.record.proposedFarePounds}`
+                            : "",
                     }),
                     bccAdmin: false,
                 });
@@ -118,7 +124,7 @@ async function handleGuestBookingHttp(req, res) {
                 await db().collection("bookings").doc(saved.bookingId).collection("audit").add({
                     action: "terms_accepted",
                     actor: saved.email || "guest",
-                    at: admin.firestore.FieldValue.serverTimestamp(),
+                    at: firestore_1.FieldValue.serverTimestamp(),
                     termsVersion: "2026-10-25",
                     acceptanceMethod: "website",
                     guestRequest: true,
@@ -246,11 +252,11 @@ exports.claimGuestBooking = functions.https.onCall(async (data, context) => {
             return;
         }
         if (!existingUid)
-            tx.update(bookingRef, (0, guestRequest_1.guestClaimPatch)(uid));
+            tx.update(bookingRef, { ...(0, guestRequest_1.guestClaimPatch)(uid), revision: (0, bookingRevision_1.nextBookingRevision)(booking) });
         tx.set(claimRef, {
             used: true,
             usedBy: uid,
-            usedAt: admin.firestore.FieldValue.serverTimestamp(),
+            usedAt: firestore_1.FieldValue.serverTimestamp(),
         }, { merge: true });
         outcome.bookingId = decision.bookingId;
     });

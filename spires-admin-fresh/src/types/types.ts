@@ -91,9 +91,12 @@ export interface Booking {
   driverId?: string;
   /** Driver for the return leg. Empty means the return driver is not confirmed. */
   returnDriverId?: string;
+  returnVehicleId?: string;
   vehicleId?: string;
   subContract?: string;
   status: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
+  /** Increments on every successful save. A stale screen cannot overwrite a newer save. */
+  revision?: number;
   /** Workflow status shown to staff when it differs from the stored customer status. */
   adminStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'cancelled';
   /** Set when the outbound is completed separately from the return. Missing on older records. */
@@ -183,6 +186,7 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   flightNumber?: string;
   terminal?: string;
   vehicleType?: 'standard' | '8_seater' | string;
+  executiveAvailability?: string;
   depositRequired?: boolean;
   depositAmount?: number | string;
   depositStatus?: 'not_required' | 'pending' | 'paid' | string;

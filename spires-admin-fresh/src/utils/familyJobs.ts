@@ -10,7 +10,7 @@ export const FAMILY_CONFLICT_WINDOW_MS = 90 * 60 * 1000;
 
 export type FamilyJobView = "today" | "tomorrow" | "week" | "calendar";
 
-export type FamilyVehicleRequired = "standard" | "8_seater" | "multiple";
+export type FamilyVehicleRequired = "standard" | "8_seater" | "multiple" | "executive";
 
 export type FamilyJobDraft = {
   pickupLocation: string;
@@ -26,6 +26,11 @@ export type FamilyJobDraft = {
   flightNumber: string;
   notes: string;
 };
+
+export function familyVehicleChoices(current?: string): { value: FamilyVehicleRequired; label: string }[] {
+  if (current === "executive") return [...FAMILY_VEHICLE_OPTIONS, { value: "executive", label: "Executive Car" }];
+  return FAMILY_VEHICLE_OPTIONS;
+}
 
 export const FAMILY_VEHICLE_OPTIONS: { value: FamilyVehicleRequired; label: string }[] = [
   { value: "standard", label: "Standard car" },
@@ -72,7 +77,7 @@ export function isCompletedJob(booking: Booking): boolean {
   }
   const customerStatus = (booking as { customerStatus?: string }).customerStatus;
   return [booking.status, booking.adminStatus, customerStatus].some(
-    (value) => value === "completed" || value === "paid"
+    (value) => value === "completed"
   );
 }
 
@@ -126,7 +131,7 @@ export function validateFamilyJobDraft(draft: FamilyJobDraft): string | null {
   if (!draft.pickupTime) return "Choose a pickup time.";
   if (!draft.hirerName.trim()) return "Enter the customer name.";
   if (!draft.hirerPhone.trim()) return "Enter the customer phone number.";
-  if (!FAMILY_VEHICLE_OPTIONS.some((option) => option.value === draft.vehicleType)) {
+  if (draft.vehicleType !== "executive" && !FAMILY_VEHICLE_OPTIONS.some((option) => option.value === draft.vehicleType)) {
     return "Choose the vehicle required.";
   }
   return null;
@@ -205,7 +210,7 @@ export function findJobConflicts(bookings: Booking[]): JobConflict[] {
         id: row.id as string,
         at: leg.pickupAt as Date,
         driverId: leg.driverId,
-        vehicleId: row.vehicleId,
+        vehicleId: "vehicleId" in leg ? leg.vehicleId : row.vehicleId,
         vehicleType: row.vehicleType,
       }));
   });
@@ -317,7 +322,6 @@ export function buildFamilyCreatePayload(
     bookingType: "one_way",
     vehicleType: draft.vehicleType,
     status: driverId ? "allocated" : "confirmed",
-    paymentStatus: draft.paymentStatus || "pending",
     flightNumber: draft.flightNumber.trim(),
     notes: draft.notes.trim(),
     source: "family",
@@ -325,6 +329,7 @@ export function buildFamilyCreatePayload(
     createdByUid: actor.uid,
     updatedByEmail: actor.email,
     updatedByUid: actor.uid,
+    revision: 1,
     ...(driverId ? { driverId, allocatedTime: new Date().toISOString() } : {}),
     ...(Number.isFinite(fare) && draft.actualFare.trim() ? { actualFare: fare } : {}),
   };
@@ -352,11 +357,11 @@ export function buildFamilyUpdatePayload(
     hirerPhone: draft.hirerPhone.trim(),
     vehicleType: draft.vehicleType,
     status: nextStatus,
-    paymentStatus: draft.paymentStatus || existing.paymentStatus || "pending",
     flightNumber: draft.flightNumber.trim(),
     notes: draft.notes.trim(),
     updatedByEmail: actor.email,
     updatedByUid: actor.uid,
+    revision: Number((existing as { revision?: number }).revision || 0) + 1,
     ...(driverId ? { driverId } : { driverId: "" }),
     ...(Number.isFinite(fare) && draft.actualFare.trim() ? { actualFare: fare } : {}),
   };
@@ -370,6 +375,7 @@ export function buildFamilyCancelPayload(existing: Booking, actor: FamilyActor):
     cancelledByUid: actor.uid,
     updatedByEmail: actor.email,
     updatedByUid: actor.uid,
+    revision: Number((existing as { revision?: number }).revision || 0) + 1,
   };
   if (existing.uid) payload.customerStatus = "cancelled";
   return payload;
@@ -383,11 +389,13 @@ export function draftFromBooking(booking: Booking): FamilyJobDraft {
     : "";
   const pickupTime = pickup ? `${pad(pickup.getHours())}:${pad(pickup.getMinutes())}` : "";
   const vehicleType: FamilyVehicleRequired =
-    booking.vehicleType === "8_seater" || booking.vehicleType === "8-seater"
-      ? "8_seater"
-      : booking.vehicleType === "multiple"
-        ? "multiple"
-        : "standard";
+    booking.vehicleType === "executive"
+      ? "executive"
+      : booking.vehicleType === "8_seater" || booking.vehicleType === "8-seater"
+        ? "8_seater"
+        : booking.vehicleType === "multiple"
+          ? "multiple"
+          : "standard";
   return {
     pickupLocation: booking.pickupLocation || "",
     destination: booking.destination || "",

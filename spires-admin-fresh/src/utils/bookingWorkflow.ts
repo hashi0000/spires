@@ -5,7 +5,7 @@ type BookingWorkflow = { status?: string | null; adminStatus?: string | null; cu
 /** Main status wins. Preserve the historical confirmed/admin-allocated representation. */
 export function effectiveWorkflowStatus(data: BookingWorkflow): string {
   const primary = data.status || data.adminStatus || data.customerStatus || "pending";
-  if (primary === "paid") return "completed";
+  if (primary === "paid") return "needs_review";
   if (primary === "confirmed" && ["allocated", "completed"].includes(data.adminStatus || "")) {
     return data.adminStatus!;
   }
@@ -32,6 +32,8 @@ export function workflowStatusLabel(status: string | null | undefined): string {
       return "Cancelled";
     case "paid":
       return "Paid";
+    case "needs_review":
+      return "Needs review";
     default:
       return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Pending";
   }
@@ -39,6 +41,6 @@ export function workflowStatusLabel(status: string | null | undefined): string {
 
 export function workflowBadgeClass(status: string | null | undefined): string {
   if (status === "awaiting_customer_confirmation") return "badge-awaiting";
-  if (status === "paid") return "badge-completed";
+  if (status === "paid" || status === "needs_review") return "badge-awaiting";
   return `badge-${status || "pending"}`;
 }

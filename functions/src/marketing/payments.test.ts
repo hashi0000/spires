@@ -39,6 +39,35 @@ test('a reduced total is a refund and a repeated card receipt is ignored', () =>
   assert.equal(rest && rest.amountReceivedPence, 9200);
   const replay = cardReceiptPatch({ actualFare: 92, amountReceivedPence: 9200, stripePaymentIntentId: 'pi_oldpaid1', paymentEntries: [] }, { paymentIntentId: 'pi_oldpaid1', amountPence: 9200 }, '2026-11-11T14:00:00Z');
   assert.equal(replay, null);
+  const cashThenCard = cardReceiptPatch({
+    actualFare: 92,
+    amountReceivedPence: 2000,
+    paymentStatus: 'processing',
+    stripePaymentIntentId: 'pi_balance1',
+    paymentEntries: [{ method: 'cash', amountPence: 2000, clientRequestId: 'cash1' }],
+  }, { paymentIntentId: 'pi_balance1', amountPence: 7200 }, '2026-11-11T15:00:00Z');
+  assert.ok(cashThenCard);
+  assert.equal(cashThenCard.amountReceivedPence, 9200);
+  const cashReplay = cardReceiptPatch(cashThenCard, { paymentIntentId: 'pi_balance1', amountPence: 7200 }, '2026-11-11T15:01:00Z');
+  assert.equal(cashReplay, null);
+  const cardDeposit = cardReceiptPatch({ actualFare: 92, amountReceivedPence: 0, paymentEntries: [] }, { paymentIntentId: 'pi_deposit1', amountPence: 2000 }, '2026-11-11T16:00:00Z');
+  assert.ok(cardDeposit);
+  const cardBalance = cardReceiptPatch({
+    ...cardDeposit,
+    paymentStatus: 'processing',
+    stripePaymentIntentId: 'pi_balance2',
+  }, { paymentIntentId: 'pi_balance2', amountPence: 7200 }, '2026-11-11T16:05:00Z');
+  assert.ok(cardBalance);
+  assert.equal(cardBalance.amountReceivedPence, 9200);
+  const truncated = cardReceiptPatch({
+    actualFare: 92,
+    amountReceivedPence: 9200,
+    paymentStatus: 'processing',
+    stripePaymentIntentId: 'pi_other',
+    paymentEntries: [],
+    appliedStripePaymentIntentIds: ['pi_oldpaid1'],
+  }, { paymentIntentId: 'pi_oldpaid1', amountPence: 9200 }, '2026-11-11T17:00:00Z');
+  assert.equal(truncated, null);
 });
 
 test('validation must pass before transport, and transport is not a GA4 receipt', () => {

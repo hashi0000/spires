@@ -91,16 +91,37 @@ export function paymentPayload(bookingId: string, attribution: Attribution, chan
   };
 }
 
+function entryIntentId(entry: unknown): string {
+  if (!entry || typeof entry !== 'object') return '';
+  return String((entry as Record<string, unknown>).stripePaymentIntentId || '');
+}
+
+/** Credited provider ids. The visible entry list may be shortened. This list is not. */
+export function appliedCardIntentIds(booking: BookingRow): string[] {
+  const stored = Array.isArray(booking.appliedStripePaymentIntentIds) ? booking.appliedStripePaymentIntentIds : [];
+  const fromEntries = (Array.isArray(booking.paymentEntries) ? booking.paymentEntries : []).map(entryIntentId);
+  return [...stored, ...fromEntries].map((id) => String(id || '')).filter((id) => /^pi_[A-Za-z0-9]+$/.test(id));
+}
+
+function cardIntentAlreadyCredited(booking: BookingRow, paymentIntentId: string): boolean {
+  if (appliedCardIntentIds(booking).includes(paymentIntentId)) return true;
+  const stored = String(booking.stripePaymentIntentId || '');
+  const received = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+  const opened = booking.paymentStatus === 'processing';
+  const knownEntries = appliedCardIntentIds(booking);
+  return !opened && stored === paymentIntentId && received > 0 && knownEntries.length === 0;
+}
+
 export function cardReceiptPatch(booking: BookingRow, input: { paymentIntentId: string; amountPence: number; chargeId?: string }, atIso: string): Record<string, unknown> | null {
   if (!/^pi_[A-Za-z0-9]+$/.test(input.paymentIntentId)) return null;
   if (!Number.isInteger(input.amountPence) || input.amountPence <= 0) return null;
+  if (cardIntentAlreadyCredited(booking, input.paymentIntentId)) return null;
   const entries = Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [];
-  if (entries.some((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>).stripePaymentIntentId === input.paymentIntentId)) return null;
-  if (String(booking.stripePaymentIntentId || '') === input.paymentIntentId && Math.round(Number(booking.amountReceivedPence) || 0) > 0) return null;
   const previous = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
   const received = previous + input.amountPence;
   const fare = farePence(booking);
   const position = paymentPosition(fare, received, '');
+  const applied = Array.from(new Set([...appliedCardIntentIds(booking), input.paymentIntentId]));
   return {
     amountReceivedPence: received,
     outstandingPence: position.outstandingPence,
@@ -110,6 +131,7 @@ export function cardReceiptPatch(booking: BookingRow, input: { paymentIntentId: 
     paymentVerified: fare > 0 && received >= fare,
     stripePaymentIntentId: input.paymentIntentId,
     stripeChargeId: input.chargeId || '',
+    appliedStripePaymentIntentIds: applied,
     paymentEntries: [...entries, {
       stripePaymentIntentId: input.paymentIntentId,
       clientRequestId: input.paymentIntentId,

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { localCallableUrl } from "../firebase";
 
-const ENDPOINT = "https://us-central1-spires-taxis.cloudfunctions.net/searchLocations";
+const ENDPOINT = localCallableUrl("searchLocations");
 
 export default function LocationField({ label, value, required, placeholder, onChange }) {
   const listId = useId();

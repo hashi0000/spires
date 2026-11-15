@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from "firebase/auth";
 import { auth, db, functions } from "./firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -102,6 +102,7 @@ export default function Signup() {
       await updateProfile(user, {
         displayName: fullName
       });
+      await sendEmailVerification(user);
       
         // Prepare addresses array if address provided
         const addresses = [];

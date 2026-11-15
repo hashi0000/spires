@@ -28,8 +28,10 @@ import {
   suggestInvoicePrefix,
   todayIsoDate,
 } from "../utils/generalInvoiceTypes";
+import { invoiceSupplierForReprint } from "../utils/bookingOps";
+import type { Booking } from "../types/types";
 import {
-  allocateGeneralInvoiceNumber,
+  applyAssignedInvoiceNumbers,
   loadGeneralInvoiceVault,
   persistGeneralInvoiceVault,
   rebuildGeneralInvoiceSeq,
@@ -75,20 +77,21 @@ function pdfInputFromRecord(
     destination: row.destination,
     lines: row.lines,
     notes: row.notes,
-    supplier,
+    supplier: invoiceSupplierForReprint(row.issuedSupplier, supplier),
     paymentMethod: normaliseInvoicePaymentMethod(row.paymentMethod),
     paid: Boolean(row.paidAt),
     paidAt: row.paidAt,
   };
 }
 
-const GeneralInvoices: React.FC = () => {
+const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) => {
   const [vault, setVault] = useState<GeneralInvoiceVault | null>(null);
   const [supplier, setSupplier] = useState<InvoiceSupplierDetails>(DEFAULT_GENERAL_SUPPLIER);
   const [clients, setClients] = useState<SavedInvoiceClient[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [clientDraft, setClientDraft] = useState(emptyClientDraft);
   const [history, setHistory] = useState<GeneratedGeneralInvoice[]>([]);
+  const [historyShown, setHistoryShown] = useState(25);
   const [customer, setCustomer] = useState<GeneralInvoiceCustomer>(emptyCustomer);
   const [invoiceDate, setInvoiceDate] = useState(() => todayIsoDate());
   const [paymentTerms, setPaymentTerms] = useState<InvoicePaymentTerms>("due_on_receipt");
@@ -132,11 +135,14 @@ const GeneralInvoices: React.FC = () => {
 
   const persist = async (next: GeneralInvoiceVault) => {
     const withClients = { ...next, clients: next.clients ?? clients };
-    await persistGeneralInvoiceVault(withClients);
-    setVault(withClients);
-    setSupplier(withClients.supplier);
-    setClients(withClients.clients);
-    setHistory(withClients.invoices);
+    const saved = await persistGeneralInvoiceVault(withClients);
+    const invoices = applyAssignedInvoiceNumbers(withClients.invoices, saved.assigned);
+    const stored = { ...withClients, invoices, revision: saved.revision };
+    setVault(stored);
+    setSupplier(stored.supplier);
+    setClients(stored.clients);
+    setHistory(stored.invoices);
+    return stored;
   };
 
   const totals = useMemo(() => invoiceTotals(lines), [lines]);
@@ -354,6 +360,7 @@ const GeneralInvoices: React.FC = () => {
       destination: destination.trim(),
       lines: usable,
       notes: notes.trim(),
+      issuedSupplier: existing?.issuedSupplier || { ...supplier },
       createdAt: existing?.createdAt || new Date().toISOString(),
       emailedAt: existing?.emailedAt,
       emailedTo: existing?.emailedTo,
@@ -369,8 +376,7 @@ const GeneralInvoices: React.FC = () => {
     const invoices = editingId
       ? history.map((row) => (row.id === record.id ? record : row))
       : [record, ...history];
-    await persist({ ...nextVault, supplier, clients, invoices });
-    return invoices;
+    return persist({ ...nextVault, supplier, clients, invoices });
   };
 
   const handleSaveEdit = async () => {
@@ -410,24 +416,47 @@ const GeneralInvoices: React.FC = () => {
       return;
     }
     setBusy("download");
+    let draftId = "";
+    let editing = false;
     try {
       let record: GeneratedGeneralInvoice;
-      let nextVault = vault;
       if (editingInvoice) {
+        editing = true;
         record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
       } else {
-        const allocated = allocateGeneralInvoiceNumber(vault, activePrefix, invoiceDate);
-        record = buildDraftRecord(allocated.invoiceNumber);
-        nextVault = allocated.vault;
+        record = buildDraftRecord("PENDING");
+        record.id = `draft_${Date.now()}`;
+        draftId = record.id;
+        record.needsServerNumber = true;
+        record.numberPrefix = activePrefix;
+        record.numberPeriod = invoiceDate.slice(0, 7);
       }
-      await downloadGeneralInvoicePdf(pdfInputFromRecord(record, supplier));
-      await persistInvoiceRecord(record, nextVault);
+      const stored = await persistInvoiceRecord(record, vault);
+      const issued = stored.invoices.find((row) => row.id === record.id) || record;
+      if (!editingInvoice && (issued.invoiceNumber === "PENDING" || issued.needsServerNumber)) {
+        throw new Error("The server did not issue an invoice number. The PDF was not downloaded.");
+      }
+      await downloadGeneralInvoicePdf(pdfInputFromRecord(issued, supplier));
       setStatus(
         editingInvoice
-          ? `Updated PDF ${record.invoiceNumber} downloaded.`
-          : `PDF ${record.invoiceNumber} downloaded.`
+          ? `Updated PDF ${issued.invoiceNumber} downloaded.`
+          : `PDF ${issued.invoiceNumber} downloaded.`
       );
     } catch (err) {
+      if (draftId && !editing) {
+        try {
+          const loaded = await loadGeneralInvoiceVault();
+          const recovered = loaded.invoices.find((row) => row.id === draftId && row.invoiceNumber && row.invoiceNumber !== "PENDING");
+          if (recovered) {
+            await downloadGeneralInvoicePdf(pdfInputFromRecord(recovered, supplier));
+            setVault(loaded);
+            setStatus(`Invoice ${recovered.invoiceNumber} was already saved. The same PDF was downloaded again.`);
+            return;
+          }
+        } catch {
+          /* The original error is shown below. */
+        }
+      }
       setError(err instanceof Error ? err.message : "Could not generate the PDF.");
     } finally {
       setBusy(null);
@@ -465,22 +494,27 @@ const GeneralInvoices: React.FC = () => {
     setBusy("email");
     try {
       let record: GeneratedGeneralInvoice;
-      let nextVault = vault;
       if (editingInvoice) {
         record = buildDraftRecord(editingInvoice.invoiceNumber, editingInvoice);
       } else {
-        const allocated = allocateGeneralInvoiceNumber(vault, activePrefix, invoiceDate);
-        record = buildDraftRecord(allocated.invoiceNumber);
-        nextVault = allocated.vault;
+        record = buildDraftRecord("PENDING");
+        record.id = `draft_${Date.now()}`;
+        record.needsServerNumber = true;
+        record.numberPrefix = activePrefix;
+        record.numberPeriod = invoiceDate.slice(0, 7);
       }
       record.customer = { ...record.customer, email: to };
-      const invoices = await persistInvoiceRecord(record, nextVault);
-      const sent = await emailGeneralInvoicePdf(record, supplier, to);
-      await markEmailed(invoices, record.invoiceNumber, sent.to, { ...nextVault, invoices });
+      const stored = await persistInvoiceRecord(record, vault);
+      const issued = stored.invoices.find((row) => row.id === record.id) || record;
+      if (!editingInvoice && (issued.invoiceNumber === "PENDING" || issued.needsServerNumber)) {
+        throw new Error("The server did not issue an invoice number. The email was not sent.");
+      }
+      const sent = await emailGeneralInvoicePdf(issued, supplier, to);
+      await markEmailed(stored.invoices, issued.invoiceNumber, sent.to, stored);
       setStatus(
         sent.cc
-          ? `Invoice ${record.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
-          : `Invoice ${record.invoiceNumber} emailed to ${sent.to}.`
+          ? `Invoice ${issued.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
+          : `Invoice ${issued.invoiceNumber} emailed to ${sent.to}.`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not email the invoice.";
@@ -783,6 +817,42 @@ const GeneralInvoices: React.FC = () => {
             Changes keep invoice number {editingInvoice.invoiceNumber}. Save, download, or email to update the stored invoice.
           </p>
         ) : null}
+        {bookings.length > 0 && !editingInvoice ? (
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Create from booking
+            <select
+              className="form-input"
+              defaultValue=""
+              onChange={(event) => {
+                const booking = bookings.find((row) => row.bookingNumber === event.target.value);
+                if (!booking) return;
+                const contact = booking as Booking & { email?: string; hirerEmail?: string };
+                setCustomer({
+                  name: booking.hirerName || "",
+                  address: booking.hirerAddress || "",
+                  email: contact.email || contact.hirerEmail || "",
+                  phone: booking.hirerPhone || "",
+                });
+                setBookingNumber(booking.bookingNumber || "");
+                setPickup(booking.pickupLocation || "");
+                setDestination(booking.destination || "");
+                setTravelDate(String(booking.pickupTime || booking.dateTime || "").slice(0, 10));
+                if (Number(booking.actualFare) > 0) {
+                  setLines([{ ...emptyLine(), description: `Journey ${booking.bookingNumber}`, unitPrice: Number(booking.actualFare) }]);
+                }
+                const existing = history.find((row) => row.bookingNumber === booking.bookingNumber);
+                setStatus(existing
+                  ? `${booking.bookingNumber} already has invoice ${existing.invoiceNumber}. The form is filled for review and is not saved yet.`
+                  : `${booking.bookingNumber} is filled in. Download when the invoice is ready.`);
+              }}
+            >
+              <option value="">Choose a booking</option>
+              {bookings.slice(0, 200).map((booking) => (
+                <option key={booking.id || booking.bookingNumber} value={booking.bookingNumber}>{booking.bookingNumber} · {booking.hirerName}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="school-invoice-grid">
           <label className="form-group">
             <span className="form-label">Saved client</span>
@@ -965,16 +1035,16 @@ const GeneralInvoices: React.FC = () => {
       {history.length > 0 && (
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Recently generated</h3>
+            <h3 className="card-title" style={{ fontSize: "1.15rem" }}>Invoice history</h3>
             <button type="button" className="btn btn-danger btn-sm" onClick={clearGeneratedInvoices} disabled={Boolean(busy)}>
               Clear all
             </button>
           </div>
           <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-            Download again with the current headed paper, mark as paid to add the stamp, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
+            Download again uses the headed paper saved with that invoice. An invoice saved before this change uses the headed paper on file now. Mark as paid to add the stamp, or email the PDF to the customer (copy to {SPIRES_OFFICE_EMAIL}).
           </p>
           <ul className="text-sm space-y-2">
-            {history.map((row) => (
+            {history.slice(0, historyShown).map((row) => (
               <li key={row.id} className="flex items-center justify-between gap-3" style={{ border: editingId === row.id ? "2px solid #002147" : "1px solid #e5e7eb", borderRadius: 8, padding: "0.65rem 0.85rem" }}>
                 <div>
                   <strong>{row.invoiceNumber}</strong>
@@ -1057,6 +1127,11 @@ const GeneralInvoices: React.FC = () => {
               </li>
             ))}
           </ul>
+          {history.length > historyShown && (
+            <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: "0.75rem" }} onClick={() => setHistoryShown((shown) => shown + 25)}>
+              Show older invoices ({history.length - historyShown} remaining)
+            </button>
+          )}
         </div>
       )}
     </div>

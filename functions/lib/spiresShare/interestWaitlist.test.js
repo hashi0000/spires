@@ -248,13 +248,15 @@ async function fillHeathrow(db, journeyId, count, prefix) {
         const db = new bookingFlow_1.InMemoryShareDb();
         const journey = (0, bookingFlow_1.createPilotJourney)(db, { travelDate: "2026-10-12", departureTime: "14:00", customerVisible: true });
         await fillHeathrow(db, journey.id, 5, "Race");
-        (0, bookingFlow_1.addWaitlist)(db, journey.id, { ...contact("First"), passengers: 1, termsAccepted: true });
-        (0, bookingFlow_1.addWaitlist)(db, journey.id, { ...contact("Second"), passengers: 1, termsAccepted: true });
-        (0, bookingFlow_1.cancelReservation)(db, [...db.bookings.values()][0].id);
+        (0, bookingFlow_1.addWaitlist)(db, journey.id, { ...contact("First"), passengers: 1, termsAccepted: true, nowIso: "2026-10-01T10:00:00.000Z" });
+        (0, bookingFlow_1.addWaitlist)(db, journey.id, { ...contact("Second"), passengers: 1, termsAccepted: true, nowIso: "2026-10-01T10:05:00.000Z" });
+        const now = "2026-10-11T12:00:00.000Z";
+        (0, bookingFlow_1.cancelReservation)(db, [...db.bookings.values()][0].id, now);
         const offered = [...db.waitlist.values()].find((row) => row.status === "OFFERED");
+        strict_1.default.equal(offered?.email, "first@example.com");
         const results = await Promise.allSettled([
-            (0, bookingFlow_1.claimWaitlistPlace)(db, offered.id, "uid_First"),
-            (0, bookingFlow_1.claimWaitlistPlace)(db, offered.id, "uid_First"),
+            (0, bookingFlow_1.claimWaitlistPlace)(db, offered.id, offered.uid, "2026-10-11T12:05:00.000Z"),
+            (0, bookingFlow_1.claimWaitlistPlace)(db, offered.id, offered.uid, "2026-10-11T12:05:00.000Z"),
         ]);
         const fulfilled = results.filter((row) => row.status === "fulfilled");
         const rejected = results.filter((row) => row.status === "rejected");
@@ -343,7 +345,7 @@ async function fillHeathrow(db, journeyId, count, prefix) {
         const result = (0, bookingFlow_1.cancelReservation)(db, paid.id, "2026-10-11T08:00:00.000Z");
         strict_1.default.equal(result.journeyStillConfirmed, true);
         strict_1.default.equal(db.journeys.get(journey.id)?.status, "CONFIRMED");
-        const claimed = await (0, bookingFlow_1.claimWaitlistPlace)(db, [...db.waitlist.values()].find((row) => row.status === "OFFERED").id, "uid_Wait");
+        const claimed = await (0, bookingFlow_1.claimWaitlistPlace)(db, [...db.waitlist.values()].find((row) => row.status === "OFFERED").id, "uid_Wait", "2026-10-11T08:05:00.000Z");
         strict_1.default.equal(db.journeys.get(journey.id)?.status, "CONFIRMED");
         strict_1.default.equal(claimed.booking.reservationStatus, "PAYMENT_PENDING");
     });

@@ -37,6 +37,7 @@ exports.EMAIL_SETUP_MESSAGE = exports.submitWebsiteQuote = exports.quotePublic =
 exports.enqueueConfirmationIfNeeded = enqueueConfirmationIfNeeded;
 exports.stampPromotionOnCreate = stampPromotionOnCreate;
 const admin = __importStar(require("firebase-admin"));
+const firestore_1 = require("firebase-admin/firestore");
 const functions = __importStar(require("firebase-functions/v1"));
 const driverReminderEmail_1 = require("../driverReminderEmail");
 const sendBookingReceipt_1 = require("../sendBookingReceipt");
@@ -48,6 +49,9 @@ const bookingTerms_1 = require("../terms/bookingTerms");
 const paymentLink_1 = require("./paymentLink");
 const fareMath_1 = require("./fareMath");
 const bankDetails_1 = require("../bankDetails");
+const messages_1 = require("../offers/messages");
+const executiveService_1 = require("./executiveService");
+const bookingRevision_1 = require("../bookings/bookingRevision");
 const quoteWorkflow_1 = require("./quoteWorkflow");
 Object.defineProperty(exports, "bookingMatchesStatusFilter", { enumerable: true, get: function () { return quoteWorkflow_1.bookingMatchesStatusFilter; } });
 Object.defineProperty(exports, "shouldSendConfirmation", { enumerable: true, get: function () { return quoteWorkflow_1.shouldSendConfirmation; } });
@@ -79,7 +83,7 @@ async function audit(bookingId, action, actorEmail, extra = {}) {
     await db().collection("bookings").doc(bookingId).collection("audit").add({
         action,
         actorEmail,
-        at: admin.firestore.FieldValue.serverTimestamp(),
+        at: firestore_1.FieldValue.serverTimestamp(),
         ...extra,
     });
 }
@@ -141,7 +145,7 @@ async function enqueueJob(input) {
             bookingId: input.bookingId, event: input.event, version: input.version,
             kind: input.kind, to: input.to, subject: input.subject, html: input.html,
             copyTo: input.copyTo || [], status: "queued",
-            queuedAt: admin.firestore.FieldValue.serverTimestamp(), error: admin.firestore.FieldValue.delete(),
+            queuedAt: firestore_1.FieldValue.serverTimestamp(), error: firestore_1.FieldValue.delete(),
         };
         tx.set(ref, payload, { merge: true });
         return { jobId, state: decision === "requeue" ? "requeued" : "queued" };
@@ -156,7 +160,7 @@ exports.processEmailJob = functions.firestore.document("emailJobs/{jobId}").onWr
         const snap = await tx.get(ref);
         if (snap.data()?.status !== "queued")
             return false;
-        tx.update(ref, { status: "sending", sendingAt: admin.firestore.FieldValue.serverTimestamp() });
+        tx.update(ref, { status: "sending", sendingAt: firestore_1.FieldValue.serverTimestamp() });
         return true;
     });
     if (!claimed)
@@ -182,20 +186,21 @@ exports.processEmailJob = functions.firestore.document("emailJobs/{jobId}").onWr
             if (!bookingSnap.exists)
                 throw new Error("Booking no longer exists.");
             await (0, sendBookingReceipt_1.sendBookingReceipt)(bookingSnap.data(), after.kind === "payment_receipt" ? "payment" : "confirmation", String(after.bookingId), { throwOnError: true });
-            await ref.set({ status: "sent", sentAt: admin.firestore.FieldValue.serverTimestamp(), providerAccepted: true }, { merge: true });
+            await ref.set({ status: "sent", sentAt: firestore_1.FieldValue.serverTimestamp(), providerAccepted: true }, { merge: true });
             const stamp = after.kind === "payment_receipt"
-                ? { paymentReceiptEmailSentAt: admin.firestore.FieldValue.serverTimestamp(), paymentReceiptEmailStatus: "sent" }
-                : { confirmationEmailSentAt: admin.firestore.FieldValue.serverTimestamp(), confirmationEmailStatus: "sent" };
-            await bookingSnap.ref.set(stamp, { merge: true });
+                ? { paymentReceiptEmailSentAt: firestore_1.FieldValue.serverTimestamp(), paymentReceiptEmailStatus: "sent" }
+                : { confirmationEmailSentAt: firestore_1.FieldValue.serverTimestamp(), confirmationEmailStatus: "sent" };
+            await bookingSnap.ref.set({ ...stamp, revision: firestore_1.FieldValue.increment(1) }, { merge: true });
             return;
         }
         const copyTo = Array.isArray(after.copyTo)
             ? after.copyTo.map((item) => String(item || "").trim()).filter(Boolean)
             : [];
+        const html = (0, messages_1.withoutExpiredSignupOffer)(String(after.html || ""), Date.now());
         const info = await (0, emails_1.sendHtmlEmail)({
             to: String(after.to || ""),
             subject: String(after.subject || "Spires Taxis"),
-            html: String(after.html || ""),
+            html,
             bccAdmin: after.kind !== "acceptance_admin" && copyTo.length === 0,
         });
         if (after.kind === "quote") {
@@ -205,7 +210,7 @@ exports.processEmailJob = functions.firestore.document("emailJobs/{jobId}").onWr
                     await (0, emails_1.sendHtmlEmail)({
                         to: copy,
                         subject: `Copy: ${String(after.subject || "Spires Taxis quote")} sent to ${String(after.to || "")}`,
-                        html: note + String(after.html || ""),
+                        html: note + html,
                         bccAdmin: false,
                     });
                 }
@@ -217,32 +222,33 @@ exports.processEmailJob = functions.firestore.document("emailJobs/{jobId}").onWr
         }
         await ref.set({
             status: "sent",
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            sentAt: firestore_1.FieldValue.serverTimestamp(),
             providerAccepted: true,
             providerMessageId: info.messageId || "",
         }, { merge: true });
         if (after.kind === "payment_request") {
             await db().collection("bookings").doc(String(after.bookingId)).set({
                 paymentLinkEmailStatus: "sent",
-                emailError: admin.firestore.FieldValue.delete(),
-                paymentLinkSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                emailError: firestore_1.FieldValue.delete(),
+                paymentLinkSentAt: firestore_1.FieldValue.serverTimestamp(),
+                revision: firestore_1.FieldValue.increment(1),
             }, { merge: true });
         }
         if (after.kind === "quote") {
-            await db().collection("bookings").doc(String(after.bookingId)).set({ quoteEmailStatus: "sent", quoteEmailSentAt: admin.firestore.FieldValue.serverTimestamp(), emailError: admin.firestore.FieldValue.delete() }, { merge: true });
+            await db().collection("bookings").doc(String(after.bookingId)).set({ quoteEmailStatus: "sent", quoteEmailSentAt: firestore_1.FieldValue.serverTimestamp(), emailError: firestore_1.FieldValue.delete(), revision: firestore_1.FieldValue.increment(1) }, { merge: true });
         }
     }
     catch (err) {
         const message = err instanceof Error ? err.message : "Email failed";
         functions.logger.error("email job failed", { jobId: change.after.id, bookingId: after.bookingId, message });
-        await ref.set({ status: "failed", failedAt: admin.firestore.FieldValue.serverTimestamp(), error: message.slice(0, 500) }, { merge: true });
+        await ref.set({ status: "failed", failedAt: firestore_1.FieldValue.serverTimestamp(), error: message.slice(0, 500) }, { merge: true });
         if (["quote", "payment_request", "booking_confirmed", "payment_receipt"].includes(after.kind)) {
             const fields = { quote: "quoteEmailStatus", payment_request: "paymentLinkEmailStatus", booking_confirmed: "confirmationEmailStatus", payment_receipt: "paymentReceiptEmailStatus" };
             const field = fields[after.kind];
             await db()
                 .collection("bookings")
                 .doc(String(after.bookingId))
-                .set({ [field]: "failed", emailError: message.slice(0, 300) }, { merge: true });
+                .set({ [field]: "failed", emailError: message.slice(0, 300), revision: firestore_1.FieldValue.increment(1) }, { merge: true });
         }
     }
 });
@@ -350,10 +356,7 @@ function readQuoteInput(data, booking) {
     if (str(data.paymentLinkUrl))
         paymentLinkUrl = (0, paymentLink_1.validatePaymentLinkUrl)(str(data.paymentLinkUrl), allowlist());
     const validUntil = str(data.validUntil);
-    const standardTerms = str(data.terms) ||
-        (totals.discountPence > 0
-            ? "This quote is not a confirmed booking. The half term offer is £5 off this complete airport return and is not combined with other offers. One way bookings are not discounted. The journeys are subject to availability."
-            : "This quote is not a confirmed booking. The journeys are subject to availability.");
+    const standardTerms = str(data.terms) || (0, messages_1.quoteCustomerTerms)(totals.discountPence);
     const customerMessage = str(data.customerMessage).slice(0, 400);
     const terms = customerMessage ? `${standardTerms} ${customerMessage}` : standardTerms;
     return { merged, totals, paymentRequirement, paymentDescription, amountRequestedPence, paymentLinkUrl, validUntil, terms };
@@ -417,13 +420,16 @@ async function saveDraftOrIssue(data, context, issue) {
         updatedAt: new Date().toISOString(),
     };
     if (!issue) {
-        await ref.set({ quoteDraft: draft, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await ref.set({ quoteDraft: draft, revision: firestore_1.FieldValue.increment(1), updatedAt: firestore_1.FieldValue.serverTimestamp() }, { merge: true });
         await audit(bookingId, "quote_draft_saved", actor, { finalFarePence: parsed.totals.finalFarePence });
         return { ok: true, emailed: false, ...parsed.totals, formatted: {
                 normal: (0, halfTerm_1.formatPence)(parsed.totals.normalFarePence),
                 discount: (0, halfTerm_1.formatPence)(parsed.totals.discountPence),
                 final: (0, halfTerm_1.formatPence)(parsed.totals.finalFarePence),
             } };
+    }
+    if (issue && (0, executiveService_1.executiveCommerceBlocked)({ ...booking, vehicleType: str(data.vehicleType) || str(booking.vehicleType) })) {
+        throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
     }
     const gate = (0, quoteWorkflow_1.canIssueQuote)(str(booking.status), data.reissue === true);
     if (!gate.ok)
@@ -450,10 +456,10 @@ async function saveDraftOrIssue(data, context, issue) {
             issuedQuote,
             quotes,
             quoteIssuedVersion: version,
-            quoteAcceptedVersion: admin.firestore.FieldValue.delete(),
-            quoteAcceptedAt: admin.firestore.FieldValue.delete(),
-            quoteAcceptanceSubstatus: admin.firestore.FieldValue.delete(),
-            quoteAcceptedBy: admin.firestore.FieldValue.delete(),
+            quoteAcceptedVersion: firestore_1.FieldValue.delete(),
+            quoteAcceptedAt: firestore_1.FieldValue.delete(),
+            quoteAcceptanceSubstatus: firestore_1.FieldValue.delete(),
+            quoteAcceptedBy: firestore_1.FieldValue.delete(),
             status: "awaiting_customer_confirmation",
             customerStatus: "awaiting_customer_confirmation",
             adminStatus: "awaiting_customer_confirmation",
@@ -470,17 +476,18 @@ async function saveDraftOrIssue(data, context, issue) {
             depositAmount: parsed.paymentDescription === "deposit" ? parsed.amountRequestedPence / 100 : 0,
             depositStatus: parsed.paymentDescription === "deposit" && parsed.paymentRequirement === "advance"
                 ? (Number(booking.amountReceivedPence || 0) >= parsed.amountRequestedPence ? "paid" : "pending") : "not_required",
-            paymentLinkUrl: parsed.paymentLinkUrl || str(booking.paymentLinkUrl) || admin.firestore.FieldValue.delete(),
+            paymentLinkUrl: parsed.paymentLinkUrl || str(booking.paymentLinkUrl) || firestore_1.FieldValue.delete(),
             paymentStatus: buckets.stored,
             quoteEmailStatus: "queued",
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            revision: (0, bookingRevision_1.nextBookingRevision)(latest.data()),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
         }, { merge: true });
         const expiresAt = parsed.validUntil ? new Date(parsed.validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         tx.set(db().collection("quoteTokens").doc(token.hash), {
             bookingId,
             version,
-            expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: firestore_1.Timestamp.fromDate(expiresAt),
+            createdAt: firestore_1.FieldValue.serverTimestamp(),
         });
     });
     const fresh = { ...booking, ...patch, issuedQuote, bookingNumber: booking.bookingNumber, paymentLinkUrl: parsed.paymentLinkUrl || booking.paymentLinkUrl, paymentStatus: buckets.stored };
@@ -489,7 +496,7 @@ async function saveDraftOrIssue(data, context, issue) {
     let emailState = "skipped";
     if (!to) {
         emailState = "skipped";
-        await ref.set({ quoteEmailStatus: "skipped", emailError: "No customer email. Contact the customer by phone." }, { merge: true });
+        await ref.set({ quoteEmailStatus: "skipped", emailError: "No customer email. Contact the customer by phone.", revision: firestore_1.FieldValue.increment(1) }, { merge: true });
     }
     else {
         try {
@@ -507,7 +514,7 @@ async function saveDraftOrIssue(data, context, issue) {
         }
         catch (err) {
             emailState = "failed";
-            await ref.set({ quoteEmailStatus: "failed", emailError: err instanceof Error ? err.message : "Could not queue email" }, { merge: true });
+            await ref.set({ quoteEmailStatus: "failed", emailError: err instanceof Error ? err.message : "Could not queue email", revision: firestore_1.FieldValue.increment(1) }, { merge: true });
         }
     }
     await audit(bookingId, "quote_issued", actor, { version, discountPence: parsed.totals.discountPence, emailState });
@@ -540,6 +547,9 @@ exports.savePaymentLink = functions.https.onCall(async (data, context) => {
     if (!snap.exists)
         throw httpsError("not-found", "Booking not found.");
     const clear = body.clear === true || !str(body.paymentLinkUrl);
+    if (!clear && (0, executiveService_1.executiveCommerceBlocked)(snap.data() || {})) {
+        throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
+    }
     let paymentLinkUrl = "";
     let amountRequestedPence = 0;
     try {
@@ -555,10 +565,11 @@ exports.savePaymentLink = functions.https.onCall(async (data, context) => {
     }
     const paymentDescription = str(body.paymentDescription) === "deposit" ? "deposit" : "full";
     await ref.set({
-        paymentLinkUrl: clear ? admin.firestore.FieldValue.delete() : paymentLinkUrl,
+        paymentLinkUrl: clear ? firestore_1.FieldValue.delete() : paymentLinkUrl,
         amountRequestedPence,
         paymentDescription,
-        paymentLinkUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentLinkUpdatedAt: firestore_1.FieldValue.serverTimestamp(),
+        revision: firestore_1.FieldValue.increment(1),
     }, { merge: true });
     await audit(bookingId, clear ? "payment_link_removed" : "payment_link_saved", actor, {
         amountRequestedPence,
@@ -577,6 +588,8 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
     if (!snap.exists)
         throw httpsError("not-found", "Booking not found.");
     const booking = snap.data() || {};
+    if ((0, executiveService_1.executiveCommerceBlocked)(booking))
+        throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
     const to = customerEmail(booking);
     if (!to)
         throw httpsError("failed-precondition", "This booking has no email address. Call the customer on the phone number saved on the booking.");
@@ -620,9 +633,10 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
     await ref.set({
         amountRequestedPence: amount,
         paymentDescription: description,
-        paymentLinkUrl: paymentLinkUrl || admin.firestore.FieldValue.delete(),
+        paymentLinkUrl: paymentLinkUrl || firestore_1.FieldValue.delete(),
         paymentLinkEmailStatus: "queued",
-        paymentLinkUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        paymentLinkUpdatedAt: firestore_1.FieldValue.serverTimestamp(),
+        revision: firestore_1.FieldValue.increment(1),
     }, { merge: true });
     const confirmed = ["confirmed", "allocated", "completed"].includes(str(booking.status)) || ["confirmed", "allocated", "completed"].includes(str(booking.adminStatus));
     const queued = await enqueueJob({
@@ -671,6 +685,13 @@ exports.recordManualPayment = functions.https.onCall(async (data, context) => {
         if (!snap.exists)
             throw httpsError("not-found", "Booking not found.");
         const booking = snap.data() || {};
+        if ((0, executiveService_1.executiveCommerceBlocked)(booking))
+            throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
+        if (body.expectedRevision != null && body.expectedRevision !== "") {
+            const revision = (0, bookingRevision_1.bookingRevisionDecision)(booking, body.expectedRevision);
+            if (!revision.ok)
+                throw httpsError("aborted", revision.reason);
+        }
         if (booking.status === "cancelled")
             throw httpsError("failed-precondition", "This booking is cancelled. Review its payments before making changes.");
         if (finalFarePence(booking) <= 0)
@@ -715,26 +736,27 @@ exports.recordManualPayment = functions.https.onCall(async (data, context) => {
             at: new Date().toISOString(),
         };
         const patch = {
+            revision: (0, bookingRevision_1.nextBookingRevision)(booking),
             amountReceivedPence, outstandingPence: buckets.outstandingPence,
             overpaymentPence: Math.max(0, amountReceivedPence - finalFarePence(booking)),
             paymentMethod: method, paymentStatus: buckets.stored, paymentVerified,
             depositStatus: booking.depositRequired ? (amountReceivedPence >= Math.round(Number(booking.depositAmount || 0) * 100) && Number(booking.depositAmount || 0) > 0 ? "paid" : "pending") : (booking.depositStatus || "not_required"),
             paymentEntries: [...entries, entry].slice(-50),
-            paymentRecordedAt: admin.firestore.FieldValue.serverTimestamp(),
-            paymentRecordedBy: actor, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            paidAt: buckets.stored === "paid" ? (booking.paidAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.delete(),
+            paymentRecordedAt: firestore_1.FieldValue.serverTimestamp(),
+            paymentRecordedBy: actor, updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            paidAt: buckets.stored === "paid" ? (booking.paidAt || firestore_1.FieldValue.serverTimestamp()) : firestore_1.FieldValue.delete(),
         };
         if (move) {
             patch.status = "confirmed";
             patch.customerStatus = "confirmed";
             patch.adminStatus = "confirmed";
-            patch.quoteAcceptanceSubstatus = admin.firestore.FieldValue.delete();
+            patch.quoteAcceptanceSubstatus = firestore_1.FieldValue.delete();
         }
         if (Number(booking.amountReceivedPence || 0) !== amountReceivedPence || booking.paymentMethod !== method || move || mode === "correct") {
             tx.set(ref, patch, { merge: true });
             tx.set(auditRef, {
                 action: mode === "correct" ? "payment_corrected" : "payment_recorded",
-                actorEmail: actor, at: admin.firestore.FieldValue.serverTimestamp(),
+                actorEmail: actor, at: firestore_1.FieldValue.serverTimestamp(),
                 previousAmountReceivedPence: Number(booking.amountReceivedPence || 0), amountReceivedPence,
                 outstandingPence: buckets.outstandingPence, method, paymentStatus: buckets.stored, movedToConfirmed: move,
                 reason: str(body.reason).slice(0, 240),
@@ -761,6 +783,8 @@ async function applyAcceptance(ref, input) {
         if (!snap.exists)
             throw httpsError("not-found", "Booking not found.");
         const booking = snap.data() || {};
+        if ((0, executiveService_1.executiveCommerceBlocked)(booking))
+            throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
         const issued = Number(booking.quoteIssuedVersion) || 0;
         const requested = input.version || issued;
         const issuedQuote = (booking.issuedQuote || {});
@@ -791,17 +815,18 @@ async function applyAcceptance(ref, input) {
         if (!decision.already || (decision.nextStatus === "confirmed" && !["confirmed", "allocated", "completed"].includes(str(booking.status)))) {
             const patch = {
                 quoteAcceptedVersion: issued,
-                quoteAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+                quoteAcceptedAt: firestore_1.FieldValue.serverTimestamp(),
                 quoteAcceptedBy: input.onBehalf ? `admin:${input.actor}` : input.actor || "customer",
                 status: decision.nextStatus,
                 customerStatus: decision.nextStatus,
                 adminStatus: decision.nextStatus,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                revision: (0, bookingRevision_1.nextBookingRevision)(booking),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
             };
             if (decision.substatus)
                 patch.quoteAcceptanceSubstatus = decision.substatus;
             else
-                patch.quoteAcceptanceSubstatus = admin.firestore.FieldValue.delete();
+                patch.quoteAcceptanceSubstatus = firestore_1.FieldValue.delete();
             tx.set(ref, patch, { merge: true });
             mail = {
                 to: customerEmail(booking),
@@ -915,7 +940,7 @@ exports.retryEmailJob = functions.https.onCall(async (data, context) => {
             const snap = await tx.get(candidate.ref);
             if (snap.data()?.status !== "failed")
                 return false;
-            tx.update(candidate.ref, { status: "queued", queuedAt: admin.firestore.FieldValue.serverTimestamp(), error: admin.firestore.FieldValue.delete() });
+            tx.update(candidate.ref, { status: "queued", queuedAt: firestore_1.FieldValue.serverTimestamp(), error: firestore_1.FieldValue.delete() });
             return true;
         });
         if (changed) {
@@ -964,8 +989,8 @@ exports.resendQuoteEmail = functions.https.onCall(async (data, context) => {
     await db().collection("quoteTokens").doc(token.hash).set({
         bookingId,
         version,
-        expiresAt: admin.firestore.Timestamp.fromDate(expires ? new Date(expires) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: firestore_1.Timestamp.fromDate(expires ? new Date(expires) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+        createdAt: firestore_1.FieldValue.serverTimestamp(),
     });
     const resend = Number(booking.quoteResendCount || 0) + 1;
     const model = quoteModel(booking, token.token);
@@ -981,7 +1006,7 @@ exports.resendQuoteEmail = functions.https.onCall(async (data, context) => {
         kind: "quote",
         copyTo: quoteCopyRecipients(actor, to),
     });
-    await snap.ref.set({ quoteResendCount: resend, quoteEmailStatus: "queued" }, { merge: true });
+    await snap.ref.set({ quoteResendCount: resend, quoteEmailStatus: "queued", revision: firestore_1.FieldValue.increment(1) }, { merge: true });
     await audit(bookingId, "quote_resent", actor, { version, resend });
     return { ok: true, emailState: queued.state, version };
 });
@@ -1105,10 +1130,10 @@ async function stampPromotionOnCreate(snap) {
         patch.source = "customer_app";
     const customerClientWrite = (source === "customer_app" || source === "website") && data.createdByFunction !== true;
     if (customerClientWrite) {
-        patch.quoteAcceptedAt = admin.firestore.FieldValue.delete();
-        patch.quoteAcceptedVersion = admin.firestore.FieldValue.delete();
-        patch.paymentLinkUrl = admin.firestore.FieldValue.delete();
-        patch.amountReceivedPence = admin.firestore.FieldValue.delete();
+        patch.quoteAcceptedAt = firestore_1.FieldValue.delete();
+        patch.quoteAcceptedVersion = firestore_1.FieldValue.delete();
+        patch.paymentLinkUrl = firestore_1.FieldValue.delete();
+        patch.amountReceivedPence = firestore_1.FieldValue.delete();
         if (data.paymentStatus && data.paymentStatus !== "pending")
             patch.paymentStatus = "pending";
         const terms = (0, bookingTerms_1.onlineTermsAcceptance)({
@@ -1118,17 +1143,18 @@ async function stampPromotionOnCreate(snap) {
         });
         if (!terms.ok || data.acceptanceMethod !== terms.method) {
             patch.termsAccepted = false;
-            patch.termsVersion = admin.firestore.FieldValue.delete();
-            patch.termsAcceptedAt = admin.firestore.FieldValue.delete();
-            patch.acceptanceMethod = admin.firestore.FieldValue.delete();
+            patch.termsVersion = firestore_1.FieldValue.delete();
+            patch.termsAcceptedAt = firestore_1.FieldValue.delete();
+            patch.acceptanceMethod = firestore_1.FieldValue.delete();
         }
         else {
             patch.termsAccepted = true;
             patch.termsVersion = bookingTerms_1.CURRENT_BOOKING_TERMS.version;
             patch.acceptanceMethod = terms.method;
-            patch.termsAcceptedAt = admin.firestore.FieldValue.serverTimestamp();
+            patch.termsAcceptedAt = firestore_1.FieldValue.serverTimestamp();
         }
     }
+    patch.revision = firestore_1.FieldValue.increment(1);
     await snap.ref.set(patch, { merge: true });
 }
 exports.EMAIL_SETUP_MESSAGE = emails_1.EMAIL_CONFIG_HELP;

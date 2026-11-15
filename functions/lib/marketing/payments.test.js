@@ -35,6 +35,35 @@ const attribution = { consent: 'granted', consentAt: now, capturedAt: now, expir
     node_assert_1.strict.equal(rest && rest.amountReceivedPence, 9200);
     const replay = (0, payments_1.cardReceiptPatch)({ actualFare: 92, amountReceivedPence: 9200, stripePaymentIntentId: 'pi_oldpaid1', paymentEntries: [] }, { paymentIntentId: 'pi_oldpaid1', amountPence: 9200 }, '2026-11-11T14:00:00Z');
     node_assert_1.strict.equal(replay, null);
+    const cashThenCard = (0, payments_1.cardReceiptPatch)({
+        actualFare: 92,
+        amountReceivedPence: 2000,
+        paymentStatus: 'processing',
+        stripePaymentIntentId: 'pi_balance1',
+        paymentEntries: [{ method: 'cash', amountPence: 2000, clientRequestId: 'cash1' }],
+    }, { paymentIntentId: 'pi_balance1', amountPence: 7200 }, '2026-11-11T15:00:00Z');
+    node_assert_1.strict.ok(cashThenCard);
+    node_assert_1.strict.equal(cashThenCard.amountReceivedPence, 9200);
+    const cashReplay = (0, payments_1.cardReceiptPatch)(cashThenCard, { paymentIntentId: 'pi_balance1', amountPence: 7200 }, '2026-11-11T15:01:00Z');
+    node_assert_1.strict.equal(cashReplay, null);
+    const cardDeposit = (0, payments_1.cardReceiptPatch)({ actualFare: 92, amountReceivedPence: 0, paymentEntries: [] }, { paymentIntentId: 'pi_deposit1', amountPence: 2000 }, '2026-11-11T16:00:00Z');
+    node_assert_1.strict.ok(cardDeposit);
+    const cardBalance = (0, payments_1.cardReceiptPatch)({
+        ...cardDeposit,
+        paymentStatus: 'processing',
+        stripePaymentIntentId: 'pi_balance2',
+    }, { paymentIntentId: 'pi_balance2', amountPence: 7200 }, '2026-11-11T16:05:00Z');
+    node_assert_1.strict.ok(cardBalance);
+    node_assert_1.strict.equal(cardBalance.amountReceivedPence, 9200);
+    const truncated = (0, payments_1.cardReceiptPatch)({
+        actualFare: 92,
+        amountReceivedPence: 9200,
+        paymentStatus: 'processing',
+        stripePaymentIntentId: 'pi_other',
+        paymentEntries: [],
+        appliedStripePaymentIntentIds: ['pi_oldpaid1'],
+    }, { paymentIntentId: 'pi_oldpaid1', amountPence: 9200 }, '2026-11-11T17:00:00Z');
+    node_assert_1.strict.equal(truncated, null);
 });
 (0, node_test_1.test)('validation must pass before transport, and transport is not a GA4 receipt', () => {
     node_assert_1.strict.equal((0, payments_1.interpretValidation)({ validationMessages: [] }).ok, true);

@@ -4,6 +4,7 @@ exports.farePence = farePence;
 exports.paymentMethod = paymentMethod;
 exports.paymentChange = paymentChange;
 exports.paymentPayload = paymentPayload;
+exports.appliedCardIntentIds = appliedCardIntentIds;
 exports.cardReceiptPatch = cardReceiptPatch;
 exports.interpretValidation = interpretValidation;
 exports.deliveryOutcome = deliveryOutcome;
@@ -88,20 +89,39 @@ function paymentPayload(bookingId, attribution, change, at, sentAt = at) {
         events: [{ name: change.direction, params }],
     };
 }
+function entryIntentId(entry) {
+    if (!entry || typeof entry !== 'object')
+        return '';
+    return String(entry.stripePaymentIntentId || '');
+}
+/** Credited provider ids. The visible entry list may be shortened. This list is not. */
+function appliedCardIntentIds(booking) {
+    const stored = Array.isArray(booking.appliedStripePaymentIntentIds) ? booking.appliedStripePaymentIntentIds : [];
+    const fromEntries = (Array.isArray(booking.paymentEntries) ? booking.paymentEntries : []).map(entryIntentId);
+    return [...stored, ...fromEntries].map((id) => String(id || '')).filter((id) => /^pi_[A-Za-z0-9]+$/.test(id));
+}
+function cardIntentAlreadyCredited(booking, paymentIntentId) {
+    if (appliedCardIntentIds(booking).includes(paymentIntentId))
+        return true;
+    const stored = String(booking.stripePaymentIntentId || '');
+    const received = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+    const opened = booking.paymentStatus === 'processing';
+    const knownEntries = appliedCardIntentIds(booking);
+    return !opened && stored === paymentIntentId && received > 0 && knownEntries.length === 0;
+}
 function cardReceiptPatch(booking, input, atIso) {
     if (!/^pi_[A-Za-z0-9]+$/.test(input.paymentIntentId))
         return null;
     if (!Number.isInteger(input.amountPence) || input.amountPence <= 0)
         return null;
+    if (cardIntentAlreadyCredited(booking, input.paymentIntentId))
+        return null;
     const entries = Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [];
-    if (entries.some((entry) => entry && typeof entry === 'object' && entry.stripePaymentIntentId === input.paymentIntentId))
-        return null;
-    if (String(booking.stripePaymentIntentId || '') === input.paymentIntentId && Math.round(Number(booking.amountReceivedPence) || 0) > 0)
-        return null;
     const previous = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
     const received = previous + input.amountPence;
     const fare = farePence(booking);
     const position = (0, fareMath_1.paymentPosition)(fare, received, '');
+    const applied = Array.from(new Set([...appliedCardIntentIds(booking), input.paymentIntentId]));
     return {
         amountReceivedPence: received,
         outstandingPence: position.outstandingPence,
@@ -111,6 +131,7 @@ function cardReceiptPatch(booking, input, atIso) {
         paymentVerified: fare > 0 && received >= fare,
         stripePaymentIntentId: input.paymentIntentId,
         stripeChargeId: input.chargeId || '',
+        appliedStripePaymentIntentIds: applied,
         paymentEntries: [...entries, {
                 stripePaymentIntentId: input.paymentIntentId,
                 clientRequestId: input.paymentIntentId,

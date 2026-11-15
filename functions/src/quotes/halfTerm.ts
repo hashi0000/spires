@@ -1,10 +1,12 @@
+import { offerById } from "../offers/catalog";
 import { londonYmd } from "./londonTime";
 
-/** 2026 half term only. Do not treat these dates as an annual rule. */
+/** 2026 half term only. Dates and the amount come from the offer catalog. */
+const HALF_TERM_OFFER = offerById("half-term-2026");
 export const HALF_TERM_CODE = "HALFTERM";
-export const HALF_TERM_DISCOUNT_PENCE = 500;
-export const HALF_TERM_START_YMD = "2026-10-25";
-export const HALF_TERM_LAST_YMD = "2026-11-02";
+export const HALF_TERM_DISCOUNT_PENCE = HALF_TERM_OFFER.discountPence || 0;
+export const HALF_TERM_START_YMD = HALF_TERM_OFFER.startsOn || "";
+export const HALF_TERM_LAST_YMD = HALF_TERM_OFFER.endsOn || "";
 
 export type PromotionDecision = {
   code: string;

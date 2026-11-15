@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { notifyAdminNewBookingRequest } from "./sendBookingReceipt";
 import { sendWelcomeEmail } from "./sendWelcomeEmail";
 import { processBookingReminders } from "./sendBookingReminderEmails";
@@ -88,18 +89,20 @@ export const onBookingWrite = functions.firestore
           subject: "Your Spires Taxis payment receipt",
           html: "",
           status: "queued",
-          queuedAt: admin.firestore.FieldValue.serverTimestamp(),
+          queuedAt: FieldValue.serverTimestamp(),
         });
       }
     }
   });
 
 // Send welcome email when a new customer signs up
-export const onCustomerCreate = functions.firestore
+export const onCustomerCreate = functions
+  .runWith({ failurePolicy: true })
+  .firestore
   .document("customers/{customerId}")
   .onCreate(async (snapshot) => {
     const customerData = snapshot.data();
-    await sendWelcomeEmail(customerData);
+    await sendWelcomeEmail(snapshot.id, customerData);
   });
 
 /** ~24h and ~1h before pickup; uses same SMTP config as welcome email (functions.config().email / .smtp) */
@@ -170,4 +173,5 @@ export { readAdvertisingSpend } from "./marketing/advertisingSpend";
 export { recordCustomerAcquisition } from "./marketing/acquisition";
 export { recordBookingSource } from "./marketing/source";
 export { revokeMeasurementConsent, withdrawAccountMeasurement } from "./marketing/consent";
-export { scheduledAdvertisingSpend, refreshAdvertisingSpend } from './marketing/googleAdsSync';
+export { scheduledAdvertisingSpend, refreshAdvertisingSpend } from "./marketing/googleAdsSync";
+export { reviewWelcomeEmail } from "./offers/welcomeReview";

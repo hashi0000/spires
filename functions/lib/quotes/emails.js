@@ -18,6 +18,8 @@ const halfTerm_1 = require("./halfTerm");
 exports.QUOTE_PAGE_ORIGIN = "https://www.spires-taxis.com/quote";
 exports.EMAIL_CONFIG_HELP = "Email is not configured. Set firebase functions:config:set email.user=\"bookings@spires-taxis.com\" email.pass=\"YOUR_SMTP_PASSWORD\" smtp.host=\"smtp.ionos.co.uk\" smtp.port=\"587\" and redeploy functions. Do not invent a password.";
 function assertEmailConfigured() {
+    if (process.env.FUNCTIONS_EMULATOR === "true")
+        return;
     if (!(0, driverReminderEmail_1.reminderConfigOk)()) {
         throw new Error(exports.EMAIL_CONFIG_HELP);
     }
@@ -101,11 +103,16 @@ function guestRequestEmailHtml(input) {
     const contact = input.hasPhone
         ? "<p>We also have your phone number, and our team can call you.</p>"
         : "<p>We will use this email address to reply. We do not send a text message for this request.</p>";
+    const executive = input.executive
+        ? `<p><strong>Executive Car request for a Heathrow transfer.</strong> Mercedes E Class or equivalent. Advance booking required. Subject to availability and booking confirmation.</p>
+    <p>This is a request, not a confirmed booking. No vehicle is reserved, and we will not take payment until we confirm availability.${input.proposedFare ? ` The published fare for this area is ${(0, driverReminderEmail_1.escapeHtml)(input.proposedFare)}. It is not agreed until we confirm availability.` : " Where there is no published Executive fare, we will send an individual fixed quote after we confirm availability."}</p>
+    <p>Tell us if the passenger or luggage details change. We confirm the car is suitable before we accept the booking.</p>`
+        : `<p><strong>This is not a confirmed booking yet.</strong> We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>`;
     return shell(`
     <h1 style="color:#002147;font-size:22px;margin:0 0 12px;">Your booking request has been received</h1>
     <p>Dear ${(0, driverReminderEmail_1.escapeHtml)(input.name || "Customer")},</p>
     <p>Your booking request has been received. The reference is <strong>${(0, driverReminderEmail_1.escapeHtml)(input.bookingNumber)}</strong>.</p>
-    <p><strong>This is not a confirmed booking yet.</strong> We will review the journey and send a quote. The journey is confirmed only after that quote is accepted.</p>
+    ${executive}
     ${contact}
     ${claim}
   `);
@@ -130,6 +137,8 @@ async function sendHtmlEmail(input) {
 }
 function vehicleLabel(vehicleType) {
     const n = vehicleType.toLowerCase();
+    if (n === "executive" || n.includes("executive"))
+        return "Executive Car";
     if (n.includes("8"))
         return "8 Seater";
     if (n.includes("standard") || n === "car")

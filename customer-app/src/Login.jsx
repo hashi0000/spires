@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./firebase";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./styles.css";
@@ -22,6 +22,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [resetNote, setResetNote] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -44,6 +45,7 @@ export default function Login() {
         <p className="subtitle">Log in to manage your bookings</p>
 
         {error && <div className="error">{error}</div>}
+        {resetNote && <p className="subtitle">{resetNote}</p>}
 
         <form onSubmit={handleLogin}>
           <input
@@ -62,6 +64,28 @@ export default function Login() {
           />
           <button type="submit" className="btn-primary">Login</button>
         </form>
+        <p className="switch-text">
+          <button
+            type="button"
+            className="link"
+            onClick={async () => {
+              setError("");
+              setResetNote("");
+              if (!email) {
+                setError("Enter the email address first.");
+                return;
+              }
+              try {
+                await sendPasswordResetEmail(auth, email);
+                setResetNote("A password reset message has been sent. On the local test it is captured by the Auth emulator.");
+              } catch {
+                setError("The password reset message could not be sent.");
+              }
+            }}
+          >
+            Send a password reset message
+          </button>
+        </p>
 
         <p className="switch-text">
           Don’t have an account?{" "}

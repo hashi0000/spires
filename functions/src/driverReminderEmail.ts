@@ -1,24 +1,49 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import * as nodemailer from "nodemailer";
 
 export const ADMIN_EMAIL = "bookings@spires-taxis.com";
 
+function localCaptureTransport(): nodemailer.Transporter {
+  const inner = nodemailer.createTransport({ jsonTransport: true });
+  const sendMail = inner.sendMail.bind(inner);
+  const capture = (options: nodemailer.SendMailOptions) => {
+    const dir = path.join(__dirname, "..", "..", "local-mail-capture");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, "captured.jsonl"), `${JSON.stringify({
+      to: options.to || "",
+      subject: options.subject || "",
+      at: new Date().toISOString(),
+    })}\n`);
+  };
+  inner.sendMail = ((options: nodemailer.SendMailOptions, callback?: (err: Error | null, info: nodemailer.SentMessageInfo) => void) => {
+    capture(options);
+    if (callback) return sendMail(options, callback);
+    return sendMail(options);
+  }) as nodemailer.Transporter["sendMail"];
+  return inner;
+}
+
 let transporter: nodemailer.Transporter | null = null;
 
 export function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
-    const config = functions.config();
-    transporter = nodemailer.createTransport({
-      host: config.smtp?.host || "smtp.ionos.co.uk",
-      port: Number(config.smtp?.port || 587),
-      secure: false,
-      auth: {
-        user: config.email?.user || "bookings@spires-taxis.com",
-        pass: config.email?.pass,
-      },
-      tls: { rejectUnauthorized: false },
-    });
+    if (process.env.FUNCTIONS_EMULATOR === "true") {
+      transporter = localCaptureTransport();
+    } else {
+      const config = functions.config();
+      transporter = nodemailer.createTransport({
+        host: config.smtp?.host || "smtp.ionos.co.uk",
+        port: Number(config.smtp?.port || 587),
+        secure: false,
+        auth: {
+          user: config.email?.user || "bookings@spires-taxis.com",
+          pass: config.email?.pass,
+        },
+      });
+    }
   }
   return transporter;
 }

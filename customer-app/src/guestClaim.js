@@ -1,8 +1,7 @@
 import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
+import { functions, localCallableUrl } from "./firebase";
 
-export const GUEST_CLAIM_PREVIEW_URL =
-  "https://us-central1-spires-taxis.cloudfunctions.net/guestClaimPreview";
+export const GUEST_CLAIM_PREVIEW_URL = localCallableUrl("guestClaimPreview");
 
 export async function previewGuestClaim(token) {
   const response = await fetch(GUEST_CLAIM_PREVIEW_URL, {

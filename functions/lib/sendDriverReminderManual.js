@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendDriverReminderManual = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
+const journeyLegs_1 = require("./bookings/journeyLegs");
 const driverReminderEmail_1 = require("./driverReminderEmail");
 /**
  * Manual send: email goes to the driver's address on file (not admin).
@@ -57,9 +58,13 @@ exports.sendDriverReminderManual = functions.https.onCall(async (data, context) 
         throw new functions.https.HttpsError("not-found", "Booking not found.");
     }
     const booking = bookingSnap.data();
-    const driverId = booking.driverId?.toString().trim();
+    const leg = data?.leg === "return" ? "return" : "outbound";
+    const returnTarget = leg === "return" ? (0, journeyLegs_1.returnReminderTarget)(booking) : null;
+    const driverId = leg === "return"
+        ? (returnTarget?.driverId || "")
+        : booking.driverId?.toString().trim() || "";
     if (!driverId) {
-        throw new functions.https.HttpsError("failed-precondition", "No driver assigned");
+        throw new functions.https.HttpsError("failed-precondition", leg === "return" ? "Driver not confirmed" : "No driver assigned");
     }
     const driverSnap = await admin.firestore().collection("drivers").doc(driverId).get();
     if (!driverSnap.exists) {
@@ -70,7 +75,16 @@ exports.sendDriverReminderManual = functions.https.onCall(async (data, context) 
     if (!email) {
         throw new functions.https.HttpsError("failed-precondition", "Driver has no email");
     }
-    const trip = (0, driverReminderEmail_1.extractTripDetailsFromBooking)(booking);
+    const trip = leg === "return" && returnTarget
+        ? {
+            pickupTime: (0, driverReminderEmail_1.formatPickupTimeLabel)(returnTarget.pickupMs),
+            pickup: returnTarget.pickup,
+            dropoff: returnTarget.dropoff,
+            passengerName: String(booking.hirerName || booking.name || "—"),
+            stops: "",
+            returnSummary: "Return. The fare is for the whole booking.",
+        }
+        : (0, driverReminderEmail_1.extractTripDetailsFromBooking)(booking);
     if (!trip) {
         throw new functions.https.HttpsError("failed-precondition", "Booking has no valid pickup time.");
     }

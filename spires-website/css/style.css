@@ -2089,6 +2089,39 @@ h2,
 .breadcrumbs a { color: var(--blue-mid); text-decoration: none; }
 .breadcrumbs a:hover { text-decoration: underline; }
 
+.executive-feature:not([hidden]) {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--gold-soft), #fff);
+}
+
+.executive-card {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, #fff, var(--gold-soft));
+}
+
+.executive-icon {
+  display: block;
+}
+
+@media (min-width: 960px) {
+  .airport-fare-table--executive {
+    min-width: 920px;
+  }
+}
+
+@media (max-width: 720px) {
+  .executive-feature:not([hidden]) {
+    grid-template-columns: 1fr;
+  }
+}
+
 .price-options {
   display: grid;
   grid-template-columns: 1fr;

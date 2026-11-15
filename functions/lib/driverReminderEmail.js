@@ -52,23 +52,49 @@ exports.sendNoDriverAssignedWarning = sendNoDriverAssignedWarning;
 exports.buildDriverManualReminderHtml = buildDriverManualReminderHtml;
 exports.sendDriverManualReminderEmail = sendDriverManualReminderEmail;
 exports.reminderConfigOk = reminderConfigOk;
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const functions = __importStar(require("firebase-functions/v1"));
 const nodemailer = __importStar(require("nodemailer"));
 exports.ADMIN_EMAIL = "bookings@spires-taxis.com";
+function localCaptureTransport() {
+    const inner = nodemailer.createTransport({ jsonTransport: true });
+    const sendMail = inner.sendMail.bind(inner);
+    const capture = (options) => {
+        const dir = path.join(__dirname, "..", "..", "local-mail-capture");
+        fs.mkdirSync(dir, { recursive: true });
+        fs.appendFileSync(path.join(dir, "captured.jsonl"), `${JSON.stringify({
+            to: options.to || "",
+            subject: options.subject || "",
+            at: new Date().toISOString(),
+        })}\n`);
+    };
+    inner.sendMail = ((options, callback) => {
+        capture(options);
+        if (callback)
+            return sendMail(options, callback);
+        return sendMail(options);
+    });
+    return inner;
+}
 let transporter = null;
 function getTransporter() {
     if (!transporter) {
-        const config = functions.config();
-        transporter = nodemailer.createTransport({
-            host: config.smtp?.host || "smtp.ionos.co.uk",
-            port: Number(config.smtp?.port || 587),
-            secure: false,
-            auth: {
-                user: config.email?.user || "bookings@spires-taxis.com",
-                pass: config.email?.pass,
-            },
-            tls: { rejectUnauthorized: false },
-        });
+        if (process.env.FUNCTIONS_EMULATOR === "true") {
+            transporter = localCaptureTransport();
+        }
+        else {
+            const config = functions.config();
+            transporter = nodemailer.createTransport({
+                host: config.smtp?.host || "smtp.ionos.co.uk",
+                port: Number(config.smtp?.port || 587),
+                secure: false,
+                auth: {
+                    user: config.email?.user || "bookings@spires-taxis.com",
+                    pass: config.email?.pass,
+                },
+            });
+        }
     }
     return transporter;
 }

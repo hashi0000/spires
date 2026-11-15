@@ -85,6 +85,7 @@ function register(db: InMemoryShareDb, name: string, extras: Record<string, unkn
     publicNumber: group.publicNumber,
     eventSlug: group.eventSlug,
     ...person(name, extras),
+    nowIso: typeof extras.nowIso === "string" ? extras.nowIso : "2026-10-01T12:00:00.000Z",
   });
 }
 
@@ -262,6 +263,16 @@ describe("Event Share journeys", () => {
     assert.match(manifest, /RETURN/);
     assert.match(manifest, /England match/);
     assert.match(manifest, /Wembley Stadium/);
+  });
+
+  it("closes registration once the interest deadline has passed", () => {
+    const db = new InMemoryShareDb();
+    const created = createEventInterest(db, wembleyInput({ publish: true }));
+    publishEventInterest(db, created.id);
+    assert.throws(
+      () => register(db, "Closed", { nowIso: "2026-11-11T12:00:00.000Z" }),
+      /Registration closed/
+    );
   });
 
   it("respects the 5 passenger cap on the waitlist and drops cancelled passengers from the current manifest", () => {

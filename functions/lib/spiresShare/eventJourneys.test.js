@@ -59,6 +59,7 @@ function register(db, name, extras = {}) {
         publicNumber: group.publicNumber,
         eventSlug: group.eventSlug,
         ...person(name, extras),
+        nowIso: typeof extras.nowIso === "string" ? extras.nowIso : "2026-10-01T12:00:00.000Z",
     });
 }
 (0, node_test_1.describe)("Event Share journeys", () => {
@@ -233,6 +234,12 @@ function register(db, name, extras = {}) {
         strict_1.default.match(manifest, /RETURN/);
         strict_1.default.match(manifest, /England match/);
         strict_1.default.match(manifest, /Wembley Stadium/);
+    });
+    (0, node_test_1.it)("closes registration once the interest deadline has passed", () => {
+        const db = new bookingFlow_1.InMemoryShareDb();
+        const created = (0, bookingFlow_1.createEventInterest)(db, wembleyInput({ publish: true }));
+        (0, bookingFlow_1.publishEventInterest)(db, created.id);
+        strict_1.default.throws(() => register(db, "Closed", { nowIso: "2026-11-11T12:00:00.000Z" }), /Registration closed/);
     });
     (0, node_test_1.it)("respects the 5 passenger cap on the waitlist and drops cancelled passengers from the current manifest", () => {
         const db = new bookingFlow_1.InMemoryShareDb();

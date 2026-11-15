@@ -151,8 +151,9 @@ describe("family job helpers", () => {
     });
     const stillOpen = job({ id: "open", pickupTime, status: "allocated", driverId: "same-driver" });
     const rows = filterFamilyJobs([completed, paid, markedOnAdmin, stillOpen], { view: "today", now });
-    expect(rows.map((row) => row.id)).toEqual(["open"]);
+    expect(rows.map((row) => row.id)).toEqual(["paid", "open"]);
     expect(isCompletedJob(completed)).toBe(true);
+    expect(isCompletedJob(paid)).toBe(false);
     expect(findJobConflicts([markedOnAdmin, stillOpen])).toEqual([]);
   });
 
@@ -204,6 +205,9 @@ describe("family job helpers", () => {
     expect(payload.bookingMethod).toBe("telephone");
     expect(payload.status).toBe("confirmed");
     expect(payload.uid).toBeUndefined();
+    expect(payload.revision).toBe(1);
+    expect(payload.paymentStatus).toBeUndefined();
+    expect(payload.amountReceivedPence).toBeUndefined();
     expect(payload.pickupLocation).toBe("Oxford Station");
   });
 

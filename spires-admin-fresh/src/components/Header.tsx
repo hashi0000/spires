@@ -47,7 +47,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="admin-stat-chip">
               <Car className="admin-stat-chip__icon" aria-hidden="true" />
               <div>
-                <span className="admin-stat-chip__label">Available vehicles</span>
+                <span className="admin-stat-chip__label">Vehicles on fleet</span>
                 <span className="admin-stat-chip__value">{availableVehiclesCount}</span>
               </div>
             </div>

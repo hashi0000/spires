@@ -11,6 +11,9 @@ import {
 } from '../utils/airportWaitingPolicy';
 import { effectiveWorkflowStatus } from '../utils/bookingWorkflow';
 import { applyRequestedLegStatus, hasTimedReturn, proposedLegacyReturnCorrection } from '../utils/journeyLegs';
+import { airportCollectionNotes, vehicleClassRequiredMessage } from '../utils/bookingOps';
+import { paymentSummary } from '../utils/farePayment';
+import { getExpiryStatus } from '../utils/driverExpiry';
 import { generateSpiresBookingNumber } from '../utils/bookingNumber';
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../utils/bookingDateTime';
 import {
@@ -33,7 +36,7 @@ import {
 } from '../utils/customerSuggestions';
 import QuoteEditor from './QuoteEditor';
 import JourneyStopsEditor from './JourneyStopsEditor';
-import { hasExtraStops, normaliseStops, OPEN_RETURN_NOTICE, validateStops } from '../utils/journeyStops';
+import { hasExtraStops, keepStoredItinerary, normaliseStops, OPEN_RETURN_NOTICE, validateStops } from '../utils/journeyStops';
 import TermsAcceptance from './TermsAcceptance';
 
 interface BookingModalProps {
@@ -145,6 +148,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     actualFare: '',
     paymentMethod: 'cash',
     paymentStatus: 'pending',
+    executiveAvailability: '',
     expenses: [],
     vehicleType: '',
     depositRequired: false,
@@ -207,6 +211,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
             ? toDatetimeLocalValue(editingBooking.pickupTime)
             : '',
         vehicleType: editingBooking.vehicleType || (editingBooking as any).vehicleType || '',
+        executiveAvailability: (editingBooking as { executiveAvailability?: string }).executiveAvailability
+          || ((editingBooking.vehicleType === 'executive') ? 'awaiting_confirmation' : ''),
         depositRequired: editingBooking.depositRequired === true,
         depositAmount:
           editingBooking.depositAmount !== undefined && editingBooking.depositAmount !== null
@@ -401,14 +407,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setFormError(scheduleError);
       return;
     }
+    const cancellingSavedBooking = Boolean(editingBooking) && (
+      formData.status === 'cancelled' || formData.returnStatus === 'cancelled' || formData.outboundStatus === 'cancelled'
+    );
     const outboundStops = normaliseStops(formData.stops, formData.pickupLocation, formData.destination || '');
-    const outboundStopError = validateStops(outboundStops);
+    const outboundStopError = cancellingSavedBooking ? null : validateStops(outboundStops);
     if (outboundStopError) {
       setFormError(outboundStopError);
       return;
     }
     const returnStops = isReturn ? normaliseStops(formData.returnStops, formData.returnPickupLocation || '', formData.returnDestination || '') : [];
-    if (isReturn) {
+    if (isReturn && !cancellingSavedBooking) {
       const returnStopError = validateStops(returnStops);
       if (returnStopError) {
         setFormError(`Return: ${returnStopError}`);
@@ -432,6 +441,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const guestUnclaimed = (editingBooking as { guestRequest?: boolean } | null)?.guestRequest === true && !editingBooking?.uid;
     if (guestUnclaimed && !String(formData.hirerPhone || '').trim() && !normaliseCustomerEmail(typedEmail)) {
       setFormError('Add a phone number or email address before saving this guest request.');
+      return;
+    }
+    const alreadyConfirmed = Boolean(editingBooking && ['confirmed', 'allocated', 'completed', 'paid'].includes(effectiveWorkflowStatus(editingBooking)));
+    const classError = vehicleClassRequiredMessage(String(formData.status || ''), String(formData.vehicleType || ''), alreadyConfirmed);
+    if (classError) {
+      setFormError(classError);
       return;
     }
     setFormError('');
@@ -521,6 +536,23 @@ const BookingModal: React.FC<BookingModalProps> = ({
       bookingData.phone = bookingData.hirerPhone || '';
       bookingData.pickup = bookingData.pickupLocation;
     }
+    if (bookingData.vehicleType === 'executive' && bookingData.executiveAvailability !== 'accepted') {
+      if (['confirmed', 'allocated', 'completed'].includes(String(bookingData.status || ''))) {
+        bookingData.status = 'pending';
+        bookingData._executiveHold = 'Executive request kept as a request. Accept availability before confirming, allocating, or completing it.';
+      }
+      if (bookingData.paymentStatus === 'paid' || bookingData.paymentStatus === 'partial') {
+        bookingData.paymentStatus = editingBooking?.paymentStatus === 'paid' || editingBooking?.paymentStatus === 'partial'
+          ? editingBooking.paymentStatus
+          : 'pending';
+        bookingData._executiveHold = 'Payment was not recorded. Accept Executive availability first.';
+      }
+      if (bookingData.driverId || bookingData.vehicleId) {
+        bookingData.driverId = '';
+        bookingData.vehicleId = '';
+        bookingData._executiveHold = `${bookingData._executiveHold || ''} No vehicle was assigned.`.trim();
+      }
+    }
     if (!bookingData.returnStatus) delete bookingData.returnStatus;
     if (!bookingData.outboundStatus) delete bookingData.outboundStatus;
     if (!bookingData.returnDriverId) delete bookingData.returnDriverId;
@@ -545,7 +577,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
       if (!bookingData.source) bookingData.source = 'admin';
     }
 
+    const executiveHold = String(bookingData._executiveHold || '');
+    delete bookingData._executiveHold;
     try {
+      if (executiveHold) window.alert(executiveHold);
       // Check if this is a customer booking (has uid field)
       const isCustomerBooking = !!(editingBooking?.uid || (formData as any)?.uid);
       
@@ -651,8 +686,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
           const ref = doc(db, 'bookings', bookingId);
           const latest = await transaction.get(ref);
           if (!latest.exists()) throw new Error('This booking no longer exists.');
-          const current = latest.data();
-          const safeUpdate = { ...cleanedUpdateData };
+          const current = latest.data() || {};
+          const expectedRevision = Number((editingBooking as { revision?: number }).revision || 0);
+          const storedRevision = Number(current.revision || 0);
+          if (storedRevision !== expectedRevision) {
+            throw new Error('This booking was saved in another session. Your edits are still on this screen. Reload the saved booking, then apply your changes again.');
+          }
+          const safeUpdate = { ...cleanedUpdateData, revision: storedRevision + 1 };
           if (current.quoteIssuedVersion) {
             for (const key of ['depositRequired', 'depositAmount', 'depositStatus', 'paymentStatus', 'paymentMethod']) delete safeUpdate[key];
             if (safeUpdate.actualFare !== undefined && Number(safeUpdate.actualFare) !== Number(current.actualFare)) {
@@ -691,6 +731,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               safeUpdate.completedAt = serverTimestamp();
             }
           }
+          if (cancellingSavedBooking) keepStoredItinerary(safeUpdate, current);
           if (!formData.pickupPlace) safeUpdate.pickupPlace = deleteField();
           if (!formData.destinationPlace) safeUpdate.destinationPlace = deleteField();
           transaction.update(ref, safeUpdate);
@@ -717,6 +758,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
             createPayload[key] = value;
           }
         });
+        createPayload.revision = 1;
         if (!createPayload.driverId) delete createPayload.driverId;
         if (!createPayload.vehicleId) delete createPayload.vehicleId;
         if (createPayload.allocatedTime === undefined) delete createPayload.allocatedTime;
@@ -737,6 +779,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
         bookingId,
         isCustomerBooking: !!(editingBooking?.uid || (formData as any)?.uid),
       });
+      if (String(errorMessage).includes('saved in another session')) {
+        alert(errorMessage);
+        return;
+      }
       alert(
         `Error saving booking: ${errorMessage}\n\nIf this says permission-denied, deploy the updated Firestore rules (firestore.rules) from the project root.`
       );
@@ -753,6 +799,22 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const showSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ block: 'start' });
   };
+  const money = paymentSummary(Number(formData.actualFare) || 0, Number((editingBooking as { amountReceivedPence?: number } | null)?.amountReceivedPence) || 0, editingBooking?.paymentStatus);
+  const airportNotes = airportCollectionNotes({
+    airportCollection: Boolean(formData.airportCollection),
+    returnAirportCollection: Boolean(formData.returnAirportCollection),
+    pickupLocation: formData.pickupLocation,
+    destination: formData.destination,
+    returnPickupLocation: formData.returnPickupLocation,
+    returnDestination: formData.returnDestination,
+    hasReturn: formData.bookingType === 'return',
+  });
+  const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === formData.vehicleId);
+  const vehicleDateNotes = selectedVehicle
+    ? ([['MOT', selectedVehicle.compliance?.motExpiry], ['insurance', selectedVehicle.compliance?.insuranceExpiry], ['PH licence', selectedVehicle.compliance?.phLicenceExpiry], ['road tax', selectedVehicle.compliance?.taxExpiry]] as const)
+      .filter(([, value]) => getExpiryStatus(value) === 'expired')
+      .map(([label]) => `Stored ${label} date needs review. This is the date on file.`)
+    : [];
 
   return (
     <div
@@ -780,15 +842,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {editingBooking ? 'Edit Booking' : 'Create New Booking'}
           </h3>
           <p className="modal-subtitle">
-            {editingBooking
-              ? 'Update booking details and expenses'
-              : 'Choose One Way or Return. A return stays on this same booking.'}
+            {editingBooking ? editingBooking.bookingNumber : 'New booking'}
+            {' · '}
+            {formData.pickupLocation || 'Pickup not set'} to {formData.destination || 'destination not set'}
           </p>
+          <p className="booking-summary">Outstanding £{(money.outstandingPence / 100).toFixed(2)}. Saving this booking does not send a message.</p>
           <nav className="booking-section-nav" aria-label="Booking sections">
-            <button type="button" onClick={() => showSection('booking-section-journey')}>Journey</button>
-            <button type="button" onClick={() => showSection('booking-section-customer')}>Customer</button>
-            <button type="button" onClick={() => showSection('booking-section-fare')}>Fare & Payment</button>
-            <button type="button" onClick={() => showSection('booking-section-documents')}>Documents and communications</button>
+            <button type="button" onClick={() => showSection('booking-section-customer')}>Journey</button>
+            <button type="button" onClick={() => showSection('booking-section-allocation')}>Allocation</button>
+            <button type="button" onClick={() => showSection('booking-section-fare')}>Money</button>
+            <button type="button" onClick={() => showSection('booking-section-documents')}>Communications</button>
             <button type="button" onClick={() => showSection('booking-section-history')}>History</button>
           </nav>
         </div>
@@ -1002,6 +1065,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       </div>
                     </div>
                     <JourneyStopsEditor
+                      addressesRequired={formData.status !== 'cancelled'}
+                      extraStopsIncluded={Boolean((formData as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare)}
+                      onExtraStopsIncluded={(included) => setFormData((prev) => ({ ...prev, extraStopsIncludedInFare: included }))}
                       stops={formData.stops?.length ? formData.stops : normaliseStops(undefined, formData.pickupLocation, formData.destination || '')}
                       onChange={(stops) => setFormData((prev) => ({
                         ...prev,
@@ -1098,6 +1164,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         </>
                       ) : null}
                       <JourneyStopsEditor
+                        addressesRequired={formData.status !== 'cancelled' && formData.returnStatus !== 'cancelled'}
+                        extraStopsIncluded={Boolean((formData as { returnExtraStopsIncludedInFare?: boolean }).returnExtraStopsIncludedInFare)}
+                        onExtraStopsIncluded={(included) => setFormData((prev) => ({ ...prev, returnExtraStopsIncludedInFare: included }))}
                         stops={formData.returnStops?.length ? formData.returnStops : normaliseStops(undefined, formData.returnPickupLocation || '', formData.returnDestination || '')}
                         onChange={(stops) => setFormData((prev) => ({
                           ...prev,
@@ -1141,8 +1210,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {(formData.airportCollection || formData.returnAirportCollection) && (
               <AirportWaitingAdminNote />
             )}
+            {airportNotes.map((note) => <p key={note} className="text-sm text-amber-800 mb-2">{note}</p>)}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div id="booking-section-allocation" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Driver</label>
                 <select
@@ -1168,6 +1238,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     <option key={vehicle.id} value={vehicle.id}>{vehicle.registration}</option>
                   ))}
                 </select>
+                {vehicleDateNotes.map((note) => <p key={note} className="text-xs text-amber-800 mt-1">{note}</p>)}
               </div>
               {hasTimedReturn({ ...formData, returnPickupTime: formData.openReturn ? '' : formData.returnPickupTime }) ? (
                 <div>
@@ -1222,20 +1293,39 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <p className="text-sm text-gray-600 mt-1">Confirmed records that the customer accepted, including by phone.</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Contract</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subcontract operator</label>
                 <input
                   type="text"
                   value={formData.subContract || ''}
                   onChange={(e) => setFormData({ ...formData, subContract: e.target.value })}
                   className="form-input"
                 />
+                <label className="block text-sm font-medium text-gray-700 mb-1 mt-3">Agreed supplier cost (£)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={(formData as { supplierCostPence?: number }).supplierCostPence ? ((formData as { supplierCostPence?: number }).supplierCostPence || 0) / 100 : ''}
+                  onChange={(e) => setFormData({ ...formData, supplierCostPence: e.target.value === '' ? 0 : Math.round(Number(e.target.value) * 100) } as ExtendedBooking)}
+                  className="form-input"
+                />
+                <label className="block text-sm font-medium text-gray-700 mb-1 mt-3">Supplier reference</label>
+                <input
+                  type="text"
+                  value={(formData as { subcontractReference?: string }).subcontractReference || ''}
+                  onChange={(e) => setFormData({ ...formData, subcontractReference: e.target.value } as ExtendedBooking)}
+                  className="form-input"
+                />
+                <label className="flex items-center gap-2 text-sm text-gray-800 mt-3">
+                  <input type="checkbox" checked={Boolean((formData as { subcontractAccepted?: boolean }).subcontractAccepted)} onChange={(e) => setFormData({ ...formData, subcontractAccepted: e.target.checked } as ExtendedBooking)} />
+                  Supplier accepted
+                </label>
               </div>
             </div>
 
             <div id="booking-section-fare" className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
               <div className="flex items-center mb-3">
                 <Calculator className="w-5 h-5 text-yellow-600 mr-2" />
-                <h4 className="text-md font-semibold text-yellow-900">Fare & Payment</h4>
+                <h4 className="text-md font-semibold text-yellow-900">Money</h4>
               </div>
               {editingBooking?.id ? (
                 <QuoteEditor
@@ -1295,9 +1385,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value as any })}
                     className="form-input"
                   >
-                    <option value="pending">Pending</option>
+                    <option value="pending">Unpaid</option>
+                    <option value="partial">Part paid</option>
                     <option value="paid">Paid</option>
-                    <option value="partial">Partial</option>
                     <option value="refunded">Refunded</option>
                   </select>
                 </div>
@@ -1328,7 +1418,33 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   {formData.vehicleType === 'standard' && (
                     <p className="text-xs text-gray-500 mt-1">Toyota RAV4 / Corolla or similar. Customer facing class only.</p>
                   )}
+                  {formData.vehicleType === 'executive' && (
+                    <p className="text-xs text-gray-500 mt-1">Mercedes E Class or equivalent. Heathrow only. Suitability is confirmed before acceptance.</p>
+                  )}
+                  {!formData.passengers || !(formData as { luggage?: string | number }).luggage ? (
+                    <p className="text-xs text-gray-600 mt-1">Passenger or luggage details are missing. Add them when you can so the vehicle class can be checked.</p>
+                  ) : null}
                 </div>
+                {formData.vehicleType === 'executive' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Executive availability</label>
+                  <select
+                    value={(formData as { executiveAvailability?: string }).executiveAvailability || 'awaiting_confirmation'}
+                    onChange={(e) => setFormData({ ...formData, executiveAvailability: e.target.value } as ExtendedBooking)}
+                    className="form-input"
+                  >
+                    <option value="awaiting_confirmation">Awaiting availability confirmation</option>
+                    <option value="accepted">Accepted</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {(formData as { executiveFareStatus?: string }).executiveFareStatus === 'quote_required'
+                      ? 'No published Executive fare. Quote this journey individually after acceptance.'
+                      : (formData as { proposedFarePounds?: number }).proposedFarePounds
+                        ? `Published fare £${Number((formData as { proposedFarePounds?: number }).proposedFarePounds).toFixed(0)}. Not agreed until you accept availability.`
+                        : 'A request until you accept availability. Do not take payment before then.'}
+                  </p>
+                </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Deposit required?</label>
                   <select
@@ -1522,8 +1638,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </div>
 
             <div id="booking-section-documents" className="mb-6">
-              <h4 className="text-md font-semibold text-gray-900 mb-2">Documents and communications</h4>
-              <p className="text-sm text-gray-600 mb-3">Quote, payment request and confirmation messages are sent from Fare & Payment. PDF and reminder actions stay on the booking list.</p>
+              <h4 className="text-md font-semibold text-gray-900 mb-2">Communications</h4>
+              <p className="text-sm text-gray-600 mb-3">Saving does not send a quote, confirmation, payment request, or reminder. The recipient is {formData.email || formData.hirerEmail || 'not recorded yet'}.</p>
+              <button type="button" className="btn btn-secondary btn-sm mb-3" onClick={() => showSection('booking-section-fare')}>Open money and message actions</button>
               {editingBooking?.heardAbout ? (
                 <p className="text-sm text-gray-700 mb-3">How they heard about us: {heardAboutText(editingBooking.heardAbout, editingBooking.heardAboutDetail)}. This is what the customer chose on the website form.</p>
               ) : null}

@@ -12,7 +12,7 @@ import {
   bookingLooksLikeAirportTransfer,
   isReturnBooking,
 } from "./airportWaitingPolicy";
-import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
+import { executiveRequestNote, formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import { confirmationTermsParagraph } from "./terms/bookingTerms";
 
 type PDFDocumentType =
@@ -349,7 +349,10 @@ export async function generateBookingPDF(
   const buffers: Buffer[] = [];
   doc.on("data", (chunk) => buffers.push(chunk as Buffer));
 
-  const docTitle = documentTitleMap[type] || "Booking Confirmation";
+  const executiveNote = executiveRequestNote(booking);
+  const docTitle = executiveNote && booking.executiveAvailability !== "accepted"
+    ? "Booking request — not confirmed"
+    : documentTitleMap[type] || "Booking Confirmation";
   const bookingNumber = String(booking.bookingNumber || "");
   const pageW = doc.page.width;
   const contentW = pageW - PAGE_MARGIN * 2;
@@ -490,6 +493,12 @@ export async function generateBookingPDF(
           align: "right",
         });
         cy += 14;
+      }
+      if (executiveNote) {
+        doc.fillColor("#002147").font("Helvetica").fontSize(8).text(executiveNote, leftX + BOX_PAD, cy, {
+          width: contentW - BOX_PAD * 2,
+        });
+        cy = doc.y + 6;
       }
     }
     if (booking.passengers) {
