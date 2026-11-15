@@ -9,11 +9,13 @@ export function loadPublishedFares() {
   const code = fs.readFileSync(path.join(root, 'js', 'airport-prices.js'), 'utf8');
   const ctx = {
     window: {},
+    Event: function Event() {},
     document: {
       readyState: 'complete',
       querySelectorAll: () => [],
       getElementById: () => null,
       addEventListener: () => {},
+      dispatchEvent: () => true,
     },
   };
   vm.runInNewContext(code, ctx);
