@@ -73,7 +73,7 @@ async function generateInvoicePDF(input) {
     let rowNumber = 0;
     for (const line of input.lines) {
         const parts = pieces(line.description, widths[0] - 10, 280);
-        parts.forEach((part, partIndex) => {
+        for (const [partIndex, part] of parts.entries()) {
             doc.font('InterRegular').fontSize(8.5);
             const description = part + (partIndex ? ' (continued)' : '');
             const height = Math.max(42, doc.heightOfString(description, { width: widths[0] - 10 }) + 14);
@@ -86,7 +86,7 @@ async function generateInvoicePDF(input) {
             y += height;
             doc.moveTo(x, y).lineTo(x + width, y).lineWidth(0.5).strokeColor('#d5dde6').stroke();
             rowNumber += 1;
-        });
+        }
     }
     inTable = false;
     y += 12;

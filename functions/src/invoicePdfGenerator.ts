@@ -37,13 +37,13 @@ export async function generateInvoicePDF(input:InvoiceDocument):Promise<Buffer> 
  let rowNumber=0;
  for(const line of input.lines){
   const parts=pieces(line.description,widths[0]-10,280);
-  parts.forEach((part,partIndex)=>{
+  for (const [partIndex, part] of parts.entries()) {
    doc.font('InterRegular').fontSize(8.5);const description=part+(partIndex?' (continued)':'');const height=Math.max(42,doc.heightOfString(description,{width:widths[0]-10})+14);room(height);
    if(rowNumber%2===0)doc.rect(x,y,width,height).fill('#f7f4ec');
    const values=[description,partIndex?'':line.quantity,partIndex?'':money(line.unitPence),partIndex?'':money(line.netPence),partIndex?'':money(line.vatPence)+' ('+Number(line.vatRatePercent||0)+'%)',partIndex?'':money(line.totalPence)];let cx=x;
    values.forEach((value,index)=>{doc.font(index===5?'InterBold':'InterRegular').fontSize(8.5).fillColor(brand.navy).text(value,cx+5,y+7,{width:widths[index]-10,align:index?'right':'left'});cx+=widths[index];});
    y+=height;doc.moveTo(x,y).lineTo(x+width,y).lineWidth(0.5).strokeColor('#d5dde6').stroke();rowNumber+=1;
-  });
+  }
  }
  inTable=false;y+=12;room(105);
  const totalX=x+width-220;doc.moveTo(totalX,y).lineTo(x+width,y).lineWidth(2).strokeColor(brand.gold).stroke();y+=10;
