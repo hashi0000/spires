@@ -64,6 +64,7 @@ function quoteEmailHtml(model) {
     <strong>Final quote ${(0, driverReminderEmail_1.escapeHtml)(model.finalFare)}</strong></p>
     ${model.validUntil ? `<p>This quote is valid until ${(0, driverReminderEmail_1.escapeHtml)(model.validUntil)}.</p>` : ""}
     ${payment}
+    ${model.collectionNote ? `<p>${(0, driverReminderEmail_1.escapeHtml)(model.collectionNote)}</p>` : ""}
     <p>${(0, driverReminderEmail_1.escapeHtml)(model.terms)}</p>
     ${button(model.quoteUrl, "View and accept quote")}
     ${payButton}

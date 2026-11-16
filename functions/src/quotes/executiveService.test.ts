@@ -116,7 +116,9 @@ describe("executive Heathrow service", () => {
     }
     assert.equal(ctx.window.SPIRES_EXECUTIVE_SERVICE_ENABLED, true);
     assert.equal(code.includes("standardCar: { oneWay: 92, return: 180 }"), true);
-    assert.equal(code.includes(EXECUTIVE_CUSTOMER_WORDING), true);
+    const servicePage = fs.readFileSync(path.join(__dirname, '../../../spires-website/executive-travel.html'), 'utf8');
+    assert.match(servicePage, /Mercedes E Class or equivalent/);
+    assert.match(servicePage, /Cotswolds/);
     assert.equal(code.includes("vito: { oneWay: 120, return: 235 }"), true);
   });
 

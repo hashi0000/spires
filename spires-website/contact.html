@@ -128,6 +128,7 @@
                 <ul class="site-nav__links">
                   <li><a href="/oxford-taxis" data-nav="oxford"><span class="site-nav__name">Oxford taxis</span><span class="site-nav__hint">Journeys in the city</span></a></li>
                   <li><a href="/rates" data-nav="rates"><span class="site-nav__name">Rates</span><span class="site-nav__hint">Published airport prices</span></a></li>
+                  <li><a href="/executive-travel" data-nav="executive"><span class="site-nav__name">Executive travel</span><span class="site-nav__hint">Heathrow and Cotswolds</span></a></li>
                   <li><a href="/business-accounts" data-nav="business"><span class="site-nav__name">Business accounts</span><span class="site-nav__hint">Invoices for regular travel</span></a></li>
                   <li><a href="/share" data-nav="share"><span class="site-nav__name">Spires Share</span><span class="site-nav__hint">Share a journey and split the cost</span></a></li>
                 </ul>
@@ -269,6 +270,7 @@
         <ul>
           <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
           <li><a href="/rates" data-nav="rates">Rates</a></li>
+          <li><a href="/executive-travel" data-nav="executive">Executive travel</a></li>
           <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
           <li><a href="/share" data-nav="share">Spires Share</a></li>
         </ul>
@@ -420,6 +422,18 @@
             <legend>Journey</legend>
             <div class="form-field">
               <label for="journey">Journey type</label>
+              <label for="journey-purpose">Service</label>
+              <select id="journey-purpose" name="journeyType"><option value="transfer">Transfer or other journey</option><option value="cotswolds">Cotswolds trip / private tour</option></select>
+              <fieldset id="cotswolds-fields" hidden>
+                <legend>Cotswolds total hire</legend>
+                <label for="hire-hours">Duration</label><select id="hire-hours" name="hireHours"><option value="4">4 hours total hire</option><option value="6" selected>6 hours total hire</option><option value="8">8 hours total hire</option></select>
+                <p id="hire-price"></p>
+                <label for="hire-itinerary">Places to visit and final drop off</label><textarea id="hire-itinerary" name="hireItinerary" maxlength="2000"></textarea>
+                <p>Your duration includes the drive from Oxford, all travel between stops, visits, meals, shopping and final drop off. It starts at your agreed pickup time if the driver is ready. Passenger lateness uses the booked time; driver lateness shifts the finish. Driver travel to collect you does not count. Four hours total hire is not four hours sightseeing.</p>
+                <p>Additional time is £10 per started 20 minutes, per vehicle, for all car types. For example, 21 extra minutes costs £20. Extensions and route changes are subject to availability. Unexpected accidents, unplanned closures, emergency diversions and severe weather delays are reviewed separately; passenger delays and longer visits remain chargeable.</p>
+                <p>We confirm a realistic itinerary, duration and price before accepting. Private transport without guided commentary. Tickets, meals and drinks are excluded. Parking arrangements will be stated in your quote.</p>
+                <label><input id="hire-accepted" name="timedHireAccepted" type="checkbox" value="yes"> I understand that all driving and stops count towards the total hire and accept £10 per started 20 minutes after the booked duration.</label>
+              </fieldset>
               <select id="journey" name="bookingType">
                 <option value="one_way">One way</option>
                 <option value="return">Return, both journeys together</option>
@@ -457,9 +471,48 @@
                 <label for="terminal">Terminal</label>
                 <input type="text" id="terminal" name="terminal" placeholder="For example T5">
               </div>
+              <div class="form-field">
+                <label for="collection-kind">Collection place</label>
+                <select id="collection-kind" name="collectionLocationKind">
+                  <option value="terminal">Airport terminal</option>
+                  <option value="hotel">Airport hotel</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="collection-arrangement">Collection arrangement</label>
+                <select id="collection-arrangement" name="collectionArrangement">
+                  <option value="flight_monitored">Flight monitored collection</option>
+                  <option value="fixed_time">Fixed time collection</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="collection-location">Exact collection location</label>
+                <input type="text" id="collection-location" name="collectionLocation" placeholder="Terminal or hotel name and address">
+              </div>
+              <div class="form-field" id="arrival-date-field">
+                <label for="arrival-date">Arrival date</label>
+                <input type="date" id="arrival-date" name="arrivalDate">
+              </div>
+            </div>
+            <div id="fixed-time-note" class="form-help" hidden>
+              <p>Your driver is scheduled for your chosen collection time. Flight monitoring is not included with this option, and your pickup will not automatically change if your flight arrives early or late. Earlier collection or rescheduling is subject to availability. Please contact us promptly if you are delayed.</p>
+              <p>A flight number on this booking is reference information only.</p>
+              <label class="check-line"><input type="checkbox" name="fixedTimeAcknowledged"><span>I understand that my flight will not be monitored and my collection time will not automatically change.</span></label>
+            </div>
+            <div id="collection-help" class="form-help" hidden>
+              <label class="check-line"><input type="checkbox" name="precedingFlight" value="yes"><span>I am arriving on a flight before a hotel collection</span></label>
+              <label class="check-line"><input type="checkbox" name="travellingIndependently" value="yes"><span>I am travelling independently to the hotel</span></label>
+
             </div>
           </fieldset>
 
+          <details class="journey-box"><summary>Passenger assistance or mobility equipment</summary><p>Tell us about practical help needed. Do not include unnecessary medical information. Vehicle suitability and requests are subject to confirmation.</p>
+              <label class="check-line"><input type="checkbox" name="assistanceRequested" value="yes"><span>Someone needs extra time or practical assistance boarding. This is subject to confirmation.</span></label>
+              <label for="assistance-note">Practical assistance, walking aid or luggage</label>
+              <textarea id="assistance-note" name="assistanceNote" rows="2"></textarea>
+              <label class="check-line"><input type="checkbox" name="walkingAid" value="yes"><span>Walking aid</span></label>
+              <label class="check-line"><input type="checkbox" name="wheelchairCarriage" value="yes"><span>Wheelchair to be carried as luggage</span></label>
+          </details>
           <div id="return-fields" hidden>
             <fieldset class="journey-box">
               <legend>Return journey</legend>
@@ -493,8 +546,9 @@
           </div>
 
           <div id="airport-note" class="form-help" hidden>
-            <p>We monitor your flight and allow 50 minutes from the actual landing time for you to clear immigration, collect your luggage and let us know you are ready. Your driver will then make their way to the airport pickup point.</p>
-            <p>If you are not ready within 50 minutes of landing, waiting time is charged at £10 per additional 30 minutes or part thereof. The standard airport pickup charge is included in the fare.</p>
+            <p>Flight monitored collection includes 60 minutes from the verified actual landing. Fixed time collection includes 15 minutes from the booked collection time. Additional waiting is charged at £5 per started 15 minutes after your included allowance.</p>
+            <p>Waiting caused by our driver is not charged. A hotel collection stays at the booked time unless we agree a different time. Bookings already accepted keep the terms agreed at the time.</p>
+            <p>If you would prefer a later pickup, choose fixed time collection and allow enough time for immigration, luggage and reaching the collection point. Your driver will be scheduled for that time; earlier pickup is subject to availability.</p>
           </div>
 
           <div class="form-row">
@@ -520,7 +574,7 @@
             </label>
             <label class="choice-card" data-executive-block hidden>
               <input type="radio" name="vehicleType" value="executive">
-              <span><strong>Executive Car</strong><br>Mercedes E Class or equivalent. Heathrow transfers only. Advance booking required. Subject to availability and confirmation. A partner operator may provide the car.</span>
+              <span><strong>Executive Car</strong><br>Mercedes E Class or equivalent. Advance booking required, subject to availability. Heathrow only. A partner operator may provide the car.</span>
             </label>
             <p class="form-help" id="executive-note" hidden>Tell us how many passengers and how much luggage you have. We confirm the car is suitable before we accept the booking. This sends a request. It does not confirm a vehicle or take payment.</p>
             <p class="form-help">The vehicle may vary. Luggage space depends on how many people are travelling and the size of the bags.</p>
@@ -563,9 +617,9 @@
           <div class="terms-agreement">
             <label class="terms-agreement__line" for="terms-accepted">
               <input type="checkbox" id="terms-accepted" name="termsAccepted" value="yes" required aria-describedby="terms-agreement-error">
-              <span>I agree to the <a href="/terms/2026-10-25" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>
+              <span>I agree to the <a href="/terms/2026-11-15" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>
             </label>
-            <input type="hidden" name="termsVersion" value="2026-10-25">
+            <input type="hidden" name="termsVersion" value="2026-11-15">
             <p id="terms-agreement-error" class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>
           </div>
 
@@ -601,6 +655,8 @@
   </section>
 </main>
 
+<script src="/js/service-policy.js" defer></script>
+<script src="/js/cotswolds-booking.js" defer></script>
 <script src="/js/guest-booking.js" defer></script>
 <!-- SITE-FOOTER -->
 <footer class="site-footer no-print">

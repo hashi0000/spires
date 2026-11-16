@@ -213,14 +213,21 @@ assert(reviewTable.rows.includes("Not available"), "non-Heathrow Executive cells
 const abingdonReview = ctx.window.SPIRES_renderFareBlock("abingdon", "heathrow", { executive: true });
 assert(abingdonReview.rows.includes("£165") && abingdonReview.rows.includes("£320"), "Abingdon Executive review fares");
 assert(abingdonReview.rows.includes("£105") && abingdonReview.rows.includes("£205"), "Abingdon Standard fares stay in the review table");
-const page = readFileSync(join(website, "executive-heathrow-transfers.html"), "utf8");
-assert(page.includes("£150") && page.includes("£290"), "executive page Oxford fares");
-assert(page.includes("£165") && page.includes("£320"), "executive page Abingdon fares");
-assert((page.match(/£170/g) || []).length >= 3 && (page.match(/£330/g) || []).length >= 3, "executive page Didcot, Bicester and Witney fares");
-assert(page.includes("Advance booking required. Subject to availability and booking confirmation."), "executive customer wording");
-assert(page.includes("data-executive-block"), "executive page can be held");
-assert(!page.includes("whatsapp-route.js"), "executive WhatsApp message must not be rewritten");
-assert(page.includes("One%20way%20or%20return"), "executive WhatsApp prompt");
+const heathrowPage = readFileSync(join(website, "oxford-to-heathrow-taxi.html"), "utf8");
+assert(heathrowPage.includes('id="executive"'), "Heathrow page has an Executive section");
+assert(heathrowPage.includes("Mercedes E Class or equivalent. Advance booking required, subject to availability."), "Heathrow page uses the short Executive description");
+assert(heathrowPage.includes("£150") && heathrowPage.includes("£290"), "Heathrow page shows the Oxford Executive fare");
+assert(heathrowPage.includes("£92") && heathrowPage.includes("£180"), "Heathrow page keeps the Standard Car fare");
+assert(heathrowPage.includes("£120") && heathrowPage.includes("£235"), "Heathrow page keeps the 8 Seater fare");
+assert(heathrowPage.includes("vehicle=executive"), "Heathrow page books Executive as its own car type");
+assert(!heathrowPage.includes('data-nav="executive"'), "Heathrow page does not add an Executive navigation item");
+const redirect = readFileSync(join(website, "executive-heathrow-transfers.html"), "utf8");
+assert(redirect.includes('url=https://www.spires-taxis.com/oxford-to-heathrow-taxi#executive'), "old Executive address redirects to the Heathrow section");
+assert(redirect.includes('rel="canonical" href="https://www.spires-taxis.com/oxford-to-heathrow-taxi#executive"'), "old Executive address canonical points at the Heathrow section");
+assert(redirect.includes("noindex"), "old Executive address is not a second indexable page");
+const pricesSource = readFileSync(join(website, "js", "airport-prices.js"), "utf8");
+assert(!pricesSource.includes('data-nav="executive"'), "price script does not insert an Executive navigation link");
+assert(!pricesSource.includes("/executive-heathrow-transfers"), "price script does not link to the old Executive page");
 
 if (failures.length) {
   console.error("FAILED:\n" + failures.map((f) => " - " + f).join("\n"));

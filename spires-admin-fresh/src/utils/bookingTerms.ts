@@ -1,11 +1,12 @@
 export const CURRENT_BOOKING_TERMS = {
-  version: "2026-10-25",
-  appliesToJourneysFrom: "2026-04-01",
-  publishedOn: "2026-10-25",
-  url: "https://www.spires-taxis.com/terms/2026-10-25",
+  version: "2026-11-15",
+  appliesToJourneysFrom: "2026-11-15",
+  publishedOn: "2026-11-15",
+  url: "https://www.spires-taxis.com/terms/2026-11-15",
 };
 
 export function termsUrlForVersion(version: string): string {
+  if (version === "2026-10-25") return "https://www.spires-taxis.com/terms/2026-10-25";
   if (version === CURRENT_BOOKING_TERMS.version) return CURRENT_BOOKING_TERMS.url;
   if (version === "previous-public") return "https://www.spires-taxis.com/terms/previous-public";
   return "";

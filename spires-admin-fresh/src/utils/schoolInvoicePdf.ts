@@ -1,3 +1,5 @@
+import { canonicalInvoicePdf, downloadInvoiceBlob } from './canonicalInvoicePdf';
+import { DOCUMENT_FONT_CSS } from './documentFontCss';
 import {
   formatGbp,
   invoiceTotals,
@@ -32,114 +34,6 @@ export type SchoolInvoicePdfInput = {
   draft: boolean;
   supplier: SchoolSupplierDetails;
 };
-
-/** A4 at 96dpi — same iframe width as booking confirmation PDFs. */
-const A4_PX = { width: 794, height: 1122 };
-
-function html2pdfOptions(filename: string): Record<string, unknown> {
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-  const scale = Math.min(4, Math.max(2.75, dpr * 2.2));
-  return {
-    margin: [0, 0, 0, 0],
-    filename,
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: {
-      scale,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      letterRendering: true,
-      scrollX: 0,
-      scrollY: 0,
-      backgroundColor: "#ffffff",
-      imageTimeout: 20000,
-      windowWidth: A4_PX.width,
-    },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["css", "legacy"] },
-  };
-}
-
-const CAPTURE_CSS = `
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: ${A4_PX.width}px !important;
-  }
-  .booking-pdf-root.pdf-email-capture {
-    font-size: 11px !important;
-    line-height: 1.45 !important;
-    -webkit-font-smoothing: antialiased;
-    width: 100% !important;
-  }
-  .booking-pdf-root.pdf-email-capture .page-container {
-    display: flex !important;
-    flex-direction: column !important;
-    width: 100% !important;
-    min-height: ${A4_PX.height}px !important;
-    height: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .main-content {
-    flex: 1 1 auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .footer {
-    margin-top: auto !important;
-    flex: 0 0 auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .content-grid {
-    display: table !important;
-    width: 100% !important;
-    table-layout: fixed !important;
-    border-collapse: separate !important;
-    border-spacing: 10px 0 !important;
-    margin-bottom: 10px !important;
-  }
-  .booking-pdf-root.pdf-email-capture .content-grid > .info-box {
-    display: table-cell !important;
-    width: 50% !important;
-    vertical-align: top !important;
-    margin: 0 !important;
-    float: none !important;
-    grid-column: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .info-box.full-width {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 0 10px 0 !important;
-    float: none !important;
-    grid-column: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .info-box {
-    box-shadow: none !important;
-    border: 1.5px solid #e5e7eb !important;
-  }
-  .booking-pdf-root.pdf-email-capture .detail-row {
-    display: flex !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
-    align-items: flex-start !important;
-  }
-  .booking-pdf-root.pdf-email-capture .detail-value {
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
-    white-space: normal !important;
-  }
-  .booking-pdf-root.pdf-email-capture .invoice-table {
-    display: table !important;
-    width: 100% !important;
-    table-layout: fixed !important;
-  }
-  .booking-pdf-root.pdf-email-capture .header { padding: 16px 14px !important; }
-  .booking-pdf-root.pdf-email-capture .logo-svg { width: 280px !important; height: 52px !important; }
-  .booking-pdf-root.pdf-email-capture .logo-text { font-size: 30px !important; }
-  .booking-pdf-root.pdf-email-capture .payment-summary,
-  .booking-pdf-root.pdf-email-capture .header,
-  .booking-pdf-root.pdf-email-capture .footer {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-`;
 
 export function buildSchoolInvoiceHtml(input: SchoolInvoicePdfInput): string {
   const totals = invoiceTotals(input.lines);
@@ -192,8 +86,9 @@ export function buildSchoolInvoiceHtml(input: SchoolInvoicePdfInput): string {
   <title>Invoice ${esc(input.invoiceNumber)}</title>
 </head>
 <body style="margin:0;padding:0;">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
+
   <style>
+${DOCUMENT_FONT_CSS}
     @page { size: A4 portrait; margin: 0; }
     .booking-pdf-root,
     .booking-pdf-root * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -476,45 +371,14 @@ export function buildSchoolInvoiceHtml(input: SchoolInvoicePdfInput): string {
 </html>`;
 }
 
-export async function downloadSchoolInvoicePdf(input: SchoolInvoicePdfInput): Promise<void> {
-  const html = buildSchoolInvoiceHtml(input);
-  const html2pdf = (await import("html2pdf.js")).default;
-  const filename = `Spires-Taxis-Invoice-${input.invoiceNumber}.pdf`;
-
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.cssText =
-    `position:fixed;left:-9999px;top:0;width:${A4_PX.width}px;min-height:${A4_PX.height}px;border:0;opacity:0;pointer-events:none;`;
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument;
-  if (!doc) {
-    document.body.removeChild(iframe);
-    throw new Error("Could not create PDF frame");
-  }
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  try {
-    doc.querySelector(".booking-pdf-root")?.classList.add("pdf-email-capture");
-    const fix = doc.createElement("style");
-    fix.setAttribute("data-pdf-email-capture", "true");
-    fix.textContent = CAPTURE_CSS;
-    doc.body.appendChild(fix);
-
-    await new Promise<void>((r) => setTimeout(r, 900));
-    if (doc.fonts?.ready) {
-      await doc.fonts.ready.catch(() => undefined);
-    }
-    await new Promise<void>((r) => setTimeout(r, 500));
-    await new Promise<void>((r) => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => r());
-      });
-    });
-
-    await html2pdf().set(html2pdfOptions(filename)).from(doc.body).save();
-  } finally {
-    if (iframe.parentNode) document.body.removeChild(iframe);
-  }
+export async function generateSchoolInvoicePdfBlob(input: SchoolInvoicePdfInput):Promise<Blob> {
+ const pence=(value:number)=>Math.round(value*100);const totals=invoiceTotals(input.lines);
+ return canonicalInvoicePdf({number:input.invoiceNumber,title:input.draft?'Draft school invoice':'School transport invoice',invoiceDate:formatUkDate(input.invoiceDate),customerName:'Oxfordshire County Council',customerEmail:OCC_FINANCE_EMAIL,
+ supplierName:input.supplier.providerName,supplierAddress:input.supplier.address,companyNumber:input.supplier.companyNumber,vatNumber:input.supplier.vatNumber,
+ references:[['Service month',labelForServiceMonth(input.serviceMonth)],['Service',input.kind==='social_care_one_off'?'Social care transport':'School contract transport']],notes:input.notes,
+ bank:{name:input.supplier.accountName,sortCode:input.supplier.sortCode,accountNumber:input.supplier.accountNumber},
+ lines:input.lines.map(line=>({description:line.routeNumber+': '+line.description+(line.deductions?' (deductions '+formatGbp(line.deductions)+')':''),quantity:String(line.schoolDays)+' days',unitPence:pence(line.dailyPrice),netPence:pence(lineNet(line)),vatPence:pence(lineVat(line)),vatRatePercent:line.vatRatePercent,totalPence:pence(lineTotal(line))})),totals:{netPence:pence(totals.net),vatPence:pence(totals.vat),totalPence:pence(totals.total)}});
+}
+export async function downloadSchoolInvoicePdf(input:SchoolInvoicePdfInput):Promise<void> {
+ const blob=await generateSchoolInvoicePdfBlob(input);await downloadInvoiceBlob(blob,'Spires-Taxis-School-Invoice-'+input.invoiceNumber+'.pdf');
 }

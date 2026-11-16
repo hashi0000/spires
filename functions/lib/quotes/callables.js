@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EMAIL_SETUP_MESSAGE = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.processEmailJob = exports.shouldSendConfirmation = exports.bookingMatchesStatusFilter = void 0;
+exports.EMAIL_SETUP_MESSAGE = exports.recordFlightVerification = exports.recordAdditionalCharge = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.processEmailJob = exports.shouldSendConfirmation = exports.bookingMatchesStatusFilter = void 0;
 exports.enqueueConfirmationIfNeeded = enqueueConfirmationIfNeeded;
 exports.stampPromotionOnCreate = stampPromotionOnCreate;
 const admin = __importStar(require("firebase-admin"));
@@ -48,10 +48,14 @@ const journeyStops_1 = require("../bookings/journeyStops");
 const bookingTerms_1 = require("../terms/bookingTerms");
 const paymentLink_1 = require("./paymentLink");
 const fareMath_1 = require("./fareMath");
+const paymentAmount_1 = require("../paymentAmount");
 const bankDetails_1 = require("../bankDetails");
 const messages_1 = require("../offers/messages");
 const executiveService_1 = require("./executiveService");
 const bookingRevision_1 = require("../bookings/bookingRevision");
+const airportWaitingPolicy_1 = require("../airportWaitingPolicy");
+const timedHire_1 = require("../timedHire");
+const airportWaitingPolicy_2 = require("../airportWaitingPolicy");
 const quoteWorkflow_1 = require("./quoteWorkflow");
 Object.defineProperty(exports, "bookingMatchesStatusFilter", { enumerable: true, get: function () { return quoteWorkflow_1.bookingMatchesStatusFilter; } });
 Object.defineProperty(exports, "shouldSendConfirmation", { enumerable: true, get: function () { return quoteWorkflow_1.shouldSendConfirmation; } });
@@ -126,11 +130,7 @@ function customerName(data) {
     return str(data.hirerName) || str(data.name) || "Customer";
 }
 function finalFarePence(data) {
-    const quote = data.issuedQuote && typeof data.issuedQuote === "object" ? data.issuedQuote : null;
-    if (quote && Number.isFinite(Number(quote.finalFarePence)))
-        return Number(quote.finalFarePence);
-    const fare = Number(data.actualFare);
-    return Number.isFinite(fare) ? Math.round(fare * 100) : 0;
+    return (0, paymentAmount_1.agreedFarePence)(data);
 }
 async function enqueueJob(input) {
     const mode = input.mode || "auto";
@@ -283,6 +283,15 @@ function journeyLine(data, leg) {
     const stops = (0, journeyStops_1.normaliseStops)(data.stops, str(quote.pickup) || str(data.pickupLocation) || str(data.pickup), str(quote.destination) || str(data.destination));
     return (0, journeyStops_1.routeSentence)(stops, str(quote.dateTime) || str(data.dateTime) || str(data.pickupTime));
 }
+function collectionNote(data) {
+    const parts = [];
+    if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(data))
+        parts.push((0, airportWaitingPolicy_1.airportWaitingTextForBooking)(data));
+    const hire = data.timedHire;
+    if (hire && !(0, timedHire_1.timedHireIssueError)({ timedHire: hire }))
+        parts.push((0, timedHire_1.timedHireAcknowledgement)(hire));
+    return parts.join(" ");
+}
 function quoteModel(data, token) {
     const quote = (data.issuedQuote || {});
     const paymentUrl = str(data.paymentLinkUrl);
@@ -312,6 +321,7 @@ function quoteModel(data, token) {
         quoteUrl: `${emails_1.QUOTE_PAGE_ORIGIN}?t=${encodeURIComponent(token)}`,
         paymentUrl: safePay,
         terms: str(quote.terms),
+        collectionNote: collectionNote({ ...data, ...(quote.serviceTerms || {}) }),
     };
 }
 function readQuoteInput(data, booking) {
@@ -428,6 +438,9 @@ async function saveDraftOrIssue(data, context, issue) {
                 final: (0, halfTerm_1.formatPence)(parsed.totals.finalFarePence),
             } };
     }
+    const hireError = (0, timedHire_1.timedHireIssueError)(booking);
+    if (issue && hireError)
+        throw httpsError("failed-precondition", hireError);
     if (issue && (0, executiveService_1.executiveCommerceBlocked)({ ...booking, vehicleType: str(data.vehicleType) || str(booking.vehicleType) })) {
         throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
     }
@@ -436,7 +449,8 @@ async function saveDraftOrIssue(data, context, issue) {
         throw httpsError("failed-precondition", gate.reason || "Quote cannot be issued.");
     const version = Number(booking.quoteIssuedVersion || 0) + 1;
     const token = (0, emails_1.newQuoteToken)();
-    const issuedQuote = { ...draft, version, issuedAt: new Date().toISOString() };
+    const serviceTerms = Object.fromEntries(['waitingPolicyVersion', 'airportCollection', 'returnAirportCollection', 'collectionArrangement', 'collectionLocationKind', 'returnCollectionArrangement', 'returnCollectionLocationKind', 'timedHire', 'journeyType'].filter(key => booking[key] !== undefined).map(key => [key, booking[key]]));
+    const issuedQuote = { ...draft, version, issuedAt: new Date().toISOString(), serviceTerms };
     const quotes = Array.isArray(booking.quotes) ? booking.quotes.slice(-19) : [];
     quotes.push(issuedQuote);
     const buckets = (0, quoteWorkflow_1.paymentBuckets)({
@@ -740,6 +754,7 @@ exports.recordManualPayment = functions.https.onCall(async (data, context) => {
             amountReceivedPence, outstandingPence: buckets.outstandingPence,
             overpaymentPence: Math.max(0, amountReceivedPence - finalFarePence(booking)),
             paymentMethod: method, paymentStatus: buckets.stored, paymentVerified,
+            lastPaymentSource: "office",
             depositStatus: booking.depositRequired ? (amountReceivedPence >= Math.round(Number(booking.depositAmount || 0) * 100) && Number(booking.depositAmount || 0) > 0 ? "paid" : "pending") : (booking.depositStatus || "not_required"),
             paymentEntries: [...entries, entry].slice(-50),
             paymentRecordedAt: firestore_1.FieldValue.serverTimestamp(),
@@ -815,6 +830,7 @@ async function applyAcceptance(ref, input) {
         if (!decision.already || (decision.nextStatus === "confirmed" && !["confirmed", "allocated", "completed"].includes(str(booking.status)))) {
             const patch = {
                 quoteAcceptedVersion: issued,
+                acceptedServiceTerms: booking.issuedQuote?.serviceTerms || booking.acceptedServiceTerms || {},
                 quoteAcceptedAt: firestore_1.FieldValue.serverTimestamp(),
                 quoteAcceptedBy: input.onBehalf ? `admin:${input.actor}` : input.actor || "customer",
                 status: decision.nextStatus,
@@ -1026,7 +1042,7 @@ function publicView(data, id) {
         }
     }
     const buckets = (0, quoteWorkflow_1.paymentBuckets)({
-        finalFarePence: Number(quote.finalFarePence) || 0,
+        finalFarePence: finalFarePence(data),
         amountReceivedPence: Number(data.amountReceivedPence) || 0,
         paymentRequirement: str(quote.paymentRequirement),
         substatus: str(data.quoteAcceptanceSubstatus),
@@ -1061,9 +1077,10 @@ function publicView(data, id) {
         bookingType: str(quote.bookingType) || str(data.bookingType),
         normalFare: (0, halfTerm_1.formatPence)(Number(quote.normalFarePence) || 0),
         discount: (0, halfTerm_1.formatPence)(Number(quote.discountPence) || 0),
-        finalFare: (0, halfTerm_1.formatPence)(Number(quote.finalFarePence) || 0),
+        finalFare: (0, halfTerm_1.formatPence)(finalFarePence(data)),
         validUntil: str(quote.validUntil),
         terms: str(quote.terms),
+        collectionNote: collectionNote({ ...data, ...(quote.serviceTerms || {}) }),
         paymentRequirement: str(quote.paymentRequirement) || "later",
         paymentDescription: str(quote.paymentDescription) === "deposit" ? "Deposit" : "Full payment",
         amountRequested: (0, halfTerm_1.formatPence)(Number(quote.amountRequestedPence) || Number(quote.finalFarePence) || 0),
@@ -1161,4 +1178,80 @@ async function stampPromotionOnCreate(snap) {
     patch.revision = firestore_1.FieldValue.increment(1);
     await snap.ref.set(patch, { merge: true });
 }
+exports.recordAdditionalCharge = functions.https.onCall(async (data, context) => {
+    const actor = requireAdmin(context);
+    const body = (data || {});
+    const bookingId = str(body.bookingId);
+    if (!bookingId || bookingId.includes("/"))
+        throw httpsError("invalid-argument", "A booking ID is required.");
+    const ref = db().collection("bookings").doc(bookingId);
+    const result = await db().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists)
+            throw httpsError("not-found", "Booking not found.");
+        const booking = snap.data() || {};
+        const revision = Number(booking.revision || 0);
+        if (body.expectedRevision != null && Number(body.expectedRevision) !== revision) {
+            throw httpsError("aborted", "The office saved this booking first. Your charge was not added. Review the latest booking and try again.");
+        }
+        const decision = (0, airportWaitingPolicy_2.addAdditionalCharge)(booking.additionalCharges, {
+            id: str(body.id),
+            amountPence: Number(body.amountPence),
+            reason: str(body.reason),
+        });
+        if (!decision.ok)
+            throw httpsError("failed-precondition", decision.error);
+        const position = (0, fareMath_1.paymentPosition)((0, paymentAmount_1.agreedFarePence)({ ...booking, additionalCharges: decision.charges }), Number(booking.amountReceivedPence || 0), '');
+        tx.set(ref, {
+            additionalCharges: decision.charges,
+            outstandingPence: position.outstandingPence,
+            paymentStatus: position.stored,
+            revision: revision + 1,
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { revision: revision + 1, charges: decision.charges };
+    });
+    await audit(bookingId, "additional_charge_recorded", actor, { id: str(body.id), amountPence: Number(body.amountPence) });
+    return { ok: true, ...result };
+});
+exports.recordFlightVerification = functions.https.onCall(async (data, context) => {
+    const actor = requireAdmin(context);
+    const body = (data || {});
+    const bookingId = str(body.bookingId);
+    const when = str(body.verifiedLandingAt);
+    const source = str(body.source);
+    if (!bookingId || Number.isNaN(new Date(when).getTime()) || !source) {
+        throw httpsError("invalid-argument", "A verified landing time and the source are required.");
+    }
+    const leg = body.leg === "return" ? "return" : "outbound";
+    const prefix = leg === "return" ? "return" : "";
+    const atField = prefix ? "returnVerifiedLandingAt" : "verifiedLandingAt";
+    const ref = db().collection("bookings").doc(bookingId);
+    await db().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists)
+            throw httpsError("not-found", "Booking not found.");
+        const booking = snap.data() || {};
+        const revision = Number(booking.revision || 0);
+        if (body.expectedRevision != null && Number(body.expectedRevision) !== revision) {
+            throw httpsError("aborted", "The office saved this booking first. The landing time was not changed.");
+        }
+        const previous = str(booking[atField]);
+        if (previous && !str(body.reason))
+            throw httpsError("failed-precondition", "A correction needs a reason.");
+        const history = Array.isArray(booking.landingVerificationHistory) ? booking.landingVerificationHistory.slice(-19) : [];
+        history.push({ leg, at: when, source, reason: str(body.reason), actorUid: context.auth?.uid || "", actorEmail: actor, recordedAt: new Date().toISOString() });
+        const patch = {
+            landingVerificationHistory: history,
+            revision: revision + 1,
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        };
+        patch[atField] = when;
+        patch[prefix ? "returnLandingStatus" : "landingStatus"] = "actual";
+        patch[prefix ? "returnVerifiedLandingSource" : "verifiedLandingSource"] = source;
+        patch[prefix ? "returnVerifiedLandingByUid" : "verifiedLandingByUid"] = context.auth?.uid || "";
+        tx.set(ref, patch, { merge: true });
+    });
+    return { ok: true };
+});
 exports.EMAIL_SETUP_MESSAGE = emails_1.EMAIL_CONFIG_HELP;

@@ -1,0 +1,10 @@
+{
+  "version": "2026-11-15",
+  "airport": { "flightFreeMinutes": 60, "fixedFreeMinutes": 15, "blockMinutes": 15, "chargePounds": 5 },
+  "cotswolds": {
+    "durationsHours": [4, 6, 8],
+    "prices": { "standard": [180, 260, 340], "executive": [240, 350, 460], "8_seater": [220, 320, 420] },
+    "extraRatePounds": 10,
+    "extraIntervalMinutes": 20
+  }
+}

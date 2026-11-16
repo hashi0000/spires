@@ -11,10 +11,10 @@ import {
 } from "./bookingTerms";
 
 describe("booking terms version", () => {
-  it("keeps the journey date separate from the publication date", () => {
-    assert.equal(CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-04-01");
-    assert.equal(CURRENT_BOOKING_TERMS.publishedOn, "2026-10-25");
-    assert.equal(CURRENT_BOOKING_TERMS.version, "2026-10-25");
+  it("publishes the new terms without replacing historic agreements", () => {
+    assert.equal(CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-15");
+    assert.equal(CURRENT_BOOKING_TERMS.publishedOn, "2026-11-15");
+    assert.equal(CURRENT_BOOKING_TERMS.version, "2026-11-15");
     assert.equal(PREVIOUS_PUBLIC_TERMS.publicationDateRecorded, false);
     assert.notEqual(PREVIOUS_PUBLIC_TERMS.id, "2026-04-01");
   });
@@ -44,16 +44,16 @@ describe("online terms agreement", () => {
   it("accepts the published version for the customer portal and the website", () => {
     const portal = onlineTermsAcceptance({
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: CURRENT_BOOKING_TERMS.version,
       channel: "customer_portal",
     });
     const website = onlineTermsAcceptance({
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: CURRENT_BOOKING_TERMS.version,
       channel: "website",
     });
     assert.equal(portal.ok && portal.method, "customer_portal");
-    assert.equal(website.ok && website.version, "2026-10-25");
+    assert.equal(website.ok && website.version, CURRENT_BOOKING_TERMS.version);
   });
 });
 
@@ -108,7 +108,7 @@ describe("acceptance display", () => {
     assert.equal(summary.text, "Acceptance not recorded.");
     assert.doesNotMatch(confirmationTermsParagraph({}), /Accepted /);
     assert.match(confirmationTermsParagraph({}), /Acceptance not recorded/);
-    assert.match(confirmationTermsParagraph({}), /2026-10-25/);
+    assert.match(confirmationTermsParagraph({}), /2026-11-15/);
   });
 
   it("shows the version that was actually stored", () => {
@@ -120,7 +120,7 @@ describe("acceptance display", () => {
     });
     assert.equal(summary.recorded, true);
     if (summary.recorded) {
-      assert.equal(summary.url, CURRENT_BOOKING_TERMS.url);
+      assert.equal(summary.url, 'https://www.spires-taxis.com/terms/2026-10-25');
       assert.match(summary.text, /Customer portal/);
       assert.match(summary.text, /25 Oct 2026/);
     }

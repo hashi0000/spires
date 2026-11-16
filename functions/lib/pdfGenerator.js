@@ -3,9 +3,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.__pdfTest = void 0;
+exports.DOCUMENT_BRAND = exports.__pdfTest = void 0;
 exports.generateBookingPDF = generateBookingPDF;
+exports.registerDocumentFonts = registerDocumentFonts;
 const pdfkit_1 = __importDefault(require("pdfkit"));
+const documentFonts_json_1 = __importDefault(require("./documentFonts.json"));
+const paymentAmount_1 = require("./paymentAmount");
+const timedHire_1 = require("./timedHire");
 const bankDetails_1 = require("./bankDetails");
 const airportWaitingPolicy_1 = require("./airportWaitingPolicy");
 const vehicleTypes_1 = require("./vehicleTypes");
@@ -82,11 +86,21 @@ function formatPaymentMethod(method) {
     return raw.replace(/_/g, " ").toUpperCase();
 }
 function paymentCopy(type, booking, hasFare) {
-    const amount = hasFare && typeof booking.actualFare === "number"
+    let amount = hasFare && typeof booking.actualFare === "number"
         ? `£${Number(booking.actualFare).toFixed(2)}`
         : hasFare && Number.isFinite(Number(booking.actualFare))
             ? `£${Number(booking.actualFare).toFixed(2)}`
             : "TBC";
+    const receivedPounds = Math.max(0, Number(booking.amountReceivedPence || 0) / 100);
+    const totalPounds = Number(booking.actualFare) || 0;
+    const latest = Array.isArray(booking.paymentEntries) ? booking.paymentEntries[booking.paymentEntries.length - 1] : null;
+    if (type === 'payment_request' && hasFare) {
+        const balance = Math.max(0, totalPounds - receivedPounds);
+        const depositDue = booking.depositRequired === true && Number(booking.depositAmount || 0) > receivedPounds ? Number(booking.depositAmount) - receivedPounds : 0;
+        amount = '£' + (depositDue > 0 ? Math.min(balance, depositDue) : balance).toFixed(2);
+    }
+    if ((type === 'payment_receipt' || type === 'payment') && hasFare)
+        amount = '£' + (latest?.mode === 'add' ? Number(latest.amountPence || 0) / 100 : receivedPounds).toFixed(2);
     const method = formatPaymentMethod(booking.paymentMethod);
     const isPaid = booking.paymentStatus === "paid";
     const isPartial = booking.paymentStatus === "partial";
@@ -97,7 +111,7 @@ function paymentCopy(type, booking, hasFare) {
     if (isPaymentRequest && hasFare) {
         methodLine = `Payment Required - ${method}`;
     }
-    else if ((isCompleted && isPaid && hasFare) || (isPaymentReceipt && hasFare)) {
+    else if ((isCompleted && isPaid && hasFare) || (isPaymentReceipt && isPaid && hasFare)) {
         methodLine = `Paid by ${method}`;
     }
     else if (hasFare && isPartial) {
@@ -121,12 +135,12 @@ function drawFooter(doc) {
     doc.rect(0, y, w, FOOTER_H).fill(NAVY);
     doc
         .fillColor(GOLD)
-        .font("Times-Bold")
+        .font("CinzelBold")
         .fontSize(11)
         .text("SPIRES TAXIS", PAGE_MARGIN, y + 10, { width: w - PAGE_MARGIN * 2, align: "center" });
     doc
         .fillColor(WHITE)
-        .font("Helvetica")
+        .font("InterRegular")
         .fontSize(8)
         .text("bookings@spires-taxis.com  ·  07776 897772  ·  www.spires-taxis.com", PAGE_MARGIN, y + 28, {
         width: w - PAGE_MARGIN * 2,
@@ -155,12 +169,12 @@ function drawHeader(doc, bookingNumber) {
     doc.rect(0, 0, w, HEADER_H).fill(NAVY);
     doc
         .fillColor(GOLD)
-        .font("Times-Bold")
+        .font("CinzelBold")
         .fontSize(22)
         .text("SPIRES TAXIS", 0, 22, { width: w, align: "center" });
     doc
         .fillColor("#e8eef5")
-        .font("Times-Italic")
+        .font("PlayfairItalic")
         .fontSize(10)
         .text("Your Oxford Journey Starts Here", 0, 50, { width: w, align: "center" });
     const label = bookingNumber || "";
@@ -171,7 +185,7 @@ function drawHeader(doc, bookingNumber) {
         doc.roundedRect(bx, by, badgeW, 26, 4).lineWidth(1.6).strokeColor(GOLD).stroke();
         doc
             .fillColor(WHITE)
-            .font("Times-Bold")
+            .font("CinzelBold")
             .fontSize(9)
             .text(label, bx, by + 8, { width: badgeW, align: "center" });
     }
@@ -185,7 +199,7 @@ function drawBanner(doc, title) {
     doc.moveTo(0, y + BANNER_H).lineTo(w, y + BANNER_H).lineWidth(3).strokeColor(SLATE).stroke();
     doc
         .fillColor(SLATE)
-        .font("Helvetica-Bold")
+        .font("InterBold")
         .fontSize(11)
         .text(title.toUpperCase(), 0, y + 12, { width: w, align: "center", characterSpacing: 1.4 });
     doc.restore();
@@ -193,16 +207,15 @@ function drawBanner(doc, title) {
 function ensureSpace(doc, y, needed) {
     if (y + needed <= pageContentBottom(doc))
         return y;
-    drawFooter(doc);
     doc.addPage({ size: "A4", margin: 0 });
-    drawHeader(doc, "");
     return HEADER_H + 16;
 }
 function boxedSection(doc, x, y, width, title, drawBody) {
     const startY = y;
+    const startPage = doc.page;
     doc
         .fillColor(NAVY)
-        .font("Times-Bold")
+        .font("CinzelBold")
         .fontSize(11)
         .text(title, x + BOX_PAD, startY + 8, { width: width - BOX_PAD * 2 });
     doc
@@ -212,6 +225,8 @@ function boxedSection(doc, x, y, width, title, drawBody) {
         .strokeColor(GOLD)
         .stroke();
     const innerEnd = drawBody(startY + BOX_PAD + 22);
+    if (doc.page !== startPage)
+        return innerEnd + BOX_PAD;
     const height = Math.max(52, innerEnd - startY + BOX_PAD);
     doc.save();
     doc.roundedRect(x, startY, width, height, 6).lineWidth(1.4).strokeColor(BORDER).stroke();
@@ -221,20 +236,22 @@ function boxedSection(doc, x, y, width, title, drawBody) {
 function detailRow(doc, x, y, width, label, value) {
     const labelW = Math.min(118, width * 0.4);
     const valueW = width - labelW - 6;
-    const h = Math.max(doc.font("Helvetica").fontSize(8).heightOfString(label || " ", { width: labelW }), doc.font("Helvetica").fontSize(9).heightOfString(value || " ", { width: valueW }));
-    doc.fillColor(MUTED).font("Helvetica").fontSize(8).text(label, x, y, { width: labelW });
+    const h = Math.max(doc.font("InterRegular").fontSize(8).heightOfString(label || " ", { width: labelW }), doc.font("InterRegular").fontSize(9).heightOfString(value || " ", { width: valueW }));
+    y = ensureSpace(doc, y, Math.min(h + 5, pageContentBottom(doc) - HEADER_H - 16));
+    const rowPage = doc.page;
+    doc.fillColor(MUTED).font("InterRegular").fontSize(8).text(label, x, y, { width: labelW });
     doc
         .fillColor(NAVY)
-        .font("Helvetica")
+        .font("InterRegular")
         .fontSize(9)
         .text(value || "", x + labelW + 6, y, { width: valueW, align: "right" });
-    return y + h + 5;
+    return doc.page === rowPage ? y + h + 5 : doc.y + 5;
 }
 function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, destination, airportCollection, flightNumber, stops) {
     let cy = y;
     doc
         .fillColor(NAVY)
-        .font("Times-Bold")
+        .font("CinzelBold")
         .fontSize(9)
         .text(title.toUpperCase(), x, cy, { width, characterSpacing: 0.4 });
     cy += 16;
@@ -245,10 +262,10 @@ function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, desti
         extraStops.forEach((stop, index) => {
             const kind = stop?.type === "dropoff" ? "Drop off" : "Pickup";
             const notes = stop?.notes ? ` (${stop.notes})` : "";
-            doc.fillColor(NAVY).font("Helvetica").fontSize(9).text(`${index + 1}. ${kind}: ${stop?.address || ""}${notes}`, x, cy, { width });
+            doc.fillColor(NAVY).font("InterRegular").fontSize(9).text(`${index + 1}. ${kind}: ${stop?.address || ""}${notes}`, x, cy, { width });
             cy = doc.y + 3;
         });
-        doc.fillColor(SLATE).font("Helvetica-Bold").fontSize(8).text("Extra stops. Agree the fare.", x, cy, { width });
+        doc.fillColor(SLATE).font("InterBold").fontSize(8).text("Extra stops. Agree the fare.", x, cy, { width });
         cy = doc.y + 8;
     }
     else {
@@ -260,21 +277,21 @@ function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, desti
         const innerW = (width - 28) / 2;
         doc
             .fillColor(MUTED)
-            .font("Helvetica")
+            .font("InterRegular")
             .fontSize(8)
             .text(formatPdfTime(pickupTime), x + 12, cy + 8, { width: innerW, align: "center" });
         doc
             .fillColor(NAVY)
-            .font("Helvetica-Bold")
+            .font("InterBold")
             .fontSize(9)
             .text(pickupLocation || "", x + 12, cy + 22, { width: innerW, align: "center" });
-        doc.fillColor(GOLD).font("Helvetica-Bold").fontSize(14).text(">", x + 12 + innerW, cy + 16, {
+        doc.fillColor(GOLD).font("InterBold").fontSize(14).text(">", x + 12 + innerW, cy + 16, {
             width: 16,
             align: "center",
         });
         doc
             .fillColor(NAVY)
-            .font("Helvetica-Bold")
+            .font("InterBold")
             .fontSize(9)
             .text(destination || "", x + 12 + innerW + 16, cy + 22, { width: innerW, align: "center" });
         cy += panelH + 8;
@@ -288,7 +305,13 @@ function journeyBlock(doc, x, y, width, title, pickupTime, pickupLocation, desti
     return cy;
 }
 async function generateBookingPDF(booking, type = "booking_confirmation") {
-    const doc = new pdfkit_1.default({ size: "A4", margin: 0, compress: false });
+    booking = { ...booking, ...(booking.acceptedServiceTerms || {}) };
+    const originalFare = Number(booking.issuedQuote?.finalFarePence) / 100 || Number(booking.actualFare) || 0;
+    const totalPence = (0, paymentAmount_1.agreedFarePence)(booking);
+    booking = { ...booking, actualFare: totalPence > 0 ? totalPence / 100 : booking.actualFare };
+    const doc = new pdfkit_1.default({ size: "A4", margin: 0, compress: false, bufferPages: true });
+    registerDocumentFonts(doc);
+    doc.on("pageAdded", () => { drawHeader(doc, String(booking.bookingNumber || "")); doc.y = HEADER_H + 16; });
     const buffers = [];
     doc.on("data", (chunk) => buffers.push(chunk));
     const executiveNote = (0, vehicleTypes_1.executiveRequestNote)(booking);
@@ -366,7 +389,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             cy = journeyBlock(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Return Journey", booking.openReturn === true && !returnTime ? "" : returnTime, booking.returnPickupLocation || "", booking.returnDestination || "", booking.returnAirportCollection === true, booking.returnFlightNumber, booking.returnStops);
             if (booking.openReturn === true) {
                 cy += 6;
-                doc.font("Helvetica").fontSize(9).fillColor(SLATE).text(booking.returnPickupTime
+                doc.font("InterRegular").fontSize(9).fillColor(SLATE).text(booking.returnPickupTime
                     ? `Open return. Pickup time now set for ${booking.returnPickupTime}. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`
                     : `Open return${booking.returnDate ? ` on ${booking.returnDate}` : ""}. Return time to be confirmed. For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${booking.returnNoticeNote || ""}`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
                 cy = doc.y + 4;
@@ -379,14 +402,14 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Vehicle Class", (0, vehicleTypes_1.formatVehicleTypeLabel)(booking.vehicleType));
             const examples = (0, vehicleTypes_1.vehicleClassExamples)(booking.vehicleType);
             if (examples) {
-                doc.fillColor("#5c6570").font("Helvetica").fontSize(8).text(examples, leftX + BOX_PAD, cy, {
+                doc.fillColor("#5c6570").font("InterRegular").fontSize(8).text(examples, leftX + BOX_PAD, cy, {
                     width: contentW - BOX_PAD * 2,
                     align: "right",
                 });
                 cy += 14;
             }
             if (executiveNote) {
-                doc.fillColor("#002147").font("Helvetica").fontSize(8).text(executiveNote, leftX + BOX_PAD, cy, {
+                doc.fillColor("#002147").font("InterRegular").fontSize(8).text(executiveNote, leftX + BOX_PAD, cy, {
                     width: contentW - BOX_PAD * 2,
                 });
                 cy = doc.y + 6;
@@ -401,7 +424,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         return cy;
     }) + 10;
     if ((0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)) {
-        const body = (0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)(airportWaitingPolicy_1.AIRPORT_WAITING_POLICY);
+        const body = (0, airportWaitingPolicy_1.airportWaitingTextForBooking)(booking);
         const scope = (0, airportWaitingPolicy_1.airportWaitingScopeNote)(booking);
         y = ensureSpace(doc, y, 90);
         const noteX = leftX;
@@ -409,27 +432,54 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         const textW = noteW - 20;
         let textH = 18;
         if (scope)
-            textH += doc.font("Helvetica").fontSize(8).heightOfString(scope, { width: textW }) + 6;
-        textH += doc.font("Helvetica").fontSize(8).heightOfString(body, { width: textW }) + 16;
+            textH += doc.font("InterRegular").fontSize(8).heightOfString(scope, { width: textW }) + 6;
+        textH += doc.font("InterRegular").fontSize(8).heightOfString(body, { width: textW }) + 16;
         doc.save();
         doc.roundedRect(noteX, y, noteW, textH, 6).fill("#fbfaf7").strokeColor("#e8e4da").lineWidth(1).stroke();
         doc.restore();
         let ny = y + 8;
         doc
             .fillColor("#334155")
-            .font("Helvetica-Bold")
+            .font("InterBold")
             .fontSize(8)
             .text((0, airportWaitingPolicy_1.airportWaitingDisclaimerTitle)(), noteX + 10, ny, { width: textW });
         ny += 14;
         if (scope) {
-            doc.fillColor("#334155").font("Helvetica-Bold").fontSize(8).text(scope, noteX + 10, ny, { width: textW });
+            doc.fillColor("#334155").font("InterBold").fontSize(8).text(scope, noteX + 10, ny, { width: textW });
             ny += doc.heightOfString(scope, { width: textW }) + 6;
         }
-        doc.fillColor("#4b5563").font("Helvetica").fontSize(8).text(body, noteX + 10, ny, { width: textW, lineGap: 2 });
+        doc.fillColor("#4b5563").font("InterRegular").fontSize(8).text(body, noteX + 10, ny, { width: textW, lineGap: 2 });
         y += textH + 10;
     }
     const hasSchedule = (booking.dueOnOutbound != null && String(booking.dueOnOutbound) !== "") ||
         (booking.dueOnReturn != null && String(booking.dueOnReturn) !== "");
+    if (booking.timedHire) {
+        const text = (0, timedHire_1.timedHireAcknowledgement)(booking.timedHire) + " Total hire includes all driving and stops until final drop off. " + String(booking.timedHire.itinerary || "");
+        y = ensureSpace(doc, y, 100);
+        y = boxedSection(doc, leftX, y, contentW, "Cotswolds total hire", innerY => {
+            doc.fillColor(SLATE).font("InterRegular").fontSize(9).text(text, leftX + BOX_PAD, innerY, { width: contentW - BOX_PAD * 2 });
+            return doc.y + 8;
+        }) + 10;
+    }
+    if (totalPence > 0) {
+        const extras = Array.isArray(booking.additionalCharges) ? booking.additionalCharges : [];
+        y = ensureSpace(doc, y, 120 + extras.length * 20);
+        y = boxedSection(doc, leftX, y, contentW, "Fare and payments", innerY => {
+            let cy = innerY;
+            const row = (label, amount) => { cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, label, `£${(amount / 100).toFixed(2)}`); };
+            row("Agreed fare", Math.round(originalFare * 100));
+            extras.forEach((extra) => row(String(extra.reason || "Additional charge"), Number(extra.amountPence) || 0));
+            row("Final total", totalPence);
+            const latest = Array.isArray(booking.paymentEntries) ? booking.paymentEntries[booking.paymentEntries.length - 1] : null;
+            if ((type === 'payment_receipt' || type === 'payment') && latest?.mode === 'add') {
+                row('Earlier payments, including deposit', Math.max(0, Number(booking.amountReceivedPence || 0) - Number(latest.amountPence || 0)));
+                row('This payment', Number(latest.amountPence || 0));
+            }
+            row("Payments received, including deposit", Number(booking.amountReceivedPence) || 0);
+            row("Balance due", Math.max(0, totalPence - (Number(booking.amountReceivedPence) || 0)));
+            return cy;
+        }) + 10;
+    }
     if (hasSchedule) {
         y = ensureSpace(doc, y, 80);
         y =
@@ -443,7 +493,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
                     cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Total fare", `£${total.toFixed(2)}`);
                 }
                 if (Number.isFinite(deposit)) {
-                    cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Deposit paid", `£${deposit.toFixed(2)}`);
+                    cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Agreed deposit", `£${deposit.toFixed(2)}`);
                 }
                 if (Number.isFinite(outbound)) {
                     cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Due on outbound journey", `£${outbound.toFixed(2)}`);
@@ -464,12 +514,12 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         doc.restore();
         doc
             .fillColor(GOLD)
-            .font("Helvetica-Bold")
+            .font("InterBold")
             .fontSize(20)
             .text(amount, leftX + BOX_PAD, cy + 12, { width: contentW - BOX_PAD * 2, align: "center" });
         doc
             .fillColor(WHITE)
-            .font("Helvetica")
+            .font("InterRegular")
             .fontSize(9)
             .text(methodLine, leftX + BOX_PAD, cy + 38, { width: contentW - BOX_PAD * 2, align: "center" });
         let extraY = cy + 52;
@@ -513,12 +563,12 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
                 doc.restore();
                 doc
                     .fillColor(NAVY)
-                    .font("Helvetica-Bold")
+                    .font("InterBold")
                     .fontSize(9)
                     .text("Deposit required", leftX + BOX_PAD + 8, cy + 6, { width: contentW - BOX_PAD * 2 - 16 });
                 doc
                     .fillColor(NAVY)
-                    .font("Helvetica")
+                    .font("InterRegular")
                     .fontSize(8)
                     .text(depText, leftX + BOX_PAD + 8, cy + 20, { width: contentW - BOX_PAD * 2 - 16 });
                 cy += 50;
@@ -528,7 +578,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             const { accountName, sortCode, accountNumber } = bankDetails_1.SPIRES_BANK_DETAILS;
             doc
                 .fillColor(NAVY)
-                .font("Helvetica-Bold")
+                .font("InterBold")
                 .fontSize(10)
                 .text("Pay by bank transfer", leftX + BOX_PAD, cy);
             cy += 14;
@@ -537,7 +587,7 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
             cy = detailRow(doc, leftX + BOX_PAD, cy, contentW - BOX_PAD * 2, "Account number", accountNumber);
             doc
                 .fillColor(MUTED)
-                .font("Helvetica")
+                .font("InterRegular")
                 .fontSize(8)
                 .text(`Please use booking number ${bookingNumber || "as shown above"} as the payment reference.`, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
             cy += 16;
@@ -546,14 +596,14 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         if (termsLine) {
             doc
                 .fillColor(NAVY)
-                .font("Helvetica-Bold")
+                .font("InterBold")
                 .fontSize(10)
                 .text("Terms", leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
             cy += 14;
             const termsHeight = doc.heightOfString(termsLine, { width: contentW - BOX_PAD * 2 });
             doc
                 .fillColor(SLATE)
-                .font("Helvetica")
+                .font("InterRegular")
                 .fontSize(8)
                 .text(termsLine, leftX + BOX_PAD, cy, { width: contentW - BOX_PAD * 2 });
             cy += termsHeight + 8;
@@ -563,7 +613,11 @@ async function generateBookingPDF(booking, type = "booking_confirmation") {
         }
         return cy;
     });
-    drawFooter(doc);
+    const pages = doc.bufferedPageRange();
+    for (let page = pages.start; page < pages.start + pages.count; page += 1) {
+        doc.switchToPage(page);
+        drawFooter(doc);
+    }
     doc.end();
     await new Promise((resolve, reject) => {
         doc.on("end", () => resolve());
@@ -576,3 +630,8 @@ exports.__pdfTest = {
     formatPdfTime,
     formatPaymentMethod,
 };
+function registerDocumentFonts(doc) {
+    for (const [name, data] of Object.entries(documentFonts_json_1.default))
+        doc.registerFont(name, Uint8Array.from(atob(data), char => char.charCodeAt(0)));
+}
+exports.DOCUMENT_BRAND = { navy: NAVY, gold: GOLD, cream: CREAM, margin: PAGE_MARGIN, headerHeight: HEADER_H, bannerHeight: BANNER_H, drawHeader, drawBanner, drawFooter, contentBottom: pageContentBottom };

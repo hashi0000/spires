@@ -55,11 +55,87 @@ service cloud.firestore {
       return [
         'bookingNumber', 'dateTime', 'pickupTime', 'pickupLocation', 'destination',
         'hirerName', 'hirerPhone', 'hirerAddress', 'bookingMethod', 'bookingType',
-        'vehicleType', 'status', 'flightNumber', 'notes', 'source',
+        'vehicleType', 'status', 'adminStatus', 'flightNumber', 'notes', 'source',
         'createdByEmail', 'createdByUid', 'updatedByEmail', 'updatedByUid',
         'driverId', 'vehicleId', 'returnDriverId', 'returnVehicleId', 'allocatedTime', 'actualFare', 'cancelledAt', 'cancelledByEmail',
-        'cancelledByUid', 'customerStatus', 'createdAt', 'updatedAt', 'revision'
+        'cancelledByUid', 'customerStatus', 'createdAt', 'updatedAt', 'revision',
+        'outboundStatus', 'returnStatus',
+        'outboundCompletedAt', 'outboundCompletedByUid',
+        'returnCompletedAt', 'returnCompletedByUid',
+        'outboundDriverReadyAt', 'outboundPassengerReadyAt', 'outboundPassengerOnboardAt', 'outboundDepartedAt', 'outboundDelayCause',
+        'returnDriverReadyAt', 'returnPassengerReadyAt', 'returnPassengerOnboardAt', 'returnDepartedAt', 'returnDelayCause'
       ];
+    }
+
+    function familyChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function bookingHasReturn() {
+      return resource.data.get('bookingType', '') == 'return'
+        || resource.data.get('returnTrip', false) == true
+        || resource.data.get('openReturn', false) == true
+        || resource.data.get('returnPickupTime', '') != ''
+        || resource.data.get('returnDateTime', '') != '';
+    }
+
+    function assignedDriver(field) {
+      return resource.data.get(field, '') is string
+        && resource.data.get(field, '').size() > 0;
+    }
+
+    function familyLegWrite(field, atField, byField, driverOk, otherCompleted) {
+      return !familyChanged().hasAny([field])
+        || (
+          resource.data.get(field, '') != 'completed'
+          && resource.data.status != 'cancelled'
+          && resource.data.get('customerStatus', '') != 'cancelled'
+          && resource.data.get(field, resource.data.status) != 'cancelled'
+          && (
+            (
+              request.resource.data[field] == 'completed'
+              && driverOk
+              && request.resource.data[atField] == request.time
+              && request.resource.data[byField] == request.auth.uid
+            )
+            || (
+              request.resource.data[field] in ['confirmed', 'allocated']
+              && otherCompleted
+            )
+          )
+        );
+    }
+
+    function familyStatusWriteOk() {
+      return familyLegWrite(
+          'outboundStatus', 'outboundCompletedAt', 'outboundCompletedByUid',
+          assignedDriver('driverId'),
+          request.resource.data.returnStatus == 'completed' && request.resource.data.returnCompletedAt == request.time
+        )
+        && familyLegWrite(
+          'returnStatus', 'returnCompletedAt', 'returnCompletedByUid',
+          assignedDriver('returnDriverId'),
+          request.resource.data.outboundStatus == 'completed' && request.resource.data.outboundCompletedAt == request.time
+        )
+        && (
+          !familyChanged().hasAny(['status'])
+          || request.resource.data.status != 'completed'
+          || (
+            resource.data.status != 'cancelled'
+            && resource.data.get('customerStatus', '') != 'cancelled'
+            && request.resource.data.outboundStatus == 'completed'
+            && request.resource.data.outboundCompletedByUid == request.auth.uid
+            && (
+              !bookingHasReturn()
+              || request.resource.data.returnStatus == 'completed'
+              || request.resource.data.returnStatus == 'cancelled'
+            )
+          )
+        )
+        && (
+          resource.data.status != 'completed'
+          || request.resource.data.status == 'completed'
+        );
     }
 
     match /bookings/{bookingId} {
@@ -79,6 +155,7 @@ service cloud.firestore {
       allow update: if isFamilyDevice()
         && request.resource.data.revision == resource.data.get('revision', 0) + 1
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(familyOperationalKeys())
+        && familyStatusWriteOk()
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['actualFare'])
           || resource.data.source == 'family'
@@ -86,6 +163,11 @@ service cloud.firestore {
         && (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['customerStatus'])
           || (request.resource.data.status == 'cancelled' && request.resource.data.customerStatus == 'cancelled')
+          || (
+            request.resource.data.customerStatus == request.resource.data.status
+            && request.resource.data.status in ['confirmed', 'allocated', 'completed', 'pending']
+            && resource.data.status != 'cancelled'
+          )
         );
 
       // Customer app — own bookings only. Customers cannot set payment, quote or promotion fields.
@@ -119,7 +201,13 @@ service cloud.firestore {
       allow delete: if false;
 
       match /audit/{auditId} {
-        allow read, write: if false;
+        allow read: if isStaff();
+        allow create: if isStaff()
+          && request.resource.data.action == 'leg_completion_undone'
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.at == request.time
+          && request.resource.data.leg in ['outbound', 'return'];
+        allow update, delete: if false;
       }
     }
 

@@ -38,6 +38,117 @@
     return legStatus(booking, leg) === "completed";
   }
 
+  function readableStatus(status) {
+    const labels = {
+      completed: "Completed",
+      confirmed: "Confirmed",
+      allocated: "Allocated",
+      pending: "Pending",
+      cancelled: "Cancelled",
+      awaiting_customer_confirmation: "Awaiting confirmation",
+      needs_review: "Needs review",
+      awaiting_availability: "Awaiting availability",
+    };
+    const value = String(status || "");
+    return labels[value] || (value ? value.charAt(0).toUpperCase() + value.slice(1) : "Confirmed");
+  }
+
+  function explicitLegStatus(booking, leg) {
+    const raw = leg === "return" ? booking.returnStatus : booking.outboundStatus;
+    if (raw) return String(raw);
+    if (isCancelled(booking)) return "cancelled";
+    return String(booking.status || "confirmed");
+  }
+
+  function canMarkCompleted(booking, leg) {
+    if (!booking || isCancelled(booking)) return false;
+    if (booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted") return false;
+    const status = explicitLegStatus(booking, leg);
+    if (status !== "confirmed" && status !== "allocated") return false;
+    return Boolean(driverIdFor(booking, leg));
+  }
+
+  function overallFromLegs(booking, outbound, returnStatus) {
+    if (!hasReturn(booking)) return outbound === "completed" ? "completed" : outbound;
+    const outboundDone = outbound === "completed" || outbound === "cancelled";
+    const returnDone = returnStatus === "completed" || returnStatus === "cancelled";
+    if (outboundDone && returnDone) {
+      return outbound === "cancelled" && returnStatus === "cancelled" ? "cancelled" : "completed";
+    }
+    const openLeg = outboundDone ? "return" : "outbound";
+    const openStatus = outboundDone ? returnStatus : outbound;
+    if (openStatus === "allocated" || driverIdFor(booking, openLeg)) return "allocated";
+    return "confirmed";
+  }
+
+  function completionUpdate(booking, leg, actorUid) {
+    if (!canMarkCompleted(booking, leg)) {
+      return { ok: false, error: "This trip cannot be marked completed." };
+    }
+    const outbound = leg === "outbound" ? "completed" : explicitLegStatus(booking, "outbound");
+    const returnStatus = hasReturn(booking)
+      ? (leg === "return" ? "completed" : explicitLegStatus(booking, "return"))
+      : "";
+    const status = overallFromLegs(booking, outbound, returnStatus);
+    const update = {
+      status: status,
+      adminStatus: status,
+      outboundStatus: outbound,
+      revision: Number(booking.revision || 0) + 1,
+      updatedByUid: actorUid || "",
+    };
+    if (hasReturn(booking)) update.returnStatus = returnStatus;
+    if (booking.customerStatus) update.customerStatus = status;
+    if (leg === "outbound") update.outboundCompletedByUid = actorUid || "";
+    else update.returnCompletedByUid = actorUid || "";
+    return {
+      ok: true,
+      update: update,
+      completedAtField: leg === "outbound" ? "outboundCompletedAt" : "returnCompletedAt",
+      previousLabel: readableStatus(explicitLegStatus(booking, leg)),
+      unchanged: [
+        "actualFare", "paymentStatus", "amountReceivedPence", "outstandingPence",
+        "pickupLocation", "destination", "returnPickupLocation", "returnDestination",
+        "driverId", "vehicleId", "returnDriverId", "returnVehicleId", "stops", "returnStops",
+      ],
+    };
+  }
+
+  function reopenUpdate(booking, leg, actorUid) {
+    const current = explicitLegStatus(booking, leg);
+    if (current !== "completed" || isCancelled(booking)) {
+      return { ok: false, error: "This trip is not completed." };
+    }
+    const nextLeg = driverIdFor(booking, leg) ? "allocated" : "confirmed";
+    const outbound = leg === "outbound" ? nextLeg : explicitLegStatus(booking, "outbound");
+    const returnStatus = hasReturn(booking)
+      ? (leg === "return" ? nextLeg : explicitLegStatus(booking, "return"))
+      : "";
+    const status = overallFromLegs(booking, outbound, returnStatus);
+    const update = {
+      status: status,
+      adminStatus: status,
+      outboundStatus: outbound,
+      revision: Number(booking.revision || 0) + 1,
+      updatedByUid: actorUid || "",
+    };
+    if (hasReturn(booking)) update.returnStatus = returnStatus;
+    if (booking.customerStatus) update.customerStatus = status;
+    if (leg === "outbound") update.outboundCompletionUndoneByUid = actorUid || "";
+    else update.returnCompletionUndoneByUid = actorUid || "";
+    return {
+      ok: true,
+      update: update,
+      previousStatus: current,
+      nextStatus: status,
+      previousLabel: readableStatus(current),
+    };
+  }
+
+  function applyStatusUpdate(booking, update) {
+    return Object.assign({}, booking, update);
+  }
+
   function hasReturn(booking) {
     if (booking.bookingType === "return" || booking.returnTrip === true) return true;
     if (booking.openReturn === true) return true;
@@ -380,6 +491,8 @@
       passengers: counts.passengers,
       luggage: counts.luggage,
       allocation: allocation(booking, job.leg, named || driverName),
+      statusLabel: readableStatus(explicitLegStatus(booking, job.leg)),
+      canComplete: canMarkCompleted(booking, job.leg),
       badges: badges,
       warning: warning,
       summary: summary(booking),
@@ -670,6 +783,11 @@
     isCancelled: isCancelled,
     isCompleted: isCompleted,
     legCompleted: legCompleted,
+    readableStatus: readableStatus,
+    canMarkCompleted: canMarkCompleted,
+    completionUpdate: completionUpdate,
+    reopenUpdate: reopenUpdate,
+    applyStatusUpdate: applyStatusUpdate,
     hasReturn: hasReturn,
     expandJobs: expandJobs,
     selectJobs: selectJobs,

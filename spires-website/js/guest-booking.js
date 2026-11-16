@@ -61,12 +61,41 @@
     }
   }
 
+  function collectionCheck(prefix) {
+    var on = prefix ? returnAirport && returnAirport.checked && journey && journey.value === "return" : airport && airport.checked;
+    if (!on) return "";
+    var kindName = prefix ? "returnCollectionLocationKind" : "collectionLocationKind";
+    var arrangementName = prefix ? "returnCollectionArrangement" : "collectionArrangement";
+    var locationName = prefix ? "returnCollectionLocation" : "collectionLocation";
+    var arrivalName = prefix ? "returnArrivalDate" : "arrivalDate";
+    var ackName = prefix ? "returnFixedTimeAcknowledged" : "fixedTimeAcknowledged";
+    var flightName = prefix ? "returnFlightNumber" : "flightNumber";
+    var kind = String((form.elements[kindName] && form.elements[kindName].value) || "terminal");
+    var arrangement = kind === "hotel" ? "fixed_time" : String((form.elements[arrangementName] && form.elements[arrangementName].value) || "flight_monitored");
+    if (!String((form.elements[locationName] && form.elements[locationName].value) || "").trim()) return "Enter the exact collection location, including the terminal or hotel.";
+    if (arrangement === "flight_monitored") {
+      if (!String((form.elements[flightName] && form.elements[flightName].value) || "").trim()) return "Flight monitored collection needs the flight number.";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String((form.elements[arrivalName] && form.elements[arrivalName].value) || ""))) return "Flight monitored collection needs the arrival date.";
+    }
+    if (arrangement === "fixed_time" && !(form.elements[ackName] && form.elements[ackName].checked)) {
+      return "Tick the box to confirm this collection time will not be flight monitored.";
+    }
+    return "";
+  }
+
   function toggleAirport() {
     var outbound = airport && airport.checked;
     var inbound = returnAirport && returnAirport.checked && journey && journey.value === "return";
     show(flightFields, outbound);
     show(returnFlight, inbound);
     show(airportNote, outbound || inbound);
+    show(document.getElementById("collection-help"), outbound || inbound);
+    var fixed = document.getElementById("fixed-time-note");
+    var arrangement = form.elements.collectionArrangement;
+    var kind = form.elements.collectionLocationKind;
+    show(fixed, outbound && ((kind && kind.value === "hotel") || (arrangement && arrangement.value === "fixed_time")));
+    var flightDate = document.getElementById("arrival-date-field");
+    show(flightDate, outbound && !(kind && kind.value === "hotel") && !(arrangement && arrangement.value === "fixed_time"));
   }
 
   var dateField = document.getElementById("date");
@@ -76,6 +105,9 @@
   if (journey) journey.addEventListener("change", function () { toggleJourney(); toggleAirport(); });
   if (airport) airport.addEventListener("change", toggleAirport);
   if (returnAirport) returnAirport.addEventListener("change", toggleAirport);
+  ["collectionLocationKind", "collectionArrangement", "returnCollectionLocationKind", "returnCollectionArrangement"].forEach(function (name) {
+    if (form.elements[name]) form.elements[name].addEventListener("change", toggleAirport);
+  });
   function toggleHeardAbout() {
     show(heardAboutDetail, Boolean(heardAbout && heardAbout.value === "other"));
   }
@@ -211,6 +243,7 @@
         pickup: data.get("pickup"),
         destination: data.get("destination"),
         bookingType: data.get("bookingType"),
+        journeyType: data.get("journeyType"),
         returnPickup: data.get("returnPickupLocation"),
         returnDestination: data.get("returnDestination"),
         stops: window.spiresReadJourney ? (window.spiresReadJourney(form).stops || []) : [],
@@ -225,6 +258,18 @@
       if (termsError) termsError.hidden = false;
       if (agreed) agreed.focus();
       return;
+    }
+    var collectionProblem = collectionCheck("");
+    if (collectionProblem) {
+      setStatus(collectionProblem);
+      return;
+    }
+    if (data.get("bookingType") === "return") {
+      var returnProblem = collectionCheck("return");
+      if (returnProblem) {
+        setStatus(returnProblem);
+        return;
+      }
     }
 
     var journey = window.spiresReadJourney ? window.spiresReadJourney(form) : null;
@@ -254,6 +299,10 @@
       date: data.get("date"),
       time: data.get("time"),
       bookingType: data.get("bookingType"),
+      journeyType: data.get("journeyType"),
+      hireHours: data.get("hireHours"),
+      hireItinerary: data.get("hireItinerary"),
+      timedHireAccepted: data.get("timedHireAccepted") === "yes",
       vehicleType: selectedVehicle(),
       passengers: data.get("passengers"),
       luggage: data.get("luggage"),
@@ -264,6 +313,18 @@
       airportCollection: airport && airport.checked,
       flightNumber: data.get("flightNumber") || "",
       terminal: data.get("terminal") || "",
+      waitingPolicyVersion: (airport && airport.checked) || (returnAirport && returnAirport.checked) ? "2026-11-15" : "",
+      collectionLocationKind: data.get("collectionLocationKind") || "terminal",
+      collectionArrangement: data.get("collectionArrangement") || "flight_monitored",
+      collectionLocation: data.get("collectionLocation") || "",
+      arrivalDate: data.get("arrivalDate") || "",
+      precedingFlight: data.get("precedingFlight") === "yes",
+      travellingIndependently: data.get("travellingIndependently") === "yes",
+      assistanceRequested: data.get("assistanceRequested") === "yes",
+      assistanceNote: data.get("assistanceNote") || "",
+      walkingAid: data.get("walkingAid") === "yes",
+      wheelchairCarriage: data.get("wheelchairCarriage") === "yes",
+      fixedTimeAcknowledged: Boolean(form.querySelector("[name='fixedTimeAcknowledged']") && form.querySelector("[name='fixedTimeAcknowledged']").checked),
       returnDate: data.get("returnDate") || "",
       returnTime: journey && journey.openReturn ? "" : (data.get("returnTime") || ""),
       stops: journey ? journey.stops : [],
@@ -274,8 +335,13 @@
       returnDestination: data.get("returnDestination") || "",
       returnAirportCollection: returnAirport && returnAirport.checked,
       returnFlightNumber: data.get("returnFlightNumber") || "",
+      returnCollectionLocationKind: data.get("returnCollectionLocationKind") || "terminal",
+      returnCollectionArrangement: data.get("returnCollectionArrangement") || "flight_monitored",
+      returnCollectionLocation: data.get("returnCollectionLocation") || "",
+      returnArrivalDate: data.get("returnArrivalDate") || "",
+      returnFixedTimeAcknowledged: Boolean(form.querySelector("[name='returnFixedTimeAcknowledged']") && form.querySelector("[name='returnFixedTimeAcknowledged']").checked),
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: "2026-11-15",
       submissionId: submissionId(),
       _gotcha: data.get("_gotcha") || ""
     };

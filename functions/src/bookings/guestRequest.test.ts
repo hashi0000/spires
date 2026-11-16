@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { CURRENT_BOOKING_TERMS } from '../terms/bookingTerms';
 import {
   CONTACT_REQUIRED_MESSAGE,
   commitGuestBooking,
@@ -27,7 +28,7 @@ function body(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     luggage: "1",
     bookingType: "one_way",
     termsAccepted: true,
-    termsVersion: "2026-10-25",
+    termsVersion: CURRENT_BOOKING_TERMS.version,
     submissionId: "submission-00000001",
     ...overrides,
   };

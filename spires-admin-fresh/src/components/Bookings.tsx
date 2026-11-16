@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
+import { bookingMoney } from '../utils/bookingMoney';
 import { effectiveWorkflowStatus, bookingMatchesStatusFilter, workflowBadgeClass, workflowStatusLabel } from '../utils/bookingWorkflow';
 import { executiveAwaitingAvailability, formatVehicleTypeLabel } from '../utils/vehicleTypes';
 import { isCustomerBooking, isPendingIncomingRequest } from '../utils/bookingMapper';
@@ -772,7 +773,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const vehicle = vehicles.find(v => v.id === booking.vehicleId);
                     const ext = booking as ExtendedBooking;
                     const receivedPence = Number(booking.amountReceivedPence || 0);
-                    const balancePence = Math.max(0, Math.round((booking.actualFare || 0) * 100) - receivedPence);
+                    const balancePence = bookingMoney(booking).outstandingPence;
                     const workflow = effectiveWorkflowStatus(booking);
                     const shownStatus = leg?.needsReview ? 'needs_review' : (leg?.status || workflow);
                     const driverId = leg ? leg.driverId : (booking.driverId || '');
@@ -791,7 +792,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);
                     const driverLabel = driver?.name || (leg?.leg === 'return' ? 'Driver not confirmed' : 'Unassigned');
                     const fareAlreadyShown = shownRows.slice(0, rowIndex).some((row) => (row.booking.id || row.booking.bookingNumber) === (booking.id || booking.bookingNumber));
-                    const fareText = fareAlreadyShown ? 'Included in the booking total' : bookingTotalLabel(booking.actualFare);
+                    const fareText = fareAlreadyShown ? 'Included in the booking total' : bookingTotalLabel(bookingMoney(booking).totalPence / 100);
                     const stopsNeedFare = extraStopsNeedAgreement(hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)), (ext as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare === true);
                     const unreconciled = legacyPaidWithoutAmount(booking.paymentStatus, booking.amountReceivedPence);
                     return (
@@ -801,7 +802,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </td>
                         <td>{londonWhen(when)}</td>
                         <td>
-                          <div className="booking-customer">{booking.hirerName}</div>
+                          <button type="button" className="booking-customer booking-customer-link" onClick={() => openBooking(booking)} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
                           <div className="booking-ref">{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</div>
                           {brandOf(booking) === 'spires_international' ? <div className="booking-ref">Spires International</div> : null}
                         </td>
@@ -892,7 +893,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     <details>
                     <summary>
                       <span>{londonWhen(when)}</span>
-                      <strong>{booking.hirerName}</strong>
+                      <button type="button" className="booking-customer-link" onClick={(event) => { event.preventDefault(); event.stopPropagation(); openBooking(booking); }} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
                       <span>{leg?.leg === 'return' ? 'Return: ' : ''}{routeFrom} → {routeTo}</span>
                       <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
                       <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>

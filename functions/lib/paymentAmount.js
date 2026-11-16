@@ -5,11 +5,14 @@ exports.serverPayablePence = serverPayablePence;
 exports.paymentClaimAllows = paymentClaimAllows;
 exports.clientAmountMatchesPayable = clientAmountMatchesPayable;
 function agreedFarePence(booking) {
+    const extras = Array.isArray(booking.additionalCharges)
+        ? booking.additionalCharges.reduce((sum, row) => sum + Math.max(0, Math.round(Number(row && row.amountPence) || 0)), 0)
+        : 0;
     const quote = booking.issuedQuote && typeof booking.issuedQuote === "object" ? booking.issuedQuote : null;
-    if (quote && Number.isFinite(Number(quote.finalFarePence)))
-        return Math.max(0, Math.round(Number(quote.finalFarePence)));
-    const fare = Number(booking.actualFare);
-    return Number.isFinite(fare) ? Math.max(0, Math.round(fare * 100)) : 0;
+    const base = quote && Number.isFinite(Number(quote.finalFarePence))
+        ? Math.max(0, Math.round(Number(quote.finalFarePence)))
+        : (Number.isFinite(Number(booking.actualFare)) ? Math.max(0, Math.round(Number(booking.actualFare) * 100)) : 0);
+    return base + extras;
 }
 /** The amount a card payment may take. The browser amount is not used. */
 function serverPayablePence(booking) {

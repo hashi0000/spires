@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.HEARD_ABOUT_LABELS = exports.GUEST_RATE_MESSAGE = exports.GUEST_CLAIM_ORIGIN = exports.GUEST_CLAIM_TTL_MS = exports.GUEST_RATE_WINDOW_MS = exports.GUEST_RATE_LIMIT = exports.CONTACT_REQUIRED_MESSAGE = exports.CONTACT_HELPER = exports.OFFICE_PHONE = void 0;
 exports.isGuestRateError = isGuestRateError;
 exports.heardAboutLabel = heardAboutLabel;
+exports.collectionTerms = collectionTerms;
 exports.normaliseGuestEmail = normaliseGuestEmail;
 exports.normaliseGuestPhone = normaliseGuestPhone;
 exports.hashGuestKey = hashGuestKey;
@@ -20,6 +21,7 @@ const bookingTerms_1 = require("../terms/bookingTerms");
 const placeRecord_1 = require("../locations/placeRecord");
 const journeyStops_1 = require("./journeyStops");
 const executiveService_1 = require("../quotes/executiveService");
+const cotswoldsPolicy_1 = require("../cotswoldsPolicy");
 exports.OFFICE_PHONE = "07776 897772";
 exports.CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
 exports.CONTACT_REQUIRED_MESSAGE = `${exports.CONTACT_HELPER} You can also call us on ${exports.OFFICE_PHONE}.`;
@@ -66,6 +68,73 @@ function heardAboutLabel(code, detail) {
 }
 function flag(value) {
     return value === true || value === "true" || value === "yes" || value === "on";
+}
+function collectionLeg(body, prefix, active, now) {
+    if (!active)
+        return { ok: true, fields: {} };
+    const key = (name) => (prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name);
+    const kind = str(body[key("collectionLocationKind")]) === "hotel" ? "hotel" : "terminal";
+    const requested = str(body[key("collectionArrangement")]);
+    const arrangement = kind === "hotel" || requested === "fixed_time" ? "fixed_time" : "flight_monitored";
+    const flight = str(body[prefix ? "returnFlightNumber" : "flightNumber"]);
+    const arrival = str(body[key("arrivalDate")]);
+    if (arrangement === "flight_monitored") {
+        if (!flight)
+            return { ok: false, error: "Flight monitored collection needs the flight number." };
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(arrival))
+            return { ok: false, error: "Flight monitored collection needs the arrival date." };
+    }
+    if (arrangement === "fixed_time" && !flag(body[key("fixedTimeAcknowledged")])) {
+        return { ok: false, error: "Tick the box to confirm this collection time will not be flight monitored." };
+    }
+    const location = str(body[key("collectionLocation")]).slice(0, 240);
+    if (!location)
+        return { ok: false, error: "Enter the exact collection location, including the terminal or hotel." };
+    const acceptedAt = new Date(now).toISOString();
+    return {
+        ok: true,
+        fields: {
+            [key("collectionLocationKind")]: kind,
+            [key("collectionArrangement")]: arrangement,
+            [key("collectionLocation")]: location,
+            [key("arrivalDate")]: arrival.slice(0, 10),
+            [key("precedingFlight")]: flag(body[key("precedingFlight")]),
+            [key("travellingIndependently")]: flag(body[key("travellingIndependently")]),
+            [key("assistanceRequested")]: flag(body[key("assistanceRequested")]),
+            [key("assistanceNote")]: str(body[key("assistanceNote")]).slice(0, 500),
+            [key("walkingAid")]: flag(body[key("walkingAid")]),
+            [key("wheelchairCarriage")]: flag(body[key("wheelchairCarriage")]),
+            [key("fixedTimeAcknowledged")]: arrangement === "fixed_time",
+            [key("collectionTermsAcceptedAt")]: acceptedAt,
+            [key("flightNumberReferenceOnly")]: arrangement === "fixed_time" && Boolean(flight),
+        },
+    };
+}
+function collectionTerms(body, airportCollection, returnAirportCollection, now) {
+    const requested = flag(body.assistanceRequested) || Boolean(str(body.assistanceNote)) || flag(body.walkingAid) || flag(body.wheelchairCarriage);
+    const note = str(body.assistanceNote).slice(0, 500);
+    if (requested && !note)
+        return { ok: false, error: 'Tell us what practical assistance is needed.' };
+    const general = { assistanceRequested: requested, assistanceNote: requested ? note : '', walkingAid: requested && flag(body.walkingAid), wheelchairCarriage: requested && flag(body.wheelchairCarriage) };
+    if (!airportCollection && !returnAirportCollection)
+        return { ok: true, fields: general };
+    if (str(body.waitingPolicyVersion) !== "2026-11-15")
+        return { ok: false, error: "The collection terms have changed. Reload the booking form and review the current waiting policy." };
+    const outbound = collectionLeg(body, "", airportCollection, now);
+    if (!outbound.ok)
+        return outbound;
+    const returning = collectionLeg(body, "return", returnAirportCollection, now);
+    if (!returning.ok)
+        return returning;
+    return {
+        ok: true,
+        fields: {
+            ...general,
+            waitingPolicyVersion: "2026-11-15",
+            ...outbound.fields,
+            ...returning.fields,
+        },
+    };
 }
 function normaliseGuestEmail(value) {
     const email = value.trim().toLowerCase();
@@ -162,6 +231,7 @@ function prepareGuestBooking(body, options) {
             enabled: options.executiveEnabled,
             passengers,
             bookingType: str(body.bookingType),
+            journeyType: str(body.journeyType),
             pickup: ends.pickup,
             destination: ends.destination,
             stops,
@@ -228,6 +298,12 @@ function prepareGuestBooking(body, options) {
         return { ok: false, error: terms.error };
     const airportCollection = flag(body.airportCollection);
     const returnAirportCollection = bookingType === "return" && flag(body.returnAirportCollection);
+    const collection = collectionTerms(body, airportCollection, returnAirportCollection, options.now);
+    if (!collection.ok)
+        return collection;
+    const hire = (0, cotswoldsPolicy_1.cotswoldsRequest)(body, dateTime, vehicleType, options.now);
+    if (!hire.ok)
+        return hire;
     const paymentRaw = str(body.paymentMethod).toLowerCase();
     const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
     const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
@@ -290,6 +366,7 @@ function prepareGuestBooking(body, options) {
         flightNumber: airportCollection ? str(body.flightNumber).slice(0, 40) : "",
         terminal: airportCollection ? str(body.terminal).slice(0, 40) : "",
         returnFlightNumber: returnAirportCollection ? str(body.returnFlightNumber).slice(0, 40) : "",
+        ...collection.fields,
         vehicleType,
         paymentMethod,
         paymentStatus: "pending",
@@ -297,6 +374,7 @@ function prepareGuestBooking(body, options) {
         customerStatus: "pending",
         adminStatus: "pending",
         ...executiveFields,
+        ...hire.fields,
         depositRequired: false,
         depositStatus: "not_required",
         termsAccepted: true,

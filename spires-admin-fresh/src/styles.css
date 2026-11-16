@@ -2158,6 +2158,12 @@ header.admin-header,
 .advertising-results__header, .advertising-results__panel, .advertising-results__figures article, .advertising-results__counts article {
   background: #fff; border: 1px solid #d5dde6; border-radius: 12px; padding: 1rem;
 }
+.booking-customer-link { border: 0; background: transparent; color: #002147; text-align: left; cursor: pointer; font: inherit; font-weight: 700; padding: 0.25rem 0; overflow-wrap: anywhere; }
+.booking-customer-link:hover { text-decoration: underline; }
+.booking-customer-link:focus-visible { outline: 2px solid #002147; outline-offset: 3px; }
+.admin-main, .admin-content { min-width: 0; width: 100%; }
+.admin-main > *, .admin-content > * { min-width: 0; max-width: 100%; }
+@media (max-width: 1100px) { .admin-header-content { flex-wrap: wrap; } .admin-header-actions { flex-wrap: wrap; max-width: 100%; } }
 .advertising-results__header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
 .advertising-results__budget, .advertising-results__banner, .advertising-results__message { font-weight: 700; }
 .advertising-results__banner { background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; padding: 0.75rem 1rem; }
@@ -2188,3 +2194,11 @@ header.admin-header,
   .advertising-results__header { flex-direction: column; }
   .comms-layout { grid-template-columns: 1fr; }
 }
+
+.comms-offer-tabs { display:flex; flex-wrap:wrap; gap:0.5rem; margin:0.5rem 0 1rem; }
+.modal-content { max-width:min(900px,calc(100vw - 2rem)); max-height:calc(100dvh - 2rem); }
+.modal-body { min-width:0; overflow-wrap:anywhere; }
+.modal-body input,.modal-body select,.modal-body textarea { max-width:100%; }
+.modal-footer { flex-wrap:wrap; }
+.booking-table-wrap { overflow-x:auto; }
+@media(max-width:600px) { .modal-content {max-width:100vw;max-height:100dvh;} .comms-layout {display:block;} .comms-list {margin-bottom:1rem;} }

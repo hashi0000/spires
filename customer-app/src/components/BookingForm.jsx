@@ -13,9 +13,14 @@ import {
 import { classifyExecutiveJourney } from "../executiveService";
 import {
   airportWaitingWebsiteBody,
+  fixedTimeAcknowledgement,
+  fixedTimeExplanation,
+  CURRENT_WAITING_VERSION,
 } from "../airportWaitingPolicy";
 import "../styles.css";
 import LocationField from "./LocationField";
+import CotswoldsFields from "./CotswoldsFields";
+import JourneyAssistance from './JourneyAssistance';
 
 const PAYMENT_OPTIONS = [
   { value: "cash", label: "Cash (pay driver)" },
@@ -25,6 +30,104 @@ const PAYMENT_OPTIONS = [
 ];
 
 const OPEN_RETURN_NOTICE = "For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed.";
+
+function named(prefix, name) {
+  return prefix ? prefix + name.charAt(0).toUpperCase() + name.slice(1) : name;
+}
+
+function collectionError(form, prefix) {
+  const active = prefix ? form.returnAirportCollection : form.airportCollection;
+  if (!active) return "";
+  const kind = form[named(prefix, "collectionLocationKind")] === "hotel" ? "hotel" : "terminal";
+  const arrangement = kind === "hotel" || form[named(prefix, "collectionArrangement")] === "fixed_time" ? "fixed_time" : "flight_monitored";
+  if (!String(form[named(prefix, "collectionLocation")] || "").trim()) return "Enter the exact collection location, including the terminal or hotel.";
+  const flight = prefix ? form.returnFlightNumber : form.flightNumber;
+  if (arrangement === "flight_monitored") {
+    if (!String(flight || "").trim()) return "Flight monitored collection needs the flight number.";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(form[named(prefix, "arrivalDate")] || ""))) return "Flight monitored collection needs the arrival date.";
+  }
+  if (arrangement === "fixed_time" && form[named(prefix, "fixedTimeAcknowledged")] !== true) {
+    return "Tick the box to confirm this collection time will not be flight monitored.";
+  }
+  return "";
+}
+
+function collectionPayload(form, prefix) {
+  const active = prefix ? form.returnAirportCollection : form.airportCollection;
+  if (!active) return {};
+  const kind = form[named(prefix, "collectionLocationKind")] === "hotel" ? "hotel" : "terminal";
+  const arrangement = kind === "hotel" || form[named(prefix, "collectionArrangement")] === "fixed_time" ? "fixed_time" : "flight_monitored";
+  return {
+    [named(prefix, "collectionLocationKind")]: kind,
+    [named(prefix, "collectionArrangement")]: arrangement,
+    [named(prefix, "collectionLocation")]: String(form[named(prefix, "collectionLocation")] || "").trim(),
+    [named(prefix, "arrivalDate")]: String(form[named(prefix, "arrivalDate")] || ""),
+    [named(prefix, "precedingFlight")]: form[named(prefix, "precedingFlight")] === true,
+    [named(prefix, "travellingIndependently")]: form[named(prefix, "travellingIndependently")] === true,
+    [named(prefix, "assistanceRequested")]: form[named(prefix, "assistanceRequested")] === true,
+    [named(prefix, "assistanceNote")]: String(form[named(prefix, "assistanceNote")] || "").trim(),
+    [named(prefix, "walkingAid")]: form[named(prefix, "walkingAid")] === true,
+    [named(prefix, "wheelchairCarriage")]: form[named(prefix, "wheelchairCarriage")] === true,
+    [named(prefix, "fixedTimeAcknowledged")]: arrangement === "fixed_time" && form[named(prefix, "fixedTimeAcknowledged")] === true,
+  };
+}
+
+function CollectionChoices({ formData, setFormData, prefix }) {
+  const kind = formData[named(prefix, "collectionLocationKind")] === "hotel" ? "hotel" : "terminal";
+  const arrangement = kind === "hotel" || formData[named(prefix, "collectionArrangement")] === "fixed_time" ? "fixed_time" : "flight_monitored";
+  const set = (patch) => setFormData(Object.assign({}, formData, patch));
+  return (
+    <div style={{ display: "grid", gap: "0.65rem" }}>
+      <label>Collection place
+        <select value={kind} onChange={(event) => set({ [named(prefix, "collectionLocationKind")]: event.target.value, [named(prefix, "collectionArrangement")]: event.target.value === "hotel" ? "fixed_time" : formData[named(prefix, "collectionArrangement")] || "flight_monitored" })}>
+          <option value="terminal">Airport terminal</option>
+          <option value="hotel">Airport hotel</option>
+        </select>
+      </label>
+      <label>Exact collection location
+        <input value={formData[named(prefix, "collectionLocation")] || ""} onChange={(event) => set({ [named(prefix, "collectionLocation")]: event.target.value })} placeholder={kind === "hotel" ? "Hotel name and address" : "Terminal and meeting point"} />
+      </label>
+      {kind === "terminal" ? (
+        <label>Collection arrangement
+          <select value={arrangement} onChange={(event) => set({ [named(prefix, "collectionArrangement")]: event.target.value, [named(prefix, "fixedTimeAcknowledged")]: false })}>
+            <option value="flight_monitored">Flight monitored collection</option>
+            <option value="fixed_time">Fixed time collection</option>
+          </select>
+        </label>
+      ) : <p>A hotel collection uses the fixed time arrangement. A delay to an earlier flight does not move this pickup unless we agree a different time.</p>}
+      {arrangement === "flight_monitored" ? (
+        <label>Arrival date
+          <input type="date" value={formData[named(prefix, "arrivalDate")] || ""} onChange={(event) => set({ [named(prefix, "arrivalDate")]: event.target.value })} />
+        </label>
+      ) : (
+        <div>
+          <p>{fixedTimeExplanation()}</p>
+          <p>A flight number can be kept for reference. It is not monitored on this booking.</p>
+          <label>
+            <input type="checkbox" checked={formData[named(prefix, "fixedTimeAcknowledged")] === true} onChange={(event) => set({ [named(prefix, "fixedTimeAcknowledged")]: event.target.checked })} />
+            {" "}{fixedTimeAcknowledgement()}
+          </label>
+        </div>
+      )}
+      {kind === "hotel" ? (
+        <div>
+          <label><input type="checkbox" checked={formData[named(prefix, "precedingFlight")] === true} onChange={(event) => set({ [named(prefix, "precedingFlight")]: event.target.checked })} /> Arriving on a flight before this hotel collection</label>
+          <label><input type="checkbox" checked={formData[named(prefix, "travellingIndependently")] === true} onChange={(event) => set({ [named(prefix, "travellingIndependently")]: event.target.checked })} /> Travelling independently to the hotel</label>
+        </div>
+      ) : null}
+      {prefix ? <>
+      <label><input type="checkbox" checked={formData[named(prefix, "assistanceRequested")] === true} onChange={(event) => set({ [named(prefix, "assistanceRequested")]: event.target.checked })} /> Someone needs extra time or practical assistance boarding. This is subject to confirmation.</label>
+      {formData[named(prefix, "assistanceRequested")] ? (
+        <div>
+          <textarea value={formData[named(prefix, "assistanceNote")] || ""} onChange={(event) => set({ [named(prefix, "assistanceNote")]: event.target.value })} placeholder="What practical help is needed?" />
+          <label><input type="checkbox" checked={formData[named(prefix, "walkingAid")] === true} onChange={(event) => set({ [named(prefix, "walkingAid")]: event.target.checked })} /> Walking aid</label>
+          <label><input type="checkbox" checked={formData[named(prefix, "wheelchairCarriage")] === true} onChange={(event) => set({ [named(prefix, "wheelchairCarriage")]: event.target.checked })} /> Wheelchair to be carried as luggage</label>
+        </div>
+      ) : null}
+      </> : null}
+    </div>
+  );
+}
 
 function buildStops(start, end, startPlace, endPlace, middle) {
   return [
@@ -84,8 +187,8 @@ function ExtraStops({ stops, onChange }) {
   );
 }
 
-const TERMS_VERSION = "2026-10-25";
-const TERMS_URL = "https://www.spires-taxis.com/terms/2026-10-25";
+const TERMS_VERSION = "2026-11-15";
+const TERMS_URL = "https://www.spires-taxis.com/terms/2026-11-15";
 const createCustomerBooking = httpsCallable(functions, "createCustomerBooking");
 
 function splitLocalDateTime(value) {
@@ -101,6 +204,21 @@ function splitLocalDateTime(value) {
 function combineLocalDateTime(date, time) {
   if (!date) return "";
   return `${date}T${time || "00:00"}`;
+}
+
+function requestedBooking() {
+  const params = new URLSearchParams(window.location.search);
+  const vehicle = params.get("vehicle") || "";
+  const allowed = vehicle === "executive" && !executiveServicePublic()
+    ? ""
+    : ["standard", "8_seater", "executive"].includes(vehicle)
+      ? vehicle
+      : "";
+  return {
+    vehicleType: allowed,
+    pickup: params.get("pickup") || "",
+    destination: params.get("destination") || "",
+  };
 }
 
 export default function BookingForm({ onClose, onBookingCreated }) {
@@ -124,13 +242,29 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     middleStops: [],
     returnMiddleStops: [],
     airportCollection: false,
+    collectionLocationKind: "terminal",
+    collectionArrangement: "flight_monitored",
+    collectionLocation: "",
+    arrivalDate: "",
+    precedingFlight: false,
+    travellingIndependently: false,
+    assistanceRequested: false,
+    assistanceNote: "",
+    walkingAid: false,
+    wheelchairCarriage: false,
+    fixedTimeAcknowledged: false,
     returnAirportCollection: false,
+    returnCollectionLocationKind: "terminal",
+    returnCollectionArrangement: "flight_monitored",
+    returnCollectionLocation: "",
+    returnArrivalDate: "",
+    returnFixedTimeAcknowledged: false,
     returnFlightNumber: "",
     notes: "",
     paymentMethod: "",
     flightNumber: "",
     terminal: "",
-    vehicleType: "",
+    ...requestedBooking(),
   });
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedPickupAddress, setSelectedPickupAddress] = useState("");
@@ -247,6 +381,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         pickup: formData.pickup,
         destination: formData.destination,
         bookingType: formData.bookingType,
+        journeyType: formData.journeyType,
         returnPickup: formData.returnPickupLocation,
         returnDestination: formData.returnDestination,
         stops: buildStops(formData.pickup, formData.destination, formData.pickupPlace, formData.destinationPlace, formData.middleStops),
@@ -297,6 +432,19 @@ export default function BookingForm({ onClose, onBookingCreated }) {
       }
     }
 
+    if (formData.airportCollection === true && collectionError(formData, "")) {
+      setError(collectionError(formData, ""));
+      setSubmitting(false);
+      submitLock.current = false;
+      return;
+    }
+    if (isReturn && formData.returnAirportCollection === true && collectionError(formData, "return")) {
+      setError(collectionError(formData, "return"));
+      setSubmitting(false);
+      submitLock.current = false;
+      return;
+    }
+
     if (!termsAccepted) {
       setError("Please agree to the Terms and Conditions before submitting.");
       setSubmitting(false);
@@ -321,6 +469,12 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         luggage: parseInt(formData.luggage, 10) || 0,
         specialRequirements: formData.specialRequirements || "",
         bookingType: isReturn ? "return" : "one_way",
+        assistanceRequested: formData.assistanceRequested === true,
+        assistanceNote: formData.assistanceNote || '', walkingAid: formData.walkingAid === true, wheelchairCarriage: formData.wheelchairCarriage === true,
+        journeyType: formData.journeyType || 'transfer',
+        hireHours: formData.hireHours || '6',
+        hireItinerary: formData.hireItinerary || '',
+        timedHireAccepted: formData.timedHireAccepted === true,
         stops,
         returnStops: isReturn ? buildStops(formData.returnPickupLocation, formData.returnDestination, null, null, formData.returnMiddleStops) : [],
         openReturn: isReturn && formData.openReturn === true,
@@ -340,6 +494,9 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         vehicleType: formData.vehicleType,
         flightNumber: formData.airportCollection ? formData.flightNumber || "" : "",
         terminal: formData.terminal || "",
+        waitingPolicyVersion: formData.airportCollection || (isReturn && formData.returnAirportCollection) ? CURRENT_WAITING_VERSION : "",
+        ...collectionPayload(formData, ""),
+        ...collectionPayload(formData, "return"),
         termsAccepted: true,
         termsVersion: TERMS_VERSION,
       });
@@ -402,6 +559,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             required
           />
           <div>
+            <JourneyAssistance formData={formData} setFormData={setFormData} />
+            <CotswoldsFields value={formData} vehicleType={formData.vehicleType} onChange={change => setFormData(previous => ({ ...previous, ...change }))} />
             <label style={labelStyle}>Booking type *</label>
             <select
               name="bookingType"
@@ -550,7 +709,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
               Airport collection
             </label>
             {formData.airportCollection && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <input
                   type="text"
                   name="flightNumber"
@@ -565,6 +724,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                   value={formData.terminal}
                   onChange={handleChange}
                 />
+                <CollectionChoices formData={formData} setFormData={setFormData} prefix="" />
               </div>
             )}
           </div>
@@ -639,12 +799,15 @@ export default function BookingForm({ onClose, onBookingCreated }) {
                 Airport collection
               </label>
               {formData.returnAirportCollection && (
-                <input
-                  type="text"
-                  placeholder="Return flight number, e.g. BA123"
-                  value={formData.returnFlightNumber || ''}
-                  onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })}
-                />
+                <div style={{ display: "grid", gap: "0.75rem" }}>
+                  <input
+                    type="text"
+                    placeholder="Return flight number, e.g. BA123"
+                    value={formData.returnFlightNumber || ''}
+                    onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })}
+                  />
+                  <CollectionChoices formData={formData} setFormData={setFormData} prefix="return" />
+                </div>
               )}
             </div>
           )}
@@ -739,7 +902,7 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             </div>
             <p className="vehicle-disclaimer">{VEHICLE_ALLOCATION_DISCLAIMER}</p>
             {formData.vehicleType === "executive" && (
-              <p className="vehicle-disclaimer">Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation. A partner operator may provide the car. Executive Car is the vehicle category, not an allocated car. Sending this form does not confirm a vehicle or take payment.</p>
+              <p className="vehicle-disclaimer">Mercedes E Class or equivalent. Advance booking required, subject to availability. Heathrow journeys only. A partner operator may provide the car. Sending this form does not confirm a vehicle or take payment.</p>
             )}
             {parseInt(formData.passengers, 10) > 4 && formData.vehicleType === "standard" && (
               <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#92400e' }}>

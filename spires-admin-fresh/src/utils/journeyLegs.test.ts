@@ -7,6 +7,7 @@ import {
   legsForQuickView,
   londonDayKey,
   proposedLegacyReturnCorrection,
+  reopenCompletedLeg,
 } from "./journeyLegs";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -190,6 +191,27 @@ describe("journey legs", () => {
     expect(row.status).toBe("completed");
     expect((row as { returnStatus?: string }).returnStatus).toBeUndefined();
     expect(correction?.unchanged).toEqual(["actualFare", "amountReceivedPence", "paymentStatus", "driverId"]);
+  });
+
+  it("reopens one completed leg and leaves the fare unchanged", () => {
+    const row = legacyReturn({
+      status: "completed",
+      outboundStatus: "completed",
+      returnStatus: "completed",
+      driverId: "driver-a",
+      returnDriverId: "driver-b",
+      actualFare: 180,
+      paymentStatus: "paid",
+    });
+    const undone = reopenCompletedLeg(row, "return");
+    expect(undone.ok).toBe(true);
+    if (!undone.ok) return;
+    expect(undone.patch.returnStatus).toBe("allocated");
+    expect(undone.patch.outboundStatus).toBe("completed");
+    expect(undone.patch.status).toBe("allocated");
+    expect(undone.patch.actualFare).toBeUndefined();
+    expect(journeyLegs({ ...row, ...undone.patch }, NOW).find((leg) => leg.leg === "outbound")?.status).toBe("completed");
+    expect(journeyLegs({ ...row, ...undone.patch }, NOW).find((leg) => leg.leg === "return")?.status).toBe("allocated");
   });
 
   it("does not assume a past return was completed", () => {

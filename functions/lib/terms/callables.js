@@ -39,6 +39,8 @@ const submission_1 = require("../bookings/submission");
 const consent_1 = require("../marketing/consent");
 const crypto_1 = require("crypto");
 const admin = __importStar(require("firebase-admin"));
+const cotswoldsPolicy_1 = require("../cotswoldsPolicy");
+const guestRequest_1 = require("../bookings/guestRequest");
 const functions = __importStar(require("firebase-functions/v1"));
 const driverReminderEmail_1 = require("../driverReminderEmail");
 const emails_1 = require("../quotes/emails");
@@ -127,6 +129,7 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         ? (0, executiveService_1.assessExecutiveBooking)({
             passengers: Number(data?.passengers),
             bookingType,
+            journeyType: str(data?.journeyType),
             pickup: ends.pickup,
             destination: ends.destination,
             stops,
@@ -150,6 +153,12 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
     const { bookingId, fingerprint } = submission;
     const ref = bookingId ? db().collection("bookings").doc(bookingId) : db().collection("bookings").doc();
     const email = str(context.auth.token.email);
+    const hire = (0, cotswoldsPolicy_1.cotswoldsRequest)(data || {}, dateTime, vehicleType, Date.now());
+    if (!hire.ok)
+        throw httpsError("invalid-argument", hire.error);
+    const collection = (0, guestRequest_1.collectionTerms)(data || {}, data?.airportCollection === true, bookingType === 'return' && data?.returnAirportCollection === true, Date.now());
+    if (!collection.ok)
+        throw httpsError("invalid-argument", collection.error);
     const record = {
         uid: context.auth.uid,
         submissionFingerprint: fingerprint,
@@ -197,6 +206,8 @@ exports.createCustomerBooking = functions.https.onCall(async (data, context) => 
         adminStatus: "pending",
         revision: 1,
         ...(executive && executive.ok ? executive.fields : {}),
+        ...hire.fields,
+        ...collection.fields,
         termsAccepted: true,
         termsVersion: decision.version,
         termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),

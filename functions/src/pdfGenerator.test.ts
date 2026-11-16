@@ -2,22 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { generateBookingPDF, __pdfTest } from "./pdfGenerator";
 
-function decodePdfHex(hex: string): string {
-  let out = "";
-  for (let i = 0; i + 1 < hex.length; i += 2) {
-    out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-  }
-  return out;
-}
-
-function pdfText(buf: Buffer): string {
-  const raw = buf.toString("latin1");
-  const fromHex = [...raw.matchAll(/<([0-9A-Fa-f]+)>/g)].map((m) => decodePdfHex(m[1]));
-  const fromParen = [...raw.matchAll(/\(([^\\)]*(?:\\.[^\\)]*)*)\)/g)].map((m) =>
-    m[1].replace(/\\n/g, "\n").replace(/\\(.)/g, "$1")
-  );
-  return fromHex.concat(fromParen).join("");
-}
+import { pdfText } from "./testPdfText";
 
 const sample = {
   bookingNumber: "CUSTPMWWJ5",

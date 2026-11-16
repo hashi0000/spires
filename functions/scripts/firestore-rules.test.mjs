@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, Timestamp, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, Timestamp, updateDoc, serverTimestamp } from "firebase/firestore";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const rules = readFileSync(resolve(root, "firestore.rules"), "utf8");
@@ -57,6 +57,25 @@ await testEnv.withSecurityRulesDisabled(async (context) => {
     amountReceivedPence: 1000,
   });
   await setDoc(doc(db, "bookings/family-existing"), { ...familyJob, bookingNumber: "SP900002" });
+  await setDoc(doc(db, "bookings/assigned-job"), {
+    ...familyJob,
+    bookingNumber: "SP900010",
+    status: "confirmed",
+    driverId: "driver-1",
+    actualFare: 92,
+    paymentStatus: "pending",
+    pickupLocation: "Oxford",
+    destination: "Heathrow",
+    revision: 1,
+  });
+  await setDoc(doc(db, "bookings/cancelled-job"), {
+    ...familyJob,
+    bookingNumber: "SP900011",
+    status: "cancelled",
+    customerStatus: "cancelled",
+    driverId: "driver-1",
+    revision: 1,
+  });
   await setDoc(doc(db, "drivers/driver-1"), { name: "Driver" });
   await setDoc(doc(db, "vehicles/vehicle-1"), { registration: "AB12 CDE" });
   await setDoc(doc(db, "stripePaymentClaims/pi_test"), { bookingId: "customer-job" });
@@ -106,6 +125,52 @@ await assertFails(updateDoc(doc(family, "bookings/customer-job"), { issuedQuote:
 await assertFails(updateDoc(doc(family, "bookings/customer-job"), { uid: "family-1" }));
 await assertFails(setDoc(doc(family, "bookings/family-money"), { ...familyJob, bookingNumber: "SP900003", amountReceivedPence: 4000 }));
 await assertFails(deleteDoc(doc(family, "bookings/family-new")));
+
+const completion = {
+  status: "completed",
+  adminStatus: "completed",
+  outboundStatus: "completed",
+  outboundCompletedAt: serverTimestamp(),
+  outboundCompletedByUid: "family-1",
+  updatedByUid: "family-1",
+  updatedAt: serverTimestamp(),
+  revision: 2,
+};
+await assertFails(updateDoc(doc(family, "bookings/assigned-job"), { ...completion, actualFare: 1 }));
+await assertFails(updateDoc(doc(family, "bookings/cancelled-job"), completion));
+await assertFails(updateDoc(doc(customer, "bookings/assigned-job"), completion));
+await assertSucceeds(updateDoc(doc(family, "bookings/assigned-job"), completion));
+const saved = await getDoc(doc(family, "bookings/assigned-job"));
+assert.equal(saved.data().status, "completed");
+assert.equal(saved.data().actualFare, 92);
+assert.equal(saved.data().paymentStatus, "pending");
+assert.equal(saved.data().pickupLocation, "Oxford");
+assert.equal(saved.data().destination, "Heathrow");
+assert.equal(saved.data().driverId, "driver-1");
+await assertFails(updateDoc(doc(family, "bookings/assigned-job"), {
+  status: "allocated",
+  adminStatus: "allocated",
+  outboundStatus: "allocated",
+  revision: 3,
+}));
+await assertSucceeds(updateDoc(doc(staff, "bookings/assigned-job"), {
+  status: "allocated",
+  adminStatus: "allocated",
+  outboundStatus: "allocated",
+  revision: 3,
+}));
+await assertSucceeds(setDoc(doc(staff, "bookings/assigned-job/audit/undo-outbound-3"), {
+  action: "leg_completion_undone",
+  leg: "outbound",
+  actorUid: "staff-1",
+  at: serverTimestamp(),
+}));
+await assertFails(setDoc(doc(family, "bookings/assigned-job/audit/undo-outbound-4"), {
+  action: "leg_completion_undone",
+  leg: "outbound",
+  actorUid: "family-1",
+  at: serverTimestamp(),
+}));
 
 await testEnv.cleanup();
 

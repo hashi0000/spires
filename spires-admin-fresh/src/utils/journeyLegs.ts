@@ -241,6 +241,53 @@ export interface LegacyReturnCorrection {
   unchanged: Array<"actualFare" | "amountReceivedPence" | "paymentStatus" | "driverId">;
 }
 
+function explicitLeg(booking: LegBooking, leg: JourneyLegName): JourneyLegStatus {
+  const raw = leg === "return" ? booking.returnStatus : booking.outboundStatus;
+  return readLegStatus(raw) || overallStatus(booking);
+}
+
+function overallAfterLegs(booking: LegBooking, outbound: JourneyLegStatus, returnStatus: JourneyLegStatus): string {
+  if (!hasTimedReturn(booking)) return outbound === "completed" ? "completed" : outbound;
+  const outboundDone = resolved(outbound);
+  const returnDone = resolved(returnStatus);
+  if (outboundDone && returnDone) {
+    return outbound === "cancelled" && returnStatus === "cancelled" ? "cancelled" : "completed";
+  }
+  const openLeg = outboundDone ? "return" : "outbound";
+  const openStatus = outboundDone ? returnStatus : outbound;
+  const driver = openLeg === "return" ? text(booking.returnDriverId) : text(booking.driverId);
+  if (openStatus === "allocated" || driver) return "allocated";
+  return "confirmed";
+}
+
+/** Office reopens one completed leg. Fare, payment, route, driver and vehicle are not included. */
+export function reopenCompletedLeg(booking: LegBooking, leg: JourneyLegName): {
+  ok: true;
+  patch: Record<string, string>;
+  previousStatus: string;
+  nextStatus: string;
+} | { ok: false; error: string } {
+  if (explicitLeg(booking, leg) !== "completed" || overallStatus(booking) === "cancelled") {
+    return { ok: false, error: "This trip is not completed." };
+  }
+  const nextLeg: JourneyLegStatus = (leg === "return" ? text(booking.returnDriverId) : text(booking.driverId))
+    ? "allocated"
+    : "confirmed";
+  const outbound = leg === "outbound" ? nextLeg : explicitLeg(booking, "outbound");
+  const returnStatus = hasTimedReturn(booking)
+    ? (leg === "return" ? nextLeg : explicitLeg(booking, "return"))
+    : "confirmed";
+  const status = overallAfterLegs(booking, outbound, returnStatus);
+  const patch: Record<string, string> = {
+    status,
+    adminStatus: status,
+    outboundStatus: outbound,
+  };
+  if (hasTimedReturn(booking)) patch.returnStatus = returnStatus;
+  if (booking.customerStatus) patch.customerStatus = status;
+  return { ok: true, patch, previousStatus: "completed", nextStatus: status };
+}
+
 /** Prepared for review. This does not write the booking. */
 export function proposedLegacyReturnCorrection(booking: Booking, now: Date = new Date()): LegacyReturnCorrection | null {
   const ret = journeyLegs(booking, now).find((leg) => leg.leg === "return");

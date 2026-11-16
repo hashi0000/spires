@@ -1,10 +1,11 @@
+import { DOCUMENT_FONT_CSS } from './documentFontCss';
+import { canonicalBookingPdf } from "./canonicalBookingPdf";
 // utils/pdfGenerator.ts - Booking PDF Generator
 import { Booking, Driver, Vehicle } from "../types/types";
 import { bankTransferDetailsHtml, isBankTransferMethod } from "./bankDetails";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
-  AIRPORT_WAITING_POLICY,
-  airportWaitingDisclaimerBody,
+  airportWaitingTextForBooking,
   airportWaitingDisclaimerTitle,
   airportWaitingScopeNote,
   bookingLooksLikeAirportTransfer,
@@ -142,7 +143,7 @@ function paymentScheduleHtml(booking: Booking): string {
 function airportWaitingHtml(booking: Booking): string {
   if (!bookingHasAirportCollection(booking)) return "";
   const scope = airportWaitingScopeNote(booking);
-  const body = airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY)
+  const body = airportWaitingTextForBooking(booking)
     .split("\n\n")
     .map((para) => `<p>${escapePdfText(para)}</p>`)
     .join("");
@@ -283,9 +284,10 @@ export function buildBookingConfirmationHtml(
 
     <body style="margin:0;padding:0;">
         <!-- Styles + fonts live in body so html2pdf's clone (body only, moved to parent doc) still has CSS. -->
-        <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
+
 
         <style>
+${DOCUMENT_FONT_CSS}
             /* Zero page margins: mobile “Save as PDF” often can’t remove margins; html2pdf + @page stay edge-to-edge A4 */
             @page { size: A4 portrait; margin: 0; }
             /*
@@ -740,7 +742,7 @@ export function buildBookingConfirmationHtml(
                   <a href="https://wa.me/447776897772" target="_blank">07776 897772</a> •
                   <a href="https://www.spires-taxis.com" target="_blank">www.spires-taxis.com</a>
                 </div>
-                
+
                 <div style="font-size: 0.65rem; opacity: 0.9; text-align: center; line-height: 1.3;">
                     <span>⭐ We'd love your feedback! </span>
                     <a href="https://g.page/r/CWu0N7lUD-YKEAI/review" target="_blank" style="color: #4285F4; text-decoration: underline; font-weight: 600;">📝 Leave a Review on Google</a>
@@ -757,253 +759,18 @@ export function buildBookingConfirmationHtml(
   return pdfContent;
 }
 
-export const generateBookingConfirmationPDF = (
-  booking: Booking,
-  driver?: Driver,
-  vehicle?: Vehicle,
-  type: AdminPDFType = "booking_confirmation"
-) => {
-  const pdfContent = buildBookingConfirmationHtml(booking, driver, vehicle, type);
-
-  // ---------------------------
-  // PRINT OR FALLBACK DOWNLOAD
-  // ---------------------------
-
-  const printWindow = window.open("", "_blank");
-
-  if (printWindow) {
-    printWindow.document.write(pdfContent);
-    printWindow.document.close();
-
-    const schedulePrint = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
-
-    const runWhenReady = async () => {
-      const d = printWindow.document;
-      if (d.readyState !== "complete") {
-        await new Promise<void>((r) => {
-          printWindow.addEventListener("load", () => r(), { once: true });
-        });
-      }
-      if (d.fonts?.ready) {
-        await d.fonts.ready.catch(() => undefined);
-      }
-      await new Promise<void>((r) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => r()));
-      });
-      setTimeout(schedulePrint, 120);
-    };
-
-    void runWhenReady();
-  } else {
-    const blob = new Blob([pdfContent], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `booking-${booking.bookingNumber}.html`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-};
-
-/**
- * html2canvas (used by html2pdf) renders CSS grid/flex poorly. These overrides flatten layout
- * only while we capture for email — print / on-screen preview stay unchanged (no class on body).
- */
-const PDF_EMAIL_CAPTURE_CSS = `
-  .booking-pdf-root.pdf-email-capture {
-    font-size: 11px !important;
-    line-height: 1.45 !important;
-    -webkit-font-smoothing: antialiased;
-    width: 100% !important;
-  }
-  /*
-   * html2pdf capture used to force min-height: auto on the page column, which collapses the flex column
-   * so margin-top:auto on the footer cannot push it down. Match one A4 portrait sheet (~1123px @ 96dpi,
-   * same as the hidden iframe min-height) so the footer sits at the bottom of the first page.
-   */
-  .booking-pdf-root.pdf-email-capture .page-container {
-    display: flex !important;
-    flex-direction: column !important;
-    min-height: 1123px !important;
-    width: 100% !important;
-  }
-  .booking-pdf-root.pdf-email-capture .main-content {
-    flex: 1 1 auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .footer {
-    margin-top: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .content-grid {
-    display: block !important;
-    width: 100% !important;
-    margin-bottom: 10px !important;
-  }
-  .booking-pdf-root.pdf-email-capture .content-grid > .info-box,
-  .booking-pdf-root.pdf-email-capture .info-box.full-width {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 0 10px 0 !important;
-    float: none !important;
-    grid-column: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .info-box {
-    box-shadow: none !important;
-    border: 1.5px solid #e5e7eb !important;
-  }
-  .booking-pdf-root.pdf-email-capture .detail-row {
-    display: flex !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
-    align-items: baseline !important;
-  }
-  .booking-pdf-root.pdf-email-capture .journey-section.has-stops {
-    display: block !important;
-    height: auto !important;
-    overflow: visible !important;
-    page-break-inside: auto !important;
-  }
-  .booking-pdf-root.pdf-email-capture .stop-list,
-  .booking-pdf-root.pdf-email-capture .stop-list li,
-  .booking-pdf-root.pdf-email-capture .stop-fare-note {
-    display: block !important;
-    width: 100% !important;
-    text-align: left !important;
-  }
-  .booking-pdf-root.pdf-email-capture .journey-flow {
-    display: table !important;
-    width: 100% !important;
-    table-layout: fixed !important;
-    border-collapse: separate !important;
-    border-spacing: 6px 0 !important;
-  }
-  .booking-pdf-root.pdf-email-capture .journey-point {
-    display: table-cell !important;
-    width: 42% !important;
-    vertical-align: middle !important;
-    text-align: center !important;
-  }
-  .booking-pdf-root.pdf-email-capture .journey-arrow {
-    display: table-cell !important;
-    width: 16% !important;
-    vertical-align: middle !important;
-    text-align: center !important;
-    font-size: 1.25rem !important;
-  }
-  .booking-pdf-root.pdf-email-capture .journey-location,
-  .booking-pdf-root.pdf-email-capture .detail-value,
-  .booking-pdf-root.pdf-email-capture .airport-waiting-note {
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
-    white-space: normal !important;
-  }
-  .booking-pdf-root.pdf-email-capture .airport-waiting-note {
-    display: block !important;
-    margin-top: 12px !important;
-  }
-  .booking-pdf-root.pdf-email-capture .header { padding: 16px 14px !important; }
-  .booking-pdf-root.pdf-email-capture .logo-svg { width: 280px !important; height: 52px !important; }
-  .booking-pdf-root.pdf-email-capture .logo-text { font-size: 30px !important; }
-  .booking-pdf-root.pdf-email-capture .payment-summary,
-  .booking-pdf-root.pdf-email-capture .header,
-  .booking-pdf-root.pdf-email-capture .footer {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-`;
-
-function buildHtml2PdfOptions(): Record<string, unknown> {
-  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-  const scale = Math.min(4, Math.max(2.75, dpr * 2.2));
-  return {
-    margin: [0, 0, 0, 0],
-    filename: "booking.pdf",
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: {
-      scale,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      letterRendering: true,
-      scrollX: 0,
-      scrollY: 0,
-      backgroundColor: "#ffffff",
-      imageTimeout: 20000,
-      windowWidth: 794,
-    },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["css", "legacy"] },
-  };
+export async function generateBookingConfirmationPdfBlob(booking: Booking, driver?: Driver, vehicle?: Vehicle, type: AdminPDFType = 'booking_confirmation'): Promise<Blob> {
+  return canonicalBookingPdf({ ...booking, driverName: driver?.name, vehicleRegistration: vehicle?.registration }, type);
 }
 
-/**
- * Renders the same HTML as print/download, converts to a real PDF in-browser (html2pdf.js),
- * for emailing via Cloud Functions + Storage without duplicating the template server-side.
- */
-export async function generateBookingConfirmationPdfBlob(
-  booking: Booking,
-  driver?: Driver,
-  vehicle?: Vehicle,
-  type: AdminPDFType = "booking_confirmation"
-): Promise<Blob> {
-  const html = buildBookingConfirmationHtml(booking, driver, vehicle, type);
-  const html2pdf = (await import("html2pdf.js")).default;
-
-  return new Promise((resolve, reject) => {
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;border:0;opacity:0;pointer-events:none;";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument;
-    if (!doc) {
-      document.body.removeChild(iframe);
-      reject(new Error("Could not create print frame"));
-      return;
-    }
-
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    const cleanup = () => {
-      if (iframe.parentNode) {
-        document.body.removeChild(iframe);
-      }
-    };
-
-    const run = async () => {
-      try {
-        doc.querySelector(".booking-pdf-root")?.classList.add("pdf-email-capture");
-        const fix = doc.createElement("style");
-        fix.setAttribute("data-pdf-email-capture", "true");
-        fix.textContent = PDF_EMAIL_CAPTURE_CSS;
-        doc.body.appendChild(fix);
-
-        await new Promise<void>((r) => setTimeout(() => r(), 900));
-        if (doc.fonts?.ready) {
-          await doc.fonts.ready.catch(() => undefined);
-        }
-        await new Promise<void>((r) => setTimeout(() => r(), 500));
-        await new Promise<void>((r) => {
-          window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => r());
-          });
-        });
-
-        const blob = (await html2pdf().set(buildHtml2PdfOptions()).from(doc.body).outputPdf("blob")) as Blob;
-        resolve(blob);
-      } catch (e) {
-        reject(e instanceof Error ? e : new Error(String(e)));
-      } finally {
-        cleanup();
-      }
-    };
-
-    void run();
-  });
+export async function generateBookingConfirmationPDF(booking: Booking, driver?: Driver, vehicle?: Vehicle, type: AdminPDFType = 'booking_confirmation'): Promise<void> {
+  try {
+    const blob = await generateBookingConfirmationPdfBlob(booking, driver, vehicle, type);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Spires-Taxis-' + type + '-' + String(booking.bookingNumber || 'booking').replace(/[^a-zA-Z0-9_-]/g, '') + '.pdf';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (error) { window.alert(error instanceof Error ? error.message : 'The PDF could not be generated. Please retry.'); }
 }

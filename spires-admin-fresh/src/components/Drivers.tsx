@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../utils/firebase';
 import { Plus, Edit3, Trash2, Users, Eye, EyeOff } from 'lucide-react';
 import { Driver } from '../types/types';
 import { getExpiryStatus, getDbsExpiryStatus, expiryStatusLabel, dbsExpiryStatusLabel } from '../utils/driverExpiry';
@@ -68,6 +70,19 @@ const Drivers: React.FC<DriversProps> = ({
   onDeleteDriver,
 }) => {
   const [hideInactive, setHideInactive] = useState(true);
+  const [accessBusy, setAccessBusy] = useState<string | null>(null);
+  const [accessMessage, setAccessMessage] = useState('');
+  const manageAccess = async (driver: Driver, action: 'reset' | 'revoke') => {
+    if (!driver.id || accessBusy) return;
+    if (!window.confirm(action === 'reset' ? `Generate a new code for ${driver.name}? Existing driver sessions will be revoked.` : `Revoke access for ${driver.name} on all devices?`)) return;
+    setAccessBusy(driver.id); setAccessMessage('');
+    try {
+      const result = await httpsCallable(functions, 'manageDriverAccess')({ driverId: driver.id, action });
+      const data = result.data as { code?: string; message: string };
+      setAccessMessage(`${driver.name}: ${data.code ? `Access code ${data.code}. ` : ''}${data.message}`);
+    } catch (error) { setAccessMessage(error instanceof Error ? error.message : 'Could not change access.'); }
+    finally { setAccessBusy(null); }
+  };
 
   const inactiveCount = useMemo(() => drivers.filter((d) => !d.active).length, [drivers]);
   const activeCount = drivers.length - inactiveCount;
@@ -79,6 +94,7 @@ const Drivers: React.FC<DriversProps> = ({
 
   return (
     <div className="space-y-6">
+      {accessMessage && <div role="status" className="p-4 bg-white border rounded"><p>{accessMessage}</p><button type="button" className="btn" onClick={() => setAccessMessage('')}>Dismiss</button></div>}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Drivers</h2>
@@ -185,6 +201,8 @@ const Drivers: React.FC<DriversProps> = ({
                       </div>
 
                       <div className="driver-card-actions">
+                        <button type="button" className="btn btn-sm" disabled={Boolean(accessBusy) || !driver.active} onClick={() => void manageAccess(driver, 'reset')}>New access code</button>
+                        <button type="button" className="btn btn-sm" disabled={Boolean(accessBusy)} onClick={() => void manageAccess(driver, 'revoke')}>Revoke access</button>
                         <button
                           type="button"
                           onClick={() => onEditDriver(driver)}

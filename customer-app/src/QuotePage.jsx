@@ -140,7 +140,7 @@ export default function QuotePage() {
             <p>{quote.openReturn ? `Open return${quote.returnDate ? ` on ${quote.returnDate}` : ""}. ${quote.returnPickupTime ? `Pickup time now set for ${quote.returnPickupTime}.` : "Return time to be confirmed."} For a return pickup in Oxford, please give your driver at least 30 minutes' notice. For pickups outside Oxford, contact us to confirm the notice needed. ${quote.returnNoticeNote || ""}` : `Return: ${quote.returnPickupLocation} to ${quote.returnDestination} ${quote.returnPickupTime}`}</p>
           ) : null}
           {Array.isArray(quote.returnStops) && quote.returnStops.length > 2 ? <p>Return stops: {quote.returnStops.map((stop, index) => `${index + 1}. ${stop.type === "dropoff" ? "Drop off" : "Pickup"}: ${stop.address}${stop.notes ? ` (${stop.notes})` : ""}`).join("; ")}. Extra stops. Agree the fare.</p> : null}
-          <p>Vehicle: {String(quote.vehicle || "").includes("8") ? "8 Seater" : "Standard Car"}</p>
+          <p>Vehicle: {/executive/i.test(String(quote.vehicle || "")) ? "Executive Car" : String(quote.vehicle || "").includes("8") ? "8 Seater" : "Standard Car"}</p>
           <p>Normal fare {quote.normalFare}</p>
           <p>Promotion discount {quote.discount}</p>
           <p><strong>Final total {quote.finalFare}</strong></p>

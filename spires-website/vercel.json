@@ -126,19 +126,34 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "spires-taxis.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "spires-taxis.com"
+        }
+      ],
       "destination": "https://www.spires-taxis.com/:path*",
       "statusCode": 301
     },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "booking.spires-taxis.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "booking.spires-taxis.com"
+        }
+      ],
       "destination": "https://customer.spires-taxis.com/:path*",
       "statusCode": 301
     },
     {
       "source": "/pages/oxford-to-heathrow-taxi",
       "destination": "/oxford-to-heathrow-taxi",
+      "statusCode": 301
+    },
+    {
+      "source": "/executive-heathrow-transfers",
+      "destination": "/executive-travel",
       "statusCode": 301
     },
     {

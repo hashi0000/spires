@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { touchDriverJobVersions } from "./driverTrips";
 import { FieldValue } from "firebase-admin/firestore";
 import { notifyAdminNewBookingRequest } from "./sendBookingReceipt";
 import { sendWelcomeEmail } from "./sendWelcomeEmail";
@@ -18,6 +19,8 @@ import {
   retryEmailJob,
   listBookingEmails,
   resendQuoteEmail,
+  recordAdditionalCharge,
+  recordFlightVerification,
   quotePublic,
   submitWebsiteQuote,
   processEmailJob,
@@ -49,6 +52,7 @@ export const onBookingWrite = functions.firestore
     const bookingId = context.params.bookingId as string;
 
     if (!after) return;
+    await touchDriverJobVersions(before || null, after);
 
     if (!before) {
       await stampPromotionOnCreate(change.after);
@@ -72,6 +76,7 @@ export const onBookingWrite = functions.firestore
     if (
       before &&
       before.paymentStatus !== "paid" &&
+      after.lastPaymentSource !== "driver_hub" &&
       after.paymentStatus === "paid" &&
       !after.paymentReceiptEmailSentAt &&
       (after.hirerEmail || after.email) &&
@@ -133,6 +138,8 @@ export {
   retryEmailJob,
   listBookingEmails,
   resendQuoteEmail,
+  recordAdditionalCharge,
+  recordFlightVerification,
   quotePublic,
   submitWebsiteQuote,
   processEmailJob,
@@ -175,3 +182,5 @@ export { recordBookingSource } from "./marketing/source";
 export { revokeMeasurementConsent, withdrawAccountMeasurement } from "./marketing/consent";
 export { scheduledAdvertisingSpend, refreshAdvertisingSpend } from "./marketing/googleAdsSync";
 export { reviewWelcomeEmail } from "./offers/welcomeReview";
+export { manageDriverAccess, unlockDriverJobs } from "./driverAccess";
+export { listDriverTrips, driverTripAction } from "./driverTrips";

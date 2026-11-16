@@ -14,7 +14,7 @@ import {
 } from "./bankDetails";
 import { executiveRequestNote, formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
 import {
-  airportWaitingDisclaimerBody,
+  airportWaitingTextForBooking,
   bookingHasAirportCollection,
 } from "./airportWaitingPolicy";
 import { confirmationTermsParagraph } from "./terms/bookingTerms";
@@ -83,7 +83,7 @@ const getIntroCopy = (type: EmailDocType, booking: any) => {
     default: {
       const collectionNote = !internationalBrand(booking) && bookingHasAirportCollection(booking)
         ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${escapeHtml(
-            airportWaitingDisclaimerBody()
+            airportWaitingTextForBooking(booking)
           )}</p>`
         : "";
       const thanks = internationalBrand(booking)

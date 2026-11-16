@@ -2090,10 +2090,7 @@ h2,
 .breadcrumbs a:hover { text-decoration: underline; }
 
 .executive-feature:not([hidden]) {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1rem;
-  align-items: center;
+  display: block;
   margin-top: 1.5rem;
   padding: 1.25rem 1.35rem;
   border: 1px solid var(--gold);
@@ -2106,19 +2103,9 @@ h2,
   background: linear-gradient(180deg, #fff, var(--gold-soft));
 }
 
-.executive-icon {
-  display: block;
-}
-
 @media (min-width: 960px) {
   .airport-fare-table--executive {
     min-width: 920px;
-  }
-}
-
-@media (max-width: 720px) {
-  .executive-feature:not([hidden]) {
-    grid-template-columns: 1fr;
   }
 }
 

@@ -104,6 +104,7 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
 
   return {
     id: customerBooking.id,
+    ...(customerBooking as any),
     bookingNumber,
     dateTime,
     hirerName: customerBooking.name || 'Customer',
