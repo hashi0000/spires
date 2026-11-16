@@ -3918,6 +3918,9 @@ html[dir="rtl"] .booking-form label {
 .executive-card .price-option__amount--secondary .fare-amount{font-size:1.6rem!important}
 .executive-card .price-option__unit{display:inline!important;font-size:.9rem!important}
 .executive-card .btn{margin-top:12px;text-decoration:none}
+.executive-service .price-options{margin-top:1.5rem}
+.executive-service .service-rate-note{margin:1.5rem 0}
+.message-preview{margin:0.75rem 0;padding:0.9rem 1rem;border:1px solid #dce2ea;border-radius:10px;background:#faf8f2;line-height:1.6;white-space:pre-wrap}
 .executive-page{background:#f7f8fa;padding-bottom:40px}
 .executive-page .section{padding:64px 0}
 .executive-page .container{max-width:1100px}

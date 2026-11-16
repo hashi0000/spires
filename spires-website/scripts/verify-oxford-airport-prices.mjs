@@ -220,14 +220,23 @@ assert(heathrowPage.includes("£150") && heathrowPage.includes("£290"), "Heathr
 assert(heathrowPage.includes("£92") && heathrowPage.includes("£180"), "Heathrow page keeps the Standard Car fare");
 assert(heathrowPage.includes("£120") && heathrowPage.includes("£235"), "Heathrow page keeps the 8 Seater fare");
 assert(heathrowPage.includes("vehicle=executive"), "Heathrow page books Executive as its own car type");
-assert(!heathrowPage.includes('data-nav="executive"'), "Heathrow page does not add an Executive navigation item");
 const redirect = readFileSync(join(website, "executive-heathrow-transfers.html"), "utf8");
-assert(redirect.includes('url=https://www.spires-taxis.com/oxford-to-heathrow-taxi#executive'), "old Executive address redirects to the Heathrow section");
-assert(redirect.includes('rel="canonical" href="https://www.spires-taxis.com/oxford-to-heathrow-taxi#executive"'), "old Executive address canonical points at the Heathrow section");
+assert(redirect.includes('url=https://www.spires-taxis.com/executive-travel'), "old Executive address redirects to Executive travel");
+assert(redirect.includes('rel="canonical" href="https://www.spires-taxis.com/executive-travel"'), "old Executive address canonical points at Executive travel");
 assert(redirect.includes("noindex"), "old Executive address is not a second indexable page");
+const execTravel = readFileSync(join(website, "executive-travel.html"), "utf8");
+assert(execTravel.includes("Mercedes E Class or equivalent"), "Executive travel page describes the car");
+assert((execTravel.includes("£150") || execTravel.includes("&pound;150")) && (execTravel.includes("£290") || execTravel.includes("&pound;290")), "Executive travel page shows Oxford fares");
+assert(execTravel.includes("Standard Car") && execTravel.includes("8 Seater"), "Executive travel page compares the car types");
+assert(!/partner (operator|provider)/i.test(execTravel + heathrowPage), "customer Executive copy has no partner wording");
 const pricesSource = readFileSync(join(website, "js", "airport-prices.js"), "utf8");
-assert(!pricesSource.includes('data-nav="executive"'), "price script does not insert an Executive navigation link");
 assert(!pricesSource.includes("/executive-heathrow-transfers"), "price script does not link to the old Executive page");
+assert(!/partner (operator|provider)/i.test(pricesSource), "price script has no partner wording");
+assert(heathrowPage.includes('data-nav="executive"') && execTravel.includes('data-nav="executive"'), "Services navigation includes Executive travel");
+{
+  const airportPanel = heathrowPage.match(/data-nav-group="airport"[\s\S]*?<\/details>/);
+  assert(airportPanel && !airportPanel[0].includes("executive-travel") && !airportPanel[0].includes('data-nav="executive"'), "Heathrow does not list Executive under Airport transfers");
+}
 
 if (failures.length) {
   console.error("FAILED:\n" + failures.map((f) => " - " + f).join("\n"));

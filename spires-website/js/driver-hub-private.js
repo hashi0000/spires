@@ -92,7 +92,10 @@
       const message = "Welcome to Heathrow. Your flight is recorded as landing at " + date(field(booking, leg, "verifiedLandingAt")) + ". Your included waiting ends at " + date(proposed.includedUntil) + ". Additional waiting costs £" + (booking.waitingPolicyVersion === "2026-11-15" ? "5 per started 15 minutes" : "10 per started 30 minutes") + ". Call or message when your whole group has collected its luggage and is ready at the agreed collection point. Your waiting timer stops when you notify us you are ready.";
       let phone = String(booking.hirerPhone || "").replace(/\D/g, "");
       if (phone.startsWith("0")) phone = "44" + phone.slice(1);
-      if (phone) document.getElementById("driver-whatsapp").innerHTML = '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(message) + '">Open WhatsApp</a>';
+      const preview = '<p class="message-preview"><strong>WhatsApp message preview</strong><br>' + esc(message) + '</p><p>Opening WhatsApp does not send the message.</p>';
+      document.getElementById("driver-whatsapp").innerHTML = preview + (phone
+        ? '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(message) + '">Open WhatsApp</a>'
+        : '<p>Add a customer phone number before opening WhatsApp.</p>');
     }
   }
   async function act(action) {

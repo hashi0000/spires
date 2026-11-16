@@ -687,9 +687,8 @@
       '<p class="price-save">Save ' +
       formatMoney(prices.oneWay * 2 - prices.return) +
       " on a return</p>" +
-      '<p class="price-option__meta">Per vehicle, either direction. Heathrow only.</p>' +
-      "<p>A partner operator may provide the car.</p>" +
-      '<p><a href="' + executiveBookHref(area) + '">Book an Executive Car</a></p>'
+      '<p class="price-option__meta">Per vehicle, either direction. Heathrow airport transfers.</p>' +
+      '<p><a class="btn btn--primary" href="' + executiveBookHref(area) + '">Request Executive Car</a></p>'
     );
   }
 
@@ -711,8 +710,7 @@
         "<p>Mercedes E Class or equivalent. Advance booking required, subject to availability.</p>" +
         "<p>Heathrow from " + executivePickupName(area) + ": " +
         formatMoney(prices.oneWay) + " one way or " + formatMoney(prices.return) + " return.</p>" +
-        "<p>A partner operator may provide the car.</p>" +
-        '<p><a href="' + executiveBookHref(area) + '">Book an Executive Car</a></p>';
+        '<p><a class="btn btn--primary" href="' + executiveBookHref(area) + '">Request Executive Car</a></p>';
       el.parentNode.insertBefore(note, el);
       return;
     }
