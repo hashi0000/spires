@@ -1185,7 +1185,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       </div>
                     </div>
                     {formData.vehicleType === 'executive' ? (
-                      <p className="text-sm text-gray-700 mb-3">Mercedes E Class or equivalent. Heathrow only. A partner operator may provide the car. This is a request until availability is accepted.</p>
+                      <p className="text-sm text-gray-700 mb-3">Mercedes E Class or equivalent for Heathrow or Cotswolds trips. Availability must be confirmed.</p>
                     ) : null}
                     <label className="block text-sm font-medium text-gray-700 mb-1">Airport</label>
                     <select
@@ -1763,9 +1763,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <p className="text-sm text-gray-700 mb-3">How they heard about us: {heardAboutText(editingBooking.heardAbout, editingBooking.heardAboutDetail)}. This is what the customer chose on the website form.</p>
               ) : null}
             </div> : null}
+            <TermsAcceptance booking={editingBooking || {}} />
           </div>
-
-          <TermsAcceptance booking={editingBooking || {}} />
 
           <div className="modal-footer">
             {formError ? (

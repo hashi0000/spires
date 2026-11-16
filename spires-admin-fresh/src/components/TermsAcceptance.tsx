@@ -40,8 +40,8 @@ export default function TermsAcceptance({ booking }: Props) {
   };
 
   return (
-    <div className="card" style={{ margin: "0 0 1.25rem", border: "1px solid #e4e9ef" }}>
-      <h3 className="card-title" style={{ fontSize: "1.05rem" }}>Terms agreement</h3>
+    <details className="booking-terms-panel">
+      <summary>Terms agreement <span>{accepted ? "Accepted" : "Not recorded"}</span></summary><div className="booking-terms-panel__body">
       {accepted ? (
         <div className="text-sm">
           <p>Accepted</p>
@@ -58,7 +58,7 @@ export default function TermsAcceptance({ booking }: Props) {
         <p className="text-sm">Acceptance not recorded.</p>
       )}
       <p className="text-sm" style={{ marginTop: "0.75rem" }}>
-        Current terms, version {CURRENT_BOOKING_TERMS.version}. Applies to journeys from 1 April 2026. Published 25 October 2026.
+        Current terms: {CURRENT_BOOKING_TERMS.version}.
         {" "}<a href={CURRENT_BOOKING_TERMS.url} target="_blank" rel="noopener noreferrer">Open terms</a>
       </p>
       {booking?.id && !accepted ? (
@@ -108,6 +108,6 @@ export default function TermsAcceptance({ booking }: Props) {
       ) : null}
       {error ? <p className="text-sm" style={{ color: "#b91c1c" }} role="alert">{error}</p> : null}
       {message ? <p className="text-sm" style={{ color: "#166534" }}>{message}</p> : null}
-    </div>
+    </div></details>
   );
 }
