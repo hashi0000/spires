@@ -834,7 +834,7 @@
       escapeHtml(draft.actualFare || "") +
       '"></label>' +
       (booking && booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted"
-        ? '<p class="job-notes">Executive Car is the category requested for a Heathrow transfer. It is not an allocated car. A partner operator may provide it. This request is awaiting availability confirmation.</p>'
+        ? '<p class="job-notes">Executive Car is the category requested. It is not an allocated car. This request is awaiting availability confirmation.</p>'
         : "") +
       '<fieldset class="vehicle"><legend>Vehicle</legend>' +
       (draft.vehicleType === "executive" ? VEHICLES.concat([{ value: "executive", label: "Executive Car" }]) : VEHICLES).map(

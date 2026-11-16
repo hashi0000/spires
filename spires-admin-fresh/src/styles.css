@@ -2216,3 +2216,31 @@ header.admin-header,
 .booking-table{min-width:1100px}
 .booking-table td:nth-child(2){min-width:105px;white-space:nowrap}
 .booking-table-wrap{overflow-x:auto;position:relative}
+
+.modal-body .journey-box{border:1px solid #d5dde6;border-radius:10px;padding:20px;margin:16px 0;background:#fff;min-width:0}
+.modal-body .journey-box legend{padding:0 8px;font-weight:600;color:#002147;font-size:.9rem}
+.modal-body .journey-box label,.modal-body .journey-assistance label{display:grid;gap:8px;margin:14px 0;font-size:.875rem;font-weight:500}
+.modal-body .journey-box select,.modal-body .journey-box textarea,.modal-body .journey-assistance textarea{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:12px 14px;background:#fff;color:#102033;font:inherit;min-height:46px}
+.modal-body .journey-box textarea,.modal-body .journey-assistance textarea{min-height:110px;resize:vertical}
+.modal-body .journey-box select:focus-visible,.modal-body textarea:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.journey-assistance{padding:16px;border:1px solid #d5dde6;border-radius:10px;background:#fff;margin:16px 0}
+.journey-assistance summary{cursor:pointer;font-size:.875rem;font-weight:600;color:#002147}
+.journey-assistance p,.journey-box p{font-size:.8125rem;line-height:1.65;color:#475569;margin:12px 0}
+.modal-body .journey-assistance label:has(input[type=checkbox]){display:flex;align-items:flex-start;gap:10px}
+.booking-table{table-layout:fixed;min-width:0}.booking-table td,.booking-table th{white-space:normal;overflow-wrap:anywhere}.booking-table .btn{font-size:.75rem;padding:.45rem .6rem;min-width:0}.booking-table td:nth-child(2){min-width:0;white-space:normal}
+
+.booking-setup{background:#fff;border:1px solid #dce4ed;border-radius:12px;padding:20px;margin-bottom:16px}
+.booking-setup__title{font-size:1rem;font-weight:700;color:#002147;margin:0 0 18px}
+.booking-setup__label{display:block;font-size:.875rem;font-weight:600;margin:16px 0 8px;color:#334155}
+.modal-body .booking-setup .journey-box--service{padding:0;margin:0 0 16px;border:0;background:transparent}
+.modal-body .booking-setup .journey-box--service>label:first-child{margin-top:0}
+.booking-setup>p{font-size:.8rem;line-height:1.5;color:#64748b;margin:8px 0 0}
+.modal-body>.journey-assistance{background:#f8fafc;padding:0;margin:0 0 24px}
+.modal-body>.journey-assistance>summary{padding:16px 18px;line-height:1.5;min-height:48px;box-sizing:border-box}
+.modal-body>.journey-assistance[open]>summary{border-bottom:1px solid #e2e8f0;margin-bottom:16px}
+.modal-body>.journey-assistance>p,.modal-body>.journey-assistance>label{margin-left:18px;margin-right:18px}
+.modal-body>.journey-assistance>label:last-child{margin-bottom:18px}
+.modal-body>.journey-assistance input[type=checkbox]{width:18px;height:18px;flex:0 0 18px;margin-top:2px}
+.booking-section-nav{gap:8px;margin-top:16px}
+.modal-header .booking-summary{margin:8px 0;font-size:.8125rem}
+@media(max-width:600px){.booking-setup{padding:16px}.modal-header{padding:18px}.modal-body{padding:16px}}
