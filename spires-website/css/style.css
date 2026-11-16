@@ -3910,3 +3910,57 @@ html[dir="rtl"] .booking-form label {
 @media (prefers-reduced-motion: reduce) {
   .spires-map__flow { animation: none; }
 }
+
+/* Executive presentation: keep published fares unchanged. */
+.executive-card{border-top:4px solid #b58b45!important;background:linear-gradient(145deg,#fff,#faf7ef);position:relative}
+.executive-card .price-option__amount{display:flex!important;align-items:baseline;gap:8px;flex-wrap:wrap;margin:12px 0 0!important}
+.executive-card .fare-amount{display:inline!important;font-family:"Source Serif 4",Georgia,serif;font-size:2.2rem!important;line-height:1.2;font-weight:700}
+.executive-card .price-option__amount--secondary .fare-amount{font-size:1.6rem!important}
+.executive-card .price-option__unit{display:inline!important;font-size:.9rem!important}
+.executive-card .btn{margin-top:12px;text-decoration:none}
+.executive-page{background:#f7f8fa;padding-bottom:40px}
+.executive-page .section{padding:64px 0}
+.executive-page .container{max-width:1100px}
+.executive-eyebrow{display:block;color:#967031;font-weight:700;letter-spacing:.18em;font-size:.78rem;margin-top:36px}
+.executive-page h1{font-size:clamp(2.5rem,5vw,4.4rem);max-width:760px;line-height:1.08;margin:16px 0 24px}
+.executive-page h1+p{font-size:1.15rem;max-width:780px;line-height:1.8}
+.executive-page h2{margin-top:52px;padding-top:24px;border-top:1px solid #dce2ea;font-size:clamp(1.65rem,3vw,2.2rem)}
+.executive-page p{max-width:850px;line-height:1.8}
+.executive-page ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:0;list-style:none;margin:24px 0}
+.executive-page li{padding:24px;background:#fff;border:1px solid #dce2ea;border-radius:12px;line-height:1.75}
+.executive-page li strong{display:block;font-size:1.15rem;margin-bottom:10px}
+.executive-page table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #dce2ea;border-radius:12px;overflow:hidden;margin:22px 0;min-width:480px}
+.executive-page caption{text-align:left;padding:0 0 16px;font-size:.95rem;line-height:1.6}
+.executive-page th,.executive-page td{padding:19px 24px;text-align:left;border-bottom:1px solid #e8ecf1;white-space:nowrap}
+.executive-page thead th{background:#0c2340;color:#fff;font-size:.85rem;font-weight:600}
+.executive-page tbody tr:last-child>*{border-bottom:0}
+.executive-page tbody tr:nth-child(even){background:#faf8f2}
+.executive-page td{font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums}
+.executive-page .btn{margin-top:12px;padding:15px 25px;text-decoration:none}
+@media(max-width:680px){.executive-page .section{padding:32px 0}.executive-page ul{grid-template-columns:1fr}.executive-page th,.executive-page td{padding:15px 16px}.executive-page h2{margin-top:36px}.executive-page .btn{display:inline-flex;justify-content:center;max-width:100%}}
+
+/* Terms reading rhythm and airport waiting rate table. */
+.terms-page .card h4{margin:28px 0 12px;line-height:1.4}
+.terms-page .card ul{padding-left:1.2rem;margin:16px 0 24px}
+.terms-page .card li{padding-left:4px;margin:0 0 12px;line-height:1.75}
+.terms-page .card p{margin:0 0 18px;line-height:1.8}
+.terms-page .card p:last-child{margin-bottom:0}
+.terms-policy{max-width:1000px}
+.terms-policy-block{padding:26px 30px;border:1px solid #dde4ed;border-radius:12px;background:#fff;margin:20px 0}
+.terms-policy-block h3{margin:0 0 12px;font-size:1.2rem}
+.terms-policy-block p{margin:0;line-height:1.85;max-width:80ch}
+.waiting-allowance{font-size:2.6rem!important;font-family:"Source Serif 4",Georgia,serif;font-weight:700;color:#0c2340;line-height:1.2!important;margin:18px 0!important}
+.waiting-allowance span{display:block;font-family:"DM Sans",sans-serif;font-size:.95rem;font-weight:400;margin-top:8px}
+.waiting-price-table{margin-top:28px;border:1px solid #dde4ed;border-radius:12px;overflow:auto;background:#fff}
+.waiting-price-table table{width:100%;border-collapse:collapse;min-width:300px;text-align:left}
+.waiting-price-table caption{text-align:left;padding:20px 24px;font-weight:600;color:#0c2340;background:#f8f5ed}
+.waiting-price-table thead{background:#0c2340;color:#fff}
+.waiting-price-table th,.waiting-price-table td{padding:17px 24px;border-bottom:1px solid #e6ebf1}
+.waiting-price-table tbody th{font-weight:400}
+.waiting-price-table td{font-size:1.3rem;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.waiting-price-table thead th:last-child{text-align:right}
+.waiting-price-table tbody tr:nth-child(even){background:#f7f9fc}
+.waiting-price-table tbody tr:last-child>*{border-bottom:0}
+.waiting-note{margin:18px 0 28px;line-height:1.75}
+.waiting-price-table:focus-visible{outline:3px solid #b58b45;outline-offset:4px}
+@media(max-width:600px){.terms-policy-block{padding:22px 20px}.waiting-price-table th,.waiting-price-table td{padding:16px}.waiting-price-table caption{padding:18px 16px}}
