@@ -88,7 +88,7 @@ const getIntroCopy = (type, booking) => {
                 : `<p>This is a payment request for your booking with Spires Taxis. Please arrange payment for the fare amount shown in the attached document.</p>${bankNote}${depositNote}`;
         default: {
             const collectionNote = !internationalBrand(booking) && (0, airportWaitingPolicy_1.bookingHasAirportCollection)(booking)
-                ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, airportWaitingPolicy_1.airportWaitingDisclaimerBody)())}</p>`
+                ? `<p style="margin-top:12px;padding:12px;border:1px solid #e8e4da;background:#fbfaf7;border-radius:8px;white-space:pre-line;">${(0, driverReminderEmail_1.escapeHtml)((0, airportWaitingPolicy_1.airportWaitingTextForBooking)(booking))}</p>`
                 : "";
             const thanks = internationalBrand(booking)
                 ? "Thank you for booking with Spires International, operated by Spires Taxis Ltd. This confirms the booking. It does not mean a driver has been allocated. Pickup, waiting and cancellation terms are the ones agreed on your quote."

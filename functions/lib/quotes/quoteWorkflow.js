@@ -110,6 +110,8 @@ function isWorkflowConfirmed(data) {
     return ["confirmed", "allocated", "completed"].includes(effectiveWorkflowStatus(data));
 }
 function shouldSendConfirmation(before, after) {
+    if (effectiveWorkflowStatus(after) === "completed")
+        return false;
     if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after))
         return false;
     if (!before || !isWorkflowConfirmed(before))

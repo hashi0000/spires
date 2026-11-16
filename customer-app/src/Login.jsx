@@ -12,7 +12,7 @@ function afterLoginPath(location) {
   const params = new URLSearchParams(location.search || "");
   const claim = params.get("t");
   if (claim) return `/claim?t=${encodeURIComponent(claim)}`;
-  if (params.get("share") === "1" || params.get("request") === "1") {
+  if (params.get("share") === "1" || params.get("request") === "1" || params.get("vehicle")) {
     return `/dashboard${location.search || ""}`;
   }
   return "/dashboard";

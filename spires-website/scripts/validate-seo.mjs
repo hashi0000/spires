@@ -120,7 +120,6 @@ const requiredSitemap = [
   '/airport-transfers',
   '/heathrow-to-oxford-taxi',
   '/oxford-to-heathrow-taxi',
-  '/executive-heathrow-transfers',
   '/oxford-to-luton-taxi',
   '/oxford-to-gatwick-taxi',
   '/bicester-taxis',
@@ -143,6 +142,9 @@ for (const p of requiredSitemap) {
 }
 if (sitemap.includes('/airport-taxis-oxford')) {
   issues.push('sitemap must not include redirected /airport-taxis-oxford');
+}
+if (sitemap.includes('/executive-heathrow-transfers')) {
+  issues.push('sitemap must not include redirected /executive-heathrow-transfers');
 }
 
 for (const cluster of LANG_CLUSTERS) {

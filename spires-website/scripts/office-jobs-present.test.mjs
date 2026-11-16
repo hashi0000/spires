@@ -76,4 +76,102 @@ assert.equal(shown("done").remaining, "Completed");
 assert.equal(shown("done").overdue, false);
 assert.equal(hub.nextJourney(sample.bookings.filter((row) => row.id === "exec"), now, ""), null);
 
+const oneWay = {
+  id: "one",
+  status: "confirmed",
+  adminStatus: "confirmed",
+  customerStatus: "confirmed",
+  pickupTime: "2026-11-15T16:00:00",
+  dateTime: "2026-11-15T16:00:00",
+  pickupLocation: "Oxford",
+  destination: "Heathrow Terminal 5",
+  driverId: "sam",
+  vehicleId: "car-out",
+  vehicleType: "standard",
+  actualFare: 92,
+  paymentStatus: "pending",
+  amountReceivedPence: 0,
+  revision: 3,
+  stops: [{ type: "pickup", address: "Oxford" }],
+};
+const trip = {
+  id: "ret",
+  bookingType: "return",
+  status: "allocated",
+  adminStatus: "allocated",
+  pickupTime: "2026-11-15T16:40:00",
+  dateTime: "2026-11-15T16:40:00",
+  returnPickupTime: "2026-11-15T20:15:00",
+  pickupLocation: "Oxford",
+  destination: "Heathrow",
+  returnPickupLocation: "Heathrow",
+  returnDestination: "Oxford",
+  driverId: "sam",
+  returnDriverId: "alex",
+  vehicleId: "car-out",
+  returnVehicleId: "car-ret",
+  actualFare: 290,
+  paymentStatus: "pending",
+  revision: 1,
+};
+const cancelled = { ...oneWay, id: "cx", status: "cancelled", customerStatus: "cancelled" };
+const unassigned = { ...oneWay, id: "open", driverId: "" };
+
+assert.equal(hub.canMarkCompleted(oneWay, "outbound"), true);
+assert.equal(hub.presentJob(hub.expandJobs(oneWay)[0], lists, now).statusLabel, "Confirmed");
+assert.equal(hub.canMarkCompleted(cancelled, "outbound"), false);
+assert.equal(hub.canMarkCompleted(unassigned, "outbound"), false);
+assert.equal(hub.completionUpdate(cancelled, "outbound", "sam").ok, false);
+
+const first = hub.completionUpdate(oneWay, "outbound", "sam");
+assert.equal(first.ok, true);
+assert.equal(first.update.status, "completed");
+assert.equal(first.update.adminStatus, "completed");
+assert.equal(first.update.outboundStatus, "completed");
+assert.equal(first.update.customerStatus, "completed");
+assert.equal(first.update.revision, 4);
+assert.equal(first.update.actualFare, undefined);
+assert.equal(first.update.paymentStatus, undefined);
+assert.equal(first.update.driverId, undefined);
+const savedOne = hub.applyStatusUpdate(oneWay, first.update);
+for (const key of first.unchanged) assert.equal(savedOne[key], oneWay[key]);
+assert.equal(hub.presentJob(hub.expandJobs(savedOne)[0], lists, now).statusLabel, "Completed");
+assert.equal(hub.selectJobs([savedOne], "completed", now, "").length, 1);
+assert.equal(hub.selectJobs([savedOne], "today", now, "").length, 0);
+assert.equal(hub.completionUpdate(savedOne, "outbound", "sam").ok, false);
+const failed = oneWay;
+assert.equal(failed.status, "confirmed");
+const officeCopy = { ...oneWay, revision: 8 };
+assert.notEqual(first.update.revision, Number(officeCopy.revision) + 1);
+
+const outboundSave = hub.completionUpdate(trip, "outbound", "sam");
+const afterOutbound = hub.applyStatusUpdate(trip, outboundSave.update);
+assert.equal(afterOutbound.outboundStatus, "completed");
+assert.equal(afterOutbound.returnStatus, "allocated");
+assert.equal(afterOutbound.status, "allocated");
+assert.equal(afterOutbound.actualFare, 290);
+assert.equal(afterOutbound.returnDriverId, "alex");
+assert.equal(hub.legCompleted(afterOutbound, "outbound"), true);
+assert.equal(hub.legCompleted(afterOutbound, "return"), false);
+assert.equal(hub.selectJobs([afterOutbound], "completed", now, "").some((row) => row.leg === "return"), false);
+assert.equal(hub.selectJobs([afterOutbound], "today", now, "").some((row) => row.leg === "return"), true);
+assert.equal(hub.presentJob(hub.expandJobs(afterOutbound).find((row) => row.leg === "return"), lists, now).statusLabel, "Allocated");
+
+const returnSave = hub.completionUpdate(afterOutbound, "return", "alex");
+const afterReturn = hub.applyStatusUpdate(afterOutbound, returnSave.update);
+assert.equal(afterReturn.returnStatus, "completed");
+assert.equal(afterReturn.outboundStatus, "completed");
+assert.equal(afterReturn.status, "completed");
+assert.equal(afterReturn.adminStatus, "completed");
+assert.equal(afterReturn.actualFare, 290);
+assert.equal(afterReturn.pickupLocation, "Oxford");
+assert.equal(hub.presentJob(hub.expandJobs(afterReturn).find((row) => row.leg === "return"), lists, now).statusLabel, "Completed");
+
+const undone = hub.reopenUpdate(afterReturn, "return", "office");
+assert.equal(undone.ok, true);
+assert.equal(undone.update.returnStatus, "allocated");
+assert.equal(undone.update.outboundStatus, "completed");
+assert.equal(undone.update.status, "allocated");
+assert.equal(undone.update.actualFare, undefined);
+
 console.log("driver hub presentation ok");

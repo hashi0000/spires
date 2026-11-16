@@ -4,6 +4,7 @@ import { onlineTermsAcceptance } from "../terms/bookingTerms";
 import { placeRecord } from "../locations/placeRecord";
 import { applyStopEnds, hasExtraStops, OPEN_RETURN_NOTICE, readStops, validateStops } from "./journeyStops";
 import { assessExecutiveBooking } from "../quotes/executiveService";
+import { cotswoldsRequest } from "../cotswoldsPolicy";
 
 export const OFFICE_PHONE = "07776 897772";
 export const CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
@@ -102,6 +103,76 @@ export function heardAboutLabel(code: unknown, detail?: unknown): string {
 
 function flag(value: unknown): boolean {
   return value === true || value === "true" || value === "yes" || value === "on";
+}
+
+function collectionLeg(
+  body: Record<string, unknown>,
+  prefix: "" | "return",
+  active: boolean,
+  now: number
+): { ok: true; fields: Record<string, unknown> } | { ok: false; error: string } {
+  if (!active) return { ok: true, fields: {} };
+  const key = (name: string) => (prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name);
+  const kind = str(body[key("collectionLocationKind")]) === "hotel" ? "hotel" : "terminal";
+  const requested = str(body[key("collectionArrangement")]);
+  const arrangement = kind === "hotel" || requested === "fixed_time" ? "fixed_time" : "flight_monitored";
+  const flight = str(body[prefix ? "returnFlightNumber" : "flightNumber"]);
+  const arrival = str(body[key("arrivalDate")]);
+  if (arrangement === "flight_monitored") {
+    if (!flight) return { ok: false, error: "Flight monitored collection needs the flight number." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(arrival)) return { ok: false, error: "Flight monitored collection needs the arrival date." };
+  }
+  if (arrangement === "fixed_time" && !flag(body[key("fixedTimeAcknowledged")])) {
+    return { ok: false, error: "Tick the box to confirm this collection time will not be flight monitored." };
+  }
+  const location = str(body[key("collectionLocation")]).slice(0, 240);
+  if (!location) return { ok: false, error: "Enter the exact collection location, including the terminal or hotel." };
+  const acceptedAt = new Date(now).toISOString();
+  return {
+    ok: true,
+    fields: {
+      [key("collectionLocationKind")]: kind,
+      [key("collectionArrangement")]: arrangement,
+      [key("collectionLocation")]: location,
+      [key("arrivalDate")]: arrival.slice(0, 10),
+      [key("precedingFlight")]: flag(body[key("precedingFlight")]),
+      [key("travellingIndependently")]: flag(body[key("travellingIndependently")]),
+      [key("assistanceRequested")]: flag(body[key("assistanceRequested")]),
+      [key("assistanceNote")]: str(body[key("assistanceNote")]).slice(0, 500),
+      [key("walkingAid")]: flag(body[key("walkingAid")]),
+      [key("wheelchairCarriage")]: flag(body[key("wheelchairCarriage")]),
+      [key("fixedTimeAcknowledged")]: arrangement === "fixed_time",
+      [key("collectionTermsAcceptedAt")]: acceptedAt,
+      [key("flightNumberReferenceOnly")]: arrangement === "fixed_time" && Boolean(flight),
+    },
+  };
+}
+
+export function collectionTerms(
+  body: Record<string, unknown>,
+  airportCollection: boolean,
+  returnAirportCollection: boolean,
+  now: number
+): { ok: true; fields: Record<string, unknown> } | { ok: false; error: string } {
+  const requested = flag(body.assistanceRequested) || Boolean(str(body.assistanceNote)) || flag(body.walkingAid) || flag(body.wheelchairCarriage);
+  const note = str(body.assistanceNote).slice(0,500);
+  if (requested && !note) return { ok:false, error:'Tell us what practical assistance is needed.' };
+  const general = { assistanceRequested:requested, assistanceNote:requested ? note : '', walkingAid:requested && flag(body.walkingAid), wheelchairCarriage:requested && flag(body.wheelchairCarriage) };
+  if (!airportCollection && !returnAirportCollection) return { ok: true, fields: general };
+  if (str(body.waitingPolicyVersion) !== "2026-11-15") return { ok: false, error: "The collection terms have changed. Reload the booking form and review the current waiting policy." };
+  const outbound = collectionLeg(body, "", airportCollection, now);
+  if (!outbound.ok) return outbound;
+  const returning = collectionLeg(body, "return", returnAirportCollection, now);
+  if (!returning.ok) return returning;
+  return {
+    ok: true,
+    fields: {
+      ...general,
+      waitingPolicyVersion: "2026-11-15",
+      ...outbound.fields,
+      ...returning.fields,
+    },
+  };
 }
 
 export function normaliseGuestEmail(value: string): string {
@@ -217,6 +288,7 @@ export function prepareGuestBooking(
       enabled: options.executiveEnabled,
       passengers,
       bookingType: str(body.bookingType),
+      journeyType: str(body.journeyType),
       pickup: ends.pickup,
       destination: ends.destination,
       stops,
@@ -281,6 +353,10 @@ export function prepareGuestBooking(
 
   const airportCollection = flag(body.airportCollection);
   const returnAirportCollection = bookingType === "return" && flag(body.returnAirportCollection);
+  const collection = collectionTerms(body, airportCollection, returnAirportCollection, options.now);
+  if (!collection.ok) return collection;
+  const hire = cotswoldsRequest(body, dateTime, vehicleType, options.now);
+  if (!hire.ok) return hire;
   const paymentRaw = str(body.paymentMethod).toLowerCase();
   const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
   const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
@@ -344,6 +420,7 @@ export function prepareGuestBooking(
     flightNumber: airportCollection ? str(body.flightNumber).slice(0, 40) : "",
     terminal: airportCollection ? str(body.terminal).slice(0, 40) : "",
     returnFlightNumber: returnAirportCollection ? str(body.returnFlightNumber).slice(0, 40) : "",
+    ...collection.fields,
     vehicleType,
     paymentMethod,
     paymentStatus: "pending",
@@ -351,6 +428,7 @@ export function prepareGuestBooking(
     customerStatus: "pending",
     adminStatus: "pending",
     ...executiveFields,
+    ...hire.fields,
     depositRequired: false,
     depositStatus: "not_required",
     termsAccepted: true,

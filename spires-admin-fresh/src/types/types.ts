@@ -69,6 +69,10 @@ export interface TripExpense {
 }
 
 export interface Booking {
+  waitingPolicyVersion?: string;
+  collectionArrangement?: string;
+  collectionLocationKind?: string;
+  additionalCharges?: Array<{ id: string; amountPence: number; reason: string }>;
   id?: string;
   bookingNumber: string;
   dateTime: string;
@@ -173,6 +177,33 @@ export interface Booking {
 
 // Extended booking interface for form handling
 export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAmount' | 'dueOnOutbound' | 'dueOnReturn'> {
+  collectionArrangement?: string;
+  collectionLocationKind?: string;
+  collectionLocation?: string;
+  arrivalDate?: string;
+  fixedTimeAcknowledged?: boolean;
+  precedingFlight?: boolean;
+  travellingIndependently?: boolean;
+  assistanceRequested?: boolean;
+  assistanceNote?: string;
+  walkingAid?: boolean;
+  wheelchairCarriage?: boolean;
+  returnCollectionArrangement?: string;
+  returnCollectionLocationKind?: string;
+  returnCollectionLocation?: string;
+  returnArrivalDate?: string;
+  returnFixedTimeAcknowledged?: boolean;
+  returnPrecedingFlight?: boolean;
+  returnTravellingIndependently?: boolean;
+  returnAssistanceRequested?: boolean;
+  returnAssistanceNote?: string;
+  returnWalkingAid?: boolean;
+  returnWheelchairCarriage?: boolean;
+  journeyType?: 'transfer' | 'cotswolds';
+  hireHours?: string;
+  hireItinerary?: string;
+  timedHireAccepted?: boolean;
+  timedHire?: { policyVersion?: string; startAt?: string; includedMinutes?: number; itinerary?: string; extraRatePounds?: number; extraIntervalMinutes?: number; acceptedAt?: string };
   actualFare?: number | string;
   // Customer booking fields (from customer app)
   uid?: string;

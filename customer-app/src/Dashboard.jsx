@@ -7,18 +7,23 @@ import BookingForm from "./components/BookingForm";
 import ShareHeathrow from "./components/ShareHeathrow";
 import Profile from "./components/Profile";
 import { generateBookingPDF } from "./pdfGenerator";
+import { agreedFarePence } from './generatedDocuments/paymentAmount';
 import {
   SPIRES_BANK_DETAILS,
   formatPaymentMethodLabel,
   isBankTransferMethod,
 } from "./bankDetails";
 import { formatVehicleTypeLabel, vehicleClassExamples } from "./vehicleTypes";
+import { airportWaitingTextForBooking } from "./airportWaitingPolicy";
 import "./styles.css";
 
 export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showBookingForm, setShowBookingForm] = useState(() => {
+    const vehicle = new URLSearchParams(window.location.search).get("vehicle");
+    return vehicle === "executive" || vehicle === "standard" || vehicle === "8_seater";
+  });
   const [portal, setPortal] = useState(() => new URLSearchParams(window.location.search).get("share") === "1" ? "share" : "hire");
   const [showProfile, setShowProfile] = useState(false);
   const [userName, setUserName] = useState("");
@@ -507,6 +512,13 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                  {(booking.airportCollection || booking.returnAirportCollection) && (
+                    <div className="booking-info-row">
+                      <span className="info-label">Collection:</span>
+                      <span className="info-value">{airportWaitingTextForBooking(booking)}</span>
+                    </div>
+                  )}
+
                   {(booking.flightNumber || booking.terminal || booking.returnFlightNumber) && (
                     <div className="booking-info-row">
                       <span className="info-label">Flight:</span>
@@ -527,15 +539,22 @@ export default function Dashboard() {
                       <a href={`/quote?booking=${booking.id}`}>View quote</a>
                     </div>
                   ) : null}
-                  {booking.actualFare && (booking.status === "confirmed" || booking.status === "paid" || booking.paymentStatus === "paid") && (
+                  {booking.actualFare && (["confirmed", "allocated", "completed", "paid"].includes(booking.status) || booking.paymentStatus === "paid") && (
                     <div className="booking-info-row">
                       <span className="info-label">Fare:</span>
                       <span className="info-value" style={{ color: "#065f46", fontWeight: "600" }}>
-                        £{typeof booking.actualFare === "number" ? booking.actualFare.toFixed(2) : parseFloat(booking.actualFare).toFixed(2)}
+                        £{(agreedFarePence(booking) / 100).toFixed(2)}
                       </span>
                     </div>
                   )}
 
+                  {agreedFarePence(booking) > 0 && ["confirmed","allocated","completed","paid"].includes(booking.status) && (
+                    <div className="booking-financial-summary">
+                      <p>Payments received, including deposit: <strong>£{(Number(booking.amountReceivedPence || 0)/100).toFixed(2)}</strong></p>
+                      <p>Remaining balance: <strong>£{(Math.max(0,agreedFarePence(booking)-Number(booking.amountReceivedPence || 0))/100).toFixed(2)}</strong></p>
+                      {Array.isArray(booking.additionalCharges) && booking.additionalCharges.length > 0 && <details><summary>Additional charges</summary><ul>{booking.additionalCharges.map((charge,index)=><li key={charge.id || index}>{charge.reason || 'Additional charge'}: £{(Number(charge.amountPence || 0)/100).toFixed(2)}</li>)}</ul></details>}
+                    </div>
+                  )}
                   {booking.paymentMethod && (
                     <div className="booking-info-row">
                       <span className="info-label">Pay by:</span>

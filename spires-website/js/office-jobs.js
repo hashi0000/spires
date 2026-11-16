@@ -51,6 +51,7 @@
   const pinScreen = document.getElementById("pin-screen");
   const appScreen = document.getElementById("app-screen");
   const pinForm = document.getElementById("pin-form");
+  pinForm.insertAdjacentHTML("afterbegin", '<label for="access-kind">Sign in as</label><select id="access-kind"><option value="driver">Driver, assigned trips only</option><option value="office">Office / existing family access</option></select>');
   const pinInput = document.getElementById("pin-input");
   const pinError = document.getElementById("pin-error");
   const pinSubmit = document.getElementById("pin-submit");
@@ -191,7 +192,7 @@
     const tomorrow = addDays(today, 1);
     if (view === "today") return pickup >= today && pickup < tomorrow;
     if (view === "tomorrow") return pickup >= tomorrow && pickup < addDays(tomorrow, 1);
-    if (view === "completed") return pickup < now;
+    if (view === "completed") return true;
     return pickup >= now;
   }
 
@@ -304,6 +305,7 @@
       .filter((row) => !isCancelled(row))
       .filter((row) => view === "completed" || !isCompleted(row))
       .flatMap(expandJobs)
+      .filter((job) => view === "completed" ? Hub().legCompleted(job.booking, job.leg) : !Hub().legCompleted(job.booking, job.leg))
       .filter((job) => inViewPickup(job.pickup, now))
       .sort((a, b) => {
         const diff = (a.pickup ? a.pickup.getTime() : 0) - (b.pickup ? b.pickup.getTime() : 0);
@@ -386,7 +388,8 @@
       '<p class="who"><strong>' + escapeHtml(viewModel.driverName) + "</strong> · " + escapeHtml(viewModel.registration) + "</p>" +
       '<p class="meta">' + escapeHtml(viewModel.category) + " · " + escapeHtml(viewModel.passengers) + " · " + escapeHtml(viewModel.luggage) +
       (viewModel.extraStops ? " · " + escapeHtml(viewModel.extraStops) : "") + "</p>" +
-      '<p class="state">' + escapeHtml(viewModel.allocation.label) + "</p>" +
+      '<p class="state">Status: ' + escapeHtml(viewModel.statusLabel || "") + "</p>" +
+      '<p class="meta">' + escapeHtml(viewModel.allocation.label) + "</p>" +
       badgeMarkup(viewModel.badges) +
       (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
       (viewModel.summary ? '<p class="summary">' + escapeHtml(viewModel.summary) + "</p>" : "") +
@@ -513,6 +516,76 @@
     editingId = null;
   }
 
+  function waitingMarkup(booking, job) {
+    const policy = window.SpiresCollection;
+    if (!policy) return "";
+    const leg = job && job.leg === "return" ? "return" : "outbound";
+    const prefix = leg === "return" ? "return" : "outbound";
+    const location = leg === "return" ? booking.returnCollectionLocation : booking.collectionLocation;
+    const assistance = leg === "return" ? booking.returnAssistanceNote : booking.assistanceNote;
+    const proposal = policy.proposeWaitingCharge({
+      waitingPolicyVersion: booking.waitingPolicyVersion,
+      collectionArrangement: leg === "return" ? booking.returnCollectionArrangement : booking.collectionArrangement,
+      collectionLocationKind: leg === "return" ? booking.returnCollectionLocationKind : booking.collectionLocationKind,
+      landingStatus: leg === "return" ? booking.returnLandingStatus : booking.landingStatus,
+      verifiedLandingAt: leg === "return" ? booking.returnVerifiedLandingAt : booking.verifiedLandingAt,
+      bookedCollectionAt: leg === "return" ? (booking.returnPickupTime || booking.returnDateTime) : (booking.pickupTime || booking.dateTime),
+      driverReadyAt: booking[prefix + "DriverReadyAt"],
+      passengerReadyAt: booking[prefix + "PassengerReadyAt"],
+    });
+    const hire = booking.timedHire ? policy.proposeTimedHireCharge({
+      startAt: booking.timedHire.startAt,
+      includedMinutes: booking.timedHire.includedMinutes,
+      extraRatePounds: booking.timedHire.extraRatePounds,
+      extraIntervalMinutes: booking.timedHire.extraIntervalMinutes,
+      driverArrivedAt: booking[prefix + "DriverReadyAt"],
+      completedAt: booking[prefix + "CompletedAt"],
+      delayCause: booking[prefix + "DelayCause"],
+      now: nowFn(),
+    }) : null;
+    const marks = [
+      [prefix + "DriverReadyAt", "Driver ready"],
+      [prefix + "PassengerReadyAt", "Passenger ready"],
+      [prefix + "PassengerOnboardAt", "Passenger onboard"],
+      [prefix + "DepartedAt", "Waiting ended"],
+    ];
+    return (location ? "<p>Collection point: " + escapeHtml(location) + "</p>" : "") +
+      (assistance ? "<p>Assistance requested, subject to confirmation: " + escapeHtml(assistance) + "</p>" : "") +
+      "<p>" + escapeHtml(proposal.preview) + "</p>" +
+      (hire ? "<p" + (hire.warning ? ' class="warning"' : "") + ">" + escapeHtml(hire.preview) + "</p>" : "") +
+      '<div class="actions">' + marks.map(function (row) {
+        return '<button type="button" class="btn" data-waiting="' + row[0] + '">' + row[1] + "</button>";
+      }).join("") + "</div>";
+  }
+
+  async function saveWaitingMark(booking, job, field) {
+    if (saving || !field) return;
+    saving = true;
+    const buttons = sheetCard.querySelectorAll("[data-waiting]");
+    buttons.forEach(function (button) { button.disabled = true; });
+    const err = document.getElementById("detail-error");
+    try {
+      const revision = Number(booking.revision || 0) + 1;
+      const when = new Date().toISOString();
+      if (!preview && db) {
+        await db.collection("bookings").doc(booking.id).update({
+          [field]: firebase.firestore.FieldValue.serverTimestamp(),
+          revision: revision,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      const next = Object.assign({}, booking, { revision: revision });
+      next[field] = when;
+      replaceBooking(next);
+      openDetail(Object.assign({}, job, { booking: next }));
+    } catch (error) {
+      setError(err, "Could not save this time. The trip is unchanged. Try again.");
+      buttons.forEach(function (button) { button.disabled = false; });
+    } finally {
+      saving = false;
+    }
+  }
+
   function openDetail(job) {
     const booking = job.booking;
     const viewModel = Hub().presentJob(job, lists(), nowFn());
@@ -536,8 +609,15 @@
       "<h2>" + escapeHtml(viewModel.time) + "</h2>" +
       "<p>" + escapeHtml(viewModel.date) + "</p>" +
       '<p class="next-remain' + (viewModel.overdue ? " is-overdue" : "") + '">' + escapeHtml(viewModel.remaining) + "</p>" +
-      '<p class="state">' + escapeHtml(viewModel.allocation.label) + "</p>" +
+      '<p class="state">Status: ' + escapeHtml(viewModel.statusLabel || "") + "</p>" +
+      '<p class="meta">' + escapeHtml(viewModel.allocation.label) + "</p>" +
       (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
+      (viewModel.canComplete
+        ? '<div class="actions"><button type="button" class="btn btn-primary" id="mark-complete">Mark as completed</button></div>'
+        : "") +
+      (viewModel.statusLabel === "Completed" && isOfficeUser()
+        ? '<div class="actions"><button type="button" class="btn" id="undo-complete">Undo completion</button></div>'
+        : "") +
       '<div class="actions">' +
       (navigate ? '<a class="btn btn-primary" href="' + navigate + '" target="_blank" rel="noreferrer">Navigate</a>' : "") +
       (call ? '<a class="btn" href="' + call + '">Call</a>' : "") +
@@ -557,7 +637,9 @@
       '<section class="detail-block"><h3>Customer</h3><p>' + escapeHtml(viewModel.customer) + "</p>" +
       (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</section>" +
       '<section class="detail-block"><h3>Collection and payment</h3>' + flight +
-      "<p>" + escapeHtml(viewModel.collect.text) + "</p></section>" +
+      "<p>" + escapeHtml(viewModel.collect.text) + "</p>" +
+      waitingMarkup(booking, job) +
+      "</section>" +
       '<section class="detail-block"><h3>Driver notes</h3>' +
       (viewModel.summary ? "<p>" + escapeHtml(viewModel.summary) + "</p>" : "") +
       notes + "</section>" +
@@ -570,6 +652,110 @@
     document.getElementById("close-detail").onclick = closeSheet;
     document.getElementById("edit-job").onclick = () => openForm(booking);
     document.getElementById("cancel-job").onclick = () => confirmCancel(booking, job);
+    const mark = document.getElementById("mark-complete");
+    if (mark) mark.onclick = () => confirmComplete(booking, job);
+    sheetCard.querySelectorAll("[data-waiting]").forEach(function (button) {
+      button.onclick = () => saveWaitingMark(booking, job, button.getAttribute("data-waiting"));
+    });
+    const undo = document.getElementById("undo-complete");
+    if (undo) undo.onclick = () => confirmUndo(booking, job);
+  }
+
+  function isOfficeUser() {
+    const email = auth && auth.currentUser && String(auth.currentUser.email || "").toLowerCase();
+    return email === "hashim@spires.com" || email === "spirestaxis24@gmail.com";
+  }
+
+  function replaceBooking(next) {
+    bookings = bookings.map(function (row) { return row.id === next.id ? next : row; });
+    renderList();
+  }
+
+  function confirmComplete(booking, job) {
+    const legName = job && job.leg === "return" ? "return" : (Hub().hasReturn(booking) ? "outbound" : "trip");
+    const returnNote = job && job.leg === "outbound" && Hub().hasReturn(booking) ? " The return stays open." : "";
+    sheetCard.innerHTML =
+      "<h2>Mark this " + legName + " as completed?</h2>" +
+      "<p>This saves the status only." + returnNote + " The fare, payment, route, driver and vehicle stay as they are.</p>" +
+      '<div class="actions">' +
+      '<button type="button" class="btn btn-primary" id="confirm-complete">Confirm completion</button>' +
+      '<button type="button" class="btn" id="keep-open">Keep it open</button>' +
+      "</div>" +
+      '<p id="detail-error" class="error" hidden></p>';
+    document.getElementById("keep-open").onclick = () => openDetail(job || Hub().expandJobs(booking)[0]);
+    document.getElementById("confirm-complete").onclick = () => saveLegStatus(booking, job, "complete");
+  }
+
+  function confirmUndo(booking, job) {
+    sheetCard.innerHTML =
+      "<h2>Undo this completion?</h2>" +
+      "<p>The trip goes back on the open list. The fare, payment, route, driver and vehicle stay as they are.</p>" +
+      '<div class="actions">' +
+      '<button type="button" class="btn btn-primary" id="confirm-undo">Undo completion</button>' +
+      '<button type="button" class="btn" id="keep-completed">Keep it completed</button>' +
+      "</div>" +
+      '<p id="detail-error" class="error" hidden></p>';
+    document.getElementById("keep-completed").onclick = () => openDetail(job || Hub().expandJobs(booking)[0]);
+    document.getElementById("confirm-undo").onclick = () => saveLegStatus(booking, job, "undo");
+  }
+
+  async function saveLegStatus(booking, job, action) {
+    if (saving) return;
+    const leg = job && job.leg === "return" ? "return" : "outbound";
+    const actor = auth && auth.currentUser && auth.currentUser.uid;
+    const decision = action === "undo"
+      ? Hub().reopenUpdate(booking, leg, actor)
+      : Hub().completionUpdate(booking, leg, actor);
+    const err = document.getElementById("detail-error");
+    const button = document.getElementById(action === "undo" ? "confirm-undo" : "confirm-complete");
+    if (!decision.ok) {
+      setError(err, decision.error);
+      return;
+    }
+    saving = true;
+    if (button) button.disabled = true;
+    try {
+      if (!preview && db) {
+        const payload = Object.assign({}, decision.update, {
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        if (decision.completedAtField) {
+          payload[decision.completedAtField] = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        if (action === "undo") {
+          payload[leg + "CompletionUndoneAt"] = firebase.firestore.FieldValue.serverTimestamp();
+          const auditId = "undo-" + leg + "-" + decision.update.revision;
+          const batch = db.batch();
+          batch.update(db.collection("bookings").doc(booking.id), payload);
+          batch.set(db.collection("bookings").doc(booking.id).collection("audit").doc(auditId), {
+            action: "leg_completion_undone",
+            leg: leg,
+            actorUid: actor || "",
+            actorEmail: auth.currentUser && auth.currentUser.email || "",
+            at: firebase.firestore.FieldValue.serverTimestamp(),
+            previousStatus: decision.previousStatus,
+            nextStatus: decision.nextStatus,
+          });
+          await batch.commit();
+        } else {
+          await db.collection("bookings").doc(booking.id).update(payload);
+        }
+      }
+      replaceBooking(Hub().applyStatusUpdate(booking, decision.update));
+      setError(errorEl, "");
+      statusEl.textContent = action === "undo" ? "Completion undone." : "Marked as completed.";
+      show(statusEl, true);
+      closeSheet();
+    } catch (error) {
+      replaceBooking(booking);
+      const conflict = /revision|another session|failed-precondition/i.test(String(error && error.message || ""));
+      setError(err, conflict
+        ? "The office saved this trip first. The status on this screen is unchanged. Reload and try again."
+        : "Could not save the status. This trip is still " + (decision.previousLabel || "unchanged") + ". Try again.");
+      if (button) button.disabled = false;
+    } finally {
+      saving = false;
+    }
   }
 
   function confirmCancel(booking, job) {
@@ -851,7 +1037,9 @@
     setError(pinError, "");
     pinSubmit.disabled = true;
     try {
-      const result = await unlock({
+      const signIn = document.getElementById("access-kind").value === "driver"
+        ? firebase.app().functions("us-central1").httpsCallable("unlockDriverJobs") : unlock;
+      const result = await signIn({
         pin: pinInput.value,
         userAgent: navigator.userAgent,
       });
@@ -917,11 +1105,18 @@
     bootPreview();
   } else auth.onAuthStateChanged(async (user) => {
     if (!user) {
+      if (window.SpiresPrivateDriver) window.SpiresPrivateDriver.stop();
       if (unsub) unsub();
       showApp(false);
       return;
     }
     try {
+      const accessToken = await user.getIdTokenResult();
+      if (accessToken.claims.driverJobs === true) {
+        showApp(true);
+        window.SpiresPrivateDriver.start(auth, firebase.app().functions("us-central1"));
+        return;
+      }
       const ok = await deviceStillValid(user);
       if (!ok) {
         await auth.signOut();

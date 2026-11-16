@@ -97,6 +97,7 @@
                 <ul class="site-nav__links">
                   <li><a href="/oxford-taxis" data-nav="oxford"><span class="site-nav__name">Oxford taxis</span><span class="site-nav__hint">Journeys in the city</span></a></li>
                   <li><a href="/rates" data-nav="rates"><span class="site-nav__name">Rates</span><span class="site-nav__hint">Published airport prices</span></a></li>
+                  <li><a href="/executive-travel" data-nav="executive"><span class="site-nav__name">Executive travel</span><span class="site-nav__hint">Heathrow and Cotswolds</span></a></li>
                   <li><a href="/business-accounts" data-nav="business"><span class="site-nav__name">Business accounts</span><span class="site-nav__hint">Invoices for regular travel</span></a></li>
                   <li><a href="/share" data-nav="share"><span class="site-nav__name">Spires Share</span><span class="site-nav__hint">Share a journey and split the cost</span></a></li>
                 </ul>
@@ -159,7 +160,6 @@
                     <p class="site-nav__group">Motorsport</p>
                     <ul class="site-nav__links">
                       <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone"><span class="site-nav__name">Silverstone</span></a></li>
-                      <li><a href="/oxford-to-silverstone-grand-prix-taxi" data-nav="silverstone-gp"><span class="site-nav__name">Grand Prix 2027</span></a></li>
                     </ul>
                     <p class="site-nav__group">Horse racing</p>
                     <ul class="site-nav__links">
@@ -239,6 +239,7 @@
         <ul>
           <li><a href="/oxford-taxis" data-nav="oxford">Oxford taxis</a></li>
           <li><a href="/rates" data-nav="rates">Rates</a></li>
+          <li><a href="/executive-travel" data-nav="executive">Executive travel</a></li>
           <li><a href="/business-accounts" data-nav="business">Business accounts</a></li>
           <li><a href="/share" data-nav="share">Spires Share</a></li>
         </ul>
@@ -274,7 +275,6 @@
           <li><a href="/oxford-to-twickenham-taxi" data-nav="twickenham">Twickenham Rugby</a></li>
           <li class="site-menu__label">Motorsport</li>
           <li><a href="/oxford-to-silverstone-taxi" data-nav="silverstone">Silverstone</a></li>
-          <li><a href="/oxford-to-silverstone-grand-prix-taxi" data-nav="silverstone-gp">Grand Prix 2027</a></li>
           <li class="site-menu__label">Horse racing</li>
           <li><a href="/oxford-to-cheltenham-racecourse" data-nav="cheltenham-races">Cheltenham</a></li>
           <li><a href="/oxford-to-ascot-racecourse" data-nav="ascot">Ascot</a></li>
@@ -951,93 +951,7 @@
 </a>
 <script src="/js/airport-prices.js" defer></script>
 <script src="/js/share-teaser.js" defer></script>
-<script src="/js/event-quote.js" defer></script>
 <script src="/js/main.js" defer></script>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  var form = document.getElementById("event-quote-form");
-  var selected = document.getElementById("gp-selected");
-  var packageField = document.getElementById("gp-package");
-  var totalField = document.getElementById("gp-total");
-  if (!form) return;
-
-  function vehicleLabel(value) {
-    return value === "8_seater" ? "8 Seater" : "Standard Car";
-  }
-
-  function track(name, params) {
-    if (typeof gtag === "function") gtag("event", name, params || {});
-  }
-
-  function choose(button) {
-    var name = button.getAttribute("data-gp-package");
-    var vehicle = button.getAttribute("data-gp-vehicle");
-    var total = button.getAttribute("data-gp-total");
-    var extra = button.getAttribute("data-gp-note") || "";
-    packageField.value = name;
-    totalField.value = total;
-    document.getElementById("gp-note").value = extra;
-    var radio = form.querySelector("input[name='vehicleType'][value='" + vehicle + "']");
-    if (radio) {
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change"));
-    }
-    selected.textContent = (extra ? extra + ". " : "") + name + ". " + vehicleLabel(vehicle) + ". Three day package, 2 to 4 July 2027. Starting price " + total + " for central Oxford.";
-    track("gp_package_select", { package_name: name, vehicle_type: vehicle, value_label: total });
-    var quote = document.getElementById("quote");
-    if (quote) quote.scrollIntoView({ block: "start" });
-    var pickup = document.getElementById("eq-pickup");
-    if (pickup) pickup.focus();
-  }
-
-  Array.prototype.forEach.call(document.querySelectorAll("[data-gp-package]"), function (button) {
-    button.addEventListener("click", function () { choose(button); });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll("[data-gp-cta]"), function (link) {
-    link.addEventListener("click", function () {
-      track("gp_cta_click", { cta: link.getAttribute("data-gp-cta") });
-    });
-  });
-  var whatsapp = document.querySelector(".whatsapp-float");
-  if (whatsapp) whatsapp.addEventListener("click", function () { track("gp_whatsapp_click"); });
-
-  var detail = document.getElementById("gp-corner-detail");
-  Array.prototype.forEach.call(document.querySelectorAll("[data-corner]"), function (button) {
-    button.addEventListener("click", function () {
-      Array.prototype.forEach.call(document.querySelectorAll("[data-corner]"), function (other) {
-        other.setAttribute("aria-pressed", other === button ? "true" : "false");
-      });
-      if (detail) detail.textContent = button.getAttribute("data-corner") + ". " + button.getAttribute("data-note");
-    });
-  });
-
-  form.addEventListener("submit", function () {
-    var message = form.querySelector("[name='message']");
-    var other = form.querySelector("[name='otherTimes']");
-    var flight = form.querySelector("[name='flightDetails']");
-    var thursday = form.querySelector("[name='thursdayConcert']");
-    var chosen = form.querySelector("input[name='vehicleType']:checked");
-    var note = [
-      "Silverstone Grand Prix 2027",
-      document.getElementById("gp-note").value,
-      packageField.value || "Package to be confirmed",
-      vehicleLabel(chosen ? chosen.value : ""),
-      "Three day package, 2 to 4 July 2027",
-      totalField.value ? "Starting price " + totalField.value : "",
-      other && other.value.trim() ? "Preferred daily times: " + other.value.trim() : "",
-      flight && flight.value.trim() ? "Travel details: " + flight.value.trim() : "",
-      thursday && thursday.checked ? "Also quote a separate Thursday 1 July concert transfer" : ""
-    ].filter(Boolean).join(". ");
-    if (message && message.value.indexOf("Silverstone Grand Prix 2027") !== 0) {
-      message.value = note + (message.value.trim() ? "\n" + message.value.trim() : "");
-    }
-    track("gp_quote_request", {
-      package_name: packageField.value || "unselected",
-      vehicle_type: chosen ? chosen.value : ""
-    });
-  }, true);
-});
-</script>
 <script src="/js/lang-switcher.js" defer></script>
 <!-- /SITE-FOOTER -->
 </body>

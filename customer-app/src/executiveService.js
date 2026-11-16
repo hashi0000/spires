@@ -39,8 +39,9 @@ function textOf(journey) {
 
 export function classifyExecutiveJourney(journey) {
   const text = textOf(journey || {});
+  if (journey?.journeyType === "cotswolds" && !HEATHROW.test(text) && !OTHER_AIRPORT.test(text)) return { ok: true, fareStatus: "quote_required", proposed: null };
   if (!HEATHROW.test(text)) {
-    return { ok: false, error: "Executive Car is only available for Heathrow transfers." };
+    return { ok: false, error: "Executive Car is available for Heathrow transfers and Cotswolds private trips. Choose the Cotswolds journey type for timed hire." };
   }
   if (OTHER_AIRPORT.test(text)) {
     return { ok: true, fareStatus: "quote_required", proposed: null };

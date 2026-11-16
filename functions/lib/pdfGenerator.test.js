@@ -6,19 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const strict_1 = __importDefault(require("node:assert/strict"));
 const node_test_1 = require("node:test");
 const pdfGenerator_1 = require("./pdfGenerator");
-function decodePdfHex(hex) {
-    let out = "";
-    for (let i = 0; i + 1 < hex.length; i += 2) {
-        out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-    }
-    return out;
-}
-function pdfText(buf) {
-    const raw = buf.toString("latin1");
-    const fromHex = [...raw.matchAll(/<([0-9A-Fa-f]+)>/g)].map((m) => decodePdfHex(m[1]));
-    const fromParen = [...raw.matchAll(/\(([^\\)]*(?:\\.[^\\)]*)*)\)/g)].map((m) => m[1].replace(/\\n/g, "\n").replace(/\\(.)/g, "$1"));
-    return fromHex.concat(fromParen).join("");
-}
+const testPdfText_1 = require("./testPdfText");
 const sample = {
     bookingNumber: "CUSTPMWWJ5",
     hirerName: "Kerry Wald",
@@ -47,7 +35,7 @@ const sample = {
     (0, node_test_1.it)("uses the branded confirmation layout instead of a plain text dump", async () => {
         const buf = await (0, pdfGenerator_1.generateBookingPDF)(sample, "confirmation");
         strict_1.default.ok(buf.length > 1500);
-        const text = pdfText(buf);
+        const text = (0, testPdfText_1.pdfText)(buf);
         strict_1.default.match(text, /SPIRES TAXIS/);
         strict_1.default.match(text, /BOOKING CONFIRMATION/);
         strict_1.default.match(text, /Your Oxford Journey Starts Here/);
@@ -68,7 +56,7 @@ const sample = {
     });
     (0, node_test_1.it)("does not show the waiting policy for an Oxford to Heathrow drop off", async () => {
         const buf = await (0, pdfGenerator_1.generateBookingPDF)({ ...sample, airportCollection: false, destination: "Heathrow T5" }, "confirmation");
-        const text = pdfText(buf);
+        const text = (0, testPdfText_1.pdfText)(buf);
         strict_1.default.doesNotMatch(text, /actual landing time/);
         strict_1.default.match(text, /Standard airport charge included/);
     });
@@ -80,7 +68,7 @@ const sample = {
             airportCollection: true,
             flightNumber: "BA249",
         }, "confirmation");
-        const text = pdfText(buf);
+        const text = (0, testPdfText_1.pdfText)(buf);
         strict_1.default.match(text, /Airport Collection/);
         strict_1.default.match(text, /actual landing time/);
         strict_1.default.match(text, /BA249/);
@@ -91,7 +79,7 @@ const sample = {
             dateTime: "2026-11-09T12:13:00.000Z",
             pickupTime: "2026-11-10T18:30:00.000Z",
         }, "payment_receipt");
-        const text = pdfText(buf);
+        const text = (0, testPdfText_1.pdfText)(buf);
         strict_1.default.match(text, /18:30/);
         strict_1.default.match(text, /10\/11\/2026/);
         strict_1.default.doesNotMatch(text, /12:13/);
@@ -114,7 +102,7 @@ const sample = {
                 { type: "dropoff", address: "HB Allen Centre Oxford" },
             ],
         }, "confirmation");
-        const text = pdfText(buf);
+        const text = (0, testPdfText_1.pdfText)(buf);
         strict_1.default.match(text, /Headington Oxford/);
         strict_1.default.match(text, /Summertown Oxford/);
         strict_1.default.match(text, /Extra stops. Agree the fare/);

@@ -33,10 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.internationalPreview = exports.guestClaimPreview = exports.claimGuestBooking = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.scheduledFamilyJobPush = exports.onFamilyJobPush = exports.saveFamilyPushSubscription = exports.familyPushPublicKey = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
-exports.reviewWelcomeEmail = exports.refreshAdvertisingSpend = exports.scheduledAdvertisingSpend = exports.withdrawAccountMeasurement = exports.revokeMeasurementConsent = exports.recordBookingSource = exports.recordCustomerAcquisition = exports.readAdvertisingSpend = exports.deliverBookingMeasurements = exports.queueBookingMeasurement = exports.scheduledJourneyStats = exports.publicJourneyMap = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = void 0;
+exports.spiresShareExpressInterest = exports.spiresShareCustomerAction = exports.spiresShareGetPaymentLink = exports.spiresShareGetMyBookings = exports.spiresShareGetMyBooking = exports.spiresShareProposeOrJoin = exports.spiresShareListDepartures = exports.spiresShareSearch = exports.spiresShareSaveConfig = exports.spiresShareGetState = exports.spiresShareSession = exports.internationalPreview = exports.guestClaimPreview = exports.claimGuestBooking = exports.submitBusinessAccountEnquiry = exports.acceptTermsPublic = exports.createTermsAcceptanceLink = exports.recordStaffTermsAcceptance = exports.createCustomerBooking = exports.processEmailJob = exports.submitWebsiteQuote = exports.quotePublic = exports.recordFlightVerification = exports.recordAdditionalCharge = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.sendGeneralInvoiceEmail = exports.saveSchoolInvoiceVault = exports.getSchoolInvoiceVault = exports.sendBookingPdfToCustomer = exports.scheduledFamilyJobPush = exports.onFamilyJobPush = exports.saveFamilyPushSubscription = exports.familyPushPublicKey = exports.unlockFamilyJobs = exports.sendDriverReminderManual = exports.stripeWebhook = exports.confirmPayment = exports.createPaymentIntent = exports.scheduledBookingReminderEmails = exports.onCustomerCreate = exports.onBookingWrite = void 0;
+exports.driverTripAction = exports.listDriverTrips = exports.unlockDriverJobs = exports.manageDriverAccess = exports.reviewWelcomeEmail = exports.refreshAdvertisingSpend = exports.scheduledAdvertisingSpend = exports.withdrawAccountMeasurement = exports.revokeMeasurementConsent = exports.recordBookingSource = exports.recordCustomerAcquisition = exports.readAdvertisingSpend = exports.deliverBookingMeasurements = exports.queueBookingMeasurement = exports.scheduledJourneyStats = exports.publicJourneyMap = exports.publicJourneyStats = exports.refreshJourneyStats = exports.getJourneyStats = exports.searchLocations = exports.scheduledSpiresShareTick = exports.spiresShareRunTick = exports.spiresSharePublicList = exports.spiresSharePublicAccess = exports.spiresShareAdminAction = exports.spiresShareAcceptWaitlist = exports.spiresSharePreviewInterest = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const admin = __importStar(require("firebase-admin"));
+const driverTrips_1 = require("./driverTrips");
 const firestore_1 = require("firebase-admin/firestore");
 const sendBookingReceipt_1 = require("./sendBookingReceipt");
 const sendWelcomeEmail_1 = require("./sendWelcomeEmail");
@@ -56,6 +57,8 @@ Object.defineProperty(exports, "acceptQuote", { enumerable: true, get: function 
 Object.defineProperty(exports, "retryEmailJob", { enumerable: true, get: function () { return callables_1.retryEmailJob; } });
 Object.defineProperty(exports, "listBookingEmails", { enumerable: true, get: function () { return callables_1.listBookingEmails; } });
 Object.defineProperty(exports, "resendQuoteEmail", { enumerable: true, get: function () { return callables_1.resendQuoteEmail; } });
+Object.defineProperty(exports, "recordAdditionalCharge", { enumerable: true, get: function () { return callables_1.recordAdditionalCharge; } });
+Object.defineProperty(exports, "recordFlightVerification", { enumerable: true, get: function () { return callables_1.recordFlightVerification; } });
 Object.defineProperty(exports, "quotePublic", { enumerable: true, get: function () { return callables_1.quotePublic; } });
 Object.defineProperty(exports, "submitWebsiteQuote", { enumerable: true, get: function () { return callables_1.submitWebsiteQuote; } });
 Object.defineProperty(exports, "processEmailJob", { enumerable: true, get: function () { return callables_1.processEmailJob; } });
@@ -85,6 +88,7 @@ exports.onBookingWrite = functions.firestore
     const bookingId = context.params.bookingId;
     if (!after)
         return;
+    await (0, driverTrips_1.touchDriverJobVersions)(before || null, after);
     if (!before) {
         await (0, callables_1.stampPromotionOnCreate)(change.after);
         const freshSnap = await change.after.ref.get();
@@ -106,6 +110,7 @@ exports.onBookingWrite = functions.firestore
     }
     if (before &&
         before.paymentStatus !== "paid" &&
+        after.lastPaymentSource !== "driver_hub" &&
         after.paymentStatus === "paid" &&
         !after.paymentReceiptEmailSentAt &&
         (after.hirerEmail || after.email) &&
@@ -206,3 +211,9 @@ Object.defineProperty(exports, "scheduledAdvertisingSpend", { enumerable: true, 
 Object.defineProperty(exports, "refreshAdvertisingSpend", { enumerable: true, get: function () { return googleAdsSync_1.refreshAdvertisingSpend; } });
 var welcomeReview_1 = require("./offers/welcomeReview");
 Object.defineProperty(exports, "reviewWelcomeEmail", { enumerable: true, get: function () { return welcomeReview_1.reviewWelcomeEmail; } });
+var driverAccess_1 = require("./driverAccess");
+Object.defineProperty(exports, "manageDriverAccess", { enumerable: true, get: function () { return driverAccess_1.manageDriverAccess; } });
+Object.defineProperty(exports, "unlockDriverJobs", { enumerable: true, get: function () { return driverAccess_1.unlockDriverJobs; } });
+var driverTrips_2 = require("./driverTrips");
+Object.defineProperty(exports, "listDriverTrips", { enumerable: true, get: function () { return driverTrips_2.listDriverTrips; } });
+Object.defineProperty(exports, "driverTripAction", { enumerable: true, get: function () { return driverTrips_2.driverTripAction; } });

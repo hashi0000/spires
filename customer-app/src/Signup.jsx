@@ -145,7 +145,9 @@ export default function Signup() {
       }
       
       const from = location.state?.from;
-      navigate(typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard");
+      const vehicle = new URLSearchParams(location.search || "").get("vehicle");
+      const destination = typeof from === "string" && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard";
+      navigate(vehicle && !destination.includes("vehicle=") ? `${destination.split("?")[0]}${location.search || ""}` : destination);
     } catch (err) {
       setError(readableAuthError(err));
     }

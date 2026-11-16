@@ -3,6 +3,8 @@ import { customerSubmission } from "../bookings/submission";
 import { measurementWithdrawn } from "../marketing/consent";
 import { createHash, randomBytes } from "crypto";
 import * as admin from "firebase-admin";
+import { cotswoldsRequest } from "../cotswoldsPolicy";
+import { collectionTerms } from "../bookings/guestRequest";
 import * as functions from "firebase-functions/v1";
 import { escapeHtml } from "../driverReminderEmail";
 import { sendHtmlEmail } from "../quotes/emails";
@@ -98,6 +100,7 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     ? assessExecutiveBooking({
         passengers: Number(data?.passengers),
         bookingType,
+        journeyType: str(data?.journeyType),
         pickup: ends.pickup,
         destination: ends.destination,
         stops,
@@ -116,6 +119,10 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
   const { bookingId, fingerprint } = submission;
   const ref = bookingId ? db().collection("bookings").doc(bookingId) : db().collection("bookings").doc();
   const email = str(context.auth.token.email);
+  const hire = cotswoldsRequest(data || {}, dateTime, vehicleType, Date.now());
+  if (!hire.ok) throw httpsError("invalid-argument", hire.error);
+  const collection = collectionTerms(data || {}, data?.airportCollection === true, bookingType === 'return' && data?.returnAirportCollection === true, Date.now());
+  if (!collection.ok) throw httpsError("invalid-argument", collection.error);
   const record = {
     uid: context.auth.uid,
     submissionFingerprint: fingerprint,
@@ -164,6 +171,8 @@ export const createCustomerBooking = functions.https.onCall(async (data, context
     adminStatus: "pending",
     revision: 1,
     ...(executive && executive.ok ? executive.fields : {}),
+    ...hire.fields,
+    ...collection.fields,
     termsAccepted: true,
     termsVersion: decision.version,
     termsAcceptedAt: admin.firestore.FieldValue.serverTimestamp(),

@@ -1,8 +1,12 @@
 export function agreedFarePence(booking: Record<string, unknown>): number {
+  const extras = Array.isArray(booking.additionalCharges)
+    ? (booking.additionalCharges as Array<{ amountPence?: number }>).reduce((sum, row) => sum + Math.max(0, Math.round(Number(row && row.amountPence) || 0)), 0)
+    : 0;
   const quote = booking.issuedQuote && typeof booking.issuedQuote === "object" ? booking.issuedQuote as Record<string, unknown> : null;
-  if (quote && Number.isFinite(Number(quote.finalFarePence))) return Math.max(0, Math.round(Number(quote.finalFarePence)));
-  const fare = Number(booking.actualFare);
-  return Number.isFinite(fare) ? Math.max(0, Math.round(fare * 100)) : 0;
+  const base = quote && Number.isFinite(Number(quote.finalFarePence))
+    ? Math.max(0, Math.round(Number(quote.finalFarePence)))
+    : (Number.isFinite(Number(booking.actualFare)) ? Math.max(0, Math.round(Number(booking.actualFare) * 100)) : 0);
+  return base + extras;
 }
 
 export type Payable =

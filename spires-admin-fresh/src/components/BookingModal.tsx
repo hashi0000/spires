@@ -2,6 +2,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Minus, Calculator, Receipt, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
+import CotswoldsFields from './CotswoldsFields';
+import JourneyAssistance from './JourneyAssistance';
+import CollectionChoices from './CollectionChoices';
+import { CURRENT_WAITING_VERSION, airportWaitingTextForBooking } from '../utils/airportWaitingPolicy';
+import servicePolicy from '../data/servicePolicy.json';
+import { bookingMoney } from '../utils/bookingMoney';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
@@ -10,7 +16,7 @@ import {
   calculateAirportWaitingCharge,
 } from '../utils/airportWaitingPolicy';
 import { effectiveWorkflowStatus } from '../utils/bookingWorkflow';
-import { applyRequestedLegStatus, hasTimedReturn, proposedLegacyReturnCorrection } from '../utils/journeyLegs';
+import { applyRequestedLegStatus, hasTimedReturn, proposedLegacyReturnCorrection, reopenCompletedLeg } from '../utils/journeyLegs';
 import { airportCollectionNotes, vehicleClassRequiredMessage } from '../utils/bookingOps';
 import { paymentSummary } from '../utils/farePayment';
 import { getExpiryStatus } from '../utils/driverExpiry';
@@ -23,7 +29,7 @@ import {
   resolveBookingType,
   splitLocalDateTime,
 } from '../utils/bookingJourney';
-import { db, functions } from '../utils/firebase';
+import { auth, db, functions } from '../utils/firebase';
 import { getCallableErrorMessage } from '../utils/callableErrorMessage';
 import { httpsCallable } from 'firebase/functions';
 import { collection, doc, setDoc, runTransaction, serverTimestamp, deleteField } from 'firebase/firestore';
@@ -64,8 +70,8 @@ const AirportWaitingAdminNote: React.FC = () => {
       {airportWaitingWebsiteBody().split('\n\n').map((para) => (
         <p key={para.slice(0, 48)} className="mb-2">{para}</p>
       ))}
-      <p className="mt-2">The standard airport pickup charge is included in the fare. Extra waiting is recorded manually. Do not change a confirmed fare automatically.</p>
-      <label className="mt-3 block text-sm font-medium text-gray-700">Minutes after actual landing</label>
+      <p className="mt-2">The standard airport pickup charge is included in the fare. Record extra waiting as a separate charge. Do not mark it paid and do not take a card payment from this screen.</p>
+      <label className="mt-3 block text-sm font-medium text-gray-700">New bookings: minutes after the included allowance</label>
       <div className="mt-1 flex items-center gap-3">
         <input
           type="number"
@@ -73,10 +79,10 @@ const AirportWaitingAdminNote: React.FC = () => {
           value={minutes}
           onChange={(e) => setMinutes(e.target.value)}
           className="form-input w-32"
-          placeholder="e.g. 55"
+          placeholder="e.g. 16"
         />
         {charge != null && (
-          <span>Waiting charge: £{charge.toFixed(0)}</span>
+          <span>Older 50 minute bookings: £{charge.toFixed(0)}. New bookings: £{parsed <= 0 ? 0 : Math.ceil(parsed / 15) * 5}.</span>
         )}
       </div>
     </div>
@@ -127,6 +133,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }));
   };
   const [formError, setFormError] = useState('');
+  const [undoBusy, setUndoBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<ExtendedBooking>({
@@ -222,6 +229,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
             : '',
         depositStatus: editingBooking.depositStatus || (editingBooking.depositRequired ? 'pending' : 'not_required'),
         bookingType: resolveBookingType(editingBooking),
+        journeyType: editingBooking.journeyType || 'transfer',
+        hireHours: editingBooking.timedHire?.includedMinutes ? String(editingBooking.timedHire.includedMinutes / 60) : editingBooking.hireHours || '6',
+        hireItinerary: editingBooking.timedHire?.itinerary || editingBooking.hireItinerary || '',
+        timedHire: editingBooking.timedHire,
         airportCollection: editingBooking.airportCollection === true,
         airportDropOff: (editingBooking as { airportDropOff?: boolean }).airportDropOff === true,
         flightNumber: editingBooking.flightNumber || '',
@@ -473,6 +484,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
     const bookingData: any = {
       ...formData,
+      ...(formData.journeyType === 'cotswolds' ? { timedHire: {
+        policyVersion: servicePolicy.version,
+        startAt: pickupIso,
+        includedMinutes: Number(formData.hireHours || 6) * 60,
+        itinerary: formData.hireItinerary || '',
+        extraRatePounds: formData.timedHire?.extraRatePounds ?? servicePolicy.cotswolds.extraRatePounds,
+        extraIntervalMinutes: formData.timedHire?.extraIntervalMinutes ?? servicePolicy.cotswolds.extraIntervalMinutes,
+        ...(formData.timedHire?.acceptedAt ? { acceptedAt: formData.timedHire.acceptedAt } : {}),
+      } } : {}),
       actualFare:
         typeof formData.actualFare === 'string'
           ? (formData.actualFare.trim() ? parseFloat(formData.actualFare) : undefined)
@@ -499,7 +519,16 @@ const BookingModal: React.FC<BookingModalProps> = ({
       bookingNumber: newBookingNumber,
       bookingType: isReturn ? 'return' : 'one_way',
       returnTrip: isReturn,
+      waitingPolicyVersion: editingBooking ? (formData.waitingPolicyVersion || editingBooking.waitingPolicyVersion || "") : ((formData.airportCollection || formData.returnAirportCollection) ? CURRENT_WAITING_VERSION : ""),
       airportCollection: formData.airportCollection === true,
+      collectionArrangement: formData.collectionLocationKind === 'hotel' ? 'fixed_time' : formData.collectionArrangement || 'flight_monitored',
+      collectionLocationKind: formData.collectionLocationKind || 'terminal',
+      collectionLocation: formData.collectionLocation || formData.pickupLocation,
+      arrivalDate: formData.arrivalDate || String(pickupIso).slice(0,10),
+      returnCollectionArrangement: formData.returnCollectionLocationKind === 'hotel' ? 'fixed_time' : formData.returnCollectionArrangement || 'flight_monitored',
+      returnCollectionLocationKind: formData.returnCollectionLocationKind || 'terminal',
+      returnCollectionLocation: formData.returnCollectionLocation || formData.returnPickupLocation || '',
+      returnArrivalDate: formData.returnArrivalDate || String(formData.returnPickupTime || '').slice(0,10),
       flightNumber: formData.airportCollection === true ? String(formData.flightNumber || '').trim() : '',
       returnPickupTime: isReturn && !formData.openReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : (isReturn && formData.returnPickupTime ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : ''),
       returnDate: isReturn ? (String(formData.returnDate || '').slice(0, 10) || String(formData.returnPickupTime || '').slice(0, 10)) : '',
@@ -798,6 +827,54 @@ const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
+  const undoLeg = async (leg: 'outbound' | 'return') => {
+    if (!editingBooking?.id || undoBusy) return;
+    const decision = reopenCompletedLeg(editingBooking, leg);
+    if (!decision.ok) {
+      window.alert(decision.error);
+      return;
+    }
+    const legName = leg === 'return' ? 'return' : 'outbound';
+    if (!window.confirm(`Undo the ${legName} completion? The fare, payment, route, driver and vehicle stay as they are.`)) return;
+    setUndoBusy(true);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const ref = doc(db, 'bookings', editingBooking.id);
+        const latest = await transaction.get(ref);
+        if (!latest.exists()) throw new Error('This booking no longer exists.');
+        const current = latest.data() || {};
+        const expected = Number((editingBooking as { revision?: number }).revision || 0);
+        const stored = Number(current.revision || 0);
+        if (stored !== expected) {
+          throw new Error('The office saved this trip first. The status on this screen is unchanged. Reload and try again.');
+        }
+        const actor = auth.currentUser;
+        transaction.update(ref, {
+          ...decision.patch,
+          revision: stored + 1,
+          updatedAt: serverTimestamp(),
+          [`${leg}CompletionUndoneAt`]: serverTimestamp(),
+          [`${leg}CompletionUndoneByUid`]: actor?.uid || '',
+        });
+        transaction.set(doc(db, 'bookings', editingBooking.id, 'audit', `undo-${leg}-${stored + 1}`), {
+          action: 'leg_completion_undone',
+          leg,
+          actorUid: actor?.uid || '',
+          actorEmail: actor?.email || '',
+          at: serverTimestamp(),
+          previousStatus: decision.previousStatus,
+          nextStatus: decision.nextStatus,
+        });
+      });
+      window.alert('Completion undone.');
+      onSubmit?.({ ...editingBooking, ...decision.patch, id: editingBooking.id });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not undo the completion. The status is unchanged. Try again.');
+    } finally {
+      setUndoBusy(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const requestClose = () => {
@@ -808,7 +885,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const showSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ block: 'start' });
   };
-  const money = paymentSummary(Number(formData.actualFare) || 0, Number((editingBooking as { amountReceivedPence?: number } | null)?.amountReceivedPence) || 0, editingBooking?.paymentStatus);
+  const money = paymentSummary(bookingMoney({ ...editingBooking, ...formData }).totalPence / 100, Number((editingBooking as { amountReceivedPence?: number } | null)?.amountReceivedPence) || 0, editingBooking?.paymentStatus);
   const airportNotes = airportCollectionNotes({
     airportCollection: Boolean(formData.airportCollection),
     returnAirportCollection: Boolean(formData.returnAirportCollection),
@@ -869,6 +946,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
           <div className="modal-body">
             <div className="mb-6 p-4 rounded-lg border-2 border-blue-800 bg-blue-50">
               <label className="block text-sm font-semibold text-blue-900 mb-1">Booking type *</label>
+              <JourneyAssistance formData={formData} setFormData={setFormData} />
+            <CotswoldsFields value={formData} vehicleType={formData.vehicleType} onChange={change => setFormData(previous => ({ ...previous, ...change }))} />
               <select
                 value={formData.bookingType === 'return' ? 'return' : 'one_way'}
                 onChange={(e) => {
@@ -1125,7 +1204,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       <option value="dropoff">Airport drop off</option>
                       <option value="collection">Airport collection</option>
                     </select>
-                    {formData.airportCollection && (
+                    {formData.airportCollection && <div className="mb-4">{editingBooking && !formData.waitingPolicyVersion ? <p>{airportWaitingTextForBooking(editingBooking)} Existing agreed terms are retained.</p> : <CollectionChoices formData={formData} setFormData={setFormData} />}</div>}
+                  {formData.airportCollection && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
@@ -1228,7 +1308,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         <option value="none">Airport drop off or no flight</option>
                         <option value="collection">Airport collection</option>
                       </select>
-                      {formData.returnAirportCollection && (
+                      {formData.returnAirportCollection && <div className="mb-4">{editingBooking && !formData.waitingPolicyVersion ? <p>Existing return waiting terms are retained.</p> : <CollectionChoices formData={formData} setFormData={setFormData} prefix="return" />}</div>}
+                  {formData.returnAirportCollection && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
@@ -1335,6 +1416,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
+                {editingBooking?.id && editingBooking.outboundStatus === 'completed' ? (
+                  <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('outbound')}>Undo outbound completion</button>
+                ) : null}
+                {editingBooking?.id && editingBooking.returnStatus === 'completed' ? (
+                  <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('return')}>Undo return completion</button>
+                ) : null}
                 <p className="text-sm text-gray-600 mt-1">Confirmed records that the customer accepted, including by phone.</p>
               </div>
               <div>

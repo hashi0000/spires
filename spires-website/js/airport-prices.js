@@ -91,14 +91,14 @@
       outsideOxfordNote: "Travelling from outside Oxford? Oxford fares apply to Oxford. Abingdon, Didcot, Bicester and Witney each have their own published airport fares. An individual quote is needed when there is no published fare, for nearby villages outside that coverage, or for extra requirements.",
     },
     waitingPolicy: {
-      freeMinutesAfterActualLanding: 50,
-      chargeBlockMinutes: 30,
-      chargePerBlock: 10,
+      freeMinutesAfterActualLanding: 60,
+      chargeBlockMinutes: 15,
+      chargePerBlock: 5,
     },
     includes: [
       "Airport charges included",
-      "Flight monitoring included for airport collections",
-      "50 minutes waiting from actual landing included for airport collections",
+      "Flight monitoring included when flight monitored collection is selected",
+      "60 minutes from actual landing for flight monitored collection; 15 minutes from booked time for fixed collection",
     ],
     routes: {
       heathrow: {
@@ -602,8 +602,9 @@
 
   function classifyExecutiveJourney(journey) {
     var text = executiveJourneyText(journey || {});
+    if (journey && journey.journeyType === "cotswolds" && !HEATHROW.test(text) && !OTHER_AIRPORT.test(text)) return { ok: true, airport: "cotswolds", area: null, fareStatus: "quote_required", oneWay: null, returnFare: null };
     if (!HEATHROW.test(text)) {
-      return { ok: false, error: "Executive Car is only available for Heathrow transfers." };
+      return { ok: false, error: "Executive Car is available for Heathrow transfers and Cotswolds private trips. Choose the Cotswolds journey type for timed hire." };
     }
     if (OTHER_AIRPORT.test(text)) {
       return { ok: true, airport: "heathrow", area: null, fareStatus: "quote_required", oneWay: null, returnFare: null };
@@ -627,39 +628,12 @@
     };
   }
 
-  function executiveIconSvg() {
-    return (
-      '<svg class="executive-icon" viewBox="0 0 64 32" width="64" height="32" aria-hidden="true">' +
-      '<path d="M8 20h48M14 20l4-7h20l8 7" fill="none" stroke="#002147" stroke-width="1.6" stroke-linejoin="round"/>' +
-      '<circle cx="20" cy="22" r="3" fill="none" stroke="#b8956a" stroke-width="1.6"/>' +
-      '<circle cx="46" cy="22" r="3" fill="none" stroke="#b8956a" stroke-width="1.6"/>' +
-      "</svg>"
-    );
-  }
-
   function syncExecutiveVisibility() {
     var on = executiveReviewEnabled();
     var blocks = document.querySelectorAll("[data-executive-block]");
     for (var i = 0; i < blocks.length; i++) blocks[i].hidden = !on;
     var held = document.querySelectorAll("[data-executive-held]");
     for (var j = 0; j < held.length; j++) held[j].hidden = on;
-    if (!on) return;
-    var navLinks = document.querySelectorAll('a[data-nav="heathrow"]');
-    for (var n = 0; n < navLinks.length; n++) {
-      var item = navLinks[n].parentNode;
-      if (!item || !item.parentNode || item.parentNode.querySelector('a[data-nav="executive"]')) continue;
-      var li = document.createElement("li");
-      var anchor = document.createElement("a");
-      anchor.href = "/executive-heathrow-transfers";
-      anchor.setAttribute("data-nav", "executive");
-      if (navLinks[n].querySelector(".site-nav__name")) {
-        anchor.innerHTML = '<span class="site-nav__name">Executive Heathrow</span>';
-      } else {
-        anchor.textContent = "Executive Heathrow";
-      }
-      li.appendChild(anchor);
-      item.parentNode.insertBefore(li, item.nextSibling);
-    }
   }
 
   function mountExecutivePriceCard() {
@@ -682,12 +656,28 @@
     if (!area || !host || host.querySelector("[data-executive-option]")) return;
     var prices = area === "oxford" ? getRoute("heathrow").executive : REGIONAL[area].routes.heathrow.executive;
     var article = document.createElement("article");
+    article.id = "executive";
     article.className = "price-option executive-card";
     article.setAttribute("data-executive-option", area);
-    article.innerHTML =
-      executiveIconSvg() +
+    article.innerHTML = executiveCardHtml(prices, area);
+    host.appendChild(article);
+  }
+
+  function executivePickupName(area) {
+    if (area === "oxford") return "Oxford";
+    return area.charAt(0).toUpperCase() + area.slice(1);
+  }
+
+  function executiveBookHref(area) {
+    return "https://customer.spires-taxis.com/?vehicle=executive&pickup=" +
+      encodeURIComponent(executivePickupName(area)) +
+      "&destination=Heathrow";
+  }
+
+  function executiveCardHtml(prices, area) {
+    return (
       "<h3>Executive Car</h3>" +
-      '<p class="price-option__examples">Mercedes E Class or equivalent</p>' +
+      '<p class="price-option__examples">Mercedes E Class or equivalent. Advance booking required, subject to availability.</p>' +
       '<p class="price-option__amount"><span class="fare-amount">' +
       formatMoney(prices.oneWay) +
       '</span> <span class="price-option__unit">one way</span></p>' +
@@ -697,11 +687,35 @@
       '<p class="price-save">Save ' +
       formatMoney(prices.oneWay * 2 - prices.return) +
       " on a return</p>" +
-      '<p class="price-option__meta">Per vehicle, either direction. Advance booking required.</p>' +
-      "<p>Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation.</p>" +
-      "<p>A partner operator may provide the car. Executive Car is the vehicle category. It is not an allocated car, and it does not promise a particular model, luggage space, or extra services.</p>" +
-      '<p><a href="/executive-heathrow-transfers">Executive Heathrow transfers</a></p>';
-    host.appendChild(article);
+      '<p class="price-option__meta">Per vehicle, either direction. Heathrow only.</p>' +
+      "<p>A partner operator may provide the car.</p>" +
+      '<p><a href="' + executiveBookHref(area) + '">Book an Executive Car</a></p>'
+    );
+  }
+
+  function mountExecutiveFareNote() {
+    if (!executiveReviewEnabled() || !document || typeof document.querySelectorAll !== "function") return;
+    if (document.getElementById("executive")) return;
+    var tables = document.querySelectorAll("[data-spires-fare-table]");
+    for (var i = 0; i < tables.length; i++) {
+      var el = tables[i];
+      var area = el.getAttribute("data-spires-fare-table");
+      if (!EXECUTIVE_FARES[area]) continue;
+      var prices = EXECUTIVE_FARES[area];
+      var note = document.createElement("aside");
+      note.id = "executive";
+      note.className = "executive-card";
+      note.setAttribute("data-executive-option", area);
+      note.innerHTML =
+        "<h2>Executive Car</h2>" +
+        "<p>Mercedes E Class or equivalent. Advance booking required, subject to availability.</p>" +
+        "<p>Heathrow from " + executivePickupName(area) + ": " +
+        formatMoney(prices.oneWay) + " one way or " + formatMoney(prices.return) + " return.</p>" +
+        "<p>A partner operator may provide the car.</p>" +
+        '<p><a href="' + executiveBookHref(area) + '">Book an Executive Car</a></p>';
+      el.parentNode.insertBefore(note, el);
+      return;
+    }
   }
 
   function fillCalculatedSavings() {
@@ -733,6 +747,7 @@
     fillOriginCopy();
     syncExecutiveVisibility();
     mountExecutivePriceCard();
+    mountExecutiveFareNote();
     if (typeof Event === "function" && document && typeof document.dispatchEvent === "function") {
       document.dispatchEvent(new Event("spires-prices-ready"));
     }

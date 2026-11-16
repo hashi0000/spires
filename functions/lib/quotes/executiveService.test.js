@@ -104,7 +104,9 @@ const emails_1 = require("./emails");
         }
         strict_1.default.equal(ctx.window.SPIRES_EXECUTIVE_SERVICE_ENABLED, true);
         strict_1.default.equal(code.includes("standardCar: { oneWay: 92, return: 180 }"), true);
-        strict_1.default.equal(code.includes(executiveService_1.EXECUTIVE_CUSTOMER_WORDING), true);
+        const servicePage = node_fs_1.default.readFileSync(node_path_1.default.join(__dirname, '../../../spires-website/executive-travel.html'), 'utf8');
+        strict_1.default.match(servicePage, /Mercedes E Class or equivalent/);
+        strict_1.default.match(servicePage, /Cotswolds/);
         strict_1.default.equal(code.includes("vito: { oneWay: 120, return: 235 }"), true);
     });
     (0, node_test_1.it)("walks a synthetic Executive request through confirmation", () => {

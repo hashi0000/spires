@@ -1,15 +1,15 @@
 /**
- * Booking terms published on 25 October 2026.
- * Applies to journeys from 1 April 2026. Those dates are separate.
+ * Current service terms published on 15 November 2026.
+ * New acceptances use this version; existing agreements retain their version.
  * The previous public page had no stored publication date and is not an April archive.
  */
 
 export const CURRENT_BOOKING_TERMS = {
-  version: "2026-10-25",
-  appliesToJourneysFrom: "2026-04-01",
-  publishedOn: "2026-10-25",
-  path: "/terms/2026-10-25",
-  url: "https://www.spires-taxis.com/terms/2026-10-25",
+  version: "2026-11-15",
+  appliesToJourneysFrom: "2026-11-15",
+  publishedOn: "2026-11-15",
+  path: "/terms/2026-11-15",
+  url: "https://www.spires-taxis.com/terms/2026-11-15",
 } as const;
 
 export const PREVIOUS_PUBLIC_TERMS = {
@@ -26,6 +26,7 @@ const ONLINE_CHANNELS = ["customer_portal", "website"] as const;
 export const STAFF_ACCEPTANCE_METHODS = ["phone", "email", "whatsapp", "in_person", "other"] as const;
 
 export function termsUrlForVersion(version: string): string {
+  if (version === "2026-10-25") return "https://www.spires-taxis.com/terms/2026-10-25";
   if (version === CURRENT_BOOKING_TERMS.version) return CURRENT_BOOKING_TERMS.url;
   if (version === PREVIOUS_PUBLIC_TERMS.id) return PREVIOUS_PUBLIC_TERMS.url;
   return "";

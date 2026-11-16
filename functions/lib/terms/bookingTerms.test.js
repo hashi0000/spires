@@ -7,10 +7,10 @@ const strict_1 = __importDefault(require("node:assert/strict"));
 const node_test_1 = require("node:test");
 const bookingTerms_1 = require("./bookingTerms");
 (0, node_test_1.describe)("booking terms version", () => {
-    (0, node_test_1.it)("keeps the journey date separate from the publication date", () => {
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-04-01");
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.publishedOn, "2026-10-25");
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.version, "2026-10-25");
+    (0, node_test_1.it)("publishes the new terms without replacing historic agreements", () => {
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-15");
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.publishedOn, "2026-11-15");
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.version, "2026-11-15");
         strict_1.default.equal(bookingTerms_1.PREVIOUS_PUBLIC_TERMS.publicationDateRecorded, false);
         strict_1.default.notEqual(bookingTerms_1.PREVIOUS_PUBLIC_TERMS.id, "2026-04-01");
     });
@@ -31,16 +31,16 @@ const bookingTerms_1 = require("./bookingTerms");
     (0, node_test_1.it)("accepts the published version for the customer portal and the website", () => {
         const portal = (0, bookingTerms_1.onlineTermsAcceptance)({
             termsAccepted: true,
-            termsVersion: "2026-10-25",
+            termsVersion: bookingTerms_1.CURRENT_BOOKING_TERMS.version,
             channel: "customer_portal",
         });
         const website = (0, bookingTerms_1.onlineTermsAcceptance)({
             termsAccepted: true,
-            termsVersion: "2026-10-25",
+            termsVersion: bookingTerms_1.CURRENT_BOOKING_TERMS.version,
             channel: "website",
         });
         strict_1.default.equal(portal.ok && portal.method, "customer_portal");
-        strict_1.default.equal(website.ok && website.version, "2026-10-25");
+        strict_1.default.equal(website.ok && website.version, bookingTerms_1.CURRENT_BOOKING_TERMS.version);
     });
 });
 (0, node_test_1.describe)("staff reported acceptance", () => {
@@ -85,7 +85,7 @@ const bookingTerms_1 = require("./bookingTerms");
         strict_1.default.equal(summary.text, "Acceptance not recorded.");
         strict_1.default.doesNotMatch((0, bookingTerms_1.confirmationTermsParagraph)({}), /Accepted /);
         strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /Acceptance not recorded/);
-        strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /2026-10-25/);
+        strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /2026-11-15/);
     });
     (0, node_test_1.it)("shows the version that was actually stored", () => {
         const summary = (0, bookingTerms_1.acceptanceSummary)({
@@ -96,7 +96,7 @@ const bookingTerms_1 = require("./bookingTerms");
         });
         strict_1.default.equal(summary.recorded, true);
         if (summary.recorded) {
-            strict_1.default.equal(summary.url, bookingTerms_1.CURRENT_BOOKING_TERMS.url);
+            strict_1.default.equal(summary.url, 'https://www.spires-taxis.com/terms/2026-10-25');
             strict_1.default.match(summary.text, /Customer portal/);
             strict_1.default.match(summary.text, /25 Oct 2026/);
         }

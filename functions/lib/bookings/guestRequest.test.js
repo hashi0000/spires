@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const strict_1 = __importDefault(require("node:assert/strict"));
 const node_test_1 = require("node:test");
+const bookingTerms_1 = require("../terms/bookingTerms");
 const guestRequest_1 = require("./guestRequest");
 const today = "2026-11-02";
 const now = Date.parse("2026-11-02T12:00:00Z");
@@ -22,7 +23,7 @@ function body(overrides = {}) {
         luggage: "1",
         bookingType: "one_way",
         termsAccepted: true,
-        termsVersion: "2026-10-25",
+        termsVersion: bookingTerms_1.CURRENT_BOOKING_TERMS.version,
         submissionId: "submission-00000001",
         ...overrides,
     };

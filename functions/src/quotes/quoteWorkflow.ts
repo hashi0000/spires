@@ -140,6 +140,7 @@ type ConfirmationBooking = BookingWorkflow & {
 };
 
 export function shouldSendConfirmation(before: ConfirmationBooking | null, after: ConfirmationBooking): boolean {
+  if (effectiveWorkflowStatus(after) === "completed") return false;
   if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after)) return false;
   if (!before || !isWorkflowConfirmed(before)) return true;
   // A confirmed booking that previously had no recipient can now receive its first confirmation.

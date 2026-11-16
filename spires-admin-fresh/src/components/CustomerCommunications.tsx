@@ -52,6 +52,7 @@ function OfferTable({ rows, empty }: { rows: OfferRow[]; empty: string }) {
 const CustomerCommunications: React.FC = () => {
   const [tab, setTab] = useState<"offers" | "messages">("offers");
   const [preview, setPreview] = useState(MESSAGE_ROWS[0].name);
+  const [showArchive, setShowArchive] = useState(false);
   const selected = MESSAGE_ROWS.find((row) => row.name === preview) || MESSAGE_ROWS[0];
   const activeOffers = OFFER_ROWS.filter((offer) => offer.status === "active" || offer.status === "scheduled");
   const archivedOffers = OFFER_ROWS.filter((offer) => offer.status !== "active" && offer.status !== "scheduled");
@@ -68,25 +69,15 @@ const CustomerCommunications: React.FC = () => {
 
       {tab === "offers" ? (
         <div>
-          <h3>Active</h3>
-          <OfferTable rows={activeOffers} empty="No active offers" />
-          <h3>Archived</h3>
-          <OfferTable rows={archivedOffers} empty="No archived offers" />
+          <div className="comms-offer-tabs" role="group" aria-label="Offer history">
+            <button type="button" className={`btn btn-sm ${!showArchive ? "btn-primary" : "btn-secondary"}`} aria-pressed={!showArchive} onClick={() => setShowArchive(false)}>Current offers ({activeOffers.length})</button>
+            <button type="button" className={`btn btn-sm ${showArchive ? "btn-primary" : "btn-secondary"}`} aria-pressed={showArchive} onClick={() => setShowArchive(true)}>Past offers ({archivedOffers.length})</button>
+          </div>
+          <OfferTable rows={showArchive ? archivedOffers : activeOffers} empty={showArchive ? "No past offers." : "No promotions are currently running. Standard fares and agreed booking discounts still apply."} />
         </div>
       ) : (
         <div className="comms-layout">
-          <div className="comms-list">
-            {MESSAGE_ROWS.map((row) => (
-              <button
-                key={row.name}
-                type="button"
-                className={`btn btn-sm ${selected.name === row.name ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => setPreview(row.name)}
-              >
-                {row.name}
-              </button>
-            ))}
-          </div>
+          <div className="comms-list"><label htmlFor="message-template">Message template</label><select id="message-template" value={preview} onChange={event => setPreview(event.target.value)}>{MESSAGE_ROWS.map(row => <option key={row.name} value={row.name}>{row.name}</option>)}</select></div>
           <div>
             <p><strong>Subject:</strong> {selected.subject}</p>
             <p><strong>Sending trigger:</strong> {selected.trigger}</p>

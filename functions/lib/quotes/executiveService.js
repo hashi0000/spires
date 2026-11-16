@@ -22,11 +22,11 @@ exports.classifyExecutiveJourney = classifyExecutiveJourney;
 exports.proposedExecutiveFare = proposedExecutiveFare;
 exports.assessExecutiveBooking = assessExecutiveBooking;
 exports.EXECUTIVE_SERVICE_ENABLED = true;
-exports.EXECUTIVE_CUSTOMER_WORDING = "Travel between Heathrow and Oxfordshire in a Mercedes E Class or equivalent. An option for business travel, visiting guests or anyone who prefers an executive car. Advance booking required. Subject to availability and confirmation.";
+exports.EXECUTIVE_CUSTOMER_WORDING = "Travel in a Mercedes E Class or equivalent for Heathrow transfers or a private Cotswolds trip. Advance booking required. Subject to availability and confirmation.";
 exports.EXECUTIVE_PARTNER_NOTE = "A partner operator may provide the car. Executive Car is the vehicle category. It is not an allocated car, and it does not promise a particular model, luggage space, or extra services.";
 exports.EXECUTIVE_COMMERCE_MESSAGE = "This Executive Heathrow request is awaiting availability confirmation. Accept the request before sending a quote, taking payment, or confirming the booking.";
 exports.EXECUTIVE_NOT_OPEN_MESSAGE = "Executive Car is not open for booking yet.";
-exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE = "Executive Car is only available for Heathrow transfers.";
+exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE = "Executive Car is available for Heathrow transfers and Cotswolds private trips. Choose the Cotswolds journey type for timed hire.";
 exports.EXECUTIVE_PASSENGER_MESSAGE = "Enter the number of passengers travelling, from 1 to 8. We confirm that an Executive Car is suitable before we accept the booking.";
 /** Form limit only. It is not a published seat or luggage capacity. */
 exports.EXECUTIVE_PASSENGER_LIMIT = 8;
@@ -78,6 +78,8 @@ function executiveJourneyText(input) {
 }
 function classifyExecutiveJourney(input) {
     const text = executiveJourneyText(input);
+    if (input.journeyType === "cotswolds" && !OTHER_AIRPORT.test(text) && !HEATHROW.test(text))
+        return { ok: true, airport: "cotswolds", area: null, fareStatus: "quote_required", oneWay: null, returnFare: null };
     if (!HEATHROW.test(text)) {
         return { ok: false, error: exports.EXECUTIVE_HEATHROW_ONLY_MESSAGE };
     }
@@ -134,7 +136,7 @@ function assessExecutiveBooking(input) {
         ok: true,
         fields: {
             serviceType: "executive",
-            airport: "heathrow",
+            airport: classification.airport,
             executiveAvailability: "awaiting_confirmation",
             executiveFareStatus: classification.fareStatus,
             executiveArea: classification.area || "",

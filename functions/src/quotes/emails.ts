@@ -40,6 +40,7 @@ export type QuoteEmailModel = {
   quoteUrl: string;
   paymentUrl: string;
   terms: string;
+  collectionNote?: string;
 };
 
 function shell(inner: string): string {
@@ -77,6 +78,7 @@ export function quoteEmailHtml(model: QuoteEmailModel): string {
     <strong>Final quote ${escapeHtml(model.finalFare)}</strong></p>
     ${model.validUntil ? `<p>This quote is valid until ${escapeHtml(model.validUntil)}.</p>` : ""}
     ${payment}
+    ${model.collectionNote ? `<p>${escapeHtml(model.collectionNote)}</p>` : ""}
     <p>${escapeHtml(model.terms)}</p>
     ${button(model.quoteUrl, "View and accept quote")}
     ${payButton}
