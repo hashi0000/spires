@@ -6,7 +6,7 @@ export default function CotswoldsFields({ value, onChange, vehicleType }: { valu
   const hours = Number(value.hireHours || 6);
   const prices = (policy.cotswolds.prices as Record<string, number[]>)[vehicleType || 'standard'];
   const price = prices?.[policy.cotswolds.durationsHours.indexOf(hours)];
-  return <fieldset className="journey-box"><legend>Journey purpose</legend>
+  return <div className="journey-box journey-box--service">
     <label>Service<select value={selected ? 'cotswolds' : 'transfer'} onChange={e => onChange({ journeyType: e.target.value, hireHours: value.hireHours || '6', timedHireAccepted: false, ...(e.target.value === 'cotswolds' ? { bookingType: 'one_way', returnTrip: false } : {}) })}>
       <option value="transfer">Transfer or other journey</option><option value="cotswolds">Cotswolds trip / private tour</option>
     </select></label>
@@ -20,5 +20,5 @@ export default function CotswoldsFields({ value, onChange, vehicleType }: { valu
       </details>
       <p>Include these terms in the quote. Record customer acceptance through the booking acceptance workflow.</p>
     </>}
-  </fieldset>;
+  </div>;
 }

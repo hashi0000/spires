@@ -944,11 +944,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         <form onSubmit={handleSubmit} onChange={() => setDirty(true)}>
           <div className="modal-body">
-            <div className="mb-6 p-4 rounded-lg border-2 border-blue-800 bg-blue-50">
-              <label className="block text-sm font-semibold text-blue-900 mb-1">Booking type *</label>
-              <JourneyAssistance formData={formData} setFormData={setFormData} />
+            <section className="booking-setup" aria-label="Service and journey">
+              <h4 className="booking-setup__title">Service and journey</h4>
             <CotswoldsFields value={formData} vehicleType={formData.vehicleType} onChange={change => setFormData(previous => ({ ...previous, ...change }))} />
-              <select
+              <label className="booking-setup__label" htmlFor="booking-journey-type">Journey type</label>
+              <select id="booking-journey-type"
+                disabled={formData.journeyType === 'cotswolds'}
                 value={formData.bookingType === 'return' ? 'return' : 'one_way'}
                 onChange={(e) => {
                   const nextType = e.target.value === 'return' ? 'return' : 'one_way';
@@ -972,9 +973,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 <option value="return">Return</option>
               </select>
               <p className="text-xs text-blue-900 mt-1">
-                A return stays on this booking. It does not create a second booking.
+                {formData.journeyType === 'cotswolds' ? 'Your itinerary and final drop off are included in one timed trip.' : 'Outbound and return journeys are managed together.'}
               </p>
-            </div>
+            </section>
+            <JourneyAssistance formData={formData} setFormData={setFormData} />
 
             {customerSuggestions.length > 0 && (
               <datalist id="booking-past-customers">
