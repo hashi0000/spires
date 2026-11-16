@@ -126,13 +126,13 @@ const Bookings: React.FC<BookingsProps> = ({
     if (node && typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver((entries) => {
         const width = entries[0]?.contentRect.width ?? 0;
-        if (width > 0) setCompactList(width < 680);
+        if (width > 0) setCompactList(width < 1250);
       });
       observer.observe(node);
       return () => observer.disconnect();
     }
     if (typeof window.matchMedia !== 'function') return;
-    const media = window.matchMedia('(max-width: 900px)');
+    const media = window.matchMedia('(max-width: 1450px)');
     const apply = () => setCompactList(media.matches);
     apply();
     media.addEventListener?.('change', apply);
