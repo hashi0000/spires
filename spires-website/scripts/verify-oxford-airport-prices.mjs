@@ -226,6 +226,11 @@ assert(redirect.includes('rel="canonical" href="https://www.spires-taxis.com/exe
 assert(redirect.includes("noindex"), "old Executive address is not a second indexable page");
 const execTravel = readFileSync(join(website, "executive-travel.html"), "utf8");
 assert(execTravel.includes("Mercedes E Class or equivalent"), "Executive travel page describes the car");
+assert(execTravel.includes("Executive Heathrow transfers for Oxford business travel"), "Executive travel page leads with business Heathrow purpose");
+assert(execTravel.includes("Request an Executive transfer"), "Executive travel page has the primary request CTA");
+assert(execTravel.includes("Arranging travel for a colleague or guest?"), "Executive travel page explains booking for someone else");
+assert(execTravel.includes("60 minutes") && execTravel.includes("£5 per started 15 minutes"), "Executive travel page states flight monitored waiting");
+assert(execTravel.includes("cotswolds-tours-from-oxford"), "Executive travel page keeps Cotswolds as a secondary link");
 assert((execTravel.includes("£150") || execTravel.includes("&pound;150")) && (execTravel.includes("£290") || execTravel.includes("&pound;290")), "Executive travel page shows Oxford fares");
 assert(execTravel.includes("Standard Car") && execTravel.includes("8 Seater"), "Executive travel page compares the car types");
 assert(!/partner (operator|provider)/i.test(execTravel + heathrowPage), "customer Executive copy has no partner wording");
