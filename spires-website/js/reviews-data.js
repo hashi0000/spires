@@ -33,7 +33,7 @@
       text: "Excellent service! I use them every month for my airport drop-offs and pick-ups. They’re reliable, always on time, and great at communicating. Highly recommended!",
       permission: "unconfirmed",
       preview: true,
-      pages: ["home", "reviews"]
+      pages: ["home", "reviews", "airport"]
     },
     {
       id: "ne-jo",
@@ -51,7 +51,7 @@
       text: "I used Spires Taxis to travel to Gatwick Airport and it was a great experience! Punctual, polite and helpful. Will definitely use them again!",
       permission: "unconfirmed",
       preview: true,
-      pages: ["reviews"]
+      pages: ["reviews", "airport"]
     },
     {
       id: "stanislava-koleva",
@@ -60,7 +60,7 @@
       text: "I have used Spires Taxis for airport transfers a few times and never had any issues.\nReliable and punctual service!",
       permission: "unconfirmed",
       preview: true,
-      pages: ["reviews"]
+      pages: ["reviews", "airport"]
     },
     {
       id: "reece-henry",

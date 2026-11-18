@@ -1574,7 +1574,7 @@ h2,
 }
 
 .airport-included .included-list {
-  margin: 0;
+  margin: 0.85rem 0 0;
 }
 
 .airport-fare-cards {
@@ -1712,6 +1712,11 @@ h2,
   padding: 0;
   display: grid;
   gap: 0.5rem;
+}
+
+h2 + .included-list,
+h3 + .included-list {
+  margin-top: 1rem;
 }
 
 .included-list li {
