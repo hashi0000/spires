@@ -9,7 +9,8 @@ export const recordBookingSource = functions.https.onCall(async (data, context) 
   const id = String(data?.bookingId || '');
   const source = String(data?.source || '');
   const channel = String(data?.channel || '');
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id) || !['','google_ads','website','repeat','recommendation','other'].includes(source) || !['telephone','whatsapp'].includes(channel)) {
+  const normalisedSource = source === 'google_advert' ? 'google_ads' : source;
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id) || !['','google_ads','website','repeat','recommendation','other'].includes(normalisedSource) || !['telephone','whatsapp'].includes(channel)) {
     throw new functions.https.HttpsError('invalid-argument', 'Choose a supported booking, source and channel.');
   }
   const db = admin.firestore();
@@ -19,7 +20,7 @@ export const recordBookingSource = functions.https.onCall(async (data, context) 
   await db.runTransaction(async tx => {
     const [booking, note] = await Promise.all([tx.get(bookingRef), tx.get(noteRef)]);
     if (!booking.exists) throw new functions.https.HttpsError('not-found', 'Booking not found.');
-    const patch = { staffReportedSource:source, enquiryChannel:channel, provenance:'staff_recorded', updatedBy:actor, updatedAt:admin.firestore.FieldValue.serverTimestamp() };
+    const patch = { staffReportedSource:normalisedSource, enquiryChannel:channel, provenance:'staff_recorded', updatedBy:actor, updatedAt:admin.firestore.FieldValue.serverTimestamp() };
     tx.set(noteRef,patch,{merge:true});
     tx.create(auditRef,{bookingId:id,previousSource:note.data()?.staffReportedSource || '',previousChannel:note.data()?.enquiryChannel || '',...patch});
   });

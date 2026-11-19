@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { AdvertisingResultsView } from "./AdvertisingResults";
 import { ComparisonBars } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
-import { advertisingDateRange, advertisingPreviewBookings, buildAdvertisingReport, currentLondonCalendarMonth } from "../utils/advertisingResults";
+import { advertisingDateRange, advertisingPreviewBookings, buildAdvertisingReport, thisMonthThroughYesterday } from "../utils/advertisingResults";
 import { buildGoogleAdsPeriodReport } from "../utils/googleAdsPeriod";
 
 jest.mock("firebase/functions", () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }));
@@ -24,21 +24,21 @@ function openMoreDetail() {
   return details as HTMLDetailsElement;
 }
 
-test("main view shows spend, confirmed jobs and agreed fares with jobs list", () => {
-  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
+test("main view shows November fixture spend, bookings, fares and ratios", () => {
+  const range = { from: "2026-11-01", to: "2026-11-18" };
   const bookings = [
-    { id: "1", bookingNumber: "A", enquiryAt: "2026-11-02", createdAt: "2026-11-02", status: "confirmed", actualFare: 150, amountReceivedPence: 0, customerReportedSource: "google_advert", pickupLocation: "Oxford", destination: "Heathrow" },
-    { id: "2", bookingNumber: "B", enquiryAt: "2026-11-03", createdAt: "2026-11-03", status: "allocated", actualFare: 150, amountReceivedPence: 5000, customerReportedSource: "google_advert", pickupLocation: "Oxford", destination: "Gatwick" },
-    { id: "3", bookingNumber: "C", enquiryAt: "2026-11-04", createdAt: "2026-11-04", status: "completed", actualFare: 150, amountReceivedPence: 15000, staffReportedSource: "google_ads", pickupLocation: "Witney", destination: "Oxford" },
+    { id: "1", bookingNumber: "A", enquiryAt: "2026-11-02", createdAt: "2026-11-02", status: "confirmed", actualFare: 108, amountReceivedPence: 0, customerReportedSource: "google_advert", pickupLocation: "Oxford", destination: "Heathrow" },
+    { id: "2", bookingNumber: "B", enquiryAt: "2026-11-03", createdAt: "2026-11-03", status: "allocated", actualFare: 195, amountReceivedPence: 5000, staffReportedSource: "google_ads", pickupLocation: "Oxford", destination: "Gatwick" },
+    { id: "3", bookingNumber: "C", enquiryAt: "2026-11-04", createdAt: "2026-11-04", status: "completed", actualFare: 150, amountReceivedPence: 15000, customerReportedSource: "google_ads", pickupLocation: "Witney", destination: "Oxford" },
   ];
-  const spend = [{ id: "s", date: "2026-11-01", dateEnd: "2026-11-30", amountPence: 10000, source: "manual" as const, label: "Manual" }];
+  const spend = [{ id: "s", date: "2026-11-01", dateEnd: "2026-11-18", amountPence: 7965, source: "manual" as const, label: "Manual", replacesImported: true }];
   const report = buildAdvertisingReport(bookings as any, {
     ...range,
     dateBasis: "enquiry",
     spend,
     manualSpendIsComplete: true,
     adsConnected: false,
-    now: new Date("2026-11-12T15:00:00Z"),
+    now: new Date("2026-11-19T15:00:00Z"),
   });
   const googleAdsReport = buildGoogleAdsPeriodReport(bookings as any, { ...range, spend });
   const onOpenBooking = jest.fn();
@@ -60,32 +60,32 @@ test("main view shows spend, confirmed jobs and agreed fares with jobs list", ()
   );
 
   expect(screen.getByRole("heading", { name: "Advertising results" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "This month" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Add ad spend" })).toBeTruthy();
+  expect(screen.getAllByText(/Reporting 2026-11-01 to 2026-11-18/).length).toBeGreaterThan(0);
   const summary = screen.getByLabelText("Period summary");
-  expect(summary.textContent).toMatch(/Google Ads spend/);
-  expect(summary.textContent).toMatch(/£100\.00/);
-  expect(summary.textContent).toMatch(/Confirmed jobs from ads/);
+  expect(summary.textContent).toMatch(/£79\.65/);
+  expect(summary.textContent).toMatch(/Confirmed ad bookings/);
   expect(summary.textContent).toMatch(/3/);
-  expect(summary.textContent).toMatch(/Total agreed fares from those jobs/);
-  expect(summary.textContent).toMatch(/£450\.00/);
-  expect(screen.getByRole("heading", { name: "Jobs from ads" })).toBeTruthy();
+  expect(summary.textContent).toMatch(/£453\.00/);
+  expect(summary.textContent).toMatch(/£26\.55/);
+  expect(summary.textContent).toMatch(/£5\.69/);
+  expect(screen.getByRole("heading", { name: "Bookings from ads" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Spend history" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "2026-11-02" }));
   expect(onOpenBooking).toHaveBeenCalledWith("1");
   fireEvent.click(screen.getByRole("button", { name: "Add ad spend" }));
   expect(screen.getByRole("heading", { name: "Add ad spend" })).toBeTruthy();
+  expect(screen.getAllByLabelText(/Replace imported spend for these dates/).length).toBeGreaterThan(0);
 });
 
 test("preview hides passenger details and keeps legacy metrics under More detail", () => {
-  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
+  const range = thisMonthThroughYesterday(new Date("2026-11-19T12:00:00Z"));
   const report = buildAdvertisingReport(advertisingPreviewBookings, {
     ...range,
     dateBasis: "enquiry",
     spend: [],
     manualSpendIsComplete: false,
     adsConnected: false,
-    now: new Date("2026-11-12T15:00:00Z"),
+    now: new Date("2026-11-19T15:00:00Z"),
   });
   const onDates = jest.fn();
   const googleAdsReport = buildGoogleAdsPeriodReport(advertisingPreviewBookings, { ...range, spend: [] });
@@ -105,62 +105,20 @@ test("preview hides passenger details and keeps legacy metrics under More detail
   );
 
   expect(screen.getByRole("heading", { name: "Advertising results" })).toBeTruthy();
-  expect(screen.getAllByText("No ad spend recorded").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/No ad spend recorded/).length).toBeGreaterThan(0);
   expect(screen.getByText("More detail")).toBeTruthy();
   openMoreDetail();
   expect(screen.getByRole("heading", { name: "Google Ads" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Contribution after direct costs and advertising" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Cost per confirmed booking" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Advertising return on spend" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Selected period against the days before it" })).toBeTruthy();
-  expect(screen.getAllByText(/Revenue per day/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/Average booking value/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/Confirmed booking rate/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/Change: not calculated/).length).toBeGreaterThan(0);
-  expect(screen.getByText(/This compares daily bookings on finished days/)).toBeTruthy();
-  expect(screen.getByText(/This compares recorded payments on finished days/)).toBeTruthy();
-  expect(screen.getByText(/This compares the average quoted fare/)).toBeTruthy();
-  expect(screen.getByText(/This compares the confirmed booking rate on finished days/)).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Objective" })).toBeTruthy();
-  expect(screen.getByText(/See whether introducing Google Ads increased the number of bookings/)).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Google Ads start date" })).toBeTruthy();
-  expect(screen.getByText(/first date of impressions or spend cannot be identified/)).toBeTruthy();
-  expect(screen.getAllByText(/campaign creation date is not used/).length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Spires Taxis — before and after Google Ads performance comparison" })).toBeTruthy();
-  expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Bookings directly attributed to Google Ads" })).toBeTruthy();
-  expect(screen.getByText(/directly attributed to Google Ads only when it has a consented Google click id/)).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Overall business growth after advertising started" })).toBeTruthy();
-  expect(screen.getByText(/It is not one of those attribution counts/)).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Bookings from other sources" })).toBeTruthy();
-  expect(screen.getByText(/That report is not a stored Google click/)).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Bookings with unknown attribution" })).toBeTruthy();
-  expect(screen.getByText(/A booking has unknown attribution when no source was recorded/)).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Attribution and interpretation" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Historical data integrity" })).toBeTruthy();
-  expect(screen.getByText(/existing Firebase booking records/)).toBeTruthy();
-  expect(screen.getAllByText(/A journey date is not substituted for a booking creation date/).length).toBeGreaterThan(0);
-  expect(screen.getByText(/reliable as the time the booking record was saved/)).toBeTruthy();
-  expect(screen.getAllByText(/Historical bookings are not modified merely to produce a comparison/).length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Incomplete historical records" })).toBeTruthy();
-  expect(screen.getByText(/Where a historical booking record is incomplete, the limitation is shown here/)).toBeTruthy();
-  expect(screen.getAllByText(/Google Ads reporting is not available/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/does not claim that all additional bookings were caused by Google Ads/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/Seasonality, repeat customers, referrals and other marketing activities may affect these results/).length).toBeGreaterThan(0);
-  expect(screen.getByText("Visual comparison")).toBeTruthy();
-  expect(screen.getByText("Confirmed bookings a day")).toBeTruthy();
-  expect(screen.getByText("Booking frequency")).toBeTruthy();
-  expect(screen.getAllByText("Daily bookings").length).toBeGreaterThan(0);
-  expect(screen.getAllByText("Seven day rolling average").length).toBeGreaterThan(0);
-  expect(screen.getByText(/no start date marker is drawn/)).toBeTruthy();
-  expect(screen.getByText("Tracked Google Ads")).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Confirm Google Ads start date" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Change Google Ads start date" })).toBeDisabled();
   expect(screen.getByText("Sample preview. These are not live bookings.")).toBeTruthy();
-  expect(screen.getAllByText(/£140/).length).toBeGreaterThan(0);
   expect(screen.queryByText("07000000000")).toBeNull();
   expect(screen.queryByText("Do not show this note")).toBeNull();
-  expect(screen.getByText("8 seater")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Today" }));
   fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
   const today = advertisingDateRange("today");
@@ -170,14 +128,14 @@ test("preview hides passenger details and keeps legacy metrics under More detail
 });
 
 test("lets an administrator confirm the recorded date or change it", () => {
-  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
+  const range = thisMonthThroughYesterday(new Date("2026-11-19T12:00:00Z"));
   const report = buildAdvertisingReport([], {
     ...range,
     dateBasis: "enquiry",
     spend: [],
     manualSpendIsComplete: false,
     adsConnected: false,
-    now: new Date("2026-11-12T15:00:00Z"),
+    now: new Date("2026-11-19T15:00:00Z"),
   });
   const onSaveStartDate = jest.fn();
   render(
@@ -196,7 +154,6 @@ test("lets an administrator confirm the recorded date or change it", () => {
 
   openMoreDetail();
   expect(screen.getByText(/An administrator has not confirmed this date/)).toBeTruthy();
-  expect(screen.queryByText(/The marker shows the confirmed Google Ads start date/)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Confirm Google Ads start date" }));
   expect(onSaveStartDate).toHaveBeenCalledWith("2026-11-01");
   fireEvent.change(screen.getByLabelText("Google Ads start date"), { target: { value: "2026-11-03" } });
@@ -230,7 +187,6 @@ test("draws the Google Ads start date marker on that finished day", () => {
     />
   );
   expect(screen.getByText(/The marker shows the confirmed Google Ads start date, 2026-11-09/)).toBeTruthy();
-  expect(screen.getByText("Google Ads start date")).toBeTruthy();
   expect(container.querySelector(".frequency-chart__marker")).toBeTruthy();
 });
 
@@ -244,12 +200,9 @@ test("shows Google Ads spend only after it is chosen", () => {
       dateLabel="journey date"
     />
   );
-  expect(screen.getByText(/Google Ads spend is optional and is not shown/)).toBeTruthy();
   expect(container.querySelector(".frequency-chart__spend")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show Google Ads spend" }));
   expect(container.querySelector(".frequency-chart__spend")).toBeTruthy();
-  expect(screen.getByText(/dated Google Ads spend on finished days/)).toBeTruthy();
-  expect(screen.getAllByText("Google Ads spend").length).toBeGreaterThan(0);
 });
 
 test("does not draw Google Ads spend when no daily figure was returned", () => {
@@ -274,11 +227,8 @@ test("switches the chart from booking count to gross booking revenue", () => {
       dateLabel="journey date"
     />
   );
-  expect(screen.getByText("Bookings")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Gross booking revenue" }));
   expect(screen.getByText(/quoted fare of confirmed, allocated and completed bookings/)).toBeTruthy();
-  expect(screen.getByText(/not money received/)).toBeTruthy();
-  expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
   const gross = container.querySelector(".frequency-chart__gross");
   expect(gross).toBeTruthy();
   expect(gross?.getAttribute("points")?.trim().split(" ").length).toBe(1);

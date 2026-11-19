@@ -559,6 +559,16 @@ export function currentLondonCalendarMonth(now = new Date()): { from: string; to
   };
 }
 
+/**
+ * This month through yesterday in Europe/London, so today’s incomplete spend
+ * does not make the period total unavailable. On the 1st, uses the finished previous month.
+ */
+export function thisMonthThroughYesterday(now = new Date()): { from: string; to: string } {
+  const today = londonDateKey(now) || "1970-01-01";
+  const yesterday = shiftDateKey(today, -1);
+  return { from: `${yesterday.slice(0, 7)}-01`, to: yesterday };
+}
+
 function coerceDate(value: unknown): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
   if (value && typeof value === "object" && "toDate" in (value as { toDate?: () => Date }) && typeof (value as { toDate?: () => Date }).toDate === "function") {

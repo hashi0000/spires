@@ -14,7 +14,7 @@ import {
   SpendEntryInput,
   advertisingDateRange,
   buildAdvertisingReport,
-  currentLondonCalendarMonth,
+  thisMonthThroughYesterday,
   bookingPaceChange,
   beforeAdsBookingsPerDay,
   afterAdsBookingsPerDay,
@@ -23,17 +23,14 @@ import {
   formatRate,
   formatReturn,
   interpretAttribution,
-  routeLabel,
-  sourceLabel,
-  vehicleLabel,
 } from "../utils/advertisingResults";
 import {
   buildGoogleAdsPeriodReport,
+  filterGoogleAdsJobs,
   periodManualSpend,
   spendEntrySummary,
   type SpendRangeEntry,
 } from "../utils/googleAdsPeriod";
-import { effectiveWorkflowStatus } from "../utils/bookingWorkflow";
 import { ComparisonBars, growthComparisonItems, paceComparisonItems } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
 
@@ -44,6 +41,7 @@ export type SpendSaveInput = {
   pounds: string;
   campaign?: string;
   note?: string;
+  replacesImported?: boolean;
 };
 
 const SOURCE_OPTIONS: Array<[string, string]> = [
@@ -103,13 +101,16 @@ export function AdvertisingResultsView({
   googleAdsReport,
   onOpenBooking,
   onSaveSource,
+  onSaveAdsAttribution,
   onSaveCost,
   reportFilters,
   filterChoices,
   onReportFilters,
+  reconciliationQueue = [],
 }: {
   report: AdvertisingReport;
   deliveries?: DeliveryRow[];
+  reconciliationQueue?: Array<{ bookingNumber: string; kind: string; detail: string }>;
   preview?: boolean;
   message?: string;
   saving?: boolean;
@@ -127,6 +128,7 @@ export function AdvertisingResultsView({
   googleAdsReport?: ReturnType<typeof buildGoogleAdsPeriodReport>;
   onOpenBooking?: (bookingId: string) => void;
   onSaveSource: (id: string, source: string, channel: "telephone" | "whatsapp") => void;
+  onSaveAdsAttribution?: (id: string, source: string) => void;
   onSaveCost: (id: string, field: keyof JobCostInput, pounds: string) => void;
   reportFilters?: { status: string; route: string; vehicle: string; source: string };
   filterChoices?: { routes: string[]; vehicles: string[]; sources: string[] };
@@ -137,6 +139,7 @@ export function AdvertisingResultsView({
   const [spendPounds, setSpendPounds] = useState("");
   const [spendCampaign, setSpendCampaign] = useState("");
   const [spendNote, setSpendNote] = useState("");
+  const [spendReplacesImported, setSpendReplacesImported] = useState(false);
   const [editingSpendId, setEditingSpendId] = useState<string | null>(null);
   const [showSpendForm, setShowSpendForm] = useState(false);
   const [startDate, setStartDate] = useState(advertisingStartedOn || "");
@@ -146,10 +149,13 @@ export function AdvertisingResultsView({
   const today = advertisingDateRange("today");
   const lastSeven = advertisingDateRange("last_7");
   const lastTwentyEight = advertisingDateRange("last_28");
-  const thisMonth = currentLondonCalendarMonth();
+  const thisMonth = thisMonthThroughYesterday();
   const dateLabel = report.dateBasis === "enquiry" ? "enquiry or submission date" : "journey date";
   const figures = [report.costPerConfirmed, report.contribution, report.quoted, report.netPayments, report.manualSpend, report.adsSpend, report.advertisingSpend, report.costPerCompletedPaid, report.costs.driver, report.costs.fuel, report.costs.parking, report.costs.airport, report.costs.paymentFees];
   const ads = googleAdsReport;
+  const listedJobs = ads
+    ? filterGoogleAdsJobs(ads.jobs, reportFilters || { status: "all", route: "all", vehicle: "all", source: "all" })
+    : [];
   const resetSpendForm = () => {
     setEditingSpendId(null);
     setSpendDate(report.to);
@@ -157,6 +163,7 @@ export function AdvertisingResultsView({
     setSpendPounds("");
     setSpendCampaign("");
     setSpendNote("");
+    setSpendReplacesImported(false);
     setShowSpendForm(false);
   };
   const beginEditSpend = (entry: SpendRangeEntry) => {
@@ -166,6 +173,7 @@ export function AdvertisingResultsView({
     setSpendPounds((entry.amountPence / 100).toFixed(2));
     setSpendCampaign(entry.campaign || "");
     setSpendNote(entry.note || "");
+    setSpendReplacesImported(entry.replacesImported === true);
     setShowSpendForm(true);
   };
   const statusLabel = (status: string) => {
@@ -187,7 +195,8 @@ export function AdvertisingResultsView({
       <header className="advertising-results__header">
         <div>
           <h1>Advertising results</h1>
-          <p>{ads?.dateBasisLabel || "Jobs are counted by the date they were booked."}</p>
+          <p>{ads?.reportingDatesLabel || `Reporting ${report.from} to ${report.to} (Europe/London).`}</p>
+          <p className="advertising-results__basis-note">{ads?.dateBasisLabel || "Jobs are counted by enquiry date, falling back to the booking creation date."}</p>
         </div>
       </header>
       {preview ? <p className="advertising-results__banner">Sample preview. These are not live bookings.</p> : null}
@@ -208,7 +217,7 @@ export function AdvertisingResultsView({
             <input className="form-input" type="date" value={report.to} onChange={(event) => onDates(report.from, event.target.value, "enquiry")} />
           </label>
         </form>
-        <button type="button" className="btn btn-primary ads-simple-add" onClick={() => { setEditingSpendId(null); setShowSpendForm(true); }}>Add ad spend</button>
+        <button type="button" className="btn btn-primary ads-simple-add" onClick={() => { setEditingSpendId(null); setSpendReplacesImported(false); setShowSpendForm(true); }}>Add ad spend</button>
       </div>
 
       {showSpendForm ? (
@@ -223,6 +232,7 @@ export function AdvertisingResultsView({
               pounds: spendPounds,
               campaign: spendCampaign,
               note: spendNote,
+              replacesImported: spendReplacesImported,
             });
             resetSpendForm();
           }}
@@ -243,6 +253,10 @@ export function AdvertisingResultsView({
           <label>Notes (optional)
             <input className="form-input" value={spendNote} onChange={(event) => setSpendNote(event.target.value)} maxLength={120} />
           </label>
+          <label className="advertising-results__check">
+            <input type="checkbox" checked={spendReplacesImported} onChange={(event) => setSpendReplacesImported(event.target.checked)} disabled={saving || preview} />
+            Replace imported spend for these dates
+          </label>
           <button className="btn btn-primary" type="submit" disabled={saving || preview}>{editingSpendId ? "Save" : "Save spend"}</button>
           <button className="btn btn-secondary" type="button" disabled={saving} onClick={resetSpendForm}>Cancel</button>
         </form>
@@ -252,14 +266,28 @@ export function AdvertisingResultsView({
         <article>
           <span>Google Ads spend</span>
           <strong>{ads && ads.displaySpendPence != null ? formatGbp(ads.displaySpendPence) : "No ad spend recorded"}</strong>
+          <p className="ads-spend-source">{ads?.spendSourceLabel || "Unavailable"}</p>
         </article>
         <article>
-          <span>Confirmed jobs from ads</span>
+          <span>Confirmed ad bookings</span>
           <strong>{ads ? ads.confirmedCount : 0}</strong>
         </article>
         <article>
-          <span>Total agreed fares from those jobs</span>
+          <span>Total agreed fares</span>
           <strong>{ads ? formatGbp(ads.confirmedFarePence) : formatGbp(null)}</strong>
+        </article>
+        <article>
+          <span>Cost per confirmed ad booking</span>
+          <strong>{ads?.costPerConfirmedPence != null ? formatGbp(ads.costPerConfirmedPence) : "Unknown"}</strong>
+        </article>
+        <article>
+          <span>Booked fares per £1 spent</span>
+          <strong>{ads?.bookedFarePerPoundPence != null ? formatGbp(ads.bookedFarePerPoundPence) : "Unknown"}</strong>
+        </article>
+        <article>
+          <span>Payments received</span>
+          <strong>{ads ? formatGbp(ads.paymentsReceivedPence) : formatGbp(null)}</strong>
+          <p className="ads-spend-source">{ads?.paymentsReturnLabel || "Payments received on confirmed ad bookings."}</p>
         </article>
       </div>
       {ads?.spendOverlaps.length ? (
@@ -272,42 +300,11 @@ export function AdvertisingResultsView({
           {ads.spendPartialFlags.map((row) => <p key={row.id}>{row.detail}</p>)}
         </div>
       ) : null}
-
-      <section className="advertising-results__panel ads-jobs-panel">
-        <h2>Jobs from ads</h2>
-        <p>Period {report.from} to {report.to}. Return bookings count once. Cancelled jobs are marked.</p>
-        {!ads || ads.jobs.length === 0 ? <p>No ad jobs were booked in this period.</p> : (
-          <div className="advertising-results__table-wrap">
-            <table className="ads-jobs-table">
-              <thead>
-                <tr>
-                  <th>Date booked</th>
-                  <th>Journey</th>
-                  <th>Agreed fare</th>
-                  <th>Booking status</th>
-                  <th>Amount received</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ads.jobs.map((job) => (
-                  <tr key={job.id} className={job.cancelled ? "is-cancelled" : undefined}>
-                    <td>
-                      {onOpenBooking && job.id ? (
-                        <button type="button" className="booking-customer-link" onClick={() => onOpenBooking(job.id)}>{job.bookedDate}</button>
-                      ) : job.bookedDate}
-                      <div className="ads-job-ref">{job.bookingNumber}</div>
-                    </td>
-                    <td>{job.route}</td>
-                    <td>{formatGbp(job.farePence)}</td>
-                    <td>{job.cancelled ? <span className="ads-cancelled-tag">Cancelled</span> : statusLabel(job.status)}</td>
-                    <td>{formatGbp(job.receivedPence)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      {ads?.spendImportedConflict ? (
+        <div className="google-ads-flags" role="status">
+          <p>{ads.spendImportedConflict}</p>
+        </div>
+      ) : null}
 
       <section className="advertising-results__panel">
         <h2>Spend history</h2>
@@ -323,36 +320,11 @@ export function AdvertisingResultsView({
         )}
       </section>
 
-      <details className="ads-more-detail">
-        <summary>More detail</summary>
-
-      {ads ? (
-        <section className="advertising-results__panel google-ads-section" aria-label="Google Ads detail">
-          <h2>Google Ads</h2>
-          <p>{ads.dateBasisLabel}</p>
-          <div className="advertising-results__counts">
-            <article><span>Completed jobs from ads</span><strong>{ads.completedCount}</strong><p>Agreed fares {formatGbp(ads.completedFarePence)}</p></article>
-            <article><span>Payments received</span><strong>{formatGbp(ads.paymentsReceivedPence)}</strong></article>
-            <article><span>Cancellations</span><strong>{ads.cancelledCount}</strong></article>
-          </div>
-          {ads.adsApiSpendPence != null ? (
-            <p>Live Google Ads API spend for this period: {formatGbp(ads.adsApiSpendPence)}. Manual entries fully inside the period total {formatGbp(ads.spendPence)}.</p>
-          ) : null}
-          <h3>Spend by campaign</h3>
-          {campaignSpendRows.length === 0 ? <p>No campaign spend fully inside this period.</p> : (
-            <ul className="ads-spend-history">
-              {campaignSpendRows.map(([name, pence]) => (
-                <li key={name}><span>{name}</span><strong>{formatGbp(pence)}</strong></li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
-
-      {onReportFilters && reportFilters && filterChoices ? (
-        <section className="advertising-results__panel">
-          <h2>Report filters</h2>
-          <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
+      <section className="advertising-results__panel ads-jobs-panel">
+        <h2>Bookings from ads</h2>
+        <p>{ads?.reportingDatesLabel || `Period ${report.from} to ${report.to}.`} Returns count once. Cancelled bookings are marked and excluded from confirmed totals. List filters do not change account wide spend or headline ratios.</p>
+        {onReportFilters && reportFilters && filterChoices ? (
+          <form className="advertising-results__filters ads-job-filters" onSubmit={(event) => event.preventDefault()}>
             <label>Status
               <select className="form-select" value={reportFilters.status} onChange={(event) => onReportFilters({ ...reportFilters, status: event.target.value })}>
                 <option value="all">All statuses</option>
@@ -376,13 +348,102 @@ export function AdvertisingResultsView({
                 {filterChoices.vehicles.map((vehicle) => <option key={vehicle} value={vehicle}>{vehicle}</option>)}
               </select>
             </label>
-            <label>Recorded source
+            <label>Attribution
               <select className="form-select" value={reportFilters.source} onChange={(event) => onReportFilters({ ...reportFilters, source: event.target.value })}>
-                <option value="all">All sources</option>
+                <option value="all">All attribution</option>
                 {filterChoices.sources.map((source) => <option key={source} value={source}>{source}</option>)}
               </select>
             </label>
           </form>
+        ) : null}
+        {listedJobs.length === 0 ? <p>No ad bookings match this period{reportFilters && (reportFilters.status !== "all" || reportFilters.route !== "all" || reportFilters.vehicle !== "all" || reportFilters.source !== "all") ? " and filter" : ""}.</p> : (
+          <div className="advertising-results__table-wrap">
+            <table className="ads-jobs-table">
+              <thead>
+                <tr>
+                  <th>Enquiry or booking date</th>
+                  <th>Journey</th>
+                  <th>Agreed fare</th>
+                  <th>Status</th>
+                  <th>Attribution</th>
+                  <th>Payments received</th>
+                  <th>Attribute</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listedJobs.map((job) => (
+                  <tr key={job.id} className={job.cancelled ? "is-cancelled" : undefined}>
+                    <td>
+                      {onOpenBooking && job.id ? (
+                        <button type="button" className="booking-customer-link" onClick={() => onOpenBooking(job.id)}>{job.bookedDate}</button>
+                      ) : job.bookedDate}
+                      <div className="ads-job-ref">{job.bookingNumber}</div>
+                    </td>
+                    <td>{job.route}</td>
+                    <td>{formatGbp(job.farePence)}</td>
+                    <td>{job.cancelled ? <span className="ads-cancelled-tag">Cancelled</span> : statusLabel(job.status)}</td>
+                    <td>{job.attribution}</td>
+                    <td>{formatGbp(job.receivedPence)}</td>
+                    <td>
+                      {onSaveAdsAttribution && job.id ? (
+                        job.attribution.startsWith("Tracked") ? (
+                          <span className="ads-job-ref">Tracked click kept</span>
+                        ) : (
+                          <select
+                            className="form-select"
+                            aria-label={`Attribute ${job.bookingNumber}`}
+                            disabled={saving || preview}
+                            defaultValue={job.attribution.includes("Google Ads") ? "google_ads" : ""}
+                            onChange={(event) => onSaveAdsAttribution(job.id, event.target.value)}
+                          >
+                            <option value="">Not Google Ads</option>
+                            <option value="google_ads">Google Ads</option>
+                          </select>
+                        )
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {ads && ads.cancelledCount > 0 ? <p className="ads-cancelled-note">{ads.cancelledCount} cancelled {ads.cancelledCount === 1 ? "ad booking is" : "ad bookings are"} listed and excluded from confirmed totals.</p> : null}
+      </section>
+
+      <details className="ads-more-detail">
+        <summary>More detail</summary>
+
+      {reconciliationQueue.length > 0 ? (
+        <section className="advertising-results__panel">
+          <h2>Reconciliation</h2>
+          <p>Unknown amounts stay unknown. Open the booking to record the missing fare, payment, supplier cost, or source.</p>
+          <ul>
+            {reconciliationQueue.map((item) => <li key={`${item.bookingNumber}-${item.kind}`}>{item.bookingNumber}: {item.detail}</li>)}
+          </ul>
+        </section>
+      ) : null}
+
+      {ads ? (
+        <section className="advertising-results__panel google-ads-section" aria-label="Google Ads detail">
+          <h2>Google Ads</h2>
+          <p>{ads.dateBasisLabel}</p>
+          <div className="advertising-results__counts">
+            <article><span>Completed jobs from ads</span><strong>{ads.completedCount}</strong><p>Agreed fares {formatGbp(ads.completedFarePence)}</p></article>
+            <article><span>Payments received</span><strong>{formatGbp(ads.paymentsReceivedPence)}</strong></article>
+            <article><span>Cancellations</span><strong>{ads.cancelledCount}</strong></article>
+          </div>
+          {ads.adsApiSpendPence != null ? (
+            <p>Live Google Ads API spend for this period: {formatGbp(ads.adsApiSpendPence)}. Manual entries fully inside the period total {formatGbp(ads.spendPence)}.</p>
+          ) : null}
+          <h3>Spend by campaign</h3>
+          {campaignSpendRows.length === 0 ? <p>No campaign spend fully inside this period.</p> : (
+            <ul className="ads-spend-history">
+              {campaignSpendRows.map(([name, pence]) => (
+                <li key={name}><span>{name}</span><strong>{formatGbp(pence)}</strong></li>
+              ))}
+            </ul>
+          )}
         </section>
       ) : null}
 
@@ -609,7 +670,7 @@ export function AdvertisingResultsView({
         {onRefreshAds && <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>{refreshingAds ? "Refreshing Google Ads…" : "Refresh Google Ads spend"}</button>}
         <label className="advertising-results__check">
           <input type="checkbox" checked={manualIsComplete} onChange={(event) => onManualComplete(event.target.checked)} disabled={saving || preview} />
-          Use the dated manual entries as the full advertising spend for overall advertising results
+          Legacy only: treat dated manual entries as the full advertising spend for overall business growth figures below. Prefer “Replace imported spend for these dates” on a spend entry for the Google Ads period total.
         </label>
         <p>Add and edit dated spend entries with Add ad spend and Spend history at the top of this page.</p>
       </section>
@@ -756,7 +817,7 @@ const AdvertisingResults: React.FC<{
   previewMode?: boolean;
   onOpenBooking?: (bookingId: string) => void;
 }> = ({ bookings, email, previewMode = false, onOpenBooking }) => {
-  const initial = previewMode ? { from: "2026-11-01", to: "2026-11-30" } : currentLondonCalendarMonth();
+  const initial = previewMode ? { from: "2026-11-01", to: "2026-11-18" } : thisMonthThroughYesterday();
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [dateBasis, setDateBasis] = useState<"journey" | "enquiry">("enquiry");
@@ -794,6 +855,7 @@ const AdvertisingResults: React.FC<{
           label: String(data.label || "Manual entry"),
           campaign: String(data.campaign || "").trim(),
           note: String(data.note || "").trim(),
+          replacesImported: data.replacesImported === true,
         } as SpendRangeEntry;
       }));
     }, () => setMessage("Advertising spend could not be loaded. Admin access is required before entries can be saved."));
@@ -847,27 +909,20 @@ const AdvertisingResults: React.FC<{
   },[previewMode,email,from,to,adsReload]);
 
   const noted = useMemo(() => withNotes(bookings, notes), [bookings, notes]);
-  const filterChoices = useMemo(() => ({
-    routes: Array.from(new Set(noted.map((booking) => routeLabel(booking)))).sort(),
-    vehicles: Array.from(new Set(noted.map((booking) => vehicleLabel(booking)))).sort(),
-    sources: Array.from(new Set(noted.map((booking) => sourceLabel(booking)))).sort(),
-  }), [noted]);
-  const filteredBookings = useMemo(() => noted.filter((booking) => {
-    if (reportFilters.status !== "all" && effectiveWorkflowStatus(booking) !== reportFilters.status) return false;
-    if (reportFilters.route !== "all" && routeLabel(booking) !== reportFilters.route) return false;
-    if (reportFilters.vehicle !== "all" && vehicleLabel(booking) !== reportFilters.vehicle) return false;
-    if (reportFilters.source !== "all" && sourceLabel(booking) !== reportFilters.source) return false;
-    return true;
-  }), [noted, reportFilters]);
-  const report = useMemo(() => buildAdvertisingReport(filteredBookings, {
-    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected: adsConnected && adsRange===`${from}|${to}`, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed,
-  }), [filteredBookings, from, to, dateBasis, spend, manualIsComplete, adsConnected, adsRange, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed]);
   const googleAdsReport = useMemo(() => buildGoogleAdsPeriodReport(noted, {
     from,
     to,
     spend: spend as SpendRangeEntry[],
     adsSpendPence: adsConnected && adsRange === `${from}|${to}` ? adsSpendPence : null,
   }), [noted, from, to, spend, adsConnected, adsRange, adsSpendPence]);
+  const filterChoices = useMemo(() => ({
+    routes: Array.from(new Set(googleAdsReport.jobs.map((job) => job.route))).sort(),
+    vehicles: Array.from(new Set(googleAdsReport.jobs.map((job) => job.vehicle))).sort(),
+    sources: Array.from(new Set(googleAdsReport.jobs.map((job) => job.attribution))).sort(),
+  }), [googleAdsReport.jobs]);
+  const report = useMemo(() => buildAdvertisingReport(noted, {
+    from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected: adsConnected && adsRange===`${from}|${to}`, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed,
+  }), [noted, from, to, dateBasis, spend, manualIsComplete, adsConnected, adsRange, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed]);
 
   if (!previewMode && !isAdminEmail(email)) {
     return <section className="advertising-results"><h1>Advertising results</h1><p>This page is only for admin accounts.</p></section>;
@@ -887,19 +942,10 @@ const AdvertisingResults: React.FC<{
 
   const queue = reconciliationItems(bookings);
   return (
-    <>
-    {queue.length > 0 ? (
-      <section className="card" style={{ marginBottom: "1rem" }}>
-        <h3 className="card-title">Reconciliation queue</h3>
-        <p>Unknown amounts stay unknown. Open the booking to record the missing fare, payment, supplier cost, or source.</p>
-        <ul>
-          {queue.map((item) => <li key={`${item.bookingNumber}-${item.kind}`}>{item.bookingNumber}: {item.detail}</li>)}
-        </ul>
-      </section>
-    ) : null}
     <AdvertisingResultsView
       report={report}
       deliveries={deliveries}
+      reconciliationQueue={queue}
       preview={previewMode}
       message={message}
       connectionNote={adsReason}
@@ -976,6 +1022,7 @@ const AdvertisingResults: React.FC<{
             label: "Manual entry",
             campaign: String(input.campaign || "").trim().slice(0, 80),
             note: String(input.note || "").trim().slice(0, 120),
+            replacesImported: input.replacesImported === true,
             updatedAt: serverTimestamp(),
             updatedBy: email || "",
           };
@@ -1008,6 +1055,12 @@ const AdvertisingResults: React.FC<{
           .catch(() => setMessage('The source was not saved. The source history service must be deployed and admin access is required.'))
           .finally(() => setSaving(false));
       }}
+      onSaveAdsAttribution={(id, source) => {
+        void saveNote(id, { staffReportedSource: source });
+        setMessage(source
+          ? "Manual Google Ads attribution saved for the admin report only. Tracked click data and Google conversions were not changed."
+          : "Manual Google Ads attribution cleared for the admin report. Tracked click data was not changed.");
+      }}
       onSaveCost={(id, field, pounds) => {
         const amount = poundsToPence(pounds);
         if (amount === null) {
@@ -1017,7 +1070,6 @@ const AdvertisingResults: React.FC<{
         void saveNote(id, { [field]: amount });
       }}
     />
-    </>
   );
 };
 
