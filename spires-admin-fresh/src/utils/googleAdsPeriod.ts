@@ -2,7 +2,6 @@ import {
   AdvertisingBookingInput,
   SpendEntryInput,
   formatGbp,
-  routeLabel,
   sourceLabel,
 } from "./advertisingResults";
 import { effectiveWorkflowStatus } from "./bookingWorkflow";
