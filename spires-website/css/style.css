@@ -252,43 +252,50 @@ li + li { margin-top: 0.35rem; }
 
 .site-header__inner {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1.75rem;
+  column-gap: 1.25rem;
   min-height: 84px;
   width: min(100% - 3rem, 1440px);
   margin-inline: auto;
 }
 
 .site-logo {
-  flex: 0 0 auto;
+  grid-column: 1;
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .site-logo__img {
+  display: block;
   height: 52px;
   width: auto;
-  max-width: none;
+  max-width: min(200px, 26vw);
 }
 
 .site-nav {
-  flex: 1 1 auto;
+  grid-column: 2;
   min-width: 0;
   display: flex;
   justify-content: center;
   align-self: stretch;
+  overflow: hidden;
 }
 
 .site-nav__list {
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;
-  gap: 1.35rem;
+  gap: clamp(0.65rem, 1.1vw, 1.2rem);
   list-style: none;
   padding: 0;
   margin: 0;
+  max-width: 100%;
 }
 
 .site-nav__list > li { display: flex; align-items: stretch; }
@@ -460,10 +467,20 @@ form.event-quote:has(select[name="bookingType"] option[value="return"]:checked) 
 }
 
 .site-header__actions {
+  grid-column: 3;
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 0.85rem;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+@media (min-width: 1280px) and (max-width: 1480px) {
+  .site-header__inner { column-gap: 0.85rem; }
+  .site-nav__list > li > a,
+  .site-nav__trigger { font-size: 0.9rem; }
+  .site-header__actions .btn { padding-inline: 0.95rem; }
+  .site-header__phone { font-size: 0.88rem; }
 }
 
 .site-header__actions .btn {
