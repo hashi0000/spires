@@ -1,7 +1,7 @@
 {
-  "version": "2026-11-15",
+  "version": "2026-11-19",
   "airport": {
-    "flightFreeMinutes": 60,
+    "flightFreeMinutes": 50,
     "fixedFreeMinutes": 15,
     "blockMinutes": 15,
     "chargePounds": 5

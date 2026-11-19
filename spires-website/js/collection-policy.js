@@ -1,5 +1,23 @@
 (function (root) {
-  var CURRENT = "2026-11-15";
+  var shared = root.SpiresServicePolicy || {};
+  var CURRENT = String(shared.version || "2026-11-19");
+  var CURRENT_AIRPORT = shared.airport || {
+    flightFreeMinutes: 50,
+    fixedFreeMinutes: 15,
+    blockMinutes: 15,
+    chargePounds: 5,
+  };
+
+  /** Historic published stamps kept so older bookings keep their agreed numbers. */
+  var PUBLISHED = {
+    "2026-11-15": { flightFreeMinutes: 60, fixedFreeMinutes: 15, blockMinutes: 15, chargePounds: 5 },
+  };
+  PUBLISHED[CURRENT] = {
+    flightFreeMinutes: Number(CURRENT_AIRPORT.flightFreeMinutes),
+    fixedFreeMinutes: Number(CURRENT_AIRPORT.fixedFreeMinutes),
+    blockMinutes: Number(CURRENT_AIRPORT.blockMinutes),
+    chargePounds: Number(CURRENT_AIRPORT.chargePounds),
+  };
 
   function instant(value) {
     if (value == null || value === "") return null;
@@ -18,18 +36,23 @@
     }).format(new Date(ms));
   }
 
+  function publishedFor(version) {
+    if (!version) return null;
+    return PUBLISHED[String(version)] || null;
+  }
+
   function policyFor(input) {
-    var current = input && input.waitingPolicyVersion === CURRENT;
     var hotel = input && input.collectionLocationKind === "hotel";
     var fixed = hotel || (input && input.collectionArrangement === "fixed_time");
-    if (!current) {
+    var published = publishedFor(input && input.waitingPolicyVersion);
+    if (!published) {
       return { version: "legacy-50-30", freeMinutes: 50, blockMinutes: 30, chargePounds: 10, basis: "actual_landing" };
     }
     return {
-      version: CURRENT,
-      freeMinutes: fixed ? 15 : 60,
-      blockMinutes: 15,
-      chargePounds: 5,
+      version: String(input.waitingPolicyVersion),
+      freeMinutes: fixed ? published.fixedFreeMinutes : published.flightFreeMinutes,
+      blockMinutes: published.blockMinutes,
+      chargePounds: published.chargePounds,
       basis: fixed ? "booked_time" : "actual_landing",
     };
   }
@@ -106,6 +129,8 @@
   }
 
   var api = {
+    CURRENT_WAITING_VERSION: CURRENT,
+    policyFor: policyFor,
     proposeWaitingCharge: proposeWaitingCharge,
     proposeTimedHireCharge: proposeTimedHireCharge,
     addAdditionalCharge: addAdditionalCharge,

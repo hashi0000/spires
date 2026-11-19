@@ -133,7 +133,7 @@ function paymentScheduleHtml(booking: Booking): string {
     <div class="info-box full-width payment-schedule-box">
       <h2 class="section-header">Payment Schedule</h2>
       ${total != null ? row("Total fare", total) : ""}
-      ${row("Deposit paid", deposit)}
+      ${row(booking.depositStatus === "paid" ? "Deposit paid" : "Agreed deposit", deposit)}
       ${row("Due on outbound journey", outbound)}
       ${row("Due on return journey", ret)}
     </div>

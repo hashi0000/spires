@@ -14,6 +14,7 @@ exports.bookingLooksLikeAirportTransfer = bookingLooksLikeAirportTransfer;
 exports.airportWaitingScopeNote = airportWaitingScopeNote;
 exports.waitingPolicyForBooking = waitingPolicyForBooking;
 exports.currentCollectionCopy = currentCollectionCopy;
+exports.publicWaitingParagraph = publicWaitingParagraph;
 exports.fixedTimeExplanation = fixedTimeExplanation;
 exports.fixedTimeAcknowledgement = fixedTimeAcknowledgement;
 exports.proposeWaitingCharge = proposeWaitingCharge;
@@ -111,13 +112,29 @@ exports.CURRENT_WAITING = {
     version: exports.CURRENT_WAITING_VERSION,
     ...servicePolicy_json_1.default.airport,
 };
+/** Published waiting schedules kept so earlier acceptances keep their agreed numbers. */
+const PUBLISHED_WAITING = {
+    "2026-11-15": { flightFreeMinutes: 60, fixedFreeMinutes: 15, blockMinutes: 15, chargePounds: 5 },
+    [exports.CURRENT_WAITING_VERSION]: {
+        flightFreeMinutes: exports.CURRENT_WAITING.flightFreeMinutes,
+        fixedFreeMinutes: exports.CURRENT_WAITING.fixedFreeMinutes,
+        blockMinutes: exports.CURRENT_WAITING.blockMinutes,
+        chargePounds: exports.CURRENT_WAITING.chargePounds,
+    },
+};
+function publishedWaiting(version) {
+    if (!version)
+        return null;
+    return PUBLISHED_WAITING[version] || null;
+}
 function waitingPolicyForBooking(booking) {
-    const current = booking?.waitingPolicyVersion === exports.CURRENT_WAITING_VERSION;
     const hotel = booking?.collectionLocationKind === "hotel";
     const arrangement = hotel || booking?.collectionArrangement === "fixed_time"
         ? "fixed_time"
         : "flight_monitored";
-    if (!current) {
+    const version = String(booking?.waitingPolicyVersion || "");
+    const published = publishedWaiting(version);
+    if (!published) {
         return {
             ...exports.AIRPORT_WAITING_POLICY,
             version: "legacy-50-30",
@@ -126,23 +143,35 @@ function waitingPolicyForBooking(booking) {
         };
     }
     return {
-        version: exports.CURRENT_WAITING_VERSION,
-        freeMinutesAfterActualLanding: arrangement === "fixed_time" ? exports.CURRENT_WAITING.fixedFreeMinutes : exports.CURRENT_WAITING.flightFreeMinutes,
-        chargeBlockMinutes: exports.CURRENT_WAITING.blockMinutes,
-        chargePerBlock: exports.CURRENT_WAITING.chargePounds,
+        version,
+        freeMinutesAfterActualLanding: arrangement === "fixed_time" ? published.fixedFreeMinutes : published.flightFreeMinutes,
+        chargeBlockMinutes: published.blockMinutes,
+        chargePerBlock: published.chargePounds,
         basis: arrangement === "fixed_time" ? "booked_time" : "actual_landing",
         arrangement,
     };
 }
 function currentCollectionCopy() {
+    const flight = exports.CURRENT_WAITING.flightFreeMinutes;
+    const fixed = exports.CURRENT_WAITING.fixedFreeMinutes;
+    const charge = exports.CURRENT_WAITING.chargePounds;
+    const block = exports.CURRENT_WAITING.blockMinutes;
     return [
-        "Flight monitored collection is the usual choice for an airport terminal pickup. We track the verified actual landing, not the scheduled arrival. The included allowance is 60 minutes from that verified landing. A delay before landing does not use the allowance.",
-        "Fixed time collection is scheduled for the date and clock time you choose. Flight monitoring is not included, and the pickup does not change automatically if the flight is early or late. The included allowance is 15 minutes from the booked collection time. Earlier collection or a change of time is subject to availability.",
-        "Additional waiting is charged at £5 per started 15 minutes after your included allowance. Waiting caused by our driver is not charged. The time starts only once the included allowance has ended and the driver is ready at the agreed collection point.",
+        `Flight monitored collection is the usual choice for an airport terminal pickup. We track the verified actual landing, not the scheduled arrival. The included allowance is ${flight} minutes from that verified landing. A delay before landing does not use the allowance.`,
+        `Fixed time collection is scheduled for the date and clock time you choose. Flight monitoring is not included, and the pickup does not change automatically if the flight is early or late. The included allowance is ${fixed} minutes from the booked collection time. Earlier collection or a change of time is subject to availability.`,
+        `Additional waiting is charged at £${charge} per started ${block} minutes after your included allowance. Waiting caused by our driver is not charged. The time starts only once the included allowance has ended and the driver is ready at the agreed collection point.`,
         "A hotel collection uses the fixed time arrangement. A delay to an earlier flight does not move the hotel pickup unless we agree a different time with you.",
         "If you would prefer a later pickup, choose fixed time collection and allow enough time for immigration, luggage and reaching the collection point. Your driver will be scheduled for that time; earlier pickup is subject to availability.",
         "Bookings already accepted keep the waiting terms agreed at the time. Those terms are not replaced by this policy.",
     ].join("\n\n");
+}
+/** Short public paragraph used on rates, airport pages and the guest form. */
+function publicWaitingParagraph() {
+    const flight = exports.CURRENT_WAITING.flightFreeMinutes;
+    const fixed = exports.CURRENT_WAITING.fixedFreeMinutes;
+    const charge = exports.CURRENT_WAITING.chargePounds;
+    const block = exports.CURRENT_WAITING.blockMinutes;
+    return `Flight monitored collection includes ${flight} minutes from verified actual landing, then £${charge} per started ${block} minutes. Fixed time collection includes ${fixed} minutes from the booked clock time, then the same rate; flight monitoring and automatic adjustment are not included. Your waiting timer stops when you call or message to confirm your whole group and luggage are ready at the agreed collection point. We do not charge for delays caused by our driver. Your confirmation states the arrangement you selected.`;
 }
 function fixedTimeExplanation() {
     return "Your driver is scheduled for your chosen collection time. Flight monitoring is not included with this option, and your pickup will not automatically change if your flight arrives early or late. Earlier collection or rescheduling is subject to availability. Please contact us promptly if you are delayed.";
@@ -248,7 +277,9 @@ function additionalChargesPence(booking) {
 function airportWaitingTextForBooking(booking) {
     if (booking?.acceptedServiceTerms)
         booking = { ...booking, ...booking.acceptedServiceTerms, acceptedServiceTerms: undefined };
-    if (booking?.waitingPolicyVersion === exports.CURRENT_WAITING_VERSION && booking.returnAirportCollection) {
+    if (!booking)
+        return airportWaitingDisclaimerBody(exports.AIRPORT_WAITING_POLICY);
+    if (publishedWaiting(booking.waitingPolicyVersion) && booking.returnAirportCollection) {
         const returning = airportWaitingTextForBooking({ waitingPolicyVersion: booking.waitingPolicyVersion,
             collectionArrangement: booking.returnCollectionArrangement, collectionLocationKind: booking.returnCollectionLocationKind });
         if (!booking.airportCollection)
@@ -258,13 +289,13 @@ function airportWaitingTextForBooking(booking) {
         return `Outbound collection: ${outbound}\n\nReturn collection: ${returning}`;
     }
     const policy = waitingPolicyForBooking(booking);
-    if (policy.version !== exports.CURRENT_WAITING_VERSION)
+    if (!publishedWaiting(policy.version))
         return airportWaitingDisclaimerBody(exports.AIRPORT_WAITING_POLICY);
     const arrangement = policy.arrangement === "fixed_time" ? "fixed time collection" : "flight monitored collection";
     const allowance = policy.arrangement === "fixed_time"
-        ? "15 minutes from the booked collection time"
-        : "60 minutes from the verified actual landing";
-    return `This booking uses ${arrangement}. Included waiting is ${allowance}. Additional waiting is charged at £5 per started 15 minutes after your included allowance. Waiting stops when you call or message to confirm your whole group and luggage are ready at the agreed collection point. Delays caused by our driver are not charged.${policy.arrangement === 'fixed_time' ? ' Flight monitoring and automatic adjustment are not included. Earlier collection or rescheduling is subject to availability.' : ''}`;
+        ? `${policy.freeMinutesAfterActualLanding} minutes from the booked collection time`
+        : `${policy.freeMinutesAfterActualLanding} minutes from the verified actual landing`;
+    return `This booking uses ${arrangement}. Included waiting is ${allowance}. Additional waiting is charged at £${policy.chargePerBlock} per started ${policy.chargeBlockMinutes} minutes after your included allowance. Waiting stops when you call or message to confirm your whole group and luggage are ready at the agreed collection point. Delays caused by our driver are not charged.${policy.arrangement === 'fixed_time' ? ' Flight monitoring and automatic adjustment are not included. Earlier collection or rescheduling is subject to availability.' : ''}`;
 }
 function isReturnBooking(booking) {
     if (!booking)

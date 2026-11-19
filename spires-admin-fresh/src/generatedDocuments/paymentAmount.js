@@ -9,6 +9,35 @@ export function agreedFarePence(booking) {
         : (Number.isFinite(Number(booking.actualFare)) ? Math.max(0, Math.round(Number(booking.actualFare) * 100)) : 0);
     return base + extras;
 }
+export function depositAmountPence(booking) {
+    if (booking.depositRequired !== true)
+        return 0;
+    return Math.max(0, Math.round((Number(booking.depositAmount) || 0) * 100));
+}
+/** True when a paid deposit is already reflected in amountReceivedPence / paymentEntries. */
+export function paidDepositAlreadyRecorded(booking, depositPence = depositAmountPence(booking)) {
+    if (!(depositPence > 0))
+        return true;
+    const entries = Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [];
+    if (entries.some((entry) => entry && (entry.kind === "deposit" || String(entry.clientRequestId || "").startsWith("deposit-")))) {
+        return true;
+    }
+    const recorded = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+    return recorded >= depositPence;
+}
+/**
+ * Payments received for display and balance due.
+ * Pending deposits leave the total unchanged. A paid deposit missing from the payment history is counted once.
+ */
+export function effectiveReceivedPence(booking) {
+    const recorded = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+    if (String(booking.depositStatus || "") !== "paid")
+        return recorded;
+    const depositPence = depositAmountPence(booking);
+    if (!(depositPence > 0) || paidDepositAlreadyRecorded(booking, depositPence))
+        return recorded;
+    return recorded + depositPence;
+}
 /** The amount a card payment may take. The browser amount is not used. */
 export function serverPayablePence(booking) {
     const status = String(booking.status || "");
@@ -20,12 +49,12 @@ export function serverPayablePence(booking) {
     const farePence = agreedFarePence(booking);
     if (!(farePence > 0))
         return { ok: false, reason: "This booking has no agreed fare." };
-    const receivedPence = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+    const receivedPence = effectiveReceivedPence(booking);
     const outstanding = Math.max(0, farePence - receivedPence);
     if (outstanding <= 0)
         return { ok: false, reason: "This booking has no outstanding balance." };
-    const depositPence = Math.max(0, Math.round((Number(booking.depositAmount) || 0) * 100));
-    const depositStillDue = booking.depositRequired === true && depositPence > receivedPence;
+    const depositPence = depositAmountPence(booking);
+    const depositStillDue = booking.depositRequired === true && String(booking.depositStatus || "") !== "paid" && depositPence > receivedPence;
     const pence = depositStillDue ? Math.min(outstanding, depositPence - receivedPence) : outstanding;
     if (pence < 50)
         return { ok: false, reason: "The outstanding amount is below the card minimum." };

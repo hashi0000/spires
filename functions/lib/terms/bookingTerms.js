@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Current service terms published on 15 November 2026.
+ * Current service terms published on 19 November 2026.
  * New acceptances use this version; existing agreements retain their version.
  * The previous public page had no stored publication date and is not an April archive.
  */
@@ -16,11 +16,11 @@ exports.formatLondonDateTime = formatLondonDateTime;
 exports.acceptanceSummary = acceptanceSummary;
 exports.confirmationTermsParagraph = confirmationTermsParagraph;
 exports.CURRENT_BOOKING_TERMS = {
-    version: "2026-11-15",
-    appliesToJourneysFrom: "2026-11-15",
-    publishedOn: "2026-11-15",
-    path: "/terms/2026-11-15",
-    url: "https://www.spires-taxis.com/terms/2026-11-15",
+    version: "2026-11-19",
+    appliesToJourneysFrom: "2026-11-19",
+    publishedOn: "2026-11-19",
+    path: "/terms/2026-11-19",
+    url: "https://www.spires-taxis.com/terms/2026-11-19",
 };
 exports.PREVIOUS_PUBLIC_TERMS = {
     id: "previous-public",
@@ -35,6 +35,8 @@ exports.STAFF_ACCEPTANCE_METHODS = ["phone", "email", "whatsapp", "in_person", "
 function termsUrlForVersion(version) {
     if (version === "2026-10-25")
         return "https://www.spires-taxis.com/terms/2026-10-25";
+    if (version === "2026-11-15")
+        return "https://www.spires-taxis.com/terms/2026-11-15";
     if (version === exports.CURRENT_BOOKING_TERMS.version)
         return exports.CURRENT_BOOKING_TERMS.url;
     if (version === exports.PREVIOUS_PUBLIC_TERMS.id)

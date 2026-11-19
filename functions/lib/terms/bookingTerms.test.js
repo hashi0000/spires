@@ -8,9 +8,9 @@ const node_test_1 = require("node:test");
 const bookingTerms_1 = require("./bookingTerms");
 (0, node_test_1.describe)("booking terms version", () => {
     (0, node_test_1.it)("publishes the new terms without replacing historic agreements", () => {
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-15");
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.publishedOn, "2026-11-15");
-        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.version, "2026-11-15");
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-19");
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.publishedOn, "2026-11-19");
+        strict_1.default.equal(bookingTerms_1.CURRENT_BOOKING_TERMS.version, "2026-11-19");
         strict_1.default.equal(bookingTerms_1.PREVIOUS_PUBLIC_TERMS.publicationDateRecorded, false);
         strict_1.default.notEqual(bookingTerms_1.PREVIOUS_PUBLIC_TERMS.id, "2026-04-01");
     });
@@ -85,7 +85,7 @@ const bookingTerms_1 = require("./bookingTerms");
         strict_1.default.equal(summary.text, "Acceptance not recorded.");
         strict_1.default.doesNotMatch((0, bookingTerms_1.confirmationTermsParagraph)({}), /Accepted /);
         strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /Acceptance not recorded/);
-        strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /2026-11-15/);
+        strict_1.default.match((0, bookingTerms_1.confirmationTermsParagraph)({}), /2026-11-19/);
     });
     (0, node_test_1.it)("shows the version that was actually stored", () => {
         const summary = (0, bookingTerms_1.acceptanceSummary)({

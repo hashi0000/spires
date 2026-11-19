@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clientAmountMatchesPayable, paymentClaimAllows, serverPayablePence } from "./paymentAmount";
+import {
+  clientAmountMatchesPayable,
+  effectiveReceivedPence,
+  paymentClaimAllows,
+  serverPayablePence,
+} from "./paymentAmount";
 
 describe("server payable amount", () => {
   it("uses the deposit that is still due, then the remaining balance", () => {
@@ -8,6 +13,19 @@ describe("server payable amount", () => {
     assert.equal(deposit.ok && deposit.pence, 2000);
     const balance = serverPayablePence({ actualFare: 92, amountReceivedPence: 2000, depositRequired: true, depositAmount: 20 });
     assert.equal(balance.ok && balance.pence, 7200);
+  });
+
+  it("treats a paid deposit missing from the payment total as already received", () => {
+    const booking = {
+      actualFare: 235,
+      amountReceivedPence: 0,
+      depositRequired: true,
+      depositAmount: 35,
+      depositStatus: "paid",
+    };
+    assert.equal(effectiveReceivedPence(booking), 3500);
+    const due = serverPayablePence({ ...booking, status: "confirmed" });
+    assert.equal(due.ok && due.pence, 20000);
   });
 
   it("rejects a cancelled booking, a missing fare, and a stale browser amount", () => {

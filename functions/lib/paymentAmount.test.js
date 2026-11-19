@@ -13,6 +13,18 @@ const paymentAmount_1 = require("./paymentAmount");
         const balance = (0, paymentAmount_1.serverPayablePence)({ actualFare: 92, amountReceivedPence: 2000, depositRequired: true, depositAmount: 20 });
         strict_1.default.equal(balance.ok && balance.pence, 7200);
     });
+    (0, node_test_1.it)("treats a paid deposit missing from the payment total as already received", () => {
+        const booking = {
+            actualFare: 235,
+            amountReceivedPence: 0,
+            depositRequired: true,
+            depositAmount: 35,
+            depositStatus: "paid",
+        };
+        strict_1.default.equal((0, paymentAmount_1.effectiveReceivedPence)(booking), 3500);
+        const due = (0, paymentAmount_1.serverPayablePence)({ ...booking, status: "confirmed" });
+        strict_1.default.equal(due.ok && due.pence, 20000);
+    });
     (0, node_test_1.it)("rejects a cancelled booking, a missing fare, and a stale browser amount", () => {
         strict_1.default.equal((0, paymentAmount_1.serverPayablePence)({ status: "cancelled", actualFare: 40 }).ok, false);
         strict_1.default.equal((0, paymentAmount_1.serverPayablePence)({ status: "confirmed", actualFare: 0 }).ok, false);

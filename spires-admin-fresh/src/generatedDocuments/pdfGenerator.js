@@ -1,7 +1,7 @@
 // GENERATED from functions/src. Edit the source, then run tools/sync-document-renderer.cjs.
 import PDFDocument from "./pdfkitDocument";
 import documentFonts from "./documentFonts.json";
-import { agreedFarePence } from "./paymentAmount";
+import { agreedFarePence, effectiveReceivedPence } from "./paymentAmount";
 import { timedHireAcknowledgement } from "./timedHire";
 import { SPIRES_BANK_DETAILS, isBankTransferMethod, } from "./bankDetails";
 import { airportWaitingDisclaimerTitle, airportWaitingScopeNote, airportWaitingTextForBooking, bookingHasAirportCollection, bookingLooksLikeAirportTransfer, isReturnBooking, } from "./airportWaitingPolicy";
@@ -84,12 +84,12 @@ function paymentCopy(type, booking, hasFare) {
         : hasFare && Number.isFinite(Number(booking.actualFare))
             ? `£${Number(booking.actualFare).toFixed(2)}`
             : "TBC";
-    const receivedPounds = Math.max(0, Number(booking.amountReceivedPence || 0) / 100);
+    const receivedPounds = effectiveReceivedPence(booking) / 100;
     const totalPounds = Number(booking.actualFare) || 0;
     const latest = Array.isArray(booking.paymentEntries) ? booking.paymentEntries[booking.paymentEntries.length - 1] : null;
     if (type === 'payment_request' && hasFare) {
         const balance = Math.max(0, totalPounds - receivedPounds);
-        const depositDue = booking.depositRequired === true && Number(booking.depositAmount || 0) > receivedPounds ? Number(booking.depositAmount) - receivedPounds : 0;
+        const depositDue = booking.depositRequired === true && String(booking.depositStatus || "") !== "paid" && Number(booking.depositAmount || 0) > receivedPounds ? Number(booking.depositAmount) - receivedPounds : 0;
         amount = '£' + (depositDue > 0 ? Math.min(balance, depositDue) : balance).toFixed(2);
     }
     if ((type === 'payment_receipt' || type === 'payment') && hasFare)
@@ -463,13 +463,14 @@ export async function generateBookingPDF(booking, type = "booking_confirmation")
             row("Agreed fare", Math.round(originalFare * 100));
             extras.forEach((extra) => row(String(extra.reason || "Additional charge"), Number(extra.amountPence) || 0));
             row("Final total", totalPence);
+            const receivedPence = effectiveReceivedPence(booking);
             const latest = Array.isArray(booking.paymentEntries) ? booking.paymentEntries[booking.paymentEntries.length - 1] : null;
             if ((type === 'payment_receipt' || type === 'payment') && latest?.mode === 'add') {
-                row('Earlier payments, including deposit', Math.max(0, Number(booking.amountReceivedPence || 0) - Number(latest.amountPence || 0)));
+                row('Earlier payments, including deposit', Math.max(0, receivedPence - Number(latest.amountPence || 0)));
                 row('This payment', Number(latest.amountPence || 0));
             }
-            row("Payments received, including deposit", Number(booking.amountReceivedPence) || 0);
-            row("Balance due", Math.max(0, totalPence - (Number(booking.amountReceivedPence) || 0)));
+            row("Payments received, including deposit", receivedPence);
+            row("Balance due", Math.max(0, totalPence - receivedPence));
             return cy;
         }) + 10;
     }

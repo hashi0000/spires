@@ -6,9 +6,12 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "node scripts/sync-published-prices.mjs && node scripts/generate-sitemap.mjs && node scripts/validate-seo.mjs",
+    "build": "node scripts/sync-published-prices.mjs && node scripts/generate-sitemap.mjs && node scripts/validate-seo.mjs && node ../tools/check-customer-consistency.cjs",
     "sitemap": "node scripts/generate-sitemap.mjs",
     "seo:validate": "node scripts/validate-seo.mjs",
+    "policy:check": "node ../tools/check-customer-consistency.cjs",
+    "policy:waiting": "node ../tools/check-waiting-policy.cjs",
+    "policy:drift": "node ../tools/check-shared-policy-drift.cjs",
     "indexnow": "node scripts/submit-indexnow.mjs",
     "chrome": "node scripts/apply-chrome.mjs"
   },

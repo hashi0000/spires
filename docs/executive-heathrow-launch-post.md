@@ -1,5 +1,7 @@
 # Executive Heathrow launch post
 
+Draft social copy only. Fares and waiting rules must match [`policies/README.md`](policies/README.md). Do not publish this as a paid advert from a docs tidy task.
+
 Prepared for Facebook or WhatsApp. Do not publish this as a paid advert from this task.
 
 Executive Heathrow transfers are now open to book.

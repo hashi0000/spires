@@ -1,5 +1,8 @@
 # Offers and messages
 
+Operational pre-release checklist for emails and offers.  
+**Not** the policy source of truth — use [`policies/README.md`](policies/README.md).
+
 The admin screen shows configured templates. It does not prove a live inbox received them.
 
 Before a release:
@@ -12,4 +15,11 @@ Before a release:
 6. Check Firebase Authentication password reset and verification templates in the Firebase console.
 7. Do not take a real payment. Use the admin payment request preview only.
 
-Executive Car stays switched off until partner confirmation covers the existing airport pickup charge, flight monitoring, and 50 minutes from the actual landing time. Extra waiting remains £10 per additional 30 minutes or part thereof.
+## Policy dependency (do not hard-code here)
+
+Executive Car and airport waiting rules belong in the [policy register](policies/README.md):
+
+- Flight-monitored allowance: **50 minutes** from actual landing (approved).
+- Overage and fixed-time: separate register entries. This checklist previously said **£10 per 30 minutes** while current published stamps use **£5 per started 15 minutes** — **Needs Hashim’s approval** before treating either line as permanent ops gate text.
+
+Keep Executive launch gated on partner confirmation for vehicle supply and the **register** waiting rules, not on a one-off sentence in this file.

@@ -1,40 +1,26 @@
-# Environment Variables for Vercel
+# Environment variables (customer app)
 
-## Optional Configuration
+Optional Firebase web config for Vercel. Fallback values also exist in `src/firebase.js` for local builds.
 
-The Firebase configuration in `src/firebase.js` has fallback values, so environment variables are **optional**. However, using them is a best practice for security and flexibility.
+**Do not commit secrets.** Firebase web API keys are public client identifiers, but treat measurement protocol secrets, SMTP passwords and payment keys as private — store them in Secret Manager / Vercel encrypted env, not in Markdown.
 
-## Setting Up in Vercel
+## Setting up in Vercel
 
-1. Go to your Vercel project dashboard
-2. Navigate to **Settings** → **Environment Variables**
-3. Add these variables for **Production**, **Preview**, and **Development**:
+1. Open the customer-app Vercel project → **Settings** → **Environment Variables**
+2. Add these for Production, Preview and Development (values from the Firebase project console, not from chat history):
 
 ```
-REACT_APP_FIREBASE_API_KEY=AIzaSyAJIrqyzPbl72e_4aGyCe2cXX1lX949T-4
-REACT_APP_FIREBASE_AUTH_DOMAIN=spires-taxis.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=spires-taxis
-REACT_APP_FIREBASE_STORAGE_BUCKET=spires-taxis.firebasestorage.app
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=12158743704
-REACT_APP_FIREBASE_APP_ID=1:12158743704:web:402ace8b3430906bf28ced
-REACT_APP_FIREBASE_MEASUREMENT_ID=G-8JQVEJB1NR
+REACT_APP_FIREBASE_API_KEY=
+REACT_APP_FIREBASE_AUTH_DOMAIN=
+REACT_APP_FIREBASE_PROJECT_ID=
+REACT_APP_FIREBASE_STORAGE_BUCKET=
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=
+REACT_APP_FIREBASE_APP_ID=
+REACT_APP_FIREBASE_MEASUREMENT_ID=
 ```
 
-## Local Development
+## Local development
 
-For local development, you can create a `.env` file in the `customer-app` directory:
+Create a gitignored `.env` in `customer-app/` with the same keys. See also [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md).
 
-```bash
-REACT_APP_FIREBASE_API_KEY=AIzaSyAJIrqyzPbl72e_4aGyCe2cXX1lX949T-4
-REACT_APP_FIREBASE_AUTH_DOMAIN=spires-taxis.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=spires-taxis
-REACT_APP_FIREBASE_STORAGE_BUCKET=spires-taxis.firebasestorage.app
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=12158743704
-REACT_APP_FIREBASE_APP_ID=1:12158743704:web:402ace8b3430906bf28ced
-REACT_APP_FIREBASE_MEASUREMENT_ID=G-8JQVEJB1NR
-```
-
-**Note:** The `.env` file should be added to `.gitignore` to keep credentials secure.
-
-
-
+Private credential locations: [`../docs/ops/README.md`](../docs/ops/README.md).

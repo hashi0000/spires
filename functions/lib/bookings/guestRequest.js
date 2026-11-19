@@ -22,6 +22,7 @@ const placeRecord_1 = require("../locations/placeRecord");
 const journeyStops_1 = require("./journeyStops");
 const executiveService_1 = require("../quotes/executiveService");
 const cotswoldsPolicy_1 = require("../cotswoldsPolicy");
+const airportWaitingPolicy_1 = require("../airportWaitingPolicy");
 exports.OFFICE_PHONE = "07776 897772";
 exports.CONTACT_HELPER = "Please provide a phone number or email address so we can respond to your request.";
 exports.CONTACT_REQUIRED_MESSAGE = `${exports.CONTACT_HELPER} You can also call us on ${exports.OFFICE_PHONE}.`;
@@ -118,7 +119,7 @@ function collectionTerms(body, airportCollection, returnAirportCollection, now) 
     const general = { assistanceRequested: requested, assistanceNote: requested ? note : '', walkingAid: requested && flag(body.walkingAid), wheelchairCarriage: requested && flag(body.wheelchairCarriage) };
     if (!airportCollection && !returnAirportCollection)
         return { ok: true, fields: general };
-    if (str(body.waitingPolicyVersion) !== "2026-11-15")
+    if (str(body.waitingPolicyVersion) !== airportWaitingPolicy_1.CURRENT_WAITING_VERSION)
         return { ok: false, error: "The collection terms have changed. Reload the booking form and review the current waiting policy." };
     const outbound = collectionLeg(body, "", airportCollection, now);
     if (!outbound.ok)
@@ -130,7 +131,7 @@ function collectionTerms(body, airportCollection, returnAirportCollection, now) 
         ok: true,
         fields: {
             ...general,
-            waitingPolicyVersion: "2026-11-15",
+            waitingPolicyVersion: airportWaitingPolicy_1.CURRENT_WAITING_VERSION,
             ...outbound.fields,
             ...returning.fields,
         },

@@ -1060,6 +1060,20 @@ a.btn-primary, .btn.btn-primary,
 }
 
 .card--link:hover h3 { color: var(--blue-mid); }
+
+.areas-cover__card h3::after {
+  content: none !important;
+}
+
+.areas-cover__card:hover {
+  border-color: var(--blue);
+}
+
+.areas-cover__card:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+  border-color: var(--blue);
+}
 .link-arrow { font-weight: 600; color: var(--blue); }
 .section__note { margin-top: 1.4rem; max-width: 42rem; color: var(--text-muted); }
 .event-feature {
@@ -1744,8 +1758,27 @@ h3 + .included-list {
   align-items: start;
 }
 
+.contact-grid--quote-first {
+  grid-template-columns: 1.25fr 1fr;
+}
+
+#booking {
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 5rem;
+}
+
+.airport-fare-card__actions {
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.airport-fare-card__actions .btn {
+  flex: 1 1 auto;
+}
+
 @media (max-width: 900px) {
-  .contact-grid { grid-template-columns: 1fr; }
+  .contact-grid,
+  .contact-grid--quote-first { grid-template-columns: 1fr; }
 }
 
 .contact-card {
@@ -2577,6 +2610,11 @@ h3 + .included-list {
     height: 48px;
     bottom: 0.9rem;
     right: 0.7rem;
+  }
+
+  #booking .btn-group,
+  #booking-submit {
+    margin-bottom: 4.5rem;
   }
 }
 

@@ -12,9 +12,9 @@ import {
 
 describe("booking terms version", () => {
   it("publishes the new terms without replacing historic agreements", () => {
-    assert.equal(CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-15");
-    assert.equal(CURRENT_BOOKING_TERMS.publishedOn, "2026-11-15");
-    assert.equal(CURRENT_BOOKING_TERMS.version, "2026-11-15");
+    assert.equal(CURRENT_BOOKING_TERMS.appliesToJourneysFrom, "2026-11-19");
+    assert.equal(CURRENT_BOOKING_TERMS.publishedOn, "2026-11-19");
+    assert.equal(CURRENT_BOOKING_TERMS.version, "2026-11-19");
     assert.equal(PREVIOUS_PUBLIC_TERMS.publicationDateRecorded, false);
     assert.notEqual(PREVIOUS_PUBLIC_TERMS.id, "2026-04-01");
   });
@@ -108,7 +108,7 @@ describe("acceptance display", () => {
     assert.equal(summary.text, "Acceptance not recorded.");
     assert.doesNotMatch(confirmationTermsParagraph({}), /Accepted /);
     assert.match(confirmationTermsParagraph({}), /Acceptance not recorded/);
-    assert.match(confirmationTermsParagraph({}), /2026-11-15/);
+    assert.match(confirmationTermsParagraph({}), /2026-11-19/);
   });
 
   it("shows the version that was actually stored", () => {

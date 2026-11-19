@@ -249,7 +249,8 @@
         <div class="lang-menu__panel" role="listbox" hidden></div>
       </div>
       <a href="tel:+447776897772" class="site-header__phone">07776 897772</a>
-      <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
+      <a href="/contact#booking" class="btn btn--primary">Request a quote</a>
+      <a href="https://customer.spires-taxis.com" class="btn btn--outline" target="_blank" rel="noopener noreferrer">Manage my booking</a>
       <button type="button" class="site-menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
         <span></span><span></span><span></span>
       </button>
@@ -344,7 +345,8 @@
     <a href="/share" class="btn btn--share btn--block">Spires Share</a>
     <a href="tel:+447776897772" class="btn btn--outline btn--block">Call us</a>
     <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="btn btn--whatsapp btn--block" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
-    <a href="https://customer.spires-taxis.com" class="btn btn--primary btn--block" target="_blank" rel="noopener noreferrer">Book online</a>
+    <a href="/contact#booking" class="btn btn--primary btn--block">Request a quote</a>
+    <a href="https://customer.spires-taxis.com" class="btn btn--outline btn--block" target="_blank" rel="noopener noreferrer">Manage my booking</a>
   </div>
 </aside>
 <!-- /SITE-HEADER -->
@@ -356,46 +358,18 @@
       <h1>Book a taxi in&nbsp;Oxford</h1>
       <p class="hero__lead">Use phone, WhatsApp, email or the form below. We handle pre-booked journeys across Oxford, nearby towns and airport routes.</p>
       <div class="btn-group">
-        <a href="https://customer.spires-taxis.com" class="btn btn--primary" target="_blank" rel="noopener noreferrer">Book online</a>
-        <a href="tel:+447776897772" class="btn btn--outline">Call now</a>
+        <a href="#booking" class="btn btn--primary">Request a quote</a>
         <a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" class="btn btn--whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp us</a>
+        <a href="https://customer.spires-taxis.com" class="btn btn--outline" target="_blank" rel="noopener noreferrer">Manage my booking</a>
       </div>
     </div>
   </section>
 
-  <section class="section">
-    <div class="container contact-grid">
-      <div class="fade-in">
-        <h2>Contact details</h2>
-        <div class="grid grid-1">
-          <article class="card">
-            <h3>Phone</h3>
-            <p><a href="tel:+447776897772">07776 897772</a></p>
-            <p>Best for urgent bookings when available.</p>
-          </article>
-          <article class="card">
-            <h3>WhatsApp</h3>
-            <p><a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" target="_blank" rel="noopener noreferrer">Message 07776 897772</a></p>
-            <p>Usually answered within an hour.</p>
-          </article>
-          <article class="card">
-            <h3>Email</h3>
-            <p><a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a></p>
-            <p>We usually reply the same day.</p>
-          </article>
-        </div>
-        <div class="prose prose--spaced">
-          <h3>Areas we cover</h3>
-          <p>Oxford city: Headington, Summertown, Cowley, Jericho and Marston. Surrounding towns including <a href="/kidlington-taxis">Kidlington</a>, <a href="/abingdon-taxis">Abingdon</a>, <a href="/bicester-taxis">Bicester</a>, <a href="/witney-taxis">Witney</a>, <a href="/didcot-taxis">Didcot</a>, <a href="/woodstock-taxis">Woodstock</a> and <a href="/banbury-to-oxford-taxi">Banbury</a>. Published airport fares for Oxford are on the rates page. <a href="/abingdon-airport-transfers#airport-fares">Abingdon</a>, <a href="/didcot-airport-transfers#airport-fares">Didcot</a>, <a href="/bicester-airport-transfers#airport-fares">Bicester</a> and <a href="/witney-airport-transfers#airport-fares">Witney</a> each have their own published airport fares. Other places are quoted individually.</p>
-          <p>See <a href="/oxford-taxis">Oxford local taxis</a> and the <a href="/rates#regional-fares">Oxfordshire indicative fares</a>. Airport pickups from towns outside Oxford: <a href="/airport-transfers#areas-we-serve">areas we serve</a>. Longer pre booked runs are on <a href="/long-distance-taxis">long distance taxis</a>.</p>
-          <h3>Response times</h3>
-          <p>Phone calls are answered when available. WhatsApp is usually within an hour, and emails are typically answered the same day.</p>
-        </div>
-      </div>
-
+    <section class="section" id="quote">
+    <div class="container contact-grid contact-grid--quote-first">
       <div class="card fade-in" id="booking">
-        <h2>Request a taxi</h2>
-        <p class="form-privacy">Tell us the journey and we will prepare a quote. You do not need an account. Sending this form does not confirm the booking.</p>
+        <h2>Request a quote</h2>
+        <p class="form-privacy">No account is required. Tell us the journey and we will send a quote before anything is confirmed. Sending this form does not confirm the booking.</p>
         <div id="booking-result" hidden></div>
         <form class="booking-form" id="booking-form" novalidate>
           <input type="text" name="_gotcha" class="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -546,7 +520,7 @@
           </div>
 
           <div id="airport-note" class="form-help" hidden>
-            <p>Flight monitored collection includes 60 minutes from the verified actual landing. Fixed time collection includes 15 minutes from the booked collection time. Additional waiting is charged at £5 per started 15 minutes after your included allowance.</p>
+            <p>Flight monitored collection includes 50 minutes from the verified actual landing. Fixed time collection includes 15 minutes from the booked collection time. Additional waiting is charged at £5 per started 15 minutes after your included allowance.</p>
             <p>Waiting caused by our driver is not charged. A hotel collection stays at the booked time unless we agree a different time. Bookings already accepted keep the terms agreed at the time.</p>
             <p>If you would prefer a later pickup, choose fixed time collection and allow enough time for immigration, luggage and reaching the collection point. Your driver will be scheduled for that time; earlier pickup is subject to availability.</p>
           </div>
@@ -617,9 +591,9 @@
           <div class="terms-agreement">
             <label class="terms-agreement__line" for="terms-accepted">
               <input type="checkbox" id="terms-accepted" name="termsAccepted" value="yes" required aria-describedby="terms-agreement-error">
-              <span>I agree to the <a href="/terms/2026-11-15" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>
+              <span>I agree to the <a href="/terms/2026-11-19" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>
             </label>
-            <input type="hidden" name="termsVersion" value="2026-11-15">
+            <input type="hidden" name="termsVersion" value="2026-11-19">
             <p id="terms-agreement-error" class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>
           </div>
 
@@ -628,6 +602,33 @@
             <button type="submit" class="btn btn--primary" id="booking-submit">Send booking request</button>
           </div>
         </form>
+      </div>
+      <div class="fade-in">
+        <h2>Contact details</h2>
+        <div class="grid grid-1">
+          <article class="card">
+            <h3>Phone</h3>
+            <p><a href="tel:+447776897772">07776 897772</a></p>
+            <p>Best for urgent bookings when available.</p>
+          </article>
+          <article class="card">
+            <h3>WhatsApp</h3>
+            <p><a href="https://wa.me/447776897772?text=Hi%20Spires%20Taxis%2C%20I%27d%20like%20a%20quote%20please" target="_blank" rel="noopener noreferrer">Message 07776 897772</a></p>
+            <p>Usually answered within an hour.</p>
+          </article>
+          <article class="card">
+            <h3>Email</h3>
+            <p><a href="mailto:bookings@spires-taxis.com">bookings@spires-taxis.com</a></p>
+            <p>We usually reply the same day.</p>
+          </article>
+        </div>
+        <div class="prose prose--spaced">
+          <h3>Areas we cover</h3>
+          <p>Oxford city: Headington, Summertown, Cowley, Jericho and Marston. Surrounding towns including <a href="/kidlington-taxis">Kidlington</a>, <a href="/abingdon-taxis">Abingdon</a>, <a href="/bicester-taxis">Bicester</a>, <a href="/witney-taxis">Witney</a>, <a href="/didcot-taxis">Didcot</a>, <a href="/woodstock-taxis">Woodstock</a> and <a href="/banbury-to-oxford-taxi">Banbury</a>. Published airport fares for Oxford are on the rates page. <a href="/abingdon-airport-transfers#airport-fares">Abingdon</a>, <a href="/didcot-airport-transfers#airport-fares">Didcot</a>, <a href="/bicester-airport-transfers#airport-fares">Bicester</a> and <a href="/witney-airport-transfers#airport-fares">Witney</a> each have their own published airport fares. Other places are quoted individually.</p>
+          <p>See <a href="/oxford-taxis">Oxford local taxis</a> and the <a href="/rates#regional-fares">Oxfordshire indicative fares</a>. Airport pickups from towns outside Oxford: <a href="/airport-transfers#areas-we-serve">areas we serve</a>. Longer pre booked runs are on <a href="/long-distance-taxis">long distance taxis</a>.</p>
+          <h3>Response times</h3>
+          <p>Phone calls are answered when available. WhatsApp is usually within an hour, and emails are typically answered the same day.</p>
+        </div>
       </div>
     </div>
   </section>
