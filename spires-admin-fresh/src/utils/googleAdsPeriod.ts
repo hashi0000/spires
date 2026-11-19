@@ -259,7 +259,7 @@ function receivedPence(booking: AdvertisingBookingInput): number {
 }
 
 function vehicleLabel(booking: AdvertisingBookingInput): string {
-  return String(booking.vehicleType || booking.vehicle || "Vehicle not recorded").trim() || "Vehicle not recorded";
+  return String(booking.vehicleType || "Vehicle not recorded").trim() || "Vehicle not recorded";
 }
 
 function routeLabel(booking: AdvertisingBookingInput): string {
