@@ -342,8 +342,9 @@ export function airportWaitingTextForBooking(booking: {
   returnCollectionLocationKind?: string | null;
   acceptedServiceTerms?: Record<string, any>;
 } | null | undefined): string {
-  if (booking?.acceptedServiceTerms) booking = { ...booking, ...booking.acceptedServiceTerms, acceptedServiceTerms: undefined };
-  if (publishedWaiting(booking?.waitingPolicyVersion) && booking.returnAirportCollection) {
+  if (!booking) return airportWaitingDisclaimerBody(AIRPORT_WAITING_POLICY);
+  if (booking.acceptedServiceTerms) booking = { ...booking, ...booking.acceptedServiceTerms, acceptedServiceTerms: undefined };
+  if (publishedWaiting(booking.waitingPolicyVersion) && booking.returnAirportCollection) {
     const returning = airportWaitingTextForBooking({ waitingPolicyVersion: booking.waitingPolicyVersion,
       collectionArrangement: booking.returnCollectionArrangement, collectionLocationKind: booking.returnCollectionLocationKind });
     if (!booking.airportCollection) return `Return collection: ${returning}`;
