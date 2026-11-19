@@ -170,6 +170,11 @@ button, a, input, select, textarea { font: inherit; }
 .sheet-card h2 { margin: 0.15rem 0 0; font-size: 2rem; color: var(--navy); }
 .detail-block { margin: 1rem 0 0; padding-top: 0.8rem; border-top: 1px solid var(--line); }
 .detail-block h3 { margin: 0 0 0.35rem; font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.payment-summary { background: #eef3f8; border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 0.9rem; border-top: 1px solid var(--line); }
+.sheet-card fieldset { border: 1px solid var(--line); border-radius: 12px; margin: 0.85rem 0; padding: 0.65rem 0.75rem 0.85rem; }
+.sheet-card fieldset legend { font-weight: 800; color: var(--navy); padding: 0 0.25rem; }
+.sheet-card fieldset label { flex-direction: row; align-items: center; gap: 0.55rem; min-height: var(--touch); margin: 0.2rem 0; font-weight: 650; }
+.sheet-card fieldset input[type="radio"] { width: auto; min-height: 1.25rem; }
 .stops { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
 .stops li strong { color: var(--navy); }
 .more-actions { margin-top: 1rem; }

@@ -46,6 +46,67 @@ const driverTripLogic_1 = require("../driverTripLogic");
     assert.equal(visible.returnPickupLocation, "return hotel");
     assert.throws(() => (0, driverTripLogic_1.driverBooking)(booking, "stranger", "booking"));
 });
+(0, node_test_1.test)("£235 fare with £35 deposit shows £200 to collect on a one way", () => {
+    const booking = {
+        actualFare: 235,
+        depositRequired: true,
+        depositAmount: 35,
+        depositStatus: "paid",
+        amountReceivedPence: 3500,
+        paymentEntries: [{ kind: "deposit", amountPence: 3500, mode: "add" }],
+        paymentStatus: "partial",
+        paymentMethod: "cash",
+    };
+    const summary = (0, driverTripLogic_1.driverPaymentSummary)(booking, "outbound");
+    assert.equal(summary.kind, "collect");
+    assert.equal(summary.amountToCollectPence, 20000);
+    assert.match(summary.title, /£200\.00/);
+});
+(0, node_test_1.test)("fully prepaid and account jobs need no collection", () => {
+    assert.equal((0, driverTripLogic_1.driverPaymentSummary)({ actualFare: 90, paymentStatus: "paid", amountReceivedPence: 9000 }, "outbound").kind, "paid");
+    assert.equal((0, driverTripLogic_1.driverPaymentSummary)({ actualFare: 90, paymentMethod: "account", paymentStatus: "pending" }, "outbound").kind, "account");
+});
+(0, node_test_1.test)("return leg uses dueOnReturn and unknown split asks the office", () => {
+    const booking = {
+        bookingType: "return",
+        returnTrip: true,
+        actualFare: 235,
+        amountReceivedPence: 3500,
+        depositRequired: true,
+        depositAmount: 35,
+        depositStatus: "paid",
+        paymentEntries: [{ kind: "deposit", amountPence: 3500, mode: "add" }],
+        dueOnOutbound: 100,
+        dueOnReturn: 100,
+        paymentStatus: "partial",
+        paymentMethod: "card",
+    };
+    assert.equal((0, driverTripLogic_1.driverPaymentSummary)(booking, "outbound").amountToCollectPence, 10000);
+    assert.equal((0, driverTripLogic_1.driverPaymentSummary)(booking, "return").amountToCollectPence, 10000);
+    const unknown = { ...booking, dueOnOutbound: "", dueOnReturn: "" };
+    assert.equal((0, driverTripLogic_1.driverPaymentSummary)(unknown, "outbound").kind, "office");
+    assert.match((0, driverTripLogic_1.driverPaymentSummary)(unknown, "outbound").title, /Check with the office/);
+});
+(0, node_test_1.test)("driver booking exposes payment summary for assigned legs only", () => {
+    const booking = {
+        driverId: "a",
+        returnDriverId: "b",
+        bookingType: "return",
+        actualFare: 200,
+        dueOnOutbound: 80,
+        dueOnReturn: 120,
+        amountReceivedPence: 0,
+        paymentStatus: "pending",
+        paymentMethod: "cash",
+        pickupLocation: "Oxford",
+        returnPickupLocation: "Heathrow",
+    };
+    const outbound = (0, driverTripLogic_1.driverBooking)(booking, "a", "id");
+    assert.equal(outbound.outboundPaymentSummary.amountToCollectPence, 8000);
+    assert.equal(outbound.returnPaymentSummary, undefined);
+    const returning = (0, driverTripLogic_1.driverBooking)(booking, "b", "id");
+    assert.equal(returning.returnPaymentSummary.amountToCollectPence, 12000);
+});
 (0, node_test_1.test)("approved Cotswolds blocks and excluded delay", () => {
     const booking = { timedHire: { startAt: "2026-11-15T10:00:00Z", includedMinutes: 240, extraRatePounds: 10, extraIntervalMinutes: 20 }, outboundCompletedAt: "2026-11-15T14:21:00Z" };
     assert.equal((0, driverTripLogic_1.tripCharge)(booking, "outbound"), 20);

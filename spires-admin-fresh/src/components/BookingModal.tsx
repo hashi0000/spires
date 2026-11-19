@@ -1477,10 +1477,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   <option value="cancelled">Cancelled</option>
                 </select>
                 {editingBooking?.id && editingBooking.outboundStatus === 'completed' ? (
-                  <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('outbound')}>Undo outbound completion</button>
+                  <>
+                    {(editingBooking as { outboundPaymentOutcome?: string }).outboundPaymentOutcome ? (
+                      <p className="mt-2 text-sm text-gray-600">Outbound payment outcome: {String((editingBooking as { outboundPaymentOutcome?: string }).outboundPaymentOutcome).replace(/_/g, ' ')}</p>
+                    ) : null}
+                    <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('outbound')}>Undo outbound completion</button>
+                  </>
                 ) : null}
                 {editingBooking?.id && editingBooking.returnStatus === 'completed' ? (
-                  <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('return')}>Undo return completion</button>
+                  <>
+                    {(editingBooking as { returnPaymentOutcome?: string }).returnPaymentOutcome ? (
+                      <p className="mt-2 text-sm text-gray-600">Return payment outcome: {String((editingBooking as { returnPaymentOutcome?: string }).returnPaymentOutcome).replace(/_/g, ' ')}</p>
+                    ) : null}
+                    <button type="button" className="mt-2 w-full min-h-12 rounded border border-gray-300 px-3 py-2 text-sm" disabled={undoBusy} onClick={() => undoLeg('return')}>Undo return completion</button>
+                  </>
                 ) : null}
                 <p className="text-sm text-gray-600 mt-1">Confirmed records that the customer accepted, including by phone.</p>
               </div>

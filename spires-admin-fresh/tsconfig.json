@@ -22,5 +22,9 @@
   },
   "include": [
     "src"
-, "../brandedPDF.tsx"  ]
+, "../brandedPDF.tsx"  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
+  ]
 }

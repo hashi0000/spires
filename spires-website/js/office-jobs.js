@@ -613,7 +613,7 @@
       '<p class="meta">' + escapeHtml(viewModel.allocation.label) + "</p>" +
       (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
       (viewModel.canComplete
-        ? '<div class="actions"><button type="button" class="btn btn-primary" id="mark-complete">Mark as completed</button></div>'
+        ? '<div class="actions"><button type="button" class="btn btn-primary" id="mark-complete">Mark job completed</button></div>'
         : "") +
       (viewModel.statusLabel === "Completed" && isOfficeUser()
         ? '<div class="actions"><button type="button" class="btn" id="undo-complete">Undo completion</button></div>'
@@ -637,7 +637,11 @@
       '<section class="detail-block"><h3>Customer</h3><p>' + escapeHtml(viewModel.customer) + "</p>" +
       (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</section>" +
       '<section class="detail-block"><h3>Collection and payment</h3>' + flight +
-      "<p>" + escapeHtml(viewModel.collect.text) + "</p>" +
+      "<p><strong>" + escapeHtml(viewModel.collect.title || viewModel.collect.text) + "</strong></p>" +
+      (viewModel.collect.detail ? "<p>" + escapeHtml(viewModel.collect.detail) + "</p>" : "") +
+      (booking[(job.leg === "return" ? "return" : "outbound") + "PaymentOutcome"]
+        ? "<p>Payment outcome recorded: <strong>" + escapeHtml(String(booking[(job.leg === "return" ? "return" : "outbound") + "PaymentOutcome"]).replace(/_/g, " ")) + "</strong></p>"
+        : "") +
       waitingMarkup(booking, job) +
       "</section>" +
       '<section class="detail-block"><h3>Driver notes</h3>' +
@@ -672,18 +676,118 @@
   }
 
   function confirmComplete(booking, job) {
-    const legName = job && job.leg === "return" ? "return" : (Hub().hasReturn(booking) ? "outbound" : "trip");
-    const returnNote = job && job.leg === "outbound" && Hub().hasReturn(booking) ? " The return stays open." : "";
+    const leg = job && job.leg === "return" ? "return" : "outbound";
+    const legName = leg === "return" ? "return" : (Hub().hasReturn(booking) ? "outbound" : "trip");
+    const returnNote = leg === "outbound" && Hub().hasReturn(booking) ? " The return stays open." : "";
+    const summary = Hub().collectInstruction(booking, leg);
+    const suggested = summary.amountToCollectPence != null ? (summary.amountToCollectPence / 100).toFixed(2) : "";
+    const method = String(summary.paymentMethod || "").toLowerCase();
+    const defaultOutcome = summary.kind === "account" || summary.kind === "paid"
+      ? "not_required"
+      : summary.kind === "office"
+        ? "still_due"
+        : "collected";
+    const methodOptions = ["cash", "card", "bank transfer"].map(function (value) {
+      const label = value === "card" ? "Card / Shift4" : value === "bank transfer" ? "Bank transfer" : "Cash";
+      const selected = method === value || (value === "card" && method.indexOf("card") !== -1) ? " selected" : "";
+      return '<option value="' + value + '"' + selected + ">" + label + "</option>";
+    }).join("");
     sheetCard.innerHTML =
       "<h2>Mark this " + legName + " as completed?</h2>" +
-      "<p>This saves the status only." + returnNote + " The fare, payment, route, driver and vehicle stay as they are.</p>" +
+      "<p><strong>" + escapeHtml(summary.title || summary.text) + "</strong></p>" +
+      (summary.detail ? "<p>" + escapeHtml(summary.detail) + "</p>" : "") +
+      "<p>Confirm the payment outcome before saving." + returnNote + " Journey completion and payment stay separate.</p>" +
+      "<fieldset><legend>Payment outcome</legend>" +
+      '<label><input type="radio" name="family-outcome" value="collected"' + (defaultOutcome === "collected" ? " checked" : "") + "> Collected</label>" +
+      '<label><input type="radio" name="family-outcome" value="partly_collected"> Partly collected</label>' +
+      '<label><input type="radio" name="family-outcome" value="still_due"' + (defaultOutcome === "still_due" ? " checked" : "") + "> Still due</label>" +
+      '<label><input type="radio" name="family-outcome" value="not_required"' + (defaultOutcome === "not_required" ? " checked" : "") + "> No collection required</label>" +
+      "</fieldset>" +
+      '<div id="family-collect-fields">' +
+      '<label>Amount collected (£)<input id="family-payment" type="number" min="0.01" step="0.01" value="' + escapeHtml(suggested) + '"></label>' +
+      "<label>Method<select id=\"family-method\">" + methodOptions + "</select></label>" +
+      "</div>" +
       '<div class="actions">' +
-      '<button type="button" class="btn btn-primary" id="confirm-complete">Confirm completion</button>' +
+      '<button type="button" class="btn btn-primary" id="confirm-complete">Mark job completed</button>' +
       '<button type="button" class="btn" id="keep-open">Keep it open</button>' +
       "</div>" +
       '<p id="detail-error" class="error" hidden></p>';
+    function syncCollect() {
+      const outcome = document.querySelector('input[name="family-outcome"]:checked');
+      const fields = document.getElementById("family-collect-fields");
+      if (fields && outcome) fields.hidden = !["collected", "partly_collected"].includes(outcome.value);
+    }
+    sheetCard.querySelectorAll('input[name="family-outcome"]').forEach(function (input) {
+      input.onchange = syncCollect;
+    });
+    syncCollect();
     document.getElementById("keep-open").onclick = () => openDetail(job || Hub().expandJobs(booking)[0]);
-    document.getElementById("confirm-complete").onclick = () => saveLegStatus(booking, job, "complete");
+    document.getElementById("confirm-complete").onclick = () => saveCloseout(booking, job);
+  }
+
+  async function saveCloseout(booking, job) {
+    if (saving) return;
+    const leg = job && job.leg === "return" ? "return" : "outbound";
+    const err = document.getElementById("detail-error");
+    const button = document.getElementById("confirm-complete");
+    const outcomeEl = document.querySelector('input[name="family-outcome"]:checked');
+    const paymentOutcome = outcomeEl ? outcomeEl.value : "";
+    if (!paymentOutcome) {
+      setError(err, "Confirm the payment outcome before completing this job.");
+      return;
+    }
+    const amountPence = Math.round(Number(document.getElementById("family-payment")?.value || 0) * 100);
+    const method = document.getElementById("family-method")?.value || "";
+    if (["collected", "partly_collected"].includes(paymentOutcome) && !(amountPence > 0)) {
+      setError(err, "Enter the amount collected.");
+      return;
+    }
+    saving = true;
+    if (button) button.disabled = true;
+    try {
+      if (preview) {
+        const decision = Hub().completionUpdate(booking, leg, "preview");
+        if (!decision.ok) {
+          setError(err, decision.error);
+          return;
+        }
+        const patch = Object.assign({}, decision.update, {
+          [leg + "PaymentOutcome"]: paymentOutcome,
+        });
+        if (["collected", "partly_collected"].includes(paymentOutcome)) {
+          patch.amountReceivedPence = Math.max(0, Math.round(Number(booking.amountReceivedPence || 0))) + amountPence;
+          patch.paymentMethod = method;
+        }
+        replaceBooking(Hub().applyStatusUpdate(booking, patch));
+      } else {
+        const closeout = firebase.app().functions("us-central1").httpsCallable("familyTripAction");
+        const result = (await closeout({
+          bookingId: booking.id,
+          leg: leg,
+          action: "complete_closeout",
+          paymentOutcome: paymentOutcome,
+          amountPence: amountPence,
+          method: method,
+          at: new Date().toISOString(),
+          expectedRevision: Number(booking.revision || 0),
+          requestId: (crypto.randomUUID && crypto.randomUUID()) || ("fam-" + Date.now() + "-" + Math.random().toString(16).slice(2)),
+        })).data;
+        if (result && result.booking) replaceBooking(Object.assign({ id: booking.id }, result.booking));
+      }
+      setError(errorEl, "");
+      statusEl.textContent = "Marked as completed.";
+      show(statusEl, true);
+      closeSheet();
+    } catch (error) {
+      replaceBooking(booking);
+      const conflict = /revision|another session|aborted|failed-precondition/i.test(String(error && error.message || ""));
+      setError(err, conflict
+        ? "The office saved this trip first. The status on this screen is unchanged. Reload and try again."
+        : (error && error.message) || "Could not save the status. Try again.");
+      if (button) button.disabled = false;
+    } finally {
+      saving = false;
+    }
   }
 
   function confirmUndo(booking, job) {

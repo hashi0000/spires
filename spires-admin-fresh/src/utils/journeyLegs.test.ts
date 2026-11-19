@@ -1,13 +1,16 @@
+import { describe, expect, it } from "vitest";
 import { Booking } from "../types/types";
 import { getUpcomingBookings, returnsToReview } from "./bookingSchedule";
 import {
   applyRequestedLegStatus,
+  completeJourneyLeg,
   hasTimedReturn,
   journeyLegs,
   legsForQuickView,
   londonDayKey,
   proposedLegacyReturnCorrection,
   reopenCompletedLeg,
+  setJourneyLegStatus,
 } from "./journeyLegs";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -191,6 +194,33 @@ describe("journey legs", () => {
     expect(row.status).toBe("completed");
     expect((row as { returnStatus?: string }).returnStatus).toBeUndefined();
     expect(correction?.unchanged).toEqual(["actualFare", "amountReceivedPence", "paymentStatus", "driverId"]);
+  });
+
+  it("completes only the selected return leg from the jobs list", () => {
+    const row = legacyReturn({
+      status: "allocated",
+      outboundStatus: "completed",
+      returnStatus: "allocated",
+      driverId: "driver-a",
+      returnDriverId: "driver-b",
+      actualFare: 180,
+      paymentStatus: "partial",
+      amountReceivedPence: 3500,
+    });
+    const done = completeJourneyLeg(row, "return");
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(done.patch.returnStatus).toBe("completed");
+    expect(done.patch.outboundStatus).toBe("completed");
+    expect(done.patch.status).toBe("completed");
+    expect(done.patch.actualFare).toBeUndefined();
+    expect(done.patch.paymentStatus).toBeUndefined();
+    const confirmed = setJourneyLegStatus(row, "return", "confirmed");
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) return;
+    expect(confirmed.patch.returnStatus).toBe("confirmed");
+    expect(confirmed.patch.outboundStatus).toBe("completed");
+    expect(confirmed.patch.status).toBe("allocated");
   });
 
   it("reopens one completed leg and leaves the fare unchanged", () => {

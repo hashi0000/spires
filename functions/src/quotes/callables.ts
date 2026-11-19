@@ -753,6 +753,7 @@ export const recordManualPayment = functions.https.onCall(async (data, context) 
       issuedVersion: Number(booking.quoteIssuedVersion) || null,
       paymentVerified, status: str(booking.status),
     });
+    const leg = str(body.leg);
     const entry = {
       clientRequestId: requestId,
       mode,
@@ -762,6 +763,7 @@ export const recordManualPayment = functions.https.onCall(async (data, context) 
       note: str(body.note).slice(0, 240),
       reason: str(body.reason).slice(0, 240),
       at: new Date().toISOString(),
+      ...(leg === "outbound" || leg === "return" ? { leg } : {}),
     };
     const patch: Record<string, unknown> = {
       revision: nextBookingRevision(booking),

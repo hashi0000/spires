@@ -183,4 +183,4 @@ export { revokeMeasurementConsent, withdrawAccountMeasurement } from "./marketin
 export { scheduledAdvertisingSpend, refreshAdvertisingSpend } from "./marketing/googleAdsSync";
 export { reviewWelcomeEmail } from "./offers/welcomeReview";
 export { manageDriverAccess, unlockDriverJobs } from "./driverAccess";
-export { listDriverTrips, driverTripAction } from "./driverTrips";
+export { listDriverTrips, driverTripAction, familyTripAction } from "./driverTrips";

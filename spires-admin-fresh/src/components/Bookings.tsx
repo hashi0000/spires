@@ -21,6 +21,9 @@ import { blobToRawBase64 } from '../utils/blobToBase64';
 import { getCallableErrorMessage } from '../utils/callableErrorMessage';
 import JourneyStatsCard from './JourneyStatsCard';
 import { QuickBookingActions } from './QuickBookingActions';
+import { JobCardStatusControls } from './JobCardStatusControls';
+import { JobsSelectionBar, selectedRowsFromKeys } from './JobsSelectionBar';
+import { jobSelectionKey, resolveJobCardLeg } from '../utils/jobCardActions';
 
 type QuickView = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'past' | 'unassigned' | 'awaiting_payment';
 const FILTER_KEY = 'spires_admin_booking_filters';
@@ -113,7 +116,7 @@ const Bookings: React.FC<BookingsProps> = ({
   const [openRouteId, setOpenRouteId] = useState<string | null>(null);
   const [compactList, setCompactList] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [bulkDriver, setBulkDriver] = useState('');
   const [bulkVehicle, setBulkVehicle] = useState('');
   const [bulkStatus, setBulkStatus] = useState<BulkJobChanges['status']>('');
@@ -512,20 +515,23 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     onEditBooking(booking);
   };
 
-  const visibleIds = sortedBookings.map((booking) => booking.id).filter((id): id is string => Boolean(id));
-  const selectedBookings = sortedBookings.filter((booking) => booking.id && selectedIds.includes(booking.id));
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const visibleKeys = shownRows
+    .map(({ booking, leg }) => (booking.id ? jobSelectionKey(booking.id, resolveJobCardLeg(leg)) : ''))
+    .filter(Boolean);
+  const selectedRows = selectedRowsFromKeys(selectedKeys, shownRows);
+  const selectedBookings = Array.from(new Map(selectedRows.map((row) => [row.booking.id, row.booking])).values());
+  const allVisibleSelected = visibleKeys.length > 0 && visibleKeys.every((key) => selectedKeys.includes(key));
   const activeDrivers = drivers.filter((driver) => driver.active);
   const availableVehicles = vehicles.filter((vehicle) => vehicle.available);
 
-  const toggleSelected = (id: string) => {
-    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const toggleSelected = (key: string) => {
+    setSelectedKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
   };
 
   const toggleAllVisible = () => {
-    setSelectedIds((current) => allVisibleSelected
-      ? current.filter((id) => !visibleIds.includes(id))
-      : Array.from(new Set([...current, ...visibleIds])));
+    setSelectedKeys((current) => allVisibleSelected
+      ? current.filter((key) => !visibleKeys.includes(key))
+      : Array.from(new Set([...current, ...visibleKeys])));
   };
 
   const applyBulkEdit = async () => {
@@ -545,7 +551,10 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     try {
       if (updates.length > 0) await applyBulkJobUpdates(db, updates);
       const updatedIds = new Set(updates.map((item) => item.id));
-      setSelectedIds((current) => current.filter((id) => !updatedIds.has(id)));
+      setSelectedKeys((current) => current.filter((key) => {
+        const bookingId = key.split('|')[0];
+        return !updatedIds.has(bookingId);
+      }));
       if (updates.length > 0) {
         setBulkDriver('');
         setBulkVehicle('');
@@ -683,52 +692,59 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         </div>
       </details>
       <div className="card booking-list-card" style={{ marginTop: '1.5rem' }} ref={listRef}>
-        {selectedBookings.length > 0 && (
-          <section className="bulk-edit" aria-label="Edit selected jobs">
-            <p className="bulk-edit-count">{selectedBookings.length} selected</p>
-            <div className="bulk-edit-grid">
-              <label>
-                Driver
-                <select className="form-input" value={bulkDriver} onChange={(event) => setBulkDriver(event.target.value)} disabled={bulkSaving}>
-                  <option value="">Leave unchanged</option>
-                  <option value="clear">Remove driver</option>
-                  {activeDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
-                </select>
-              </label>
-              <label>
-                Vehicle
-                <select className="form-input" value={bulkVehicle} onChange={(event) => setBulkVehicle(event.target.value)} disabled={bulkSaving}>
-                  <option value="">Leave unchanged</option>
-                  <option value="clear">Remove vehicle</option>
-                  {availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration}</option>)}
-                </select>
-              </label>
-              <label>
-                Job status
-                <select className="form-input" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as BulkJobChanges['status'])} disabled={bulkSaving}>
-                  <option value="">Leave unchanged</option>
-                  <option value="pending">Pending</option>
-                  <option value="awaiting_customer_confirmation">Awaiting customer confirmation</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="allocated">Allocated</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </label>
-              <label>
-                Add a note
-                <textarea className="form-input" rows={2} value={bulkNote} onChange={(event) => setBulkNote(event.target.value)} disabled={bulkSaving} />
-              </label>
-            </div>
-            <p className="bulk-edit-note">The fare, payment record and customer details stay on each job. Record a payment from the booking.</p>
-            {bulkMessage ? <p className="bulk-edit-result" role="status">{bulkMessage}</p> : null}
-            <div className="bulk-edit-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
-                {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => { setSelectedIds([]); setBulkMessage(''); }} disabled={bulkSaving}>Clear selection</button>
-            </div>
-          </section>
+        {selectedKeys.length > 0 && (
+          <>
+            <JobsSelectionBar
+              selectedRows={selectedRows}
+              selectedKeys={selectedKeys}
+              onSelectedKeysChange={setSelectedKeys}
+              onMessage={setBulkMessage}
+            />
+            <section className="bulk-edit" aria-label="Edit selected jobs">
+              <p className="bulk-edit-count">Also update driver, vehicle or notes</p>
+              <div className="bulk-edit-grid">
+                <label>
+                  Driver
+                  <select className="form-input" value={bulkDriver} onChange={(event) => setBulkDriver(event.target.value)} disabled={bulkSaving}>
+                    <option value="">Leave unchanged</option>
+                    <option value="clear">Remove driver</option>
+                    {activeDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Vehicle
+                  <select className="form-input" value={bulkVehicle} onChange={(event) => setBulkVehicle(event.target.value)} disabled={bulkSaving}>
+                    <option value="">Leave unchanged</option>
+                    <option value="clear">Remove vehicle</option>
+                    {availableVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.registration}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Job status
+                  <select className="form-input" value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as BulkJobChanges['status'])} disabled={bulkSaving}>
+                    <option value="">Leave unchanged</option>
+                    <option value="pending">Pending</option>
+                    <option value="awaiting_customer_confirmation">Awaiting customer confirmation</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="allocated">Allocated</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <label>
+                  Add a note
+                  <textarea className="form-input" rows={2} value={bulkNote} onChange={(event) => setBulkNote(event.target.value)} disabled={bulkSaving} />
+                </label>
+              </div>
+              <p className="bulk-edit-note">Payment is recorded from the action bar or payment badge, not by changing a payment flag alone.</p>
+              {bulkMessage ? <p className="bulk-edit-result" role="status">{bulkMessage}</p> : null}
+              <div className="bulk-edit-actions">
+                <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
+                  {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
+                </button>
+              </div>
+            </section>
+          </>
         )}
         {filteredBookings.length === 0 ? (
           <div className="text-center" style={{ padding: '3rem 1rem' }}>
@@ -762,8 +778,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     <th>Route</th>
                     <th>Vehicle</th>
                     <th>Fare</th>
-                    <th>Booking</th>
-                    <th>Payment</th>
+                    <th>Status / Payment</th>
                     <th>Driver</th>
                     <th>Actions</th>
                   </tr>
@@ -795,10 +810,12 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const fareText = fareAlreadyShown ? 'Included in the booking total' : bookingTotalLabel(bookingMoney(booking).totalPence / 100);
                     const stopsNeedFare = extraStopsNeedAgreement(hasExtraStops(normaliseStops(ext.stops, booking.pickupLocation, booking.destination)) || hasExtraStops(normaliseStops(ext.returnStops, ext.returnPickupLocation, ext.returnDestination)), (ext as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare === true);
                     const unreconciled = legacyPaidWithoutAmount(booking.paymentStatus, booking.amountReceivedPence);
+                    const selectionKey = booking.id ? jobSelectionKey(booking.id, resolveJobCardLeg(leg)) : '';
+                    const cardLeg = resolveJobCardLeg(leg);
                     return (
                       <tr key={rowKey} className={unassigned ? 'is-unassigned' : undefined}>
                         <td>
-                          <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
+                          <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}${leg?.leg === 'return' ? ' return' : ''}`} checked={Boolean(selectionKey && selectedKeys.includes(selectionKey))} onChange={() => selectionKey && toggleSelected(selectionKey)} />
                         </td>
                         <td>{londonWhen(when)}</td>
                         <td>
@@ -831,9 +848,15 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         </td>
                         <td>{formatVehicleTypeLabel(ext.vehicleType)}{ext.passengers ? ` · ${ext.passengers}` : ''}{executiveAwaitingAvailability(ext) ? <div className="booking-failed">Executive request — awaiting availability</div> : ext.vehicleType === 'executive' ? <div className="booking-ref">Executive accepted</div> : null}</td>
                         <td className="booking-money">{fareText}{stopsNeedFare ? <div className="booking-failed">Extra stops. Agree the fare.</div> : null}</td>
-                        <td><span className={`badge ${badgeClass}`}>{badgeLabel}</span></td>
-                        <td>
-                          <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
+                        <td className="job-card-status-cell">
+                          <JobCardStatusControls
+                            booking={booking}
+                            leg={cardLeg}
+                            badgeLabel={badgeLabel}
+                            badgeClass={badgeClass}
+                            paymentLabel={paymentLabel(booking)}
+                            paymentPaid={booking.paymentStatus === 'paid'}
+                          />
                           {unreconciled ? <p className="booking-failed">Paid flag, amount not recorded.</p> : null}
                           <details className="booking-more-actions">
                             <summary className="btn btn-secondary btn-sm">Allocate or record payment</summary>
@@ -884,21 +907,30 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 const badgeLabel = shownStatus === 'needs_review' ? 'Needs review' : workflowStatusLabel(shownStatus);
                 const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);
                 const driverLabel = driver?.name || (leg?.leg === 'return' ? 'Driver not confirmed' : 'Unassigned');
+                const selectionKey = booking.id ? jobSelectionKey(booking.id, resolveJobCardLeg(leg)) : '';
+                const cardLeg = resolveJobCardLeg(leg);
                 return (
                   <div key={rowKey} className="booking-mobile-card">
                     <label className="booking-mobile-select">
-                      <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}`} checked={Boolean(booking.id && selectedIds.includes(booking.id))} onChange={() => booking.id && toggleSelected(booking.id)} />
+                      <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}${leg?.leg === 'return' ? ' return' : ''}`} checked={Boolean(selectionKey && selectedKeys.includes(selectionKey))} onChange={() => selectionKey && toggleSelected(selectionKey)} />
                       Select
                     </label>
-                    <details>
-                    <summary>
+                    <div className="booking-mobile-topline">
                       <span>{londonWhen(when)}</span>
-                      <button type="button" className="booking-customer-link" onClick={(event) => { event.preventDefault(); event.stopPropagation(); openBooking(booking); }} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
+                      <button type="button" className="booking-customer-link" onClick={() => openBooking(booking)} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
                       <span>{leg?.leg === 'return' ? 'Return: ' : ''}{routeFrom} → {routeTo}</span>
-                      <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
-                      <span className={`badge ${booking.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>{paymentLabel(booking)}</span>
+                      <JobCardStatusControls
+                        booking={booking}
+                        leg={cardLeg}
+                        badgeLabel={badgeLabel}
+                        badgeClass={badgeClass}
+                        paymentLabel={paymentLabel(booking)}
+                        paymentPaid={booking.paymentStatus === 'paid'}
+                      />
                       <span>{driverLabel}</span>
-                    </summary>
+                    </div>
+                    <details>
+                    <summary>Job details</summary>
                     <div className="booking-mobile-body">
                       <p>{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</p>
                       {leg?.needsReview ? <p>Needs review. The return was not marked completed.</p> : null}

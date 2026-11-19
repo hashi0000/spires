@@ -260,6 +260,80 @@ function overallAfterLegs(booking: LegBooking, outbound: JourneyLegStatus, retur
   return "confirmed";
 }
 
+/** Complete one leg from the jobs list. Fare and payment stay unchanged. */
+export function completeJourneyLeg(booking: LegBooking, leg: JourneyLegName): {
+  ok: true;
+  patch: Record<string, string>;
+  completedAtField: "outboundCompletedAt" | "returnCompletedAt";
+  previousStatus: string;
+  nextStatus: string;
+} | { ok: false; error: string } {
+  if (overallStatus(booking) === "cancelled") {
+    return { ok: false, error: "This trip is cancelled." };
+  }
+  const current = explicitLeg(booking, leg);
+  if (current === "completed") {
+    return { ok: false, error: "This leg is already completed." };
+  }
+  if (current === "cancelled") {
+    return { ok: false, error: "This leg is cancelled." };
+  }
+  const outbound = leg === "outbound" ? "completed" : explicitLeg(booking, "outbound");
+  const returnStatus = hasTimedReturn(booking)
+    ? (leg === "return" ? "completed" : explicitLeg(booking, "return"))
+    : "confirmed";
+  const status = overallAfterLegs(booking, outbound, returnStatus);
+  const patch: Record<string, string> = {
+    status,
+    adminStatus: status,
+    outboundStatus: outbound,
+  };
+  if (hasTimedReturn(booking)) patch.returnStatus = returnStatus;
+  if (booking.customerStatus) patch.customerStatus = status;
+  return {
+    ok: true,
+    patch,
+    completedAtField: leg === "outbound" ? "outboundCompletedAt" : "returnCompletedAt",
+    previousStatus: current,
+    nextStatus: status,
+  };
+}
+
+/** Set a leg journey status from the jobs list without opening the full form. */
+export function setJourneyLegStatus(booking: LegBooking, leg: JourneyLegName, nextLegStatus: JourneyLegStatus): {
+  ok: true;
+  patch: Record<string, string>;
+  completedAtField?: "outboundCompletedAt" | "returnCompletedAt";
+  previousStatus: string;
+  nextStatus: string;
+} | { ok: false; error: string } {
+  if (overallStatus(booking) === "cancelled" && nextLegStatus !== "cancelled") {
+    return { ok: false, error: "Reopen a cancelled booking from the full form." };
+  }
+  if (!LEG_STATUSES.has(nextLegStatus) || nextLegStatus === "needs_review") {
+    return { ok: false, error: "Choose a valid journey status." };
+  }
+  if (nextLegStatus === "completed") return completeJourneyLeg(booking, leg);
+  const outbound = leg === "outbound" ? nextLegStatus : explicitLeg(booking, "outbound");
+  const returnStatus = hasTimedReturn(booking)
+    ? (leg === "return" ? nextLegStatus : explicitLeg(booking, "return"))
+    : "confirmed";
+  const status = overallAfterLegs(booking, outbound, returnStatus);
+  const patch: Record<string, string> = {
+    status,
+    adminStatus: status,
+    outboundStatus: outbound,
+  };
+  if (hasTimedReturn(booking)) patch.returnStatus = returnStatus;
+  if (booking.customerStatus) patch.customerStatus = status;
+  return {
+    ok: true,
+    patch,
+    previousStatus: explicitLeg(booking, leg),
+    nextStatus: status,
+  };
+}
+
 /** Office reopens one completed leg. Fare, payment, route, driver and vehicle are not included. */
 export function reopenCompletedLeg(booking: LegBooking, leg: JourneyLegName): {
   ok: true;

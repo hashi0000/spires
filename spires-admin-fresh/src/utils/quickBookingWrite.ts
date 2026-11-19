@@ -1,6 +1,7 @@
-import { doc, runTransaction, type Firestore } from "firebase/firestore";
+import { doc, runTransaction, serverTimestamp, type Firestore, type UpdateData } from "firebase/firestore";
 import { httpsCallable, type Functions } from "firebase/functions";
 import type { Booking } from "../types/types";
+import { completeJourneyLeg, setJourneyLegStatus, type JourneyLegName, type JourneyLegStatus } from "./journeyLegs";
 
 export const BOOKING_CONFLICT_MESSAGE = "This booking was saved in another session. Your edits are still on this screen. Reload the saved booking, then apply your changes again.";
 const ALLOCATION_WINDOW_MS = 90 * 60 * 1000;
@@ -90,16 +91,72 @@ export async function commitQuickPayment(
   functions: Functions,
   booking: Booking,
   amountPounds: string,
-  method: string
-): Promise<void> {
+  method: string,
+  options: { clientRequestId?: string; leg?: "outbound" | "return" | "booking"; note?: string } = {}
+): Promise<{ duplicate?: boolean }> {
   if (!booking.id) throw new Error("This booking has no id.");
   const call = httpsCallable(functions, "recordManualPayment");
-  await call({
+  const clientRequestId = options.clientRequestId || `quick_${booking.id}_${amountPounds}_${Date.now()}`;
+  const result = await call({
     bookingId: booking.id,
     mode: "add",
     amountPounds,
     method,
     expectedRevision: Number(booking.revision || 0),
-    clientRequestId: `quick_${booking.id}_${amountPounds}_${Date.now()}`,
+    clientRequestId,
+    leg: options.leg && options.leg !== "booking" ? options.leg : undefined,
+    note: options.note || "",
   });
+  const data = (result.data || {}) as { duplicate?: boolean };
+  return { duplicate: Boolean(data.duplicate) };
+}
+
+export async function commitQuickLegStatus(
+  db: Firestore,
+  booking: Booking,
+  leg: JourneyLegName,
+  nextStatus: JourneyLegStatus,
+  actorUid = ""
+): Promise<void> {
+  if (!booking.id) throw new Error("This booking has no id.");
+  const decision = setJourneyLegStatus(booking, leg, nextStatus);
+  if (!decision.ok) throw new Error(decision.error);
+  const expected = Number(booking.revision || 0);
+  await runTransaction(db, async (tx) => {
+    const ref = doc(db, "bookings", booking.id as string);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("This booking no longer exists.");
+    const stored = Number(snap.data()?.revision || 0);
+    if (stored !== expected) throw new Error(BOOKING_CONFLICT_MESSAGE);
+    const payload: Record<string, unknown> = {
+      ...decision.patch,
+      revision: stored + 1,
+      updatedAt: serverTimestamp(),
+    };
+    if ("completedAtField" in decision && decision.completedAtField) {
+      payload[decision.completedAtField] = new Date().toISOString();
+      payload[`${leg}CompletedByUid`] = actorUid;
+    }
+    tx.update(ref, payload as UpdateData<Record<string, unknown>>);
+    tx.set(doc(db, "bookings", booking.id as string, "audit", `status-${leg}-${stored + 1}`), {
+      action: nextStatus === "completed" ? "leg_completed" : "leg_status_updated",
+      leg,
+      nextStatus,
+      actorUid,
+      at: serverTimestamp(),
+      previousStatus: decision.previousStatus,
+      bookingStatus: decision.nextStatus,
+    });
+  });
+}
+
+export async function commitQuickLegComplete(
+  db: Firestore,
+  booking: Booking,
+  leg: JourneyLegName,
+  actorUid = ""
+): Promise<void> {
+  const decision = completeJourneyLeg(booking, leg);
+  if (!decision.ok) throw new Error(decision.error);
+  await commitQuickLegStatus(db, booking, leg, "completed", actorUid);
 }

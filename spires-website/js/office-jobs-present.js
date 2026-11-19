@@ -292,17 +292,123 @@
     return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  function collectInstruction(booking, leg) {
-    if (String(booking.paymentStatus || "").toLowerCase() === "paid") {
-      return { kind: "paid", text: "Paid. Nothing to collect on this leg." };
+  function moneyLabel(pence) {
+    return pounds(Number(pence || 0) / 100);
+  }
+
+  function agreedFarePence(booking) {
+    const extras = Array.isArray(booking.additionalCharges)
+      ? booking.additionalCharges.reduce(function (sum, row) {
+        return sum + Math.max(0, Math.round(Number(row && row.amountPence) || 0));
+      }, 0)
+      : 0;
+    const quote = booking.issuedQuote && typeof booking.issuedQuote === "object" ? booking.issuedQuote : null;
+    const base = quote && Number.isFinite(Number(quote.finalFarePence))
+      ? Math.max(0, Math.round(Number(quote.finalFarePence)))
+      : (Number.isFinite(Number(booking.actualFare)) ? Math.max(0, Math.round(Number(booking.actualFare) * 100)) : 0);
+    return base + extras;
+  }
+
+  function effectiveReceivedPence(booking) {
+    const recorded = Math.max(0, Math.round(Number(booking.amountReceivedPence) || 0));
+    if (String(booking.depositStatus || "") !== "paid") return recorded;
+    const depositPence = booking.depositRequired === true
+      ? Math.max(0, Math.round((Number(booking.depositAmount) || 0) * 100))
+      : 0;
+    if (!(depositPence > 0)) return recorded;
+    const entries = Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [];
+    const depositRecorded = entries.some(function (entry) {
+      return entry && (entry.kind === "deposit" || String(entry.clientRequestId || "").indexOf("deposit-") === 0);
+    }) || recorded >= depositPence;
+    return depositRecorded ? recorded : recorded + depositPence;
+  }
+
+  /** Same meanings as functions driverPaymentSummary for Driver Hub / Family Jobs. */
+  function paymentSummary(booking, leg) {
+    booking = Object.assign({}, booking, booking.acceptedServiceTerms || {});
+    const method = String(booking.paymentMethod || "").trim();
+    const methodKey = method.toLowerCase();
+    const outstandingPence = Math.max(0, agreedFarePence(booking) - effectiveReceivedPence(booking));
+    const paid = outstandingPence <= 0 || String(booking.paymentStatus || "").toLowerCase() === "paid";
+
+    if (methodKey === "account" || methodKey === "on account" || methodKey === "invoice") {
+      return {
+        kind: "account",
+        amountToCollectPence: 0,
+        outstandingPence: outstandingPence,
+        paymentMethod: method || "account",
+        title: "On account — no payment to collect",
+        detail: "This is an invoiced job. Complete the journey without collecting payment.",
+        text: "On account — no payment to collect",
+      };
     }
+    if (paid) {
+      return {
+        kind: "paid",
+        amountToCollectPence: 0,
+        outstandingPence: 0,
+        paymentMethod: method,
+        title: "Already paid",
+        detail: "Nothing remains due on this booking.",
+        text: "Already paid. Nothing remains due on this booking.",
+      };
+    }
+
     const raw = leg === "return" ? booking.dueOnReturn : booking.dueOnOutbound;
-    if (raw === undefined || raw === null || String(raw).trim() === "") {
-      return { kind: "confirm", text: "Confirm the amount with the office." };
+    const schedule = (raw === undefined || raw === null || String(raw).trim() === "")
+      ? null
+      : (Number.isFinite(Number(raw)) ? Number(raw) : null);
+    const legExtras = (Array.isArray(booking.additionalCharges) ? booking.additionalCharges : [])
+      .filter(function (row) { return row && (row.leg === leg || row.id === "trip-time-" + leg); })
+      .reduce(function (sum, row) { return sum + Math.max(0, Math.round(Number(row.amountPence) || 0)); }, 0);
+    const legReceived = (Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [])
+      .filter(function (row) { return row && row.leg === leg && row.mode === "add"; })
+      .reduce(function (sum, row) { return sum + Math.max(0, Math.round(Number(row.amountPence) || 0)); }, 0);
+
+    if (schedule != null) {
+      const amount = Math.min(outstandingPence, Math.max(0, Math.round(schedule * 100) + legExtras - legReceived));
+      return {
+        kind: amount > 0 ? "collect" : "paid",
+        amountToCollectPence: amount,
+        outstandingPence: outstandingPence,
+        paymentMethod: method,
+        title: amount > 0 ? ("Amount to collect on this leg: " + moneyLabel(amount)) : "Already paid",
+        detail: [
+          method ? ("Agreed payment method: " + method) : "Payment method not recorded.",
+          outstandingPence > amount ? ("Booking balance due overall: " + moneyLabel(outstandingPence) + ".") : "",
+        ].filter(Boolean).join(" "),
+        text: amount > 0
+          ? ("Collect " + pounds(amount / 100) + " on this leg.")
+          : "Already paid. Nothing remains due on this booking.",
+      };
     }
-    const n = typeof raw === "number" ? raw : parseFloat(String(raw));
-    if (!Number.isFinite(n)) return { kind: "confirm", text: "Confirm the amount with the office." };
-    return { kind: "due", text: "Collect " + pounds(n) + " on this leg." };
+
+    if (!hasReturn(booking)) {
+      return {
+        kind: "collect",
+        amountToCollectPence: outstandingPence,
+        outstandingPence: outstandingPence,
+        paymentMethod: method,
+        title: "Amount to collect on this leg: " + moneyLabel(outstandingPence),
+        detail: method ? ("Agreed payment method: " + method) : "Payment method not recorded.",
+        text: "Collect " + pounds(outstandingPence / 100) + " on this leg.",
+      };
+    }
+
+    return {
+      kind: "office",
+      amountToCollectPence: null,
+      outstandingPence: outstandingPence,
+      paymentMethod: method,
+      title: "Check with the office",
+      detail: "This return booking has no agreed amount for this leg. Booking balance due overall: " +
+        moneyLabel(outstandingPence) + ". You can still complete the journey.",
+      text: "Check with the office",
+    };
+  }
+
+  function collectInstruction(booking, leg) {
+    return paymentSummary(booking, leg);
   }
 
   function collecting(booking, leg) {
@@ -796,6 +902,7 @@
     presentJob: presentJob,
     groupJobs: groupJobs,
     collectInstruction: collectInstruction,
+    paymentSummary: paymentSummary,
     flightForLeg: flightForLeg,
     previewBundle: previewBundle,
     category: category,

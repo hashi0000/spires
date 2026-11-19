@@ -30,7 +30,8 @@ assert.equal(next.booking.id, "overdue");
 assert.equal(shown("overdue").remaining, "Overdue");
 assert.equal(shown("overdue").passengers, "Passengers unknown");
 assert.equal(shown("overdue").luggage, "Luggage unknown");
-assert.equal(shown("overdue").collect.text, "Confirm the amount with the office.");
+assert.equal(shown("overdue").collect.kind, "collect");
+assert.match(shown("overdue").collect.title, /Amount to collect on this leg/);
 assert.equal(hub.selectJobs(sample.bookings, "completed", now, "").some((row) => row.booking.id === "overdue"), false);
 assert.equal(hub.selectJobs(sample.bookings, "today", now, "").some((row) => row.booking.id === "archive"), false);
 assert.equal(hub.selectJobs(sample.bookings, "upcoming", now, "").some((row) => row.booking.id === "archive"), false);
@@ -41,7 +42,8 @@ const standard = shown("standard");
 assert.equal(standard.driverName, "Sam Test");
 assert.equal(standard.registration, "TE57 OUT");
 assert.equal(standard.allocation.label, "Allocated to Sam Test");
-assert.equal(standard.collect.kind, "confirm");
+assert.equal(standard.collect.kind, "collect");
+assert.match(standard.collect.title, /£18\.00/);
 
 const exec = shown("exec");
 assert.equal(exec.driverName, "Unassigned");
@@ -70,8 +72,41 @@ assert.equal(hub.legCompleted(job("return-job", "return").booking, "return"), fa
 assert.equal(shown("stops").extraStops, "1 extra stop");
 assert.equal(shown("stops").stops.length, 3);
 assert.equal(shown("paid").collect.kind, "paid");
+assert.match(shown("paid").collect.title, /Already paid/);
+assert.equal(shown("collect").collect.kind, "collect");
 assert.equal(shown("collect").collect.text, "Collect £45.00 on this leg.");
+assert.equal(shown("collect").collect.amountToCollectPence, 4500);
 assert.equal(shown("collect").collect.text.includes("180"), false);
+assert.equal(shown("return-job", "outbound").collect.kind, "office");
+assert.match(shown("return-job", "outbound").collect.title, /Check with the office/);
+assert.equal(shown("return-job", "return").collect.kind, "collect");
+assert.equal(shown("return-job", "return").collect.amountToCollectPence, 4000);
+
+const depositJob = {
+  id: "deposit",
+  status: "allocated",
+  pickupTime: "2026-11-16T12:00:00",
+  dateTime: "2026-11-16T12:00:00",
+  pickupLocation: "Oxford",
+  destination: "Heathrow",
+  driverId: "sam",
+  vehicleId: "car-out",
+  vehicleType: "standard",
+  actualFare: 235,
+  depositRequired: true,
+  depositAmount: 35,
+  depositStatus: "paid",
+  amountReceivedPence: 3500,
+  paymentEntries: [{ kind: "deposit", amountPence: 3500, mode: "add" }],
+  paymentStatus: "partial",
+  paymentMethod: "cash",
+};
+assert.equal(hub.collectInstruction(depositJob, "outbound").amountToCollectPence, 20000);
+assert.match(hub.collectInstruction(depositJob, "outbound").title, /£200\.00/);
+
+const accountJob = { ...depositJob, id: "account", paymentMethod: "account", depositRequired: false, depositStatus: "", amountReceivedPence: 0, paymentEntries: [] };
+assert.equal(hub.collectInstruction(accountJob, "outbound").kind, "account");
+assert.match(hub.collectInstruction(accountJob, "outbound").title, /On account/);
 assert.equal(shown("done").remaining, "Completed");
 assert.equal(shown("done").overdue, false);
 assert.equal(hub.nextJourney(sample.bookings.filter((row) => row.id === "exec"), now, ""), null);

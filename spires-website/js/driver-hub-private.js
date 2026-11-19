@@ -14,7 +14,28 @@
     return value.toISOString().slice(0, 16);
   };
   const eventInput = () => '<label>Actual event time (your device local time)<input id="driver-event-time" type="datetime-local" value="' + eventNow() + '" required></label><p>For a call or message, enter when the customer contacted you, not when you record it.</p><label>Correction or excluded delay reason<input id="driver-reason" maxlength="300"></label>';
+
   function status(booking, leg) { return booking[leg + "Status"] || booking.status; }
+
+  function paymentSummary(booking, leg) {
+    return booking[leg + "PaymentSummary"] || {
+      kind: booking[leg + "CollectUnknown"] ? "office" : "collect",
+      title: booking[leg + "CollectUnknown"] ? "Check with the office" : ("Amount to collect on this leg: " + money(booking[leg + "AmountToCollectPence"])),
+      detail: "",
+      amountToCollectPence: booking[leg + "AmountToCollectPence"],
+      paymentMethod: booking.paymentMethod || "",
+    };
+  }
+
+  function paymentSummaryMarkup(booking, leg) {
+    const summary = paymentSummary(booking, leg);
+    return '<section class="detail-block payment-summary" aria-live="polite">' +
+      "<h3>Payment on this leg</h3>" +
+      "<p><strong>" + esc(summary.title) + "</strong></p>" +
+      (summary.detail ? "<p>" + esc(summary.detail) + "</p>" : "") +
+      "</section>";
+  }
+
   function render() {
     const today = londonDay(Date.now());
     const tomorrow = londonDay(Date.now() + 86400000);
@@ -33,12 +54,14 @@
     document.getElementById("app-empty").hidden = filtered.length > 0;
     document.getElementById("app-empty").textContent = "No assigned trips in this view.";
   }
+
   function refreshTimingPreview() {
     const el = document.getElementById("driver-timing-preview");
     if (!selected || !el) return;
     const result = proposal(selected.booking, selected.leg);
     el.textContent = result.preview; el.classList.toggle("warning", result.warning === true);
   }
+
   async function refresh() {
     if (busy) return;
     refreshTimingPreview();
@@ -58,6 +81,7 @@
       if (/permission-denied|unauthenticated/.test(err.code || "")) { stop(); await sessionAuth.signOut(); }
     }
   }
+
   function proposal(booking, leg) {
     if (booking.timedHire) return root.SpiresCollection.proposeTimedHireCharge({ ...booking.timedHire,
       driverArrivedAt: booking[leg + "DriverReadyAt"], completedAt: booking[leg + "CompletedAt"], excludedMinutes: booking[leg + "ExcludedMinutes"], now: Date.now() });
@@ -66,6 +90,45 @@
       landingStatus: field(booking, leg, "landingStatus"), verifiedLandingAt: field(booking, leg, "verifiedLandingAt"),
       bookedCollectionAt: legTime(booking, leg), driverReadyAt: booking[leg + "DriverReadyAt"], passengerReadyAt: booking[leg + "PassengerReadyAt"] });
   }
+
+  function closeoutForm(booking, leg) {
+    const summary = paymentSummary(booking, leg);
+    const suggested = summary.amountToCollectPence != null ? (summary.amountToCollectPence / 100).toFixed(2) : "";
+    const method = String(summary.paymentMethod || "").toLowerCase();
+    const methodOptions = ["cash", "card", "bank transfer"].map(value => {
+      const label = value === "card" ? "Card / Shift4" : value === "bank transfer" ? "Bank transfer" : "Cash";
+      const selected = method === value || (value === "card" && method.indexOf("card") !== -1) ? " selected" : "";
+      return '<option value="' + value + '"' + selected + ">" + label + "</option>";
+    }).join("");
+    const defaultOutcome = summary.kind === "account" || summary.kind === "paid"
+      ? "not_required"
+      : summary.kind === "office"
+        ? "still_due"
+        : "collected";
+    return '<section class="detail-block" id="driver-closeout">' +
+      "<h3>Mark job completed</h3>" +
+      "<fieldset><legend>Payment outcome</legend>" +
+      '<label><input type="radio" name="driver-outcome" value="collected"' + (defaultOutcome === "collected" ? " checked" : "") + '> Collected</label>' +
+      '<label><input type="radio" name="driver-outcome" value="partly_collected"> Partly collected</label>' +
+      '<label><input type="radio" name="driver-outcome" value="still_due"' + (defaultOutcome === "still_due" ? " checked" : "") + "> Still due</label>" +
+      '<label><input type="radio" name="driver-outcome" value="not_required"' + (defaultOutcome === "not_required" ? " checked" : "") + "> No collection required</label>" +
+      "</fieldset>" +
+      '<div id="driver-collect-fields">' +
+      '<label>Amount collected (£)<input id="driver-payment" type="number" min="0.01" step="0.01" value="' + esc(suggested) + '"></label>' +
+      "<label>Method<select id=\"driver-method\">" + methodOptions + "</select></label>" +
+      "</div>" +
+      '<button class="btn btn-primary" data-action="complete_closeout">Mark job completed</button>' +
+      "<p>Journey completion and payment stay separate. You can complete with a balance still due. Ask the office to correct an accidental save.</p>" +
+      "</section>";
+  }
+
+  function syncCollectFields() {
+    const outcome = document.querySelector('input[name="driver-outcome"]:checked');
+    const fields = document.getElementById("driver-collect-fields");
+    if (!fields || !outcome) return;
+    fields.hidden = !["collected", "partly_collected"].includes(outcome.value);
+  }
+
   function detail(booking, leg) {
     if (!booking) return;
     selected = { booking, leg };
@@ -74,23 +137,34 @@
     const fixed = field(booking, leg, "collectionArrangement") === "fixed_time" || field(booking, leg, "collectionLocationKind") === "hotel";
     const timed = airport || booking.timedHire;
     const proposed = timed ? proposal(booking, leg) : null;
-    const due = Number.isFinite(booking[leg + 'AmountToCollectPence'])
-      ? booking[leg + 'AmountToCollectPence']
-      : Math.max(0, Number(booking.outstandingPence != null ? booking.outstandingPence : (Number(booking.finalFarePence || 0) - Number(booking.amountReceivedPence || 0))));
+    const summary = paymentSummary(booking, leg);
+    const due = summary.amountToCollectPence != null
+      ? summary.amountToCollectPence
+      : Math.max(0, Number(booking.outstandingPence != null ? booking.outstandingPence : (Number(booking.finalFarePence || 0) - Number(booking.receivedPence || booking.amountReceivedPence || 0))));
     const legStatus = status(booking, leg);
-    pane.innerHTML = '<h2>' + esc(booking.hirerName) + '</h2><p>' + esc(booking.bookingNumber) + ' · ' + leg + '</p><p>' + esc(field(booking, leg, "pickupLocation")) + ' → ' + esc(field(booking, leg, "destination")) + '</p><p>' + esc(date(legTime(booking, leg))) + '</p>' +
-      '<p>' + esc(field(booking, leg, "assistanceNote")) + '</p><p>Final total: <strong>' + money(booking.finalFarePence) + '</strong><br>Balance due: <strong>' + money(due) + '</strong></p>' +
-      (proposed ? '<p id="driver-timing-preview"' + (proposed.warning ? ' class="warning"' : '') + '>' + esc(proposed.preview) + '</p>' : '') + eventInput() +
-      (airport && !fixed ? '<label>Landing verification source<input id="driver-landing-source" placeholder="For example Flightradar24 actual landing" maxlength="160"></label><button class="btn" data-action="landing">Has the flight landed? Confirm actual time</button>' : '') +
+    const outcome = booking[leg + "PaymentOutcome"];
+    pane.innerHTML = "<h2>" + esc(booking.hirerName) + "</h2><p>" + esc(booking.bookingNumber) + " · " + leg + "</p><p>" + esc(field(booking, leg, "pickupLocation")) + " → " + esc(field(booking, leg, "destination")) + "</p><p>" + esc(date(legTime(booking, leg))) + "</p>" +
+      "<p>" + esc(field(booking, leg, "assistanceNote")) + "</p><p>Final total: <strong>" + money(booking.finalFarePence) + "</strong><br>Booking balance due: <strong>" + money(booking.outstandingPence) + "</strong></p>" +
+      paymentSummaryMarkup(booking, leg) +
+      (outcome ? "<p>Payment outcome recorded: <strong>" + esc(String(outcome).replace(/_/g, " ")) + "</strong></p>" : "") +
+      (proposed ? '<p id="driver-timing-preview"' + (proposed.warning ? ' class="warning"' : "") + ">" + esc(proposed.preview) + "</p>" : "") +
+      (legStatus === "completed" ? "" : eventInput()) +
+      (airport && !fixed && legStatus !== "completed" ? '<label>Landing verification source<input id="driver-landing-source" placeholder="For example Flightradar24 actual landing" maxlength="160"></label><button class="btn" data-action="landing">Has the flight landed? Confirm actual time</button>' : "") +
       '<div class="actions">' +
-      (["confirmed", "allocated"].includes(legStatus) || (legStatus !== "completed" && legStatus !== "in_progress" && !booking[leg + "JobStartedAt"]) ? '<button class="btn btn-primary" data-action="job_started">Job Started</button>' : '') +
-      '<button class="btn" data-action="driver_ready">Driver ready</button><button class="btn" data-action="passenger_ready">Customer ready for collection</button><button class="btn" data-action="onboard">Passenger onboard</button></div>' +
-      (legStatus !== "completed" ? '<button class="btn btn-primary" data-action="complete">Confirm finish time and complete trip</button>' : '') +
-      (timed ? '<label>Excluded delay minutes<input id="driver-excluded" type="number" min="0" step="1" value="0"></label><button class="btn" data-action="finalise">Review and save additional time charge</button>' : '') +
-      '<h3>Record payment received</h3><label>Amount received (£)<input id="driver-payment" type="number" min="0.01" step="0.01" value="' + (due / 100).toFixed(2) + '"></label><label>Method<select id="driver-method"><option value="cash">Cash</option><option value="card">Card / Shift4</option><option value="bank transfer">Bank transfer</option></select></label><button class="btn" data-action="payment">Record this payment</button><p>Only record money actually received. This does not charge a card. Parking extras need office approval before they affect Balance due.</p><p id="driver-error" role="alert"></p><div id="driver-whatsapp"></div><button class="btn" id="driver-close">Close</button>';
+      (["confirmed", "allocated"].includes(legStatus) || (legStatus !== "completed" && legStatus !== "in_progress" && !booking[leg + "JobStartedAt"]) ? '<button class="btn btn-primary" data-action="job_started">Job Started</button>' : "") +
+      (legStatus !== "completed" ? '<button class="btn" data-action="driver_ready">Driver ready</button><button class="btn" data-action="passenger_ready">Customer ready for collection</button><button class="btn" data-action="onboard">Passenger onboard</button>' : "") +
+      "</div>" +
+      (timed && legStatus !== "completed" ? '<label>Excluded delay minutes<input id="driver-excluded" type="number" min="0" step="1" value="0"></label><button class="btn" data-action="finalise">Review and save additional time charge</button>' : "") +
+      (legStatus !== "completed" ? closeoutForm(booking, leg) : "") +
+      (legStatus === "completed" && due > 0 && summary.kind === "collect"
+        ? '<h3>Record payment received</h3><label>Amount received (£)<input id="driver-payment" type="number" min="0.01" step="0.01" value="' + (due / 100).toFixed(2) + '"></label><label>Method<select id="driver-method"><option value="cash">Cash</option><option value="card">Card / Shift4</option><option value="bank transfer">Bank transfer</option></select></label><button class="btn" data-action="payment">Record this payment</button><p>Only record money actually received. This does not charge a card.</p>'
+        : "") +
+      '<p id="driver-error" role="alert"></p><div id="driver-whatsapp"></div><button class="btn" id="driver-close">Close</button>';
     document.getElementById("sheet").hidden = false;
     document.getElementById("driver-close").onclick = () => { document.getElementById("sheet").hidden = true; selected = null; };
     pane.querySelectorAll("[data-action]").forEach(button => button.onclick = () => act(button.dataset.action));
+    pane.querySelectorAll('input[name="driver-outcome"]').forEach(input => input.onchange = syncCollectFields);
+    syncCollectFields();
     const wa = document.getElementById("driver-whatsapp");
     let phone = String(booking.hirerPhone || "").replace(/\D/g, "");
     if (phone.startsWith("0")) phone = "44" + phone.slice(1);
@@ -111,22 +185,50 @@
     if (messages.length) {
       wa.innerHTML = messages.map(function (message, index) {
         const label = index === 0 && (booking[leg + "JobStartedAt"] || legStatus === "in_progress") ? "Job Started WhatsApp preview" : "WhatsApp message preview";
-        return '<p class="message-preview"><strong>' + label + '</strong><br>' + esc(message) + '</p><p>Opening WhatsApp does not send the message.</p>' +
+        return '<p class="message-preview"><strong>' + label + "</strong><br>" + esc(message) + "</p><p>Opening WhatsApp does not send the message.</p>" +
           (phone
-            ? '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(message) + '">Open WhatsApp</a>'
-            : '<p>Add a customer phone number before opening WhatsApp.</p>');
+            ? '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + "?text=" + encodeURIComponent(message) + '">Open WhatsApp</a>'
+            : "<p>Add a customer phone number before opening WhatsApp.</p>");
       }).join("");
     }
   }
+
   async function act(action) {
     if (busy || !selected) return;
     const { booking, leg } = selected;
-    const event = document.getElementById("driver-event-time").value;
-    const payload = { bookingId: booking.id, leg, expectedRevision: Number(booking.revision || 0), requestId: crypto.randomUUID(), action,
-      at: event ? new Date(event).toISOString() : null, source: document.getElementById("driver-landing-source")?.value,
-      reason: document.getElementById("driver-reason").value, excludedMinutes: Number(document.getElementById("driver-excluded")?.value || 0),
-      amountPence: Math.round(Number(document.getElementById("driver-payment").value) * 100), method: document.getElementById("driver-method").value };
-    if (["job_started", "complete", "finalise", "payment"].includes(action) && !confirm(action === "payment" ? "Confirm this money has actually been received?" : action === "finalise" ? "Save the calculated additional time charge? This is separate from payment." : action === "job_started" ? "Mark this job as started? You can open the Job Started WhatsApp preview next. Nothing is sent automatically." : "Confirm the actual finish time? This will not send a booking update email.")) return;
+    const event = document.getElementById("driver-event-time")?.value;
+    const outcomeEl = document.querySelector('input[name="driver-outcome"]:checked');
+    const paymentOutcome = outcomeEl ? outcomeEl.value : "";
+    const payload = {
+      bookingId: booking.id,
+      leg,
+      expectedRevision: Number(booking.revision || 0),
+      requestId: crypto.randomUUID(),
+      action,
+      at: event ? new Date(event).toISOString() : new Date().toISOString(),
+      source: document.getElementById("driver-landing-source")?.value,
+      reason: document.getElementById("driver-reason")?.value || "",
+      excludedMinutes: Number(document.getElementById("driver-excluded")?.value || 0),
+      amountPence: Math.round(Number(document.getElementById("driver-payment")?.value || 0) * 100),
+      method: document.getElementById("driver-method")?.value || "",
+      paymentOutcome,
+    };
+    if (action === "complete_closeout") {
+      if (!paymentOutcome) {
+        document.getElementById("driver-error").textContent = "Confirm the payment outcome before completing this job.";
+        return;
+      }
+      if (["collected", "partly_collected"].includes(paymentOutcome) && !(payload.amountPence > 0)) {
+        document.getElementById("driver-error").textContent = "Enter the amount collected.";
+        return;
+      }
+      const confirmText = paymentOutcome === "collected" || paymentOutcome === "partly_collected"
+        ? "Mark this job completed and record " + money(payload.amountPence) + " as collected?"
+        : "Mark this job completed with payment outcome: " + paymentOutcome.replace(/_/g, " ") + "?";
+      if (!confirm(confirmText)) return;
+    } else if (["job_started", "complete", "finalise", "payment"].includes(action) && !confirm(action === "payment" ? "Confirm this money has actually been received?" : action === "finalise" ? "Save the calculated additional time charge? This is separate from payment." : action === "job_started" ? "Mark this job as started? You can open the Job Started WhatsApp preview next. Nothing is sent automatically." : "Confirm the actual finish time? This will not send a booking update email.")) {
+      return;
+    }
     busy = true;
     document.querySelectorAll("#sheet-card button").forEach(button => button.disabled = true);
     try {
@@ -139,6 +241,7 @@
       document.querySelectorAll("#sheet-card button").forEach(button => button.disabled = false);
     } finally { busy = false; }
   }
+
   function stop() { clearInterval(timer); active = false; rows = []; version = null; selected = null; for (const [id, value] of hiddenState) { const el = document.getElementById(id); if (el) el.hidden = value; } hiddenState.clear(); const sheet = document.getElementById("sheet"); if (sheet) sheet.hidden = true; document.getElementById("sheet-card")?.replaceChildren(); document.getElementById("job-list")?.replaceChildren(); }
   function start(auth, functions) {
     stop(); sessionAuth = auth; api = functions; active = true;

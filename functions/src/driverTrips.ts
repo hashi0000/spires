@@ -1,7 +1,8 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions/v1";
 import { requireDriver } from "./driverAccess";
-import { assignedLegs, driverBooking, tripCharge } from "./driverTripLogic";
+import { FAMILY_DEVICES } from "./familyJobsAuthLogic";
+import { assignedLegs, driverBooking, driverPaymentSummary, hasReturnLeg, tripCharge } from "./driverTripLogic";
 import { agreedFarePence, effectiveReceivedPence } from "./paymentAmount";
 import { paymentPosition } from "./quotes/fareMath";
 
@@ -12,6 +13,65 @@ function serialise(value: any): any {
   if (Array.isArray(value)) return value.map(serialise);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serialise(entry)]));
   return value;
+}
+
+function applyLegCompletion(booking: Record<string, any>, leg: string, atIso: string, actorUid: string): Record<string, any> {
+  const prior = booking[leg + "Status"] || booking.status;
+  if (!["confirmed", "allocated", "in_progress"].includes(prior)) error("failed-precondition", "Only a confirmed trip can be completed.");
+  if (booking[leg + "Status"] === "completed") error("failed-precondition", "This leg is already completed.");
+  const patch: Record<string, any> = {
+    [leg + "Status"]: "completed",
+    [leg + "CompletedAt"]: atIso,
+    [leg + "CompletedByUid"]: actorUid,
+  };
+  const hasReturn = hasReturnLeg(booking);
+  const other = leg === "return" ? "outbound" : "return";
+  const otherStatus = booking[other + "Status"] || booking.status;
+  const allDone = !hasReturn || ["completed", "cancelled"].includes(otherStatus);
+  patch.status = allDone ? "completed" : "confirmed";
+  patch.adminStatus = patch.status;
+  patch.customerStatus = patch.status;
+  return patch;
+}
+
+function applyCollectedPayment(
+  booking: Record<string, any>,
+  leg: string,
+  requestId: string,
+  actorUid: string,
+  amount: number,
+  method: string,
+  source: string,
+): Record<string, any> {
+  if (!Number.isSafeInteger(amount) || amount <= 0 || !["cash", "card", "bank transfer"].includes(method)) {
+    error("invalid-argument", "Enter the payment amount and method.");
+  }
+  const total = agreedFarePence(booking);
+  const received = effectiveReceivedPence(booking);
+  if (!total || amount > Math.max(0, total - received)) {
+    error("failed-precondition", "The payment exceeds the outstanding balance. Ask the office to review.");
+  }
+  const position = paymentPosition(total, received + amount, "");
+  return {
+    amountReceivedPence: Math.max(0, Math.round(Number(booking.amountReceivedPence || 0))) + amount,
+    outstandingPence: position.outstandingPence,
+    paymentStatus: position.stored,
+    paymentMethod: method,
+    lastPaymentSource: source,
+    paymentEntries: (booking.paymentEntries || []).concat([{
+      clientRequestId: requestId,
+      leg,
+      mode: "add",
+      kind: "collection",
+      amountPence: amount,
+      method,
+      at: new Date().toISOString(),
+      actorUid,
+      note: source === "family_jobs" ? "Recorded in Family Jobs" : "Recorded in Driver Hub",
+      paidOn: new Date().toISOString().slice(0, 10),
+      reason: "",
+    }]),
+  };
 }
 
 export const listDriverTrips = functions.https.onCall(async (data, context) => {
@@ -60,11 +120,39 @@ export const driverTripAction = functions.https.onCall(async (data, context) => 
     if (booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted") error("failed-precondition", "Executive availability has not been accepted.");
     const action = String(data.action || "");
     if (["finalise", "payment"].includes(action) && booking.paymentStatus === "paid" && Number(booking.amountReceivedPence || 0) === 0 && agreedFarePence(booking) > 0) error("failed-precondition", "The office must review this older paid record before any further collection.");
-    if (booking[leg + "ChargesFinalisedAt"] && action !== "payment") error("failed-precondition", "Charges are finalised. Ask the office to correct the timing record.");
+    if (booking[leg + "ChargesFinalisedAt"] && !["payment", "complete_closeout"].includes(action)) error("failed-precondition", "Charges are finalised. Ask the office to correct the timing record.");
     const patch: Record<string, any> = {};
     const timings: Record<string, string> = { driver_ready: leg + "DriverReadyAt", passenger_ready: leg + "PassengerReadyAt", onboard: leg + "PassengerOnboardAt", departed: leg + "DepartedAt" };
     const reason = String(data.reason || "").trim().slice(0, 300);
-    if (action === "job_started") {
+    if (action === "complete_closeout") {
+      const at = new Date(String(data.at || "")).getTime();
+      if (!Number.isFinite(at) || at > Date.now() + 60000) error("invalid-argument", "Enter a valid event time, not a future time.");
+      if (booking[leg + "DriverReadyAt"] && at < Date.parse(booking[leg + "DriverReadyAt"])) error("invalid-argument", "The finish time cannot be before the driver was ready.");
+      const outcome = String(data.paymentOutcome || "");
+      if (!["collected", "partly_collected", "still_due", "not_required"].includes(outcome)) {
+        error("invalid-argument", "Confirm the payment outcome before completing this job.");
+      }
+      const summary = driverPaymentSummary(booking, leg);
+      if (summary.kind === "account" && !["not_required", "still_due"].includes(outcome)) {
+        error("failed-precondition", "Account jobs do not collect payment in the driver app.");
+      }
+      if (summary.kind === "paid" && !["not_required", "still_due"].includes(outcome)) {
+        error("failed-precondition", "This booking is already paid. Complete without collecting again.");
+      }
+      Object.assign(patch, applyLegCompletion(booking, leg, new Date(at).toISOString(), context.auth!.uid));
+      patch[leg + "PaymentOutcome"] = outcome;
+      if (outcome === "collected" || outcome === "partly_collected") {
+        Object.assign(patch, applyCollectedPayment(
+          booking,
+          leg,
+          requestId,
+          context.auth!.uid,
+          Number(data.amountPence),
+          String(data.method || ""),
+          "driver_hub",
+        ));
+      }
+    } else if (action === "job_started") {
       const at = new Date(String(data.at || "")).getTime();
       if (!Number.isFinite(at) || at > Date.now() + 60000) error("invalid-argument", "Enter a valid event time, not a future time.");
       const value = new Date(at).toISOString();
@@ -98,18 +186,7 @@ export const driverTripAction = functions.https.onCall(async (data, context) => 
         patch[prefix ? "returnLandingStatus" : "landingStatus"] = "actual";
         patch[prefix ? "returnVerifiedLandingSource" : "verifiedLandingSource"] = source;
       } else {
-        const prior = booking[leg + "Status"] || booking.status;
-        if (!["confirmed", "allocated", "in_progress"].includes(prior)) error("failed-precondition", "Only a confirmed trip can be completed.");
-        patch[leg + "Status"] = "completed";
-        patch[leg + "CompletedAt"] = value;
-        patch[leg + "CompletedByUid"] = context.auth!.uid;
-        const hasReturn = booking.bookingType === "return" || booking.returnTrip || booking.openReturn || booking.returnPickupTime || booking.returnDateTime;
-        const other = leg === "return" ? "outbound" : "return";
-        const otherStatus = booking[other + "Status"] || booking.status;
-        const allDone = !hasReturn || ["completed", "cancelled"].includes(otherStatus);
-        patch.status = allDone ? "completed" : "confirmed";
-        patch.adminStatus = patch.status;
-        patch.customerStatus = patch.status;
+        Object.assign(patch, applyLegCompletion(booking, leg, value, context.auth!.uid));
       }
     } else if (action === "finalise") {
       if (!booking[leg + "CompletedAt"]) error("failed-precondition", "Record the finish time first.");
@@ -134,19 +211,7 @@ export const driverTripAction = functions.https.onCall(async (data, context) => 
     } else if (action === "payment") {
       const timed = booking.timedHire || (leg === "return" ? booking.returnAirportCollection : booking.airportCollection);
       if (timed && !booking[leg + "ChargesFinalisedAt"]) error("failed-precondition", "Finalise the trip time charges before recording the final payment.");
-      const amount = Number(data.amountPence);
-      const method = String(data.method || "");
-      if (!Number.isSafeInteger(amount) || amount <= 0 || !["cash", "card", "bank transfer"].includes(method)) error("invalid-argument", "Enter the payment amount and method.");
-      const total = agreedFarePence(booking);
-      const received = effectiveReceivedPence(booking);
-      if (!total || amount > Math.max(0, total - received)) error("failed-precondition", "The payment exceeds the outstanding balance. Ask the office to review.");
-      const position = paymentPosition(total, received + amount, "");
-      patch.amountReceivedPence = Math.max(0, Math.round(Number(booking.amountReceivedPence || 0))) + amount;
-      patch.outstandingPence = position.outstandingPence;
-      patch.paymentStatus = position.stored;
-      patch.paymentMethod = method;
-      patch.lastPaymentSource = "driver_hub";
-      patch.paymentEntries = (booking.paymentEntries || []).concat([{ clientRequestId: requestId, leg, mode: "add", amountPence: amount, method, at: new Date().toISOString(), actorUid: context.auth!.uid, note: "Recorded in Driver Hub", paidOn: new Date().toISOString().slice(0, 10), reason: "" }]);
+      Object.assign(patch, applyCollectedPayment(booking, leg, requestId, context.auth!.uid, Number(data.amountPence), String(data.method || ""), "driver_hub"));
       const recipient = booking.hirerEmail || booking.email;
       if (recipient) tx.create(db.collection("emailJobs").doc(`driver_receipt__${bookingId}__${requestId}`), {
         bookingId, event: "payment_receipt", kind: "payment_receipt", version: requestId,
@@ -156,11 +221,85 @@ export const driverTripAction = functions.https.onCall(async (data, context) => 
     patch.revision = Number(booking.revision || 0) + 1;
     patch.updatedAt = stamp();
     tx.update(ref, patch);
-    tx.create(actionRef, { actorUid: context.auth!.uid, driverId, action, leg, at: stamp(), reason });
-    tx.create(ref.collection("audit").doc(), { actorUid: context.auth!.uid, driverId, action: `driver_${action}`, leg, eventAt: data.at || null, reason, at: stamp() });
+    tx.create(actionRef, { actorUid: context.auth!.uid, driverId, action, leg, at: stamp(), reason, paymentOutcome: data.paymentOutcome || null });
+    tx.create(ref.collection("audit").doc(), { actorUid: context.auth!.uid, driverId, action: `driver_${action}`, leg, eventAt: data.at || null, reason, paymentOutcome: data.paymentOutcome || null, at: stamp() });
     const result = { ...booking, ...patch };
     delete result.updatedAt;
     return { booking: driverBooking(result, driverId, bookingId) };
+  });
+});
+
+/** Family Jobs closeout: same payment and completion rules, family device auth. */
+export const familyTripAction = functions.https.onCall(async (data, context) => {
+  const auth = context.auth;
+  if (!auth || auth.token.familyJobs !== true) error("permission-denied", "Family Jobs access required.");
+  const actorUid = auth!.uid;
+  const device = (await admin.firestore().collection(FAMILY_DEVICES).doc(actorUid).get()).data();
+  if (!device || device.enabled === false) error("permission-denied", "Sign in again with the Family Jobs code.");
+  const bookingId = String(data?.bookingId || "");
+  const requestId = String(data?.requestId || "");
+  const leg = data?.leg;
+  if (!/^[\w-]{1,128}$/.test(bookingId) || !/^[\w-]{8,100}$/.test(requestId) || !["outbound", "return"].includes(leg)) {
+    error("invalid-argument", "A booking, leg and request id are required.");
+  }
+  const db = admin.firestore();
+  const ref = db.collection("bookings").doc(bookingId);
+  const actionRef = ref.collection("driverActions").doc(requestId);
+  return db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const existing = await tx.get(actionRef);
+    const booking = serialise(snap.data() || {});
+    if (!snap.exists) error("not-found", "Booking not found.");
+    if (existing.exists) {
+      if (existing.data()?.actorUid !== actorUid) error("permission-denied", "This request belongs to another session.");
+      return { duplicate: true, booking: { id: bookingId, ...booking, outboundPaymentSummary: driverPaymentSummary(booking, "outbound"), returnPaymentSummary: hasReturnLeg(booking) ? driverPaymentSummary(booking, "return") : null } };
+    }
+    if (Number(data.expectedRevision) !== Number(booking.revision || 0)) error("aborted", "This booking changed. Reload before saving; your changes have not been applied.");
+    if (booking.status === "cancelled" || booking[leg + "Status"] === "cancelled") error("failed-precondition", "This trip is cancelled.");
+    if (booking.vehicleType === "executive" && booking.executiveAvailability !== "accepted") error("failed-precondition", "Executive availability has not been accepted.");
+    const action = String(data.action || "");
+    if (action !== "complete_closeout") error("invalid-argument", "Family Jobs supports complete closeout only.");
+    const at = new Date(String(data.at || "")).getTime();
+    if (!Number.isFinite(at) || at > Date.now() + 60000) error("invalid-argument", "Enter a valid event time, not a future time.");
+    const outcome = String(data.paymentOutcome || "");
+    if (!["collected", "partly_collected", "still_due", "not_required"].includes(outcome)) {
+      error("invalid-argument", "Confirm the payment outcome before completing this job.");
+    }
+    const summary = driverPaymentSummary(booking, leg);
+    if (summary.kind === "account" && !["not_required", "still_due"].includes(outcome)) {
+      error("failed-precondition", "Account jobs do not collect payment in the driver app.");
+    }
+    if (summary.kind === "paid" && !["not_required", "still_due"].includes(outcome)) {
+      error("failed-precondition", "This booking is already paid. Complete without collecting again.");
+    }
+    const patch: Record<string, any> = applyLegCompletion(booking, leg, new Date(at).toISOString(), actorUid);
+    patch[leg + "PaymentOutcome"] = outcome;
+    if (outcome === "collected" || outcome === "partly_collected") {
+      Object.assign(patch, applyCollectedPayment(booking, leg, requestId, actorUid, Number(data.amountPence), String(data.method || ""), "family_jobs"));
+    }
+    patch.revision = Number(booking.revision || 0) + 1;
+    patch.updatedAt = stamp();
+    tx.update(ref, patch);
+    tx.create(actionRef, { actorUid, familyDevice: true, action, leg, at: stamp(), paymentOutcome: outcome });
+    tx.create(ref.collection("audit").doc(), {
+      actorUid,
+      familyDevice: true,
+      action: `family_${action}`,
+      leg,
+      eventAt: data.at || null,
+      paymentOutcome: outcome,
+      at: stamp(),
+    });
+    const result = { ...booking, ...patch };
+    delete result.updatedAt;
+    return {
+      booking: {
+        id: bookingId,
+        ...result,
+        outboundPaymentSummary: driverPaymentSummary(result, "outbound"),
+        returnPaymentSummary: hasReturnLeg(result) ? driverPaymentSummary(result, "return") : null,
+      },
+    };
   });
 });
 
