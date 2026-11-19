@@ -493,7 +493,16 @@ const App: React.FC = () => {
       case 'link-bookings':
         return <LinkBookings />;
       case 'advertising':
-        return <AdvertisingResults bookings={bookingsHook.bookings} email={user.email} />;
+        return (
+          <AdvertisingResults
+            bookings={bookingsHook.bookings}
+            email={user.email}
+            onOpenBooking={(bookingId) => {
+              const booking = bookingsHook.bookings.find((row) => row.id === bookingId);
+              if (booking) handleEditBooking(booking);
+            }}
+          />
+        );
       case 'communications':
         return <CustomerCommunications />;
       default:

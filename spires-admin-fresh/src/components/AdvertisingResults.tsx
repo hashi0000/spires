@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../utils/firebase";
 import { isAdminEmail } from "../utils/staffAccess";
 import { reconciliationItems } from "../utils/bookingOps";
 import {
-  ADVERTISING_BUDGET_LABEL,
   ADDITIONAL_BOOKINGS_NOTE,
   RESULTS_CONTEXT_NOTE,
   AdvertisingBookingInput,
@@ -15,7 +14,7 @@ import {
   SpendEntryInput,
   advertisingDateRange,
   buildAdvertisingReport,
-  currentLondonMonth,
+  currentLondonCalendarMonth,
   bookingPaceChange,
   beforeAdsBookingsPerDay,
   afterAdsBookingsPerDay,
@@ -28,9 +27,24 @@ import {
   sourceLabel,
   vehicleLabel,
 } from "../utils/advertisingResults";
+import {
+  buildGoogleAdsPeriodReport,
+  periodManualSpend,
+  spendEntrySummary,
+  type SpendRangeEntry,
+} from "../utils/googleAdsPeriod";
 import { effectiveWorkflowStatus } from "../utils/bookingWorkflow";
 import { ComparisonBars, growthComparisonItems, paceComparisonItems } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
+
+export type SpendSaveInput = {
+  id?: string;
+  date: string;
+  dateEnd?: string;
+  pounds: string;
+  campaign?: string;
+  note?: string;
+};
 
 const SOURCE_OPTIONS: Array<[string, string]> = [
   ["", "Not recorded"],
@@ -84,7 +98,10 @@ export function AdvertisingResultsView({
   onDates,
   onManualComplete,
   onSaveStartDate,
-  onAddSpend,
+  onSaveSpend,
+  spendEntries = [],
+  googleAdsReport,
+  onOpenBooking,
   onSaveSource,
   onSaveCost,
   reportFilters,
@@ -105,7 +122,10 @@ export function AdvertisingResultsView({
   onDates: (from: string, to: string, dateBasis: "journey" | "enquiry") => void;
   onManualComplete: (value: boolean) => void;
   onSaveStartDate: (date: string) => void;
-  onAddSpend: (date: string, pounds: string, note: string) => void;
+  onSaveSpend: (input: SpendSaveInput) => void;
+  spendEntries?: SpendRangeEntry[];
+  googleAdsReport?: ReturnType<typeof buildGoogleAdsPeriodReport>;
+  onOpenBooking?: (bookingId: string) => void;
   onSaveSource: (id: string, source: string, channel: "telephone" | "whatsapp") => void;
   onSaveCost: (id: string, field: keyof JobCostInput, pounds: string) => void;
   reportFilters?: { status: string; route: string; vehicle: string; source: string };
@@ -113,8 +133,12 @@ export function AdvertisingResultsView({
   onReportFilters?: (next: { status: string; route: string; vehicle: string; source: string }) => void;
 }) {
   const [spendDate, setSpendDate] = useState(report.to);
+  const [spendDateEnd, setSpendDateEnd] = useState("");
   const [spendPounds, setSpendPounds] = useState("");
+  const [spendCampaign, setSpendCampaign] = useState("");
   const [spendNote, setSpendNote] = useState("");
+  const [editingSpendId, setEditingSpendId] = useState<string | null>(null);
+  const [showSpendForm, setShowSpendForm] = useState(false);
   const [startDate, setStartDate] = useState(advertisingStartedOn || "");
   useEffect(() => {
     setStartDate(advertisingStartedOn || "");
@@ -122,43 +146,213 @@ export function AdvertisingResultsView({
   const today = advertisingDateRange("today");
   const lastSeven = advertisingDateRange("last_7");
   const lastTwentyEight = advertisingDateRange("last_28");
-  const monthToDate = advertisingDateRange("month_to_date");
+  const thisMonth = currentLondonCalendarMonth();
   const dateLabel = report.dateBasis === "enquiry" ? "enquiry or submission date" : "journey date";
   const figures = [report.costPerConfirmed, report.contribution, report.quoted, report.netPayments, report.manualSpend, report.adsSpend, report.advertisingSpend, report.costPerCompletedPaid, report.costs.driver, report.costs.fuel, report.costs.parking, report.costs.airport, report.costs.paymentFees];
+  const ads = googleAdsReport;
+  const resetSpendForm = () => {
+    setEditingSpendId(null);
+    setSpendDate(report.to);
+    setSpendDateEnd("");
+    setSpendPounds("");
+    setSpendCampaign("");
+    setSpendNote("");
+    setShowSpendForm(false);
+  };
+  const beginEditSpend = (entry: SpendRangeEntry) => {
+    setEditingSpendId(entry.id);
+    setSpendDate(entry.date);
+    setSpendDateEnd(entry.dateEnd && entry.dateEnd !== entry.date ? entry.dateEnd : "");
+    setSpendPounds((entry.amountPence / 100).toFixed(2));
+    setSpendCampaign(entry.campaign || "");
+    setSpendNote(entry.note || "");
+    setShowSpendForm(true);
+  };
+  const statusLabel = (status: string) => {
+    if (status === "awaiting_customer_confirmation") return "Awaiting customer confirmation";
+    return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+  };
+  const campaignSpendRows = (() => {
+    const included = periodManualSpend(spendEntries, report.from, report.to).included;
+    const byCampaign = new Map<string, number>();
+    included.forEach((line) => {
+      const key = String(line.campaign || "").trim() || "Unnamed campaign";
+      byCampaign.set(key, (byCampaign.get(key) || 0) + Math.max(0, line.amountPence));
+    });
+    return Array.from(byCampaign.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  })();
 
   return (
-    <section className="advertising-results">
+    <section className="advertising-results advertising-results--simple">
       <header className="advertising-results__header">
         <div>
           <h1>Advertising results</h1>
-          <p>Booking records are the source. Unknown sources are not treated as advertising.</p>
+          <p>{ads?.dateBasisLabel || "Jobs are counted by the date they were booked."}</p>
         </div>
-        <p className="advertising-results__budget">{ADVERTISING_BUDGET_LABEL}</p>
       </header>
       {preview ? <p className="advertising-results__banner">Sample preview. These are not live bookings.</p> : null}
       {message ? <p className="advertising-results__message">{message}</p> : null}
 
-      <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
-        <div className="advertising-results__presets" role="group" aria-label="Date shortcuts">
-          <button type="button" className={report.from === today.from && report.to === today.to ? "is-active" : ""} aria-pressed={report.from === today.from && report.to === today.to} onClick={() => onDates(today.from, today.to, report.dateBasis)}>Today</button>
-          <button type="button" className={report.from === lastSeven.from && report.to === lastSeven.to ? "is-active" : ""} aria-pressed={report.from === lastSeven.from && report.to === lastSeven.to} onClick={() => onDates(lastSeven.from, lastSeven.to, report.dateBasis)}>Last 7 finished days</button>
-          <button type="button" className={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to ? "is-active" : ""} aria-pressed={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to} onClick={() => onDates(lastTwentyEight.from, lastTwentyEight.to, report.dateBasis)}>Last 28 finished days</button>
-          <button type="button" className={report.from === monthToDate.from && report.to === monthToDate.to ? "is-active" : ""} aria-pressed={report.from === monthToDate.from && report.to === monthToDate.to} onClick={() => onDates(monthToDate.from, monthToDate.to, report.dateBasis)}>Month to date</button>
+      <div className="ads-simple-toolbar">
+        <form className="advertising-results__filters ads-simple-dates" onSubmit={(event) => event.preventDefault()}>
+          <div className="advertising-results__presets" role="group" aria-label="Date shortcuts">
+            <button type="button" className={report.from === thisMonth.from && report.to === thisMonth.to ? "is-active" : ""} aria-pressed={report.from === thisMonth.from && report.to === thisMonth.to} onClick={() => onDates(thisMonth.from, thisMonth.to, "enquiry")}>This month</button>
+            <button type="button" className={report.from === today.from && report.to === today.to ? "is-active" : ""} aria-pressed={report.from === today.from && report.to === today.to} onClick={() => onDates(today.from, today.to, "enquiry")}>Today</button>
+            <button type="button" className={report.from === lastSeven.from && report.to === lastSeven.to ? "is-active" : ""} aria-pressed={report.from === lastSeven.from && report.to === lastSeven.to} onClick={() => onDates(lastSeven.from, lastSeven.to, "enquiry")}>Last 7 days</button>
+            <button type="button" className={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to ? "is-active" : ""} aria-pressed={report.from === lastTwentyEight.from && report.to === lastTwentyEight.to} onClick={() => onDates(lastTwentyEight.from, lastTwentyEight.to, "enquiry")}>Last 28 days</button>
+          </div>
+          <label>From
+            <input className="form-input" type="date" value={report.from} onChange={(event) => onDates(event.target.value, report.to, "enquiry")} />
+          </label>
+          <label>To
+            <input className="form-input" type="date" value={report.to} onChange={(event) => onDates(report.from, event.target.value, "enquiry")} />
+          </label>
+        </form>
+        <button type="button" className="btn btn-primary ads-simple-add" onClick={() => { setEditingSpendId(null); setShowSpendForm(true); }}>Add ad spend</button>
+      </div>
+
+      {showSpendForm ? (
+        <form
+          className="advertising-results__panel advertising-results__spend ads-spend-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSaveSpend({
+              id: editingSpendId || undefined,
+              date: spendDate,
+              dateEnd: spendDateEnd || undefined,
+              pounds: spendPounds,
+              campaign: spendCampaign,
+              note: spendNote,
+            });
+            resetSpendForm();
+          }}
+        >
+          <h2>{editingSpendId ? "Edit ad spend" : "Add ad spend"}</h2>
+          <label>From date
+            <input className="form-input" type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} required />
+          </label>
+          <label>To date (optional)
+            <input className="form-input" type="date" value={spendDateEnd} onChange={(event) => setSpendDateEnd(event.target.value)} />
+          </label>
+          <label>Amount spent (£)
+            <input className="form-input" inputMode="decimal" value={spendPounds} onChange={(event) => setSpendPounds(event.target.value)} placeholder="0.00" required />
+          </label>
+          <label>Campaign (optional)
+            <input className="form-input" value={spendCampaign} onChange={(event) => setSpendCampaign(event.target.value)} maxLength={80} />
+          </label>
+          <label>Notes (optional)
+            <input className="form-input" value={spendNote} onChange={(event) => setSpendNote(event.target.value)} maxLength={120} />
+          </label>
+          <button className="btn btn-primary" type="submit" disabled={saving || preview}>{editingSpendId ? "Save" : "Save spend"}</button>
+          <button className="btn btn-secondary" type="button" disabled={saving} onClick={resetSpendForm}>Cancel</button>
+        </form>
+      ) : null}
+
+      <div className="ads-simple-figures" aria-label="Period summary">
+        <article>
+          <span>Google Ads spend</span>
+          <strong>{ads && ads.displaySpendPence != null ? formatGbp(ads.displaySpendPence) : "No ad spend recorded"}</strong>
+        </article>
+        <article>
+          <span>Confirmed jobs from ads</span>
+          <strong>{ads ? ads.confirmedCount : 0}</strong>
+        </article>
+        <article>
+          <span>Total agreed fares from those jobs</span>
+          <strong>{ads ? formatGbp(ads.confirmedFarePence) : formatGbp(null)}</strong>
+        </article>
+      </div>
+      {ads?.spendOverlaps.length ? (
+        <div className="google-ads-flags" role="status">
+          {ads.spendOverlaps.map((row) => <p key={`${row.leftId}-${row.rightId}`}>{row.detail}</p>)}
         </div>
-        <label>From
-          <input className="form-input" type="date" value={report.from} onChange={(event) => onDates(event.target.value, report.to, report.dateBasis)} />
-        </label>
-        <label>To
-          <input className="form-input" type="date" value={report.to} onChange={(event) => onDates(report.from, event.target.value, report.dateBasis)} />
-        </label>
-        <label>Date used
-          <select className="form-select" value={report.dateBasis} onChange={(event) => onDates(report.from, report.to, event.target.value as "journey" | "enquiry")}>
-            <option value="journey">Journey date</option>
-            <option value="enquiry">Enquiry date</option>
-          </select>
-        </label>
-        {onReportFilters && reportFilters && filterChoices ? (
-          <>
+      ) : null}
+      {ads?.spendPartialFlags.length ? (
+        <div className="google-ads-flags" role="status">
+          {ads.spendPartialFlags.map((row) => <p key={row.id}>{row.detail}</p>)}
+        </div>
+      ) : null}
+
+      <section className="advertising-results__panel ads-jobs-panel">
+        <h2>Jobs from ads</h2>
+        <p>Period {report.from} to {report.to}. Return bookings count once. Cancelled jobs are marked.</p>
+        {!ads || ads.jobs.length === 0 ? <p>No ad jobs were booked in this period.</p> : (
+          <div className="advertising-results__table-wrap">
+            <table className="ads-jobs-table">
+              <thead>
+                <tr>
+                  <th>Date booked</th>
+                  <th>Journey</th>
+                  <th>Agreed fare</th>
+                  <th>Booking status</th>
+                  <th>Amount received</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ads.jobs.map((job) => (
+                  <tr key={job.id} className={job.cancelled ? "is-cancelled" : undefined}>
+                    <td>
+                      {onOpenBooking && job.id ? (
+                        <button type="button" className="booking-customer-link" onClick={() => onOpenBooking(job.id)}>{job.bookedDate}</button>
+                      ) : job.bookedDate}
+                      <div className="ads-job-ref">{job.bookingNumber}</div>
+                    </td>
+                    <td>{job.route}</td>
+                    <td>{formatGbp(job.farePence)}</td>
+                    <td>{job.cancelled ? <span className="ads-cancelled-tag">Cancelled</span> : statusLabel(job.status)}</td>
+                    <td>{formatGbp(job.receivedPence)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="advertising-results__panel">
+        <h2>Spend history</h2>
+        {spendEntries.length === 0 ? <p>No ad spend recorded.</p> : (
+          <ul className="ads-spend-history">
+            {spendEntries.map((entry) => (
+              <li key={entry.id}>
+                <span>{spendEntrySummary(entry)}{entry.note ? ` · ${entry.note}` : ""}</span>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={saving || preview} onClick={() => beginEditSpend(entry)}>Edit</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <details className="ads-more-detail">
+        <summary>More detail</summary>
+
+      {ads ? (
+        <section className="advertising-results__panel google-ads-section" aria-label="Google Ads detail">
+          <h2>Google Ads</h2>
+          <p>{ads.dateBasisLabel}</p>
+          <div className="advertising-results__counts">
+            <article><span>Completed jobs from ads</span><strong>{ads.completedCount}</strong><p>Agreed fares {formatGbp(ads.completedFarePence)}</p></article>
+            <article><span>Payments received</span><strong>{formatGbp(ads.paymentsReceivedPence)}</strong></article>
+            <article><span>Cancellations</span><strong>{ads.cancelledCount}</strong></article>
+          </div>
+          {ads.adsApiSpendPence != null ? (
+            <p>Live Google Ads API spend for this period: {formatGbp(ads.adsApiSpendPence)}. Manual entries fully inside the period total {formatGbp(ads.spendPence)}.</p>
+          ) : null}
+          <h3>Spend by campaign</h3>
+          {campaignSpendRows.length === 0 ? <p>No campaign spend fully inside this period.</p> : (
+            <ul className="ads-spend-history">
+              {campaignSpendRows.map(([name, pence]) => (
+                <li key={name}><span>{name}</span><strong>{formatGbp(pence)}</strong></li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      {onReportFilters && reportFilters && filterChoices ? (
+        <section className="advertising-results__panel">
+          <h2>Report filters</h2>
+          <form className="advertising-results__filters" onSubmit={(event) => event.preventDefault()}>
             <label>Status
               <select className="form-select" value={reportFilters.status} onChange={(event) => onReportFilters({ ...reportFilters, status: event.target.value })}>
                 <option value="all">All statuses</option>
@@ -188,9 +382,9 @@ export function AdvertisingResultsView({
                 {filterChoices.sources.map((source) => <option key={source} value={source}>{source}</option>)}
               </select>
             </label>
-          </>
-        ) : null}
-      </form>
+          </form>
+        </section>
+      ) : null}
 
       <section className="advertising-results__panel">
         <h2>Selected period against the days before it</h2>
@@ -410,25 +604,14 @@ export function AdvertisingResultsView({
       </section>
 
       <section className="advertising-results__panel">
-        <h2>Manual advertising spend</h2>
+        <h2>Live Google Ads connection</h2>
         <p>{connectionNote || report.adsSpend.detail}</p>
         {onRefreshAds && <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>{refreshingAds ? "Refreshing Google Ads…" : "Refresh Google Ads spend"}</button>}
         <label className="advertising-results__check">
           <input type="checkbox" checked={manualIsComplete} onChange={(event) => onManualComplete(event.target.checked)} disabled={saving || preview} />
-          Use the dated manual entries as the full advertising spend for this period
+          Use the dated manual entries as the full advertising spend for overall advertising results
         </label>
-        <form className="advertising-results__spend" onSubmit={(event) => { event.preventDefault(); onAddSpend(spendDate, spendPounds, spendNote); setSpendPounds(""); setSpendNote(""); }}>
-          <label>Date
-            <input className="form-input" type="date" value={spendDate} onChange={(event) => setSpendDate(event.target.value)} required />
-          </label>
-          <label>Amount in pounds
-            <input className="form-input" inputMode="decimal" value={spendPounds} onChange={(event) => setSpendPounds(event.target.value)} placeholder="0.00" required />
-          </label>
-          <label>Note
-            <input className="form-input" value={spendNote} onChange={(event) => setSpendNote(event.target.value)} maxLength={120} placeholder="What this spend covers" />
-          </label>
-          <button className="btn btn-primary" type="submit" disabled={saving || preview}>Add manual entry</button>
-        </form>
+        <p>Add and edit dated spend entries with Add ad spend and Spend history at the top of this page.</p>
       </section>
 
       <section className="advertising-results__panel">
@@ -484,6 +667,7 @@ export function AdvertisingResultsView({
         <p>Excluded {report.excluded.synthetic} test bookings, {report.excluded.duplicate} duplicate bookings, and {report.excluded.returnLegs} return legs whose fare was already on the original booking.</p>
         <p>Customer names, contact details, exact addresses and booking notes are not sent to Google Analytics from this page.</p>
       </footer>
+      </details>
     </section>
   );
 }
@@ -566,8 +750,13 @@ function withNotes(bookings: AdvertisingBookingInput[], notes: Record<string, No
   });
 }
 
-const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?: string | null; previewMode?: boolean }> = ({ bookings, email, previewMode = false }) => {
-  const initial = previewMode ? { from: "2026-11-01", to: "2026-11-30" } : currentLondonMonth();
+const AdvertisingResults: React.FC<{
+  bookings: AdvertisingBookingInput[];
+  email?: string | null;
+  previewMode?: boolean;
+  onOpenBooking?: (bookingId: string) => void;
+}> = ({ bookings, email, previewMode = false, onOpenBooking }) => {
+  const initial = previewMode ? { from: "2026-11-01", to: "2026-11-30" } : currentLondonCalendarMonth();
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [dateBasis, setDateBasis] = useState<"journey" | "enquiry">("enquiry");
@@ -594,13 +783,18 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
     const spendUnsub = onSnapshot(collection(db, "marketingSpend"), (snapshot) => {
       setSpend(snapshot.docs.map((row) => {
         const data = row.data();
+        const date = String(data.date || "");
+        const dateEnd = String(data.dateEnd || data.endDate || "");
         return {
           id: row.id,
-          date: String(data.date || ""),
+          date,
+          dateEnd: /^\d{4}-\d{2}-\d{2}$/.test(dateEnd) ? dateEnd : undefined,
           amountPence: Number(data.amountPence) || 0,
           source: data.source === "google_ads" ? "google_ads" : "manual",
           label: String(data.label || "Manual entry"),
-        };
+          campaign: String(data.campaign || "").trim(),
+          note: String(data.note || "").trim(),
+        } as SpendRangeEntry;
       }));
     }, () => setMessage("Advertising spend could not be loaded. Admin access is required before entries can be saved."));
     const notesUnsub = onSnapshot(collection(db, "bookingMeasurementNotes"), (snapshot) => {
@@ -668,6 +862,12 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
   const report = useMemo(() => buildAdvertisingReport(filteredBookings, {
     from, to, dateBasis, spend, manualSpendIsComplete: manualIsComplete, adsConnected: adsConnected && adsRange===`${from}|${to}`, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed,
   }), [filteredBookings, from, to, dateBasis, spend, manualIsComplete, adsConnected, adsRange, adsSpendPence, advertisingStartedOn, advertisingStartConfirmed]);
+  const googleAdsReport = useMemo(() => buildGoogleAdsPeriodReport(noted, {
+    from,
+    to,
+    spend: spend as SpendRangeEntry[],
+    adsSpendPence: adsConnected && adsRange === `${from}|${to}` ? adsSpendPence : null,
+  }), [noted, from, to, spend, adsConnected, adsRange, adsSpendPence]);
 
   if (!previewMode && !isAdminEmail(email)) {
     return <section className="advertising-results"><h1>Advertising results</h1><p>This page is only for admin accounts.</p></section>;
@@ -755,30 +955,50 @@ const AdvertisingResults: React.FC<{ bookings: AdvertisingBookingInput[]; email?
           setSaving(false);
         }
       }}
-      onAddSpend={async (date, pounds, note) => {
-        const amountPence = poundsToPence(pounds);
-        if (!date || amountPence === null) {
+      onSaveSpend={async (input) => {
+        const amountPence = poundsToPence(input.pounds);
+        if (!input.date || amountPence === null) {
           setMessage("Enter a date and an amount in pounds and pence.");
+          return;
+        }
+        const dateEnd = input.dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(input.dateEnd) ? input.dateEnd : input.date;
+        if (dateEnd < input.date) {
+          setMessage("The end date cannot be before the start date.");
           return;
         }
         setSaving(true);
         try {
-          await addDoc(collection(db, "marketingSpend"), {
-            date,
+          const payload = {
+            date: input.date,
+            dateEnd,
             amountPence,
-            source: "manual",
+            source: "manual" as const,
             label: "Manual entry",
-            note: note.trim().slice(0, 120),
-            createdAt: serverTimestamp(),
-            createdBy: email || "",
-          });
-          setMessage("Manual spend entry saved.");
+            campaign: String(input.campaign || "").trim().slice(0, 80),
+            note: String(input.note || "").trim().slice(0, 120),
+            updatedAt: serverTimestamp(),
+            updatedBy: email || "",
+          };
+          if (input.id) {
+            await updateDoc(doc(db, "marketingSpend", input.id), payload);
+            setMessage("Ad spend entry updated.");
+          } else {
+            await addDoc(collection(db, "marketingSpend"), {
+              ...payload,
+              createdAt: serverTimestamp(),
+              createdBy: email || "",
+            });
+            setMessage("Ad spend entry saved.");
+          }
         } catch {
-          setMessage("The manual entry was not saved. Admin rules for advertising spend are not available until they are deployed.");
+          setMessage("The spend entry was not saved. Admin rules for advertising spend are not available until they are deployed.");
         } finally {
           setSaving(false);
         }
       }}
+      spendEntries={spend as SpendRangeEntry[]}
+      googleAdsReport={googleAdsReport}
+      onOpenBooking={onOpenBooking}
       reportFilters={reportFilters}
       filterChoices={filterChoices}
       onReportFilters={setReportFilters}

@@ -96,9 +96,13 @@ export interface AdvertisingBookingInput {
 export interface SpendEntryInput {
   id: string;
   date: string;
+  /** Inclusive end date when the entry covers a range. */
+  dateEnd?: string;
   amountPence: number;
   source: "manual" | "google_ads";
   label: string;
+  campaign?: string;
+  note?: string;
 }
 
 export interface AdvertisingReportOptions {
@@ -352,7 +356,7 @@ const STATUS_RANK: Record<string, number> = {
 
 const REPORTED_LABELS: Record<string, string> = {
   google_ads: "Customer reported Google Ads",
-  google_advert: "Customer reported Google advert",
+  google_advert: "Customer reported Google Ads",
   google_search: "Customer reported Google search",
   website: "Customer reported website",
   repeat: "Customer reported repeat booking",
@@ -541,6 +545,18 @@ export function advertisingDateRange(preset: AdvertisingDatePreset, now = new Da
 export function currentLondonMonth(now = new Date()): { from: string; to: string } {
   const today = londonDateKey(now) || "1970-01-01";
   return { from: `${today.slice(0, 7)}-01`, to: today };
+}
+
+/** Full London calendar month containing `now` (1st through last day). */
+export function currentLondonCalendarMonth(now = new Date()): { from: string; to: string } {
+  const today = londonDateKey(now) || "1970-01-01";
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    from: `${today.slice(0, 7)}-01`,
+    to: `${today.slice(0, 7)}-${String(lastDay).padStart(2, "0")}`,
+  };
 }
 
 function coerceDate(value: unknown): Date | null {

@@ -1391,12 +1391,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 className="form-input"
               >
                 <option value="">Not recorded</option>
-                <option value="google_advert">Google advert</option>
+                <option value="google_advert">Google Ads</option>
                 <option value="google_search">Google search</option>
                 <option value="recommendation">Recommendation</option>
                 <option value="repeat">Repeat customer</option>
                 <option value="other">Other</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">Use Google Ads for phone and WhatsApp bookings when the customer says they came from an ad. Automatic website attribution stays in place when a Google click is already stored.</p>
               {editingBooking?.websiteEnquiryRef ? <p className="text-xs text-gray-500 mt-1">Website reference: {editingBooking.websiteEnquiryRef}</p> : null}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 mt-3">

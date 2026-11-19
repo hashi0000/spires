@@ -3,7 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { AdvertisingResultsView } from "./AdvertisingResults";
 import { ComparisonBars } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
-import { advertisingDateRange, advertisingPreviewBookings, buildAdvertisingReport, currentLondonMonth } from "../utils/advertisingResults";
+import { advertisingDateRange, advertisingPreviewBookings, buildAdvertisingReport, currentLondonCalendarMonth } from "../utils/advertisingResults";
+import { buildGoogleAdsPeriodReport } from "../utils/googleAdsPeriod";
 
 jest.mock("firebase/functions", () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }));
 jest.mock("firebase/firestore", () => ({
@@ -13,20 +14,81 @@ jest.mock("firebase/firestore", () => ({
   onSnapshot: jest.fn(() => () => undefined),
   serverTimestamp: jest.fn(),
   setDoc: jest.fn(),
+  updateDoc: jest.fn(),
 }));
 jest.mock("../utils/firebase", () => ({ db: {}, functions: {} }));
 
-test("preview hides passenger details and labels missing costs as unknown", () => {
-  const range = currentLondonMonth(new Date("2026-11-10T12:00:00Z"));
+function openMoreDetail() {
+  const details = screen.getByText("More detail").closest("details");
+  if (details) details.open = true;
+  return details as HTMLDetailsElement;
+}
+
+test("main view shows spend, confirmed jobs and agreed fares with jobs list", () => {
+  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
+  const bookings = [
+    { id: "1", bookingNumber: "A", enquiryAt: "2026-11-02", createdAt: "2026-11-02", status: "confirmed", actualFare: 150, amountReceivedPence: 0, customerReportedSource: "google_advert", pickupLocation: "Oxford", destination: "Heathrow" },
+    { id: "2", bookingNumber: "B", enquiryAt: "2026-11-03", createdAt: "2026-11-03", status: "allocated", actualFare: 150, amountReceivedPence: 5000, customerReportedSource: "google_advert", pickupLocation: "Oxford", destination: "Gatwick" },
+    { id: "3", bookingNumber: "C", enquiryAt: "2026-11-04", createdAt: "2026-11-04", status: "completed", actualFare: 150, amountReceivedPence: 15000, staffReportedSource: "google_ads", pickupLocation: "Witney", destination: "Oxford" },
+  ];
+  const spend = [{ id: "s", date: "2026-11-01", dateEnd: "2026-11-30", amountPence: 10000, source: "manual" as const, label: "Manual" }];
+  const report = buildAdvertisingReport(bookings as any, {
+    ...range,
+    dateBasis: "enquiry",
+    spend,
+    manualSpendIsComplete: true,
+    adsConnected: false,
+    now: new Date("2026-11-12T15:00:00Z"),
+  });
+  const googleAdsReport = buildGoogleAdsPeriodReport(bookings as any, { ...range, spend });
+  const onOpenBooking = jest.fn();
+  render(
+    <AdvertisingResultsView
+      report={report}
+      preview
+      connectionNote="Google Ads is not connected."
+      onDates={() => undefined}
+      onManualComplete={() => undefined}
+      onSaveStartDate={() => undefined}
+      onSaveSpend={() => undefined}
+      spendEntries={spend}
+      googleAdsReport={googleAdsReport}
+      onOpenBooking={onOpenBooking}
+      onSaveSource={() => undefined}
+      onSaveCost={() => undefined}
+    />
+  );
+
+  expect(screen.getByRole("heading", { name: "Advertising results" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "This month" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Add ad spend" })).toBeTruthy();
+  const summary = screen.getByLabelText("Period summary");
+  expect(summary.textContent).toMatch(/Google Ads spend/);
+  expect(summary.textContent).toMatch(/£100\.00/);
+  expect(summary.textContent).toMatch(/Confirmed jobs from ads/);
+  expect(summary.textContent).toMatch(/3/);
+  expect(summary.textContent).toMatch(/Total agreed fares from those jobs/);
+  expect(summary.textContent).toMatch(/£450\.00/);
+  expect(screen.getByRole("heading", { name: "Jobs from ads" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Spend history" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "2026-11-02" }));
+  expect(onOpenBooking).toHaveBeenCalledWith("1");
+  fireEvent.click(screen.getByRole("button", { name: "Add ad spend" }));
+  expect(screen.getByRole("heading", { name: "Add ad spend" })).toBeTruthy();
+});
+
+test("preview hides passenger details and keeps legacy metrics under More detail", () => {
+  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
   const report = buildAdvertisingReport(advertisingPreviewBookings, {
     ...range,
-    dateBasis: "journey",
+    dateBasis: "enquiry",
     spend: [],
     manualSpendIsComplete: false,
     adsConnected: false,
     now: new Date("2026-11-12T15:00:00Z"),
   });
   const onDates = jest.fn();
+  const googleAdsReport = buildGoogleAdsPeriodReport(advertisingPreviewBookings, { ...range, spend: [] });
   render(
     <AdvertisingResultsView
       report={report}
@@ -35,13 +97,18 @@ test("preview hides passenger details and labels missing costs as unknown", () =
       onDates={onDates}
       onManualComplete={() => undefined}
       onSaveStartDate={() => undefined}
-      onAddSpend={() => undefined}
+      onSaveSpend={() => undefined}
+      googleAdsReport={googleAdsReport}
       onSaveSource={() => undefined}
       onSaveCost={() => undefined}
     />
   );
 
   expect(screen.getByRole("heading", { name: "Advertising results" })).toBeTruthy();
+  expect(screen.getAllByText("No ad spend recorded").length).toBeGreaterThan(0);
+  expect(screen.getByText("More detail")).toBeTruthy();
+  openMoreDetail();
+  expect(screen.getByRole("heading", { name: "Google Ads" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Contribution after direct costs and advertising" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Cost per confirmed booking" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Advertising return on spend" })).toBeTruthy();
@@ -90,23 +157,23 @@ test("preview hides passenger details and labels missing costs as unknown", () =
   expect(screen.getByRole("button", { name: "Confirm Google Ads start date" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Change Google Ads start date" })).toBeDisabled();
   expect(screen.getByText("Sample preview. These are not live bookings.")).toBeTruthy();
-  expect(screen.getByText(/£135/)).toBeTruthy();
+  expect(screen.getAllByText(/£140/).length).toBeGreaterThan(0);
   expect(screen.queryByText("07000000000")).toBeNull();
   expect(screen.queryByText("Do not show this note")).toBeNull();
   expect(screen.getByText("8 seater")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Today" }));
-  fireEvent.click(screen.getByRole("button", { name: "Last 7 finished days" }));
+  fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
   const today = advertisingDateRange("today");
   const week = advertisingDateRange("last_7");
-  expect(onDates).toHaveBeenNthCalledWith(1, today.from, today.to, "journey");
-  expect(onDates).toHaveBeenNthCalledWith(2, week.from, week.to, "journey");
+  expect(onDates).toHaveBeenNthCalledWith(1, today.from, today.to, "enquiry");
+  expect(onDates).toHaveBeenNthCalledWith(2, week.from, week.to, "enquiry");
 });
 
 test("lets an administrator confirm the recorded date or change it", () => {
-  const range = currentLondonMonth(new Date("2026-11-10T12:00:00Z"));
+  const range = currentLondonCalendarMonth(new Date("2026-11-10T12:00:00Z"));
   const report = buildAdvertisingReport([], {
     ...range,
-    dateBasis: "journey",
+    dateBasis: "enquiry",
     spend: [],
     manualSpendIsComplete: false,
     adsConnected: false,
@@ -121,12 +188,13 @@ test("lets an administrator confirm the recorded date or change it", () => {
       onDates={() => undefined}
       onManualComplete={() => undefined}
       onSaveStartDate={onSaveStartDate}
-      onAddSpend={() => undefined}
+      onSaveSpend={() => undefined}
       onSaveSource={() => undefined}
       onSaveCost={() => undefined}
     />
   );
 
+  openMoreDetail();
   expect(screen.getByText(/An administrator has not confirmed this date/)).toBeTruthy();
   expect(screen.queryByText(/The marker shows the confirmed Google Ads start date/)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Confirm Google Ads start date" }));

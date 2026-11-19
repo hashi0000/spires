@@ -1,8 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { jobSelectionKey, legPaymentDue, planBulkPaymentLines, resolveJobCardLeg } from "./jobCardActions";
 
 describe("legPaymentDue", () => {
-  it("uses outstanding after a paid deposit on a one way", () => {
+  test("uses outstanding after a paid deposit on a one way", () => {
     const due = legPaymentDue({
       actualFare: 235,
       depositRequired: true,
@@ -17,7 +16,7 @@ describe("legPaymentDue", () => {
     if (due.ok) expect(due.amountPence).toBe(20000);
   });
 
-  it("flags return legs without an agreed split", () => {
+  test("flags return legs without an agreed split", () => {
     const due = legPaymentDue({
       bookingType: "return",
       returnPickupTime: "2026-11-20T18:00:00",
@@ -34,7 +33,7 @@ describe("legPaymentDue", () => {
     if (!due.ok) expect(due.reason).toMatch(/cannot be determined/i);
   });
 
-  it("uses dueOnOutbound for the outbound share", () => {
+  test("uses dueOnOutbound for the outbound share", () => {
     const due = legPaymentDue({
       bookingType: "return",
       returnPickupTime: "2026-11-20T18:00:00",
@@ -50,7 +49,7 @@ describe("legPaymentDue", () => {
     if (due.ok) expect(due.amountPence).toBe(10000);
   });
 
-  it("treats account jobs as no collection", () => {
+  test("treats account jobs as no collection", () => {
     const due = legPaymentDue({ actualFare: 90, paymentMethod: "account", paymentStatus: "pending" }, "booking");
     expect(due.kind).toBe("account");
     expect(due.amountPence).toBe(0);
@@ -58,7 +57,7 @@ describe("legPaymentDue", () => {
 });
 
 describe("planBulkPaymentLines", () => {
-  it("keeps exceptions selected as skip lines", () => {
+  test("keeps exceptions selected as skip lines", () => {
     const lines = planBulkPaymentLines([
       {
         key: "a|return",
@@ -82,7 +81,7 @@ describe("planBulkPaymentLines", () => {
 });
 
 describe("selection helpers", () => {
-  it("builds leg scoped keys", () => {
+  test("builds leg scoped keys", () => {
     expect(jobSelectionKey("abc", "return")).toBe("abc|return");
     expect(resolveJobCardLeg({ leg: "return" })).toBe("return");
     expect(resolveJobCardLeg(null)).toBe("booking");

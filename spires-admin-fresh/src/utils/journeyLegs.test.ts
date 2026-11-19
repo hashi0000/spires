@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { Booking } from "../types/types";
 import { getUpcomingBookings, returnsToReview } from "./bookingSchedule";
 import {
@@ -49,7 +48,7 @@ function legacyReturn(partial: Partial<Booking> = {}): Booking {
 }
 
 describe("journey legs", () => {
-  it("shows the confirmed return on its own day when the outbound is already in the past", () => {
+  test("shows the confirmed return on its own day when the outbound is already in the past", () => {
     const row = legacyReturn({ status: "confirmed", paymentStatus: "paid" });
     const legs = journeyLegs(row, NOW);
     expect(legs[0].status).toBe("confirmed");
@@ -61,7 +60,7 @@ describe("journey legs", () => {
     expect(row.actualFare).toBe(180);
   });
 
-  it("shows a completed outbound with a return inside the next 7 days", () => {
+  test("shows a completed outbound with a return inside the next 7 days", () => {
     const row = legacyReturn();
     const legs = journeyLegs(row, NOW);
     expect(legs).toHaveLength(2);
@@ -82,7 +81,7 @@ describe("journey legs", () => {
     expect(legsForQuickView(row, "upcoming", NOW).map((leg) => leg.leg)).toEqual(["return"]);
   });
 
-  it("keeps both completed legs off the upcoming list and leaves the fare on the booking", () => {
+  test("keeps both completed legs off the upcoming list and leaves the fare on the booking", () => {
     const row = legacyReturn({
       outboundStatus: "completed",
       returnStatus: "completed",
@@ -94,14 +93,14 @@ describe("journey legs", () => {
     expect(row.amountReceivedPence).toBe(18000);
   });
 
-  it("leaves a cancelled return out of upcoming journeys", () => {
+  test("leaves a cancelled return out of upcoming journeys", () => {
     const row = legacyReturn({ outboundStatus: "completed", returnStatus: "cancelled" });
     expect(journeyLegs(row, NOW).find((leg) => leg.leg === "return")?.status).toBe("cancelled");
     expect(getUpcomingBookings([row], NOW, { withinMs: WEEK_MS })).toEqual([]);
     expect(proposedLegacyReturnCorrection(row, NOW)).toBeNull();
   });
 
-  it("uses a different driver for the return", () => {
+  test("uses a different driver for the return", () => {
     const row = legacyReturn({
       status: "allocated",
       driverId: "driver-a",
@@ -116,7 +115,7 @@ describe("journey legs", () => {
     expect(getUpcomingBookings([row], NOW, { withinMs: WEEK_MS })[0].driverId).toBe("driver-b");
   });
 
-  it("keeps one way bookings and open returns on the outbound journey", () => {
+  test("keeps one way bookings and open returns on the outbound journey", () => {
     const oneWay = booking({ status: "confirmed", pickupTime: "2026-11-14T10:00:00Z" });
     expect(hasTimedReturn(oneWay)).toBe(false);
     expect(journeyLegs(oneWay, NOW)).toHaveLength(1);
@@ -136,7 +135,7 @@ describe("journey legs", () => {
     expect(getUpcomingBookings([openReturn], NOW, { withinMs: WEEK_MS })).toHaveLength(1);
   });
 
-  it("respects the 7 day window and the London day boundary", () => {
+  test("respects the 7 day window and the London day boundary", () => {
     const onTheBoundary = legacyReturn({ returnPickupTime: new Date(NOW.getTime() + WEEK_MS).toISOString(), returnDateTime: new Date(NOW.getTime() + WEEK_MS).toISOString() });
     const afterTheBoundary = legacyReturn({
       id: "later",
@@ -156,7 +155,7 @@ describe("journey legs", () => {
     expect(legsForQuickView(nextDay, "tomorrow", midnight).map((leg) => leg.leg)).toEqual(["return"]);
   });
 
-  it("does not complete the return when the outbound is completed", () => {
+  test("does not complete the return when the outbound is completed", () => {
     const previous = legacyReturn({ status: "allocated", driverId: "driver-a", returnStatus: undefined });
     const saved = applyRequestedLegStatus(previous, { ...previous, status: "completed" });
     expect(saved.outboundStatus).toBe("completed");
@@ -168,7 +167,7 @@ describe("journey legs", () => {
     expect(journeyLegs(saved, NOW).find((leg) => leg.leg === "return")?.status).toBe("needs_review");
   });
 
-  it("completes the booking only when every required leg is resolved", () => {
+  test("completes the booking only when every required leg is resolved", () => {
     const previous = legacyReturn({ status: "allocated", outboundStatus: "completed", returnStatus: "allocated" });
     const completed = applyRequestedLegStatus(previous, { ...previous, returnStatus: "completed", status: "allocated" });
     expect(completed.status).toBe("completed");
@@ -177,7 +176,7 @@ describe("journey legs", () => {
     expect(cancelled.actualFare).toBe(previous.actualFare);
   });
 
-  it("prepares a legacy correction without rewriting the stored booking", () => {
+  test("prepares a legacy correction without rewriting the stored booking", () => {
     const row = legacyReturn();
     const correction = proposedLegacyReturnCorrection(row, NOW);
     expect(correction).toMatchObject({
@@ -196,7 +195,7 @@ describe("journey legs", () => {
     expect(correction?.unchanged).toEqual(["actualFare", "amountReceivedPence", "paymentStatus", "driverId"]);
   });
 
-  it("completes only the selected return leg from the jobs list", () => {
+  test("completes only the selected return leg from the jobs list", () => {
     const row = legacyReturn({
       status: "allocated",
       outboundStatus: "completed",
@@ -223,7 +222,7 @@ describe("journey legs", () => {
     expect(confirmed.patch.status).toBe("allocated");
   });
 
-  it("reopens one completed leg and leaves the fare unchanged", () => {
+  test("reopens one completed leg and leaves the fare unchanged", () => {
     const row = legacyReturn({
       status: "completed",
       outboundStatus: "completed",
@@ -244,7 +243,7 @@ describe("journey legs", () => {
     expect(journeyLegs({ ...row, ...undone.patch }, NOW).find((leg) => leg.leg === "return")?.status).toBe("allocated");
   });
 
-  it("does not assume a past return was completed", () => {
+  test("does not assume a past return was completed", () => {
     const row = legacyReturn({ returnPickupTime: "2026-11-01T19:05:00Z", returnDateTime: "2026-11-01T19:05:00Z" });
     const ret = journeyLegs(row, NOW).find((leg) => leg.leg === "return");
     expect(ret?.status).toBe("needs_review");
