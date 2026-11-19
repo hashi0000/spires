@@ -11,6 +11,8 @@ Internal documentation for the Spires Taxis monorepo.
 | Coding agents / policy workflow | [../AGENTS.md](../AGENTS.md) |
 | **Customer-facing policy register** | [policies/README.md](policies/README.md) |
 | **Release checklist** | [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) |
+| ChatGPT review brief (19 Nov 2026) | [CHAT_GPT_RELEASE_REVIEW-2026-11-19.md](CHAT_GPT_RELEASE_REVIEW-2026-11-19.md) |
+| Phase 0 audit ledger (follow-up) | [PHASE0_AUDIT_LEDGER-2026-11-19-followup.md](PHASE0_AUDIT_LEDGER-2026-11-19-followup.md) |
 | Private ops (outside this public repo) | [ops/README.md](ops/README.md) |
 | Customer app deploy | [../customer-app/DEPLOYMENT_GUIDE.md](../customer-app/DEPLOYMENT_GUIDE.md) |
 | Admin app | [../spires-admin-fresh/README.md](../spires-admin-fresh/README.md) |
