@@ -1,6 +1,11 @@
 # Spires Taxis Customer App - Deployment Guide
 
-## 🚀 Vercel Deployment Configuration
+Monorepo docs index: [`../docs/README.md`](../docs/README.md).  
+Customer-facing policy: [`../docs/policies/README.md`](../docs/policies/README.md).
+
+Optional Firebase env var names are also listed in [`ENV_VARIABLES.md`](ENV_VARIABLES.md) (proposed for merge into this guide — see [`../docs/archive/README.md`](../docs/archive/README.md)).
+
+## Vercel Deployment Configuration
 
 This guide will help you deploy the customer booking app to Vercel and fix all configuration issues.
 

@@ -2232,6 +2232,16 @@ header.admin-header,
 .booking-setup{background:#fff;border:1px solid #dce4ed;border-radius:12px;padding:20px;margin-bottom:16px}
 .booking-setup__title{font-size:1rem;font-weight:700;color:#002147;margin:0 0 18px}
 .booking-setup__label{display:block;font-size:.875rem;font-weight:600;margin:16px 0 8px;color:#334155}
+.booking-panel{background:#fff;border:1px solid #dce4ed;border-radius:12px;padding:18px;margin-bottom:16px}
+.booking-panel__title{font-size:1rem;font-weight:700;color:#002147;margin:0 0 14px}
+.booking-panel--journey{border-color:#bbf7d0;background:#f0fdf4}
+.booking-panel--fare{border-color:#fde68a;background:#fffbeb}
+.booking-panel--more{background:#f8fafc}
+.booking-panel--more > summary.booking-panel__title{list-style:none}
+.booking-panel--more > summary.booking-panel__title::-webkit-details-marker{display:none}
+.booking-panel--more > summary.booking-panel__title::after{content:"Show";float:right;font-size:.8rem;font-weight:600;color:#64748b}
+.booking-panel--more[open] > summary.booking-panel__title::after{content:"Hide"}
+@media(max-width:600px){.booking-panel{padding:14px}}
 .modal-body .booking-setup .journey-box--service{padding:0;margin:0 0 16px;border:0;background:transparent}
 .modal-body .booking-setup .journey-box--service>label:first-child{margin-top:0}
 .booking-setup>p{font-size:.8rem;line-height:1.5;color:#64748b;margin:8px 0 0}

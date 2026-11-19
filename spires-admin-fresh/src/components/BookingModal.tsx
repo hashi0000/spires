@@ -1,13 +1,13 @@
 // components/BookingModal.tsx - FIXED CLEAN VERSION
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Minus, Calculator, Receipt, Clock } from 'lucide-react';
+import { Plus, Minus, Clock } from 'lucide-react';
 import { ExtendedBooking, TripExpense, Driver, Vehicle } from '../types/types';
 import CotswoldsFields from './CotswoldsFields';
 import JourneyAssistance from './JourneyAssistance';
 import CollectionChoices from './CollectionChoices';
 import { CURRENT_WAITING_VERSION, airportWaitingTextForBooking } from '../utils/airportWaitingPolicy';
 import servicePolicy from '../data/servicePolicy.json';
-import { bookingMoney } from '../utils/bookingMoney';
+import { bookingMoney, paidDepositAlreadyRecorded, paidDepositPaymentFields } from '../utils/bookingMoney';
 import { expenseTypes, paymentMethods } from '../utils/constants';
 import { SPIRES_BANK_DETAILS, isBankTransferMethod } from '../utils/bankDetails';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
@@ -135,7 +135,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [formError, setFormError] = useState('');
   const [undoBusy, setUndoBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const moreOptionsRef = useRef<HTMLDetailsElement>(null);
   const [formData, setFormData] = useState<ExtendedBooking>({
     bookingNumber: '',
     dateTime: '',
@@ -424,7 +426,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
           )
         : null;
     if (scheduleError) {
-      setFormError(scheduleError);
+      failValidation(scheduleError, 'booking-section-fare');
       return;
     }
     const cancellingSavedBooking = Boolean(editingBooking) && (
@@ -433,40 +435,40 @@ const BookingModal: React.FC<BookingModalProps> = ({
     const outboundStops = normaliseStops(formData.stops, formData.pickupLocation, formData.destination || '');
     const outboundStopError = cancellingSavedBooking ? null : validateStops(outboundStops);
     if (outboundStopError) {
-      setFormError(outboundStopError);
+      failValidation(outboundStopError, 'booking-section-journey');
       return;
     }
     const returnStops = isReturn ? normaliseStops(formData.returnStops, formData.returnPickupLocation || '', formData.returnDestination || '') : [];
     if (isReturn && !cancellingSavedBooking) {
       const returnStopError = validateStops(returnStops);
       if (returnStopError) {
-        setFormError(`Return: ${returnStopError}`);
+        failValidation(`Return: ${returnStopError}`, 'booking-section-journey');
         return;
       }
       const returnDate = String(formData.returnDate || '').slice(0, 10) || String(formData.returnPickupTime || '').slice(0, 10);
       if (!returnDate) {
-        setFormError('Return bookings need a return date.');
+        failValidation('Return bookings need a return date.', 'booking-section-journey');
         return;
       }
       if (!formData.openReturn && !formData.returnPickupTime) {
-        setFormError('Enter the return pickup time, or choose return time to be confirmed.');
+        failValidation('Enter the return pickup time, or choose return time to be confirmed.', 'booking-section-journey');
         return;
       }
     }
     const typedEmail = String(formData.email || formData.hirerEmail || '').trim();
     if (typedEmail && !normaliseCustomerEmail(typedEmail)) {
-      setFormError('Enter a valid customer email, or leave it blank.');
+      failValidation('Enter a valid customer email, or leave it blank.', 'booking-section-customer', '#booking-customer-email');
       return;
     }
     const guestUnclaimed = (editingBooking as { guestRequest?: boolean } | null)?.guestRequest === true && !editingBooking?.uid;
     if (guestUnclaimed && !String(formData.hirerPhone || '').trim() && !normaliseCustomerEmail(typedEmail)) {
-      setFormError('Add a phone number or email address before saving this guest request.');
+      failValidation('Add a phone number or email address before saving this guest request.', 'booking-section-customer');
       return;
     }
     const alreadyConfirmed = Boolean(editingBooking && ['confirmed', 'allocated', 'completed', 'paid'].includes(effectiveWorkflowStatus(editingBooking)));
     const classError = vehicleClassRequiredMessage(String(formData.status || ''), String(formData.vehicleType || ''), alreadyConfirmed);
     if (classError) {
-      setFormError(classError);
+      failValidation(classError, 'booking-section-journey');
       return;
     }
     setFormError('');
@@ -789,7 +791,42 @@ const BookingModal: React.FC<BookingModalProps> = ({
         if (confirmNote) setFormData((prev) => ({ ...prev, status: originalStatus as ExtendedBooking['status'] }));
         if (fareNote || confirmNote) window.alert([fareNote, confirmNote].filter(Boolean).join('\n\n'));
         console.log('✅ Booking updated successfully:', bookingId);
+        const depositSource = {
+          ...editingBooking,
+          depositRequired: editingBooking.depositRequired === true || formData.depositRequired === true,
+          depositAmount: formData.depositAmount || editingBooking.depositAmount,
+          depositStatus:
+            formData.depositStatus === 'paid' || editingBooking.depositStatus === 'paid' ? 'paid' : (formData.depositStatus || editingBooking.depositStatus),
+          amountReceivedPence: editingBooking.amountReceivedPence,
+          paymentEntries: editingBooking.paymentEntries,
+        };
+        if (
+          depositSource.depositRequired === true
+          && depositSource.depositStatus === 'paid'
+          && !paidDepositAlreadyRecorded(depositSource)
+        ) {
+          const depositPounds = Number(depositSource.depositAmount) || 0;
+          if (depositPounds > 0) {
+            try {
+              const recordManualPayment = httpsCallable(functions, 'recordManualPayment');
+              await recordManualPayment({
+                bookingId,
+                mode: 'add',
+                amountPounds: depositPounds,
+                method: formData.paymentMethod || editingBooking.paymentMethod || 'bank transfer',
+                clientRequestId: `deposit-${bookingId}`,
+                note: 'Deposit',
+                expectedRevision: Number((editingBooking as { revision?: number }).revision || 0) + 1,
+              });
+            } catch (depositError) {
+              console.error('Deposit payment recording failed after booking save:', depositError);
+              window.alert(`Booking details were saved. The paid deposit still needs recording: ${getCallableErrorMessage(depositError)}`);
+            }
+          }
+        }
       } else {
+        const depositPayment = paidDepositPaymentFields(bookingData, bookingId, String(bookingData.paymentMethod || 'bank transfer'));
+        if (depositPayment) Object.assign(bookingData, depositPayment);
         const createPayload: Record<string, unknown> = {};
         Object.entries(bookingData).forEach(([key, value]) => {
           if (value !== undefined && value !== null && key !== 'id') {
@@ -882,10 +919,35 @@ const BookingModal: React.FC<BookingModalProps> = ({
     onClose();
   };
 
-  const showSection = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  const showSection = (id: string, focusSelector?: string) => {
+    if (id === 'booking-section-more' || id === 'booking-section-allocation') {
+      setMoreOptionsOpen(true);
+      if (moreOptionsRef.current) moreOptionsRef.current.open = true;
+    }
+    window.setTimeout(() => {
+      const section = document.getElementById(id);
+      section?.scrollIntoView({ block: 'start' });
+      if (focusSelector) {
+        const field = document.querySelector(focusSelector) as HTMLElement | null;
+        field?.focus();
+      }
+    }, 0);
   };
-  const money = paymentSummary(bookingMoney({ ...editingBooking, ...formData }).totalPence / 100, Number((editingBooking as { amountReceivedPence?: number } | null)?.amountReceivedPence) || 0, editingBooking?.paymentStatus);
+
+  const failValidation = (message: string, sectionId?: string, focusSelector?: string) => {
+    setFormError(message);
+    if (sectionId) showSection(sectionId, focusSelector);
+  };
+  const moneyTotals = bookingMoney({
+    ...editingBooking,
+    ...formData,
+    amountReceivedPence: (editingBooking as { amountReceivedPence?: number } | null)?.amountReceivedPence,
+    paymentEntries: (editingBooking as { paymentEntries?: unknown } | null)?.paymentEntries,
+    depositRequired: formData.depositRequired ?? editingBooking?.depositRequired,
+    depositAmount: formData.depositAmount || editingBooking?.depositAmount,
+    depositStatus: formData.depositStatus || editingBooking?.depositStatus,
+  });
+  const money = paymentSummary(moneyTotals.totalPence / 100, moneyTotals.receivedPence, editingBooking?.paymentStatus);
   const airportNotes = airportCollectionNotes({
     airportCollection: Boolean(formData.airportCollection),
     returnAirportCollection: Boolean(formData.returnAirportCollection),
@@ -932,11 +994,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {' · '}
             {formData.pickupLocation || 'Pickup not set'} to {formData.destination || 'destination not set'}
           </p>
-            <p className="booking-summary">{editingBooking ? `Outstanding £${(money.outstandingPence / 100).toFixed(2)}. ` : ''}Save draft does not email the customer or confirm the journey.</p>
+            <p className="booking-summary">{editingBooking ? `Outstanding £${(money.outstandingPence / 100).toFixed(2)}. ` : ''}Saving does not email the customer. Confirm the journey separately when needed.</p>
           <nav className="booking-section-nav" aria-label="Booking sections">
             <button type="button" onClick={() => showSection('booking-section-customer')}>Customer</button>
             <button type="button" onClick={() => showSection('booking-section-journey')}>Journey</button>
             <button type="button" onClick={() => showSection('booking-section-fare')}>Fare</button>
+            <button type="button" onClick={() => showSection('booking-section-more')}>More options</button>
             {editingBooking ? <button type="button" onClick={() => showSection('booking-section-documents')}>Communications</button> : null}
             {editingBooking ? <button type="button" onClick={() => showSection('booking-section-history')}>History</button> : null}
           </nav>
@@ -944,40 +1007,6 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
         <form onSubmit={handleSubmit} onChange={() => setDirty(true)}>
           <div className="modal-body">
-            <section className="booking-setup" aria-label="Service and journey">
-              <h4 className="booking-setup__title">Service and journey</h4>
-            <CotswoldsFields value={formData} vehicleType={formData.vehicleType} onChange={change => setFormData(previous => ({ ...previous, ...change }))} />
-              <label className="booking-setup__label" htmlFor="booking-journey-type">Journey type</label>
-              <select id="booking-journey-type"
-                disabled={formData.journeyType === 'cotswolds'}
-                value={formData.bookingType === 'return' ? 'return' : 'one_way'}
-                onChange={(e) => {
-                  const nextType = e.target.value === 'return' ? 'return' : 'one_way';
-                  setFormData((prev) => ({
-                    ...prev,
-                    bookingType: nextType,
-                    returnTrip: nextType === 'return',
-                    returnPickupLocation:
-                      nextType === 'return'
-                        ? (prev.returnPickupLocation || prev.destination)
-                        : prev.returnPickupLocation,
-                    returnDestination:
-                      nextType === 'return'
-                        ? (prev.returnDestination || prev.pickupLocation)
-                        : prev.returnDestination,
-                  }));
-                }}
-                className="form-input"
-              >
-                <option value="one_way">One Way</option>
-                <option value="return">Return</option>
-              </select>
-              <p className="text-xs text-blue-900 mt-1">
-                {formData.journeyType === 'cotswolds' ? 'Your itinerary and final drop off are included in one timed trip.' : 'Outbound and return journeys are managed together.'}
-              </p>
-            </section>
-            <JourneyAssistance formData={formData} setFormData={setFormData} />
-
             {customerSuggestions.length > 0 && (
               <datalist id="booking-past-customers">
                 {customerSuggestions.map((c) => (
@@ -986,8 +1015,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </datalist>
             )}
 
-            <h4 id="booking-section-customer" className="text-md font-semibold text-gray-900 mb-3">Customer</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <section id="booking-section-customer" className="booking-panel" aria-label="Customer">
+            <h4 className="booking-panel__title">Customer</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
                 <input
@@ -1018,9 +1048,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
               </div>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer email</label>
               <input
+                id="booking-customer-email"
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value, hirerEmail: e.target.value })}
@@ -1035,7 +1066,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               )}
             </div>
 
-            <div className="mb-6">
+            <div className="mb-0">
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer address</label>
               <textarea
                 value={formData.hirerAddress || ''}
@@ -1045,55 +1076,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 placeholder="Optional — filled automatically for known customers when available"
               />
             </div>
-
-            <details className="mb-6">
-              <summary className="text-sm font-semibold text-gray-900">Booking source and dates</summary>
-            <div className="mb-6 mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Recorded booking time</label>
-              <input type="datetime-local" value={formData.dateTime} onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })} className="form-input" />
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Booking source</label>
-              <select
-                value={formData.bookingMethod}
-                onChange={(e) => setFormData({ ...formData, bookingMethod: e.target.value as any })}
-                className="form-input"
-              >
-                <option value="telephone">Telephone</option>
-                <option value="in person">In Person</option>
-                <option value="internet">Internet</option>
-              </select>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry date and time</label>
-              <input
-                type="datetime-local"
-                value={typeof formData.enquiryAt === "string" ? formData.enquiryAt : ""}
-                onChange={(e) => setFormData({ ...formData, enquiryAt: e.target.value })}
-                className="form-input"
-              />
-              <p className="text-xs text-gray-500 mt-1">When the customer first asked, if you know it. Leave this blank when you do not. This does not change the time the record was created.</p>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">How the customer said they heard about us</label>
-              <select
-                value={formData.customerReportedSource || ''}
-                onChange={(e) => setFormData({ ...formData, customerReportedSource: e.target.value as ExtendedBooking['customerReportedSource'] })}
-                className="form-input"
-              >
-                <option value="">Not recorded</option>
-                <option value="google_advert">Google advert</option>
-                <option value="google_search">Google search</option>
-                <option value="recommendation">Recommendation</option>
-                <option value="repeat">Repeat customer</option>
-                <option value="other">Other</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">This is what the customer told you. It is not tracked advertising. The booking method above is the channel, such as telephone or WhatsApp.</p>
-              {editingBooking?.websiteEnquiryRef ? <p className="text-xs text-gray-500 mt-1">Website reference: {editingBooking.websiteEnquiryRef}</p> : null}
-            </div>
-            </details>
+            </section>
 
             {locationSuggestions.length > 0 && (
               <datalist id="booking-past-locations">
@@ -1114,13 +1097,41 @@ const BookingModal: React.FC<BookingModalProps> = ({
               };
               return (
                 <>
-                  <div id="booking-section-journey" className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                    <div className="flex items-center mb-3">
-                      <Clock className="w-5 h-5 text-green-600 mr-2" />
-                      <h4 className="text-md font-semibold text-green-900">
-                        {formData.bookingType === 'return' ? 'Outbound journey' : 'Journey'} *
-                      </h4>
+                  <section id="booking-section-journey" className="booking-panel booking-panel--journey">
+                    <h4 className="booking-panel__title">
+                      {formData.bookingType === 'return' ? 'Journey · Outbound' : 'Journey'}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="booking-journey-type">Journey type</label>
+                        <select id="booking-journey-type"
+                          disabled={formData.journeyType === 'cotswolds'}
+                          value={formData.bookingType === 'return' ? 'return' : 'one_way'}
+                          onChange={(e) => {
+                            const nextType = e.target.value === 'return' ? 'return' : 'one_way';
+                            setFormData((prev) => ({
+                              ...prev,
+                              bookingType: nextType,
+                              returnTrip: nextType === 'return',
+                              returnPickupLocation:
+                                nextType === 'return'
+                                  ? (prev.returnPickupLocation || prev.destination)
+                                  : prev.returnPickupLocation,
+                              returnDestination:
+                                nextType === 'return'
+                                  ? (prev.returnDestination || prev.pickupLocation)
+                                  : prev.returnDestination,
+                            }));
+                          }}
+                          className="form-input"
+                        >
+                          <option value="one_way">One way</option>
+                          <option value="return">Return</option>
+                        </select>
+                      </div>
                     </div>
+                    <CotswoldsFields value={formData} vehicleType={formData.vehicleType} onChange={change => setFormData(previous => ({ ...previous, ...change }))} />
+                    <JourneyAssistance formData={formData} setFormData={setFormData} />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
@@ -1224,7 +1235,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                         </div>
                       </div>
                     )}
-                  </div>
+                  </section>
 
                   {formData.bookingType === 'return' && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -1338,8 +1349,56 @@ const BookingModal: React.FC<BookingModalProps> = ({
             )}
             {airportNotes.map((note) => <p key={note} className="text-sm text-amber-800 mb-2">{note}</p>)}
 
-            <details id="booking-section-allocation" className="mb-6">
-              <summary className="text-md font-semibold text-gray-900">Additional details</summary>
+            <details
+              id="booking-section-more"
+              className="booking-panel booking-panel--more mb-6"
+              ref={moreOptionsRef}
+              open={moreOptionsOpen}
+              onToggle={(e) => setMoreOptionsOpen((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="booking-panel__title" style={{ cursor: 'pointer' }}>More options</summary>
+            <div className="mb-4 mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recorded booking time</label>
+              <input type="datetime-local" value={formData.dateTime} onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })} className="form-input" />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Booking source</label>
+              <select
+                value={formData.bookingMethod}
+                onChange={(e) => setFormData({ ...formData, bookingMethod: e.target.value as any })}
+                className="form-input"
+              >
+                <option value="telephone">Telephone</option>
+                <option value="in person">In Person</option>
+                <option value="internet">Internet</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Enquiry date and time</label>
+              <input
+                type="datetime-local"
+                value={typeof formData.enquiryAt === "string" ? formData.enquiryAt : ""}
+                onChange={(e) => setFormData({ ...formData, enquiryAt: e.target.value })}
+                className="form-input"
+              />
+              <p className="text-xs text-gray-500 mt-1">When the customer first asked, if you know it. Leave this blank when you do not.</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">How the customer said they heard about us</label>
+              <select
+                value={formData.customerReportedSource || ''}
+                onChange={(e) => setFormData({ ...formData, customerReportedSource: e.target.value as ExtendedBooking['customerReportedSource'] })}
+                className="form-input"
+              >
+                <option value="">Not recorded</option>
+                <option value="google_advert">Google advert</option>
+                <option value="google_search">Google search</option>
+                <option value="recommendation">Recommendation</option>
+                <option value="repeat">Repeat customer</option>
+                <option value="other">Other</option>
+              </select>
+              {editingBooking?.websiteEnquiryRef ? <p className="text-xs text-gray-500 mt-1">Website reference: {editingBooking.websiteEnquiryRef}</p> : null}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 mt-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Driver</label>
@@ -1404,11 +1463,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  required
                   className="form-input"
                 >
                   <option value="pending">Pending</option>
@@ -1461,11 +1519,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </div>
             </details>
 
-            <div id="booking-section-fare" className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center mb-3">
-                <Calculator className="w-5 h-5 text-yellow-600 mr-2" />
-                <h4 className="text-md font-semibold text-yellow-900">Fare</h4>
-              </div>
+            <section id="booking-section-fare" className="booking-panel booking-panel--fare">
+              <h4 className="booking-panel__title">Fare</h4>
               {editingBooking?.id ? (
                 <QuoteEditor
                   bookingId={editingBooking.id}
@@ -1694,13 +1749,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   </div>
                 </div>
               )}
-            </div>
+            </section>
 
-            {editingBooking ? <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center mb-3">
-                <Receipt className="w-5 h-5 text-gray-600 mr-2" />
-                <h4 className="text-md font-semibold text-gray-900">Expenses</h4>
-              </div>
+            {editingBooking ? <div className="booking-panel">
+              <h4 className="booking-panel__title">Expenses</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
                 <select
                   value={newExpense.type}
@@ -1784,7 +1836,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
               type="submit"
               className="btn btn-primary"
             >
-              {editingBooking ? 'Update Booking' : 'Save draft'}
+              {editingBooking ? 'Save booking' : 'Save booking'}
             </button>
           </div>
         </form>

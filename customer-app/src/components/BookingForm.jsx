@@ -21,6 +21,7 @@ import "../styles.css";
 import LocationField from "./LocationField";
 import CotswoldsFields from "./CotswoldsFields";
 import JourneyAssistance from './JourneyAssistance';
+import { CURRENT_BOOKING_TERMS } from "../generatedDocuments/bookingTerms";
 
 const PAYMENT_OPTIONS = [
   { value: "cash", label: "Cash (pay driver)" },
@@ -187,8 +188,8 @@ function ExtraStops({ stops, onChange }) {
   );
 }
 
-const TERMS_VERSION = "2026-11-15";
-const TERMS_URL = "https://www.spires-taxis.com/terms/2026-11-15";
+const TERMS_VERSION = CURRENT_BOOKING_TERMS.version;
+const TERMS_URL = CURRENT_BOOKING_TERMS.url;
 const createCustomerBooking = httpsCallable(functions, "createCustomerBooking");
 
 function splitLocalDateTime(value) {
@@ -271,6 +272,8 @@ export default function BookingForm({ onClose, onBookingCreated }) {
   const [selectedDestinationAddress, setSelectedDestinationAddress] = useState("");
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState("");
+  const termsCheckboxRef = useRef(null);
   const submitLock = useRef(false);
   const submissionId = useRef(null);
   const [submitting, setSubmitting] = useState(false);
@@ -446,11 +449,19 @@ export default function BookingForm({ onClose, onBookingCreated }) {
     }
 
     if (!termsAccepted) {
-      setError("Please agree to the Terms and Conditions before submitting.");
+      setTermsError("Please agree to the Terms and Conditions before submitting.");
+      setError("");
       setSubmitting(false);
       submitLock.current = false;
+      window.setTimeout(() => {
+        const box = termsCheckboxRef.current;
+        if (!box) return;
+        box.focus();
+        box.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 0);
       return;
     }
+    setTermsError("");
 
     try {
       const marketingAttribution = window.SpiresMeasurement ? await window.SpiresMeasurement.attribution().catch(() => null) : null;
@@ -983,30 +994,43 @@ export default function BookingForm({ onClose, onBookingCreated }) {
             rows="3"
             className="form-textarea"
           />
-          <div className="terms-agreement">
-            <input
-              id="terms-accepted"
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              aria-describedby="terms-agreement-error"
-              aria-invalid={error && error.indexOf("Terms and Conditions") >= 0 ? "true" : "false"}
-            />
-            <label htmlFor="terms-accepted">
-              I agree to the{" "}
-              <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.
-            </label>
-            <p id="terms-agreement-error" role="alert" hidden={!(error && error.indexOf("Terms and Conditions") >= 0)}>
-              {error && error.indexOf("Terms and Conditions") >= 0 ? error : ""}
-            </p>
+          <div className="terms-submit-row">
+            <div className="terms-agreement">
+              <label className="terms-agreement__line" htmlFor="terms-accepted">
+                <input
+                  ref={termsCheckboxRef}
+                  id="terms-accepted"
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked);
+                    if (e.target.checked) setTermsError("");
+                  }}
+                  aria-describedby="terms-agreement-error"
+                  aria-invalid={termsError ? "true" : "false"}
+                />
+                <span>I agree to the Terms and Conditions</span>
+              </label>
+              <a
+                className="terms-agreement__read"
+                href={TERMS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Read the Terms and Conditions
+              </a>
+              <p id="terms-agreement-error" role="alert" hidden={!termsError}>
+                {termsError}
+              </p>
+            </div>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={submitting}
+            >
+              {submitting ? "Creating..." : "Create Booking"}
+            </button>
           </div>
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={submitting}
-          >
-            {submitting ? "Creating..." : "Create Booking"}
-          </button>
         </form>
       </div>
     </div>

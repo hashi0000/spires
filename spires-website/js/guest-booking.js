@@ -121,8 +121,37 @@
       }
     });
   });
-  var requestedVehicle = "";
-  try { requestedVehicle = new URLSearchParams(window.location.search).get("vehicle") || ""; } catch (err) { requestedVehicle = ""; }
+  var params = new URLSearchParams();
+  try { params = new URLSearchParams(window.location.search); } catch (err) { params = new URLSearchParams(); }
+  var requestedVehicle = params.get("vehicle") || "";
+  var ROUTE_PRESETS = {
+    "oxford-to-heathrow": { pickup: "Oxford", destination: "Heathrow Airport", airportCollection: false },
+    "heathrow-to-oxford": { pickup: "Heathrow Airport", destination: "Oxford", airportCollection: true },
+    "oxford-to-gatwick": { pickup: "Oxford", destination: "Gatwick Airport", airportCollection: false },
+    "gatwick-to-oxford": { pickup: "Gatwick Airport", destination: "Oxford", airportCollection: true },
+    "oxford-to-stansted": { pickup: "Oxford", destination: "Stansted Airport", airportCollection: false },
+    "stansted-to-oxford": { pickup: "Stansted Airport", destination: "Oxford", airportCollection: true },
+    "oxford-to-luton": { pickup: "Oxford", destination: "Luton Airport", airportCollection: false },
+    "oxfordshire-to-heathrow": { pickup: "Oxfordshire", destination: "Heathrow Airport", airportCollection: false }
+  };
+  function applyRoutePrefill() {
+    var preset = ROUTE_PRESETS[params.get("route") || ""] || null;
+    var pickupValue = params.get("pickup") || (preset && preset.pickup) || "";
+    var destinationValue = params.get("destination") || (preset && preset.destination) || "";
+    var pickupField = document.getElementById("pickup");
+    var destinationField = document.getElementById("destination");
+    if (pickupField && pickupValue && !pickupField.value) pickupField.value = pickupValue;
+    if (destinationField && destinationValue && !destinationField.value) destinationField.value = destinationValue;
+    var wantAirport = params.get("airportCollection") === "1" || params.get("airportCollection") === "yes" || (preset && preset.airportCollection);
+    if (wantAirport && airport && !airport.checked) {
+      airport.checked = true;
+    }
+    var direction = params.get("direction") || "";
+    if (direction === "from-airport" && airport && !airport.checked) airport.checked = true;
+    if (params.get("terminal") && form.elements.terminal && !form.elements.terminal.value) {
+      form.elements.terminal.value = params.get("terminal");
+    }
+  }
   function applyRequestedVehicle() {
     if (requestedVehicle !== "executive") return;
     var executiveInput = form.querySelector("input[name='vehicleType'][value='executive']");
@@ -133,11 +162,18 @@
       window.SpiresMeasurement.engagement("executive_option_selected", { service_type: "executive", airport: "heathrow" });
     }
   }
+  applyRoutePrefill();
   applyRequestedVehicle();
   document.addEventListener("spires-prices-ready", applyRequestedVehicle);
   toggleJourney();
   toggleAirport();
   syncPassengers();
+  if (window.location.hash === "#booking") {
+    var bookingCard = document.getElementById("booking");
+    if (bookingCard && bookingCard.scrollIntoView) {
+      setTimeout(function () { bookingCard.scrollIntoView({ behavior: "smooth", block: "start" }); }, 50);
+    }
+  }
 
   function submissionId() {
     var key = "spires-guest-submission";
@@ -313,7 +349,7 @@
       airportCollection: airport && airport.checked,
       flightNumber: data.get("flightNumber") || "",
       terminal: data.get("terminal") || "",
-      waitingPolicyVersion: (airport && airport.checked) || (returnAirport && returnAirport.checked) ? "2026-11-15" : "",
+      waitingPolicyVersion: (airport && airport.checked) || (returnAirport && returnAirport.checked) ? (window.SpiresServicePolicy && window.SpiresServicePolicy.version) || "2026-11-19" : "",
       collectionLocationKind: data.get("collectionLocationKind") || "terminal",
       collectionArrangement: data.get("collectionArrangement") || "flight_monitored",
       collectionLocation: data.get("collectionLocation") || "",
@@ -341,7 +377,7 @@
       returnArrivalDate: data.get("returnArrivalDate") || "",
       returnFixedTimeAcknowledged: Boolean(form.querySelector("[name='returnFixedTimeAcknowledged']") && form.querySelector("[name='returnFixedTimeAcknowledged']").checked),
       termsAccepted: true,
-      termsVersion: "2026-11-15",
+      termsVersion: "2026-11-19",
       submissionId: submissionId(),
       _gotcha: data.get("_gotcha") || ""
     };

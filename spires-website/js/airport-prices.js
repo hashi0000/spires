@@ -98,7 +98,7 @@
     includes: [
       "Airport charges included",
       "Flight monitoring included when flight monitored collection is selected",
-      "60 minutes from actual landing for flight monitored collection; 15 minutes from booked time for fixed collection",
+      "50 minutes from actual landing for flight monitored collection; 15 minutes from booked time for fixed collection",
     ],
     routes: {
       heathrow: {

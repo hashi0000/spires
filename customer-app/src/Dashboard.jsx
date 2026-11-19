@@ -7,7 +7,7 @@ import BookingForm from "./components/BookingForm";
 import ShareHeathrow from "./components/ShareHeathrow";
 import Profile from "./components/Profile";
 import { generateBookingPDF } from "./pdfGenerator";
-import { agreedFarePence } from './generatedDocuments/paymentAmount';
+import { agreedFarePence, effectiveReceivedPence } from './generatedDocuments/paymentAmount';
 import {
   SPIRES_BANK_DETAILS,
   formatPaymentMethodLabel,
@@ -550,8 +550,8 @@ export default function Dashboard() {
 
                   {agreedFarePence(booking) > 0 && ["confirmed","allocated","completed","paid"].includes(booking.status) && (
                     <div className="booking-financial-summary">
-                      <p>Payments received, including deposit: <strong>£{(Number(booking.amountReceivedPence || 0)/100).toFixed(2)}</strong></p>
-                      <p>Remaining balance: <strong>£{(Math.max(0,agreedFarePence(booking)-Number(booking.amountReceivedPence || 0))/100).toFixed(2)}</strong></p>
+                      <p>Payments received, including deposit: <strong>£{(effectiveReceivedPence(booking)/100).toFixed(2)}</strong></p>
+                      <p>Remaining balance: <strong>£{(Math.max(0,agreedFarePence(booking)-effectiveReceivedPence(booking))/100).toFixed(2)}</strong></p>
                       {Array.isArray(booking.additionalCharges) && booking.additionalCharges.length > 0 && <details><summary>Additional charges</summary><ul>{booking.additionalCharges.map((charge,index)=><li key={charge.id || index}>{charge.reason || 'Additional charge'}: £{(Number(charge.amountPence || 0)/100).toFixed(2)}</li>)}</ul></details>}
                     </div>
                   )}

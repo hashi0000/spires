@@ -1,5 +1,7 @@
 # IndexNow (Bing)
 
+Docs index: [`../docs/README.md`](../docs/README.md).
+
 IndexNow tells Bing (and other participating engines) that specific canonical URLs have changed. Vercel has no built-in IndexNow support for this static site, so submission is a **manual / post-deploy** step. URLs are **not** submitted on ordinary page views.
 
 ## What is already in the repo

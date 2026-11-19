@@ -161,7 +161,7 @@ exports.driverTripAction = functions.https.onCall(async (data, context) => {
             const airport = leg === "return" ? booking.returnAirportCollection : booking.airportCollection;
             if (airport && !booking[leg + "PassengerReadyAt"])
                 error("failed-precondition", "Record the customer's ready call or message time first.");
-            const fixed = booking.waitingPolicyVersion === '2026-11-15' && ((leg === "return" ? booking.returnCollectionArrangement : booking.collectionArrangement) === "fixed_time" || (leg === "return" ? booking.returnCollectionLocationKind : booking.collectionLocationKind) === 'hotel');
+            const fixed = Boolean(booking.waitingPolicyVersion) && ((leg === "return" ? booking.returnCollectionArrangement : booking.collectionArrangement) === "fixed_time" || (leg === "return" ? booking.returnCollectionLocationKind : booking.collectionLocationKind) === 'hotel');
             if (airport && !fixed && (!(leg === "return" ? booking.returnVerifiedLandingAt : booking.verifiedLandingAt) || (leg === 'return' ? booking.returnLandingStatus : booking.landingStatus) !== 'actual'))
                 error("failed-precondition", "Verify the actual landing time first.");
             const excluded = Number(data.excludedMinutes || 0);
