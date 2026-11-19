@@ -629,7 +629,7 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
         }
     }
     const fare = finalFarePence(booking);
-    const received = Number(booking.amountReceivedPence) || 0;
+    const received = (0, paymentAmount_1.effectiveReceivedPence)(booking);
     const outstanding = Math.max(0, fare - received);
     if (amount <= 0 || (fare > 0 && amount > outstanding)) {
         throw httpsError("invalid-argument", "The request must be greater than zero and no more than the outstanding balance.");

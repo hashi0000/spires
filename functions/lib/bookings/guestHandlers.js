@@ -43,6 +43,7 @@ const londonTime_1 = require("../quotes/londonTime");
 const guestRequest_1 = require("./guestRequest");
 const guestStore_1 = require("./guestStore");
 const bookingRevision_1 = require("./bookingRevision");
+const bookingTerms_1 = require("../terms/bookingTerms");
 const db = () => admin.firestore();
 function str(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -125,7 +126,8 @@ async function handleGuestBookingHttp(req, res) {
                     action: "terms_accepted",
                     actor: saved.email || "guest",
                     at: firestore_1.FieldValue.serverTimestamp(),
-                    termsVersion: "2026-10-25",
+                    termsVersion: bookingTerms_1.CURRENT_BOOKING_TERMS.version,
+                    termsUrl: bookingTerms_1.CURRENT_BOOKING_TERMS.url,
                     acceptanceMethod: "website",
                     guestRequest: true,
                 });

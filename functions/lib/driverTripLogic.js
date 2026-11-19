@@ -34,7 +34,7 @@ function driverBooking(booking, driverId, bookingId) {
         const key = leg === 'return' ? 'dueOnReturn' : 'dueOnOutbound';
         if (booking[key] !== undefined && booking[key] !== '')
             output[key] = booking[key];
-        const balance = Math.max(0, (0, paymentAmount_1.agreedFarePence)(booking) - Number(booking.amountReceivedPence || 0));
+        const balance = Math.max(0, (0, paymentAmount_1.agreedFarePence)(booking) - (0, paymentAmount_1.effectiveReceivedPence)(booking));
         const schedule = booking[key];
         const legExtras = (booking.additionalCharges || []).filter((row) => row.leg === leg || row.id === 'trip-time-' + leg).reduce((sum, row) => sum + Math.max(0, Number(row.amountPence) || 0), 0);
         const legReceived = (booking.paymentEntries || []).filter((row) => row.leg === leg && row.mode === 'add').reduce((sum, row) => sum + Math.max(0, Number(row.amountPence) || 0), 0);

@@ -196,7 +196,7 @@
       returnAirportCollection: false,
       returnFlightNumber: "",
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: "2026-11-19",
       submissionId: submissionId(),
       _gotcha: data.get("_gotcha") || ""
     };

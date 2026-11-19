@@ -1,4 +1,4 @@
-import { agreedFarePence } from "./paymentAmount";
+import { agreedFarePence, effectiveReceivedPence } from "./paymentAmount";
 import { proposeTimedHireCharge } from "./timedHire";
 import { proposeWaitingCharge } from "./airportWaitingPolicy";
 
@@ -27,7 +27,7 @@ export function driverBooking(booking: Record<string, any>, driverId: string, bo
   for (const leg of legs) {
     const key = leg === 'return' ? 'dueOnReturn' : 'dueOnOutbound';
     if (booking[key] !== undefined && booking[key] !== '') output[key] = booking[key];
-    const balance = Math.max(0, agreedFarePence(booking) - Number(booking.amountReceivedPence || 0));
+    const balance = Math.max(0, agreedFarePence(booking) - effectiveReceivedPence(booking));
     const schedule = booking[key];
     const legExtras = (booking.additionalCharges || []).filter((row: any) => row.leg === leg || row.id === 'trip-time-' + leg).reduce((sum: number,row: any) => sum + Math.max(0, Number(row.amountPence)||0),0);
     const legReceived = (booking.paymentEntries || []).filter((row: any) => row.leg === leg && row.mode === 'add').reduce((sum: number,row: any) => sum + Math.max(0,Number(row.amountPence)||0),0);

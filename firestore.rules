@@ -179,7 +179,7 @@ service cloud.firestore {
         && (!('vehicleType' in request.resource.data) || request.resource.data.vehicleType != 'executive')
         && (!('serviceType' in request.resource.data) || request.resource.data.serviceType != 'executive')
         && request.resource.data.termsAccepted == true
-        && request.resource.data.termsVersion == '2026-10-25'
+        && request.resource.data.termsVersion == '2026-11-19'
         && request.resource.data.acceptanceMethod == 'customer_portal'
         && request.resource.data.termsAcceptedAt == request.time
         && (!('paymentStatus' in request.resource.data) || request.resource.data.paymentStatus == 'pending');

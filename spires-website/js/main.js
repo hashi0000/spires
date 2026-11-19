@@ -292,7 +292,7 @@ function initBookingTerms() {
       wrap.innerHTML =
         '<label class="terms-agreement__line">' +
         '<input type="checkbox" name="termsAccepted" value="yes" required aria-describedby="terms-agreement-error">' +
-        '<span>I agree to the <a href="/terms/2026-10-25" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>' +
+        '<span>I agree to the <a href="/terms/2026-11-19" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>.</span>' +
         "</label>" +
         '<p class="terms-agreement__error" role="alert" hidden>Please agree to the Terms and Conditions before submitting.</p>';
       var button = form.querySelector("[type='submit']");

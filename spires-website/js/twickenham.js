@@ -459,7 +459,7 @@
       returnPickupLocation: destination,
       returnDestination: pickup + ", " + postcode,
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: "2026-11-19",
       submissionId: submissionId(),
       _gotcha: field("tw-gotcha")
     };

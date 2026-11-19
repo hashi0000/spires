@@ -19,6 +19,7 @@ import {
 } from "./guestRequest";
 import { firestoreGuestDb } from "./guestStore";
 import { nextBookingRevision } from "./bookingRevision";
+import { CURRENT_BOOKING_TERMS } from "../terms/bookingTerms";
 
 const db = () => admin.firestore();
 
@@ -106,7 +107,8 @@ export async function handleGuestBookingHttp(req: functions.https.Request, res: 
           action: "terms_accepted",
           actor: saved.email || "guest",
           at: FieldValue.serverTimestamp(),
-          termsVersion: "2026-10-25",
+          termsVersion: CURRENT_BOOKING_TERMS.version,
+          termsUrl: CURRENT_BOOKING_TERMS.url,
           acceptanceMethod: "website",
           guestRequest: true,
         });

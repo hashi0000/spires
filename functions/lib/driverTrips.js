@@ -110,7 +110,25 @@ exports.driverTripAction = functions.https.onCall(async (data, context) => {
         const patch = {};
         const timings = { driver_ready: leg + "DriverReadyAt", passenger_ready: leg + "PassengerReadyAt", onboard: leg + "PassengerOnboardAt", departed: leg + "DepartedAt" };
         const reason = String(data.reason || "").trim().slice(0, 300);
-        if (timings[action] || action === "landing" || action === "complete") {
+        if (action === "job_started") {
+            const at = new Date(String(data.at || "")).getTime();
+            if (!Number.isFinite(at) || at > Date.now() + 60000)
+                error("invalid-argument", "Enter a valid event time, not a future time.");
+            const value = new Date(at).toISOString();
+            const field = leg + "JobStartedAt";
+            if (booking[field] && reason.length < 3)
+                error("failed-precondition", "A Job Started correction needs a reason.");
+            const prior = booking[leg + "Status"] || booking.status;
+            if (!["confirmed", "allocated"].includes(prior) && prior !== "in_progress")
+                error("failed-precondition", "Only a confirmed or allocated trip can be marked Job Started.");
+            patch[field] = value;
+            patch[leg + "Status"] = "in_progress";
+            if (booking.status === "confirmed" || booking.status === "allocated") {
+                patch.status = "allocated";
+                patch.adminStatus = "allocated";
+            }
+        }
+        else if (timings[action] || action === "landing" || action === "complete") {
             const at = new Date(String(data.at || "")).getTime();
             if (!Number.isFinite(at) || at > Date.now() + 60000)
                 error("invalid-argument", "Enter a valid event time, not a future time.");
@@ -139,7 +157,7 @@ exports.driverTripAction = functions.https.onCall(async (data, context) => {
             }
             else {
                 const prior = booking[leg + "Status"] || booking.status;
-                if (!["confirmed", "allocated"].includes(prior))
+                if (!["confirmed", "allocated", "in_progress"].includes(prior))
                     error("failed-precondition", "Only a confirmed trip can be completed.");
                 patch[leg + "Status"] = "completed";
                 patch[leg + "CompletedAt"] = value;
@@ -176,7 +194,7 @@ exports.driverTripAction = functions.https.onCall(async (data, context) => {
             patch[leg + "ChargesFinalisedAt"] = new Date().toISOString();
             patch.additionalCharges = charges.concat(pounds > 0 ? [{ id: chargeId, amountPence: Math.round(pounds * 100), leg, reason: `Additional ${booking.timedHire ? "hire time" : "airport waiting"} (${leg})`, at: new Date().toISOString() }] : []);
             const total = (0, paymentAmount_1.agreedFarePence)({ ...booking, ...patch });
-            const position = (0, fareMath_1.paymentPosition)(total, Number(booking.amountReceivedPence || 0), "");
+            const position = (0, fareMath_1.paymentPosition)(total, (0, paymentAmount_1.effectiveReceivedPence)(booking), "");
             patch.outstandingPence = position.outstandingPence;
             patch.paymentStatus = position.stored;
         }
@@ -189,11 +207,11 @@ exports.driverTripAction = functions.https.onCall(async (data, context) => {
             if (!Number.isSafeInteger(amount) || amount <= 0 || !["cash", "card", "bank transfer"].includes(method))
                 error("invalid-argument", "Enter the payment amount and method.");
             const total = (0, paymentAmount_1.agreedFarePence)(booking);
-            const received = Number(booking.amountReceivedPence || 0);
+            const received = (0, paymentAmount_1.effectiveReceivedPence)(booking);
             if (!total || amount > Math.max(0, total - received))
                 error("failed-precondition", "The payment exceeds the outstanding balance. Ask the office to review.");
             const position = (0, fareMath_1.paymentPosition)(total, received + amount, "");
-            patch.amountReceivedPence = received + amount;
+            patch.amountReceivedPence = Math.max(0, Math.round(Number(booking.amountReceivedPence || 0))) + amount;
             patch.outstandingPence = position.outstandingPence;
             patch.paymentStatus = position.stored;
             patch.paymentMethod = method;

@@ -55,7 +55,7 @@
       passengers: data.get("passengers"),
       message: data.get("message"),
       termsAccepted: true,
-      termsVersion: "2026-10-25",
+      termsVersion: "2026-11-19",
       returnDateTime: data.get("bookingType") === "return" && data.get("returnDate")
         ? String(data.get("returnDate")) + "T" + String(data.get("returnTime") || "00:00")
         : "",

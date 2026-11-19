@@ -369,7 +369,7 @@ export default function Dashboard() {
             className={`filter-btn ${statusFilter === "awaiting_customer_confirmation" ? "active" : ""}`}
             onClick={() => setStatusFilter("awaiting_customer_confirmation")}
           >
-            Awaiting confirmation
+            Request received
           </button>
           <button
             className={`filter-btn ${statusFilter === "confirmed" ? "active" : ""}`}
@@ -422,16 +422,20 @@ export default function Dashboard() {
                   </div>
                   <span className={`status-badge status-${(booking.status || "pending").toLowerCase()}`}>
                     {booking.quoteAcceptanceSubstatus === "awaiting_payment"
-                      ? "Quote accepted — awaiting payment"
+                      ? "Quote accepted — Balance due"
                       : booking.status === "awaiting_customer_confirmation"
-                        ? "Awaiting customer confirmation"
-                        : booking.status === "allocated"
+                        ? "Request received"
+                        : booking.status === "pending"
+                          ? "Request received"
+                          : booking.status === "confirmed"
+                            ? "Confirmed"
+                          : booking.status === "allocated"
                           ? "Allocated"
                           : booking.status === "completed"
                             ? "Completed"
                             : booking.status
                               ? booking.status.charAt(0).toUpperCase() + booking.status.slice(1)
-                              : "Pending"}
+                              : "Request received"}
                   </span>
                 </div>
                 
@@ -468,10 +472,10 @@ export default function Dashboard() {
 
                   {booking.depositRequired && (
                     <div className="booking-info-row">
-                      <span className="info-label">Deposit:</span>
+                      <span className="info-label">{booking.depositStatus === "paid" ? "Deposit paid" : "Deposit"}:</span>
                       <span className="info-value" style={{ fontWeight: 600, color: booking.depositStatus === "paid" ? "#065f46" : "#92400e" }}>
                         {booking.depositStatus === "paid"
-                          ? `Paid${booking.depositAmount ? ` (£${Number(booking.depositAmount).toFixed(2)})` : ""}`
+                          ? (booking.depositAmount ? `£${Number(booking.depositAmount).toFixed(2)}` : "Yes")
                           : `Required${booking.depositAmount ? ` — £${Number(booking.depositAmount).toFixed(2)}` : ""}`}
                       </span>
                     </div>
@@ -550,8 +554,8 @@ export default function Dashboard() {
 
                   {agreedFarePence(booking) > 0 && ["confirmed","allocated","completed","paid"].includes(booking.status) && (
                     <div className="booking-financial-summary">
-                      <p>Payments received, including deposit: <strong>£{(effectiveReceivedPence(booking)/100).toFixed(2)}</strong></p>
-                      <p>Remaining balance: <strong>£{(Math.max(0,agreedFarePence(booking)-effectiveReceivedPence(booking))/100).toFixed(2)}</strong></p>
+                      <p>Received: <strong>£{(effectiveReceivedPence(booking)/100).toFixed(2)}</strong></p>
+                      <p>Balance due: <strong>£{(Math.max(0,agreedFarePence(booking)-effectiveReceivedPence(booking))/100).toFixed(2)}</strong></p>
                       {Array.isArray(booking.additionalCharges) && booking.additionalCharges.length > 0 && <details><summary>Additional charges</summary><ul>{booking.additionalCharges.map((charge,index)=><li key={charge.id || index}>{charge.reason || 'Additional charge'}: £{(Number(charge.amountPence || 0)/100).toFixed(2)}</li>)}</ul></details>}
                     </div>
                   )}

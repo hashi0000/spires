@@ -58,7 +58,8 @@ exports.manageDriverAccess = functions.https.onCall(async (data, context) => {
         fail("invalid-argument", "Choose reset or revoke.");
     const db = admin.firestore();
     const access = db.collection("driverAccess").doc(driverId);
-    const candidates = Array.from({ length: 30 }, () => String((0, crypto_1.randomInt)(0, 10000)).padStart(4, "0"));
+    // Prefer unique six digit enrolment codes; fall back across candidates if a hash collides.
+    const candidates = Array.from({ length: 40 }, () => String((0, crypto_1.randomInt)(0, 1000000)).padStart(6, "0"));
     return db.runTransaction(async (tx) => {
         const driver = await tx.get(db.collection("drivers").doc(driverId));
         if (!driver.exists)
@@ -81,13 +82,14 @@ exports.manageDriverAccess = functions.https.onCall(async (data, context) => {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(), updatedBy: context.auth.uid });
         tx.create(db.collection("driverAccessAudit").doc(), { driverId, action: data.action,
             actorUid: context.auth.uid, at: admin.firestore.FieldValue.serverTimestamp() });
-        return { code, driverId, message: code ? "Save this one use code now and activate it within 24 hours. The device then stays signed in. Previous sessions are revoked." : "Access and previous sessions revoked." };
+        return { code, driverId, message: code ? "Save this one use six digit code now and activate it within 24 hours. The device then stays signed in. Previous sessions are revoked." : "Access and previous sessions revoked." };
     });
 });
 exports.unlockDriverJobs = functions.https.onCall(async (data, context) => {
     const code = String(data?.pin || "").trim();
-    if (!/^\d{4}$/.test(code))
-        fail("invalid-argument", "Enter your four digit code.");
+    // Accept legacy four digit codes still in flight and new six digit codes.
+    if (!/^\d{4}$/.test(code) && !/^\d{6}$/.test(code))
+        fail("invalid-argument", "Enter your driver access code.");
     const db = admin.firestore();
     const ip = context.rawRequest.ip || "unknown";
     const attempts = db.collection("driverUnlockAttempts").doc(hash(ip));

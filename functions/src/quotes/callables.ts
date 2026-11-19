@@ -22,7 +22,7 @@ import { normaliseStops, openReturnSummary, routeSentence } from "../bookings/jo
 import { onlineTermsAcceptance, CURRENT_BOOKING_TERMS } from "../terms/bookingTerms";
 import { paymentLinkAllowlist, validatePaymentLinkUrl } from "./paymentLink";
 import { nextReceivedPence, paymentPosition } from "./fareMath";
-import { agreedFarePence } from "../paymentAmount";
+import { agreedFarePence, effectiveReceivedPence } from "../paymentAmount";
 import { bankTransferDetailsPlainText, isBankTransferMethod } from "../bankDetails";
 import { quoteCustomerTerms, withoutExpiredSignupOffer } from "../offers/messages";
 import { EXECUTIVE_COMMERCE_MESSAGE, EXECUTIVE_CUSTOMER_WORDING, EXECUTIVE_PARTNER_NOTE, executiveCommerceBlocked, isExecutiveVehicle } from "./executiveService";
@@ -646,7 +646,7 @@ export const sendPaymentRequest = functions.https.onCall(async (data, context) =
     }
   }
   const fare = finalFarePence(booking);
-  const received = Number(booking.amountReceivedPence) || 0;
+  const received = effectiveReceivedPence(booking);
   const outstanding = Math.max(0, fare - received);
   if (amount <= 0 || (fare > 0 && amount > outstanding)) {
     throw httpsError("invalid-argument", "The request must be greater than zero and no more than the outstanding balance.");

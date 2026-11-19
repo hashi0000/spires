@@ -74,20 +74,30 @@
     const fixed = field(booking, leg, "collectionArrangement") === "fixed_time" || field(booking, leg, "collectionLocationKind") === "hotel";
     const timed = airport || booking.timedHire;
     const proposed = timed ? proposal(booking, leg) : null;
-    const balance = Math.max(0, Number(booking.finalFarePence || 0) - Number(booking.amountReceivedPence || 0));
-    const legDue = booking[leg === 'return' ? 'dueOnReturn' : 'dueOnOutbound'];
-    const due = Number.isFinite(booking[leg + 'AmountToCollectPence']) ? booking[leg + 'AmountToCollectPence'] : (legDue != null && legDue !== '' ? Math.min(balance, Math.max(0, Math.round(Number(legDue) * 100))) : balance);
+    const due = Number.isFinite(booking[leg + 'AmountToCollectPence'])
+      ? booking[leg + 'AmountToCollectPence']
+      : Math.max(0, Number(booking.outstandingPence != null ? booking.outstandingPence : (Number(booking.finalFarePence || 0) - Number(booking.amountReceivedPence || 0))));
+    const legStatus = status(booking, leg);
     pane.innerHTML = '<h2>' + esc(booking.hirerName) + '</h2><p>' + esc(booking.bookingNumber) + ' · ' + leg + '</p><p>' + esc(field(booking, leg, "pickupLocation")) + ' → ' + esc(field(booking, leg, "destination")) + '</p><p>' + esc(date(legTime(booking, leg))) + '</p>' +
-      '<p>' + esc(field(booking, leg, "assistanceNote")) + '</p><p>Final total: <strong>' + money(booking.finalFarePence) + '</strong><br>Received: ' + money(booking.amountReceivedPence) + '<br>Amount to collect: <strong>' + money(due) + '</strong></p>' +
+      '<p>' + esc(field(booking, leg, "assistanceNote")) + '</p><p>Final total: <strong>' + money(booking.finalFarePence) + '</strong><br>Balance due: <strong>' + money(due) + '</strong></p>' +
       (proposed ? '<p id="driver-timing-preview"' + (proposed.warning ? ' class="warning"' : '') + '>' + esc(proposed.preview) + '</p>' : '') + eventInput() +
       (airport && !fixed ? '<label>Landing verification source<input id="driver-landing-source" placeholder="For example Flightradar24 actual landing" maxlength="160"></label><button class="btn" data-action="landing">Has the flight landed? Confirm actual time</button>' : '') +
-      '<div class="actions"><button class="btn" data-action="driver_ready">Driver ready</button><button class="btn" data-action="passenger_ready">Customer ready for collection</button><button class="btn" data-action="onboard">Passenger onboard</button></div>' +
-      (status(booking, leg) !== "completed" ? '<button class="btn btn-primary" data-action="complete">Confirm finish time and complete trip</button>' : '') +
+      '<div class="actions">' +
+      (["confirmed", "allocated"].includes(legStatus) || (legStatus !== "completed" && legStatus !== "in_progress" && !booking[leg + "JobStartedAt"]) ? '<button class="btn btn-primary" data-action="job_started">Job Started</button>' : '') +
+      '<button class="btn" data-action="driver_ready">Driver ready</button><button class="btn" data-action="passenger_ready">Customer ready for collection</button><button class="btn" data-action="onboard">Passenger onboard</button></div>' +
+      (legStatus !== "completed" ? '<button class="btn btn-primary" data-action="complete">Confirm finish time and complete trip</button>' : '') +
       (timed ? '<label>Excluded delay minutes<input id="driver-excluded" type="number" min="0" step="1" value="0"></label><button class="btn" data-action="finalise">Review and save additional time charge</button>' : '') +
-      '<h3>Record payment received</h3><label>Amount received (£)<input id="driver-payment" type="number" min="0.01" step="0.01" value="' + (due / 100).toFixed(2) + '"></label><label>Method<select id="driver-method"><option value="cash">Cash</option><option value="card">Card / Shift4</option><option value="bank transfer">Bank transfer</option></select></label><button class="btn" data-action="payment">Record this payment</button><p>Only record money actually received. This does not charge a card.</p><p id="driver-error" role="alert"></p><div id="driver-whatsapp"></div><button class="btn" id="driver-close">Close</button>';
+      '<h3>Record payment received</h3><label>Amount received (£)<input id="driver-payment" type="number" min="0.01" step="0.01" value="' + (due / 100).toFixed(2) + '"></label><label>Method<select id="driver-method"><option value="cash">Cash</option><option value="card">Card / Shift4</option><option value="bank transfer">Bank transfer</option></select></label><button class="btn" data-action="payment">Record this payment</button><p>Only record money actually received. This does not charge a card. Parking extras need office approval before they affect Balance due.</p><p id="driver-error" role="alert"></p><div id="driver-whatsapp"></div><button class="btn" id="driver-close">Close</button>';
     document.getElementById("sheet").hidden = false;
     document.getElementById("driver-close").onclick = () => { document.getElementById("sheet").hidden = true; selected = null; };
     pane.querySelectorAll("[data-action]").forEach(button => button.onclick = () => act(button.dataset.action));
+    const wa = document.getElementById("driver-whatsapp");
+    let phone = String(booking.hirerPhone || "").replace(/\D/g, "");
+    if (phone.startsWith("0")) phone = "44" + phone.slice(1);
+    const messages = [];
+    if (booking[leg + "JobStartedAt"] || legStatus === "in_progress") {
+      messages.push("Spires Taxis update: your driver has started the journey for booking " + (booking.bookingNumber || "") + " (" + leg + "). Pickup: " + (field(booking, leg, "pickupLocation") || "") + ".");
+    }
     if (airport && !fixed && field(booking, leg, "verifiedLandingAt") && proposed?.includedUntil) {
       const waitingPolicy = root.SpiresCollection && root.SpiresCollection.policyFor
         ? root.SpiresCollection.policyFor({
@@ -95,14 +105,17 @@
             collectionArrangement: leg === "return" ? booking.returnCollectionArrangement : booking.collectionArrangement,
             collectionLocationKind: leg === "return" ? booking.returnCollectionLocationKind : booking.collectionLocationKind,
           })
-        : { chargePounds: 10, blockMinutes: 30 };
-      const message = "Welcome to Heathrow. Your flight is recorded as landing at " + date(field(booking, leg, "verifiedLandingAt")) + ". Your included waiting ends at " + date(proposed.includedUntil) + ". Additional waiting costs £" + waitingPolicy.chargePounds + " per started " + waitingPolicy.blockMinutes + " minutes. Call or message when your whole group has collected its luggage and is ready at the agreed collection point. Your waiting timer stops when you notify us you are ready.";
-      let phone = String(booking.hirerPhone || "").replace(/\D/g, "");
-      if (phone.startsWith("0")) phone = "44" + phone.slice(1);
-      const preview = '<p class="message-preview"><strong>WhatsApp message preview</strong><br>' + esc(message) + '</p><p>Opening WhatsApp does not send the message.</p>';
-      document.getElementById("driver-whatsapp").innerHTML = preview + (phone
-        ? '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(message) + '">Open WhatsApp</a>'
-        : '<p>Add a customer phone number before opening WhatsApp.</p>');
+        : { chargePounds: 5, blockMinutes: 15 };
+      messages.push("Welcome to Heathrow. Your flight is recorded as landing at " + date(field(booking, leg, "verifiedLandingAt")) + ". Your included waiting ends at " + date(proposed.includedUntil) + ". Additional waiting costs £" + waitingPolicy.chargePounds + " per started " + waitingPolicy.blockMinutes + " minutes. Call or message when your whole group has collected its luggage and is ready at the agreed collection point. Your waiting timer stops when you notify us you are ready.");
+    }
+    if (messages.length) {
+      wa.innerHTML = messages.map(function (message, index) {
+        const label = index === 0 && (booking[leg + "JobStartedAt"] || legStatus === "in_progress") ? "Job Started WhatsApp preview" : "WhatsApp message preview";
+        return '<p class="message-preview"><strong>' + label + '</strong><br>' + esc(message) + '</p><p>Opening WhatsApp does not send the message.</p>' +
+          (phone
+            ? '<a class="btn btn-primary" target="_blank" rel="noopener noreferrer" href="https://wa.me/' + phone + '?text=' + encodeURIComponent(message) + '">Open WhatsApp</a>'
+            : '<p>Add a customer phone number before opening WhatsApp.</p>');
+      }).join("");
     }
   }
   async function act(action) {
@@ -113,7 +126,7 @@
       at: event ? new Date(event).toISOString() : null, source: document.getElementById("driver-landing-source")?.value,
       reason: document.getElementById("driver-reason").value, excludedMinutes: Number(document.getElementById("driver-excluded")?.value || 0),
       amountPence: Math.round(Number(document.getElementById("driver-payment").value) * 100), method: document.getElementById("driver-method").value };
-    if (["complete", "finalise", "payment"].includes(action) && !confirm(action === "payment" ? "Confirm this money has actually been received?" : action === "finalise" ? "Save the calculated additional time charge? This is separate from payment." : "Confirm the actual finish time? This will not send a booking update email.")) return;
+    if (["job_started", "complete", "finalise", "payment"].includes(action) && !confirm(action === "payment" ? "Confirm this money has actually been received?" : action === "finalise" ? "Save the calculated additional time charge? This is separate from payment." : action === "job_started" ? "Mark this job as started? You can open the Job Started WhatsApp preview next. Nothing is sent automatically." : "Confirm the actual finish time? This will not send a booking update email.")) return;
     busy = true;
     document.querySelectorAll("#sheet-card button").forEach(button => button.disabled = true);
     try {
