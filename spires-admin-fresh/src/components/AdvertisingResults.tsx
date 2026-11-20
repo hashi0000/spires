@@ -102,6 +102,8 @@ export function AdvertisingResultsView({
   connectionNote = "",
   onRefreshAds,
   refreshingAds = false,
+  adsSync = null,
+  importedCampaignSpend = [],
   onDates,
   onManualComplete,
   onSaveStartDate,
@@ -130,6 +132,16 @@ export function AdvertisingResultsView({
   connectionNote?: string;
   onRefreshAds?: () => void;
   refreshingAds?: boolean;
+  adsSync?: {
+    status: string;
+    lastSuccessAtMs: number | null;
+    attemptedAtMs: number | null;
+    reason: string | null;
+    from: string | null;
+    to: string | null;
+    campaigns: number | null;
+  } | null;
+  importedCampaignSpend?: Array<{ campaignId: string; campaignName: string; spendPence: number }>;
   onDates: (from: string, to: string, dateBasis: "journey" | "enquiry") => void;
   onManualComplete: (value: boolean) => void;
   onSaveStartDate: (date: string) => void;
@@ -630,14 +642,28 @@ export function AdvertisingResultsView({
           {ads.adsApiSpendPence != null ? (
             <p>Live Google Ads API spend for this period: {formatGbp(ads.adsApiSpendPence)}. Manual entries fully inside the period total {formatGbp(ads.spendPence)}.</p>
           ) : null}
-          <h3>Spend by campaign</h3>
-          {campaignSpendRows.length === 0 ? <p>No campaign spend fully inside this period.</p> : (
+          <h3>Imported Google Ads spend by campaign</h3>
+          {importedCampaignSpend.length === 0 ? (
+            <p>No imported campaign spend for this reporting period yet. Account totals still use the daily Google Ads snapshots when available.</p>
+          ) : (
+            <ul className="ads-spend-history">
+              {importedCampaignSpend.map((row) => (
+                <li key={row.campaignId}>
+                  <span>{row.campaignName}</span>
+                  <strong>{formatGbp(row.spendPence)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+          <h3>Manual spend by campaign</h3>
+          {campaignSpendRows.length === 0 ? <p>No manual campaign spend fully inside this period.</p> : (
             <ul className="ads-spend-history">
               {campaignSpendRows.map(([name, pence]) => (
                 <li key={name}><span>{name}</span><strong>{formatGbp(pence)}</strong></li>
               ))}
             </ul>
           )}
+          <p>Manual entries are never added to imported Google Ads totals for the same dates. Use Replace imported spend on a manual entry when that entry should replace the API figure.</p>
         </section>
       ) : null}
 
@@ -861,7 +887,21 @@ export function AdvertisingResultsView({
       <section className="advertising-results__panel">
         <h2>Live Google Ads connection</h2>
         <p>{connectionNote || report.adsSpend.detail}</p>
-        {onRefreshAds && <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>{refreshingAds ? "Refreshing Google Ads…" : "Refresh Google Ads spend"}</button>}
+        {adsSync ? (
+          <p>
+            Sync status: {adsSync.status}
+            {adsSync.lastSuccessAtMs ? `. Last successful synchronisation: ${new Date(adsSync.lastSuccessAtMs).toISOString()}` : ". No successful synchronisation stored yet"}
+            {adsSync.from && adsSync.to ? `. Last finished day range: ${adsSync.from} to ${adsSync.to}` : ""}
+            {Number.isSafeInteger(adsSync.campaigns) ? `. Campaigns in last sync: ${adsSync.campaigns}` : ""}
+            {adsSync.status === "error" && adsSync.reason ? `. ${adsSync.reason}` : ""}
+            {refreshingAds ? " Refresh in progress." : ""}
+          </p>
+        ) : null}
+        {onRefreshAds && (
+          <button type="button" className="btn btn-secondary" disabled={refreshingAds || preview} onClick={onRefreshAds}>
+            {refreshingAds ? "Refreshing spend…" : "Refresh Spend"}
+          </button>
+        )}
         <label className="advertising-results__check">
           <input type="checkbox" checked={manualIsComplete} onChange={(event) => onManualComplete(event.target.checked)} disabled={saving || preview} />
           Legacy only: treat dated manual entries as the full advertising spend for overall business growth figures below. Prefer “Replace imported spend for these dates” on a spend entry for the Google Ads period total.
@@ -1025,6 +1065,16 @@ const AdvertisingResults: React.FC<{
   const [adsRange, setAdsRange] = useState('');
   const [adsReload, setAdsReload] = useState(0);
   const [refreshingAds, setRefreshingAds] = useState(false);
+  const [importedCampaignSpend, setImportedCampaignSpend] = useState<Array<{ campaignId: string; campaignName: string; spendPence: number }>>([]);
+  const [adsSync, setAdsSync] = useState<{
+    status: string;
+    lastSuccessAtMs: number | null;
+    attemptedAtMs: number | null;
+    reason: string | null;
+    from: string | null;
+    to: string | null;
+    campaigns: number | null;
+  } | null>(null);
   const [adsReason, setAdsReason] = useState(previewMode
     ? "Google Ads is not connected. No advertising credentials are available to the server."
     : "Checking whether Google Ads can be read from the server.");
@@ -1094,11 +1144,51 @@ const AdvertisingResults: React.FC<{
     setAdsConnected(false); setAdsSpendPence(null);
     httpsCallable(functions,'readAdvertisingSpend')({from,to}).then(result=>{
       if (!active) return;
-      const data=result.data as {available?:boolean;spendPence?:number;reason?:string};
-      const available=data.available===true && Number.isSafeInteger(data.spendPence) && Number(data.spendPence)>=0;
-      setAdsRange(`${from}|${to}`);setAdsConnected(available);setAdsSpendPence(available?data.spendPence!:null);
+      const data = result.data as {
+        available?: boolean;
+        spendPence?: number;
+        reason?: string;
+        campaigns?: Array<{ campaignId?: string; campaignName?: string; spendPence?: number }>;
+        sync?: {
+          status?: string;
+          lastSuccessAtMs?: number | null;
+          attemptedAtMs?: number | null;
+          reason?: string | null;
+          from?: string | null;
+          to?: string | null;
+          campaigns?: number | null;
+        };
+      };
+      const available = data.available === true && Number.isSafeInteger(data.spendPence) && Number(data.spendPence) >= 0;
+      setAdsRange(`${from}|${to}`);
+      setAdsConnected(available);
+      setAdsSpendPence(available ? data.spendPence! : null);
       setAdsReason(data.reason || 'Google Ads spend is unknown.');
-    }).catch(()=>{if(active){setAdsConnected(false);setAdsReason('Google Ads spend could not be loaded.');}});
+      setImportedCampaignSpend(
+        Array.isArray(data.campaigns)
+          ? data.campaigns
+              .filter((row) => row && String(row.campaignId || '').trim() && Number.isSafeInteger(row.spendPence) && Number(row.spendPence) >= 0)
+              .map((row) => ({
+                campaignId: String(row.campaignId),
+                campaignName: String(row.campaignName || row.campaignId),
+                spendPence: Number(row.spendPence),
+              }))
+          : [],
+      );
+      setAdsSync(
+        data.sync
+          ? {
+              status: String(data.sync.status || 'unknown'),
+              lastSuccessAtMs: Number.isFinite(Number(data.sync.lastSuccessAtMs)) ? Number(data.sync.lastSuccessAtMs) : null,
+              attemptedAtMs: Number.isFinite(Number(data.sync.attemptedAtMs)) ? Number(data.sync.attemptedAtMs) : null,
+              reason: data.sync.reason ? String(data.sync.reason) : null,
+              from: data.sync.from ? String(data.sync.from) : null,
+              to: data.sync.to ? String(data.sync.to) : null,
+              campaigns: Number.isSafeInteger(data.sync.campaigns) ? Number(data.sync.campaigns) : null,
+            }
+          : null,
+      );
+    }).catch(()=>{if(active){setAdsConnected(false);setAdsReason('Google Ads spend could not be loaded.'); setImportedCampaignSpend([]);}});
     return ()=>{active=false;};
   },[previewMode,email,from,to,adsReload]);
 
@@ -1144,15 +1234,19 @@ const AdvertisingResults: React.FC<{
       message={message}
       connectionNote={adsReason}
       refreshingAds={refreshingAds}
+      adsSync={adsSync}
+      importedCampaignSpend={adsRange === `${from}|${to}` ? importedCampaignSpend : []}
       onRefreshAds={async () => {
         if (previewMode || refreshingAds) return;
         setRefreshingAds(true);
         try {
           await httpsCallable(functions, 'refreshAdvertisingSpend', { timeout: 180000 })({});
-          setAdsReload(value => value + 1);
+          setAdsReload((value) => value + 1);
           setMessage('Google Ads spend refreshed. Today remains incomplete until tomorrow.');
-        } catch {
-          setMessage('Google Ads refresh failed. Existing spend figures were kept.');
+        } catch (error: any) {
+          const detail = String(error?.message || error?.details || '').trim();
+          setMessage(detail || 'Google Ads refresh failed. Existing spend figures were kept.');
+          setAdsReload((value) => value + 1);
         } finally { setRefreshingAds(false); }
       }}
       saving={saving}
