@@ -362,6 +362,11 @@ export function prepareGuestBooking(
   const paymentMethod = ["cash", "card", "bank transfer", "undecided"].includes(paymentRaw) ? paymentRaw : "undecided";
   const details = (str(body.specialRequirements) || str(body.notes) || str(body.message)).slice(0, 2000);
   const websiteEnquiryRef = /^ST-[A-Z0-9]{6}$/.test(str(body.websiteEnquiryRef)) ? str(body.websiteEnquiryRef) : "";
+  const rawLandingPath = str(body.websiteLandingPath);
+  const websiteLandingPath = rawLandingPath.startsWith("/") ? rawLandingPath.slice(0, 200) : "";
+  const websitePageUrl = str(body.websitePageUrl).startsWith("https://www.spires-taxis.com/")
+    ? str(body.websitePageUrl).slice(0, 500)
+    : "";
   const heardCode = str(body.heardAbout);
   const heardAbout = HEARD_ABOUT_LABELS[heardCode] ? heardCode : "";
   const heardAboutDetail = heardAbout === "other" ? str(body.heardAboutDetail).replace(/\s+/g, " ").slice(0, 80) : "";
@@ -437,6 +442,8 @@ export function prepareGuestBooking(
     acceptanceMethod: "website",
     ...(heardAbout ? { heardAbout, heardAboutDetail } : {}),
     ...(websiteEnquiryRef ? { websiteEnquiryRef } : {}),
+    ...(websiteLandingPath ? { websiteLandingPath } : {}),
+    ...(websitePageUrl ? { websitePageUrl } : {}),
   };
 
   return {

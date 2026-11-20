@@ -99,6 +99,23 @@ const HEARD_ABOUT_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+function marketingAttributionSummary(attribution: any): string | null {
+  if (!attribution || typeof attribution !== 'object') return null;
+  if (String(attribution.consent || '') === 'denied') return 'Marketing consent was refused. Click and campaign fields were not stored.';
+  const parts: string[] = [];
+  const touch = attribution.latest || attribution.first || {};
+  const landing = String(touch.landingPath || attribution.landingPath || '').trim();
+  const utm = String(touch.utmSource || attribution.utmSource || '').trim();
+  const campaign = String(touch.utmCampaign || attribution.utmCampaign || '').trim();
+  const hasClick = Boolean(attribution.gclid || attribution.gbraid || attribution.wbraid || touch.gclid || touch.gbraid || touch.wbraid);
+  if (landing) parts.push('Landing page ' + landing);
+  if (utm) parts.push('Source ' + utm);
+  if (campaign) parts.push('Campaign ' + campaign);
+  if (hasClick) parts.push('Verified click id present');
+  else if (String(attribution.consent || '') === 'granted') parts.push('Consent granted; no Google click id on this booking');
+  return parts.length ? parts.join('. ') + '.' : null;
+}
+
 function heardAboutText(code?: string, detail?: string): string {
   const label = HEARD_ABOUT_LABELS[code || ""] || "";
   if (!label) return "";
@@ -1826,6 +1843,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
               <button type="button" className="btn btn-secondary btn-sm mb-3" onClick={() => showSection('booking-section-fare')}>Open fare and message actions</button>
               {editingBooking?.heardAbout ? (
                 <p className="text-sm text-gray-700 mb-3">How they heard about us: {heardAboutText(editingBooking.heardAbout, editingBooking.heardAboutDetail)}. This is what the customer chose on the website form.</p>
+              ) : null}
+              {marketingAttributionSummary((editingBooking as any)?.marketingAttribution) ? (
+                <p className="text-sm text-gray-700 mb-3">Website attribution: {marketingAttributionSummary((editingBooking as any)?.marketingAttribution)} This does not automatically mark the booking as Google Ads.</p>
+              ) : null}
+              {(editingBooking as any)?.websiteLandingPath ? (
+                <p className="text-sm text-gray-700 mb-3">Form submitted from {(editingBooking as any).websiteLandingPath}.</p>
               ) : null}
             </div> : null}
             <TermsAcceptance booking={editingBooking || {}} />

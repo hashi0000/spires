@@ -379,11 +379,12 @@
             <input type="text" id="name" name="name" autocomplete="name" required>
           </div>
 
-          <p class="form-help" id="contact-help">Please provide a phone number or email address so we can respond to your request.</p>
+          <p class="form-help" id="contact-help">Please provide a phone number or email address so we can respond to your request. International numbers with a country code are welcome. A UK telephone number is not required.</p>
           <div class="form-row">
             <div class="form-field">
               <label for="phone">Phone number</label>
-              <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="tel" aria-describedby="contact-help">
+              <input type="tel" id="phone" name="phone" autocomplete="tel" inputmode="tel" aria-describedby="contact-help phone-help" placeholder="+44 7776 897772">
+              <p class="form-help" id="phone-help">Include the country code if you are outside the UK, for example +1, +81, +86, +852, +65 or a GCC code.</p>
             </div>
             <div class="form-field">
               <label for="email">Email address</label>
@@ -416,14 +417,15 @@
             </div>
             <div class="form-row">
               <div class="form-field">
-                <label for="date">Date</label>
-                <input type="date" id="date" name="date" required>
+                <label for="date">Date (UK)</label>
+                <input type="date" id="date" name="date" required aria-describedby="uk-time-help">
               </div>
               <div class="form-field">
-                <label for="time">Pickup time</label>
-                <input type="time" id="time" name="time" required>
+                <label for="time">Pickup time (UK local)</label>
+                <input type="time" id="time" name="time" required aria-describedby="uk-time-help">
               </div>
             </div>
+            <p class="form-help" id="uk-time-help">Use United Kingdom local time (Europe/London), including for flights into Heathrow.</p>
             <div class="form-field">
               <label for="pickup">Pickup</label>
               <input type="text" id="pickup" name="pickup" autocomplete="street-address" required placeholder="Street and postcode">
