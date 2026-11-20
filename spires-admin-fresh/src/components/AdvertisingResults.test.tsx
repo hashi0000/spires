@@ -236,3 +236,56 @@ test("switches the chart from booking count to gross booking revenue", () => {
   expect(gross).toBeTruthy();
   expect(gross?.getAttribute("points")?.trim().split(" ").length).toBe(1);
 });
+
+test("shows Refresh Spend, sync timestamp and imported campaign rows", () => {
+  const range = thisMonthThroughYesterday(new Date("2026-11-19T15:00:00Z"));
+  const report = buildAdvertisingReport(advertisingPreviewBookings, {
+    from: range.from,
+    to: range.to,
+    dateBasis: "enquiry",
+    spend: [],
+    manualSpendIsComplete: false,
+    adsConnected: true,
+    adsSpendPence: 1500,
+    now: new Date("2026-11-19T15:00:00Z"),
+  });
+  const googleAdsReport = buildGoogleAdsPeriodReport(advertisingPreviewBookings, {
+    ...range,
+    spend: [],
+    adsSpendPence: 1500,
+  });
+  const onRefreshAds = jest.fn();
+  render(
+    <AdvertisingResultsView
+      report={report}
+      preview={false}
+      connectionNote="Google Ads account report in GBP."
+      onDates={() => undefined}
+      onManualComplete={() => undefined}
+      onSaveStartDate={() => undefined}
+      onSaveSpend={() => undefined}
+      googleAdsReport={googleAdsReport}
+      onRefreshAds={onRefreshAds}
+      adsSync={{
+        status: "ready",
+        lastSuccessAtMs: Date.parse("2026-11-19T12:00:00Z"),
+        attemptedAtMs: Date.parse("2026-11-19T12:00:00Z"),
+        reason: null,
+        from: "2026-08-22",
+        to: "2026-11-18",
+        campaigns: 2,
+      }}
+      importedCampaignSpend={[
+        { campaignId: "111", campaignName: "Heathrow Standard", spendPence: 900 },
+        { campaignId: "222", campaignName: "Heathrow 8 Seater", spendPence: 600 },
+      ]}
+    />
+  );
+  openMoreDetail();
+  expect(screen.getByRole("heading", { name: "Imported Google Ads spend by campaign" })).toBeTruthy();
+  expect(screen.getByText("Heathrow Standard")).toBeTruthy();
+  expect(screen.getByText("Heathrow 8 Seater")).toBeTruthy();
+  expect(screen.getByText(/Last successful synchronisation/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh Spend" }));
+  expect(onRefreshAds).toHaveBeenCalled();
+});
