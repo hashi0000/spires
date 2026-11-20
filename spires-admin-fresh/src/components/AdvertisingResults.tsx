@@ -31,6 +31,15 @@ import {
   spendEntrySummary,
   type SpendRangeEntry,
 } from "../utils/googleAdsPeriod";
+import {
+  buildRoutePerformanceReport,
+  formatRouteFare,
+  routeBarWidth,
+  type RoutePerformanceAttributionFilter,
+  type RoutePerformanceBarMetric,
+  type RoutePerformanceCategory,
+  type RoutePerformanceDateBasis,
+} from "../utils/routePerformance";
 import { ComparisonBars, growthComparisonItems, paceComparisonItems } from "./ComparisonBars";
 import { BookingFrequencyChart } from "./BookingFrequencyChart";
 
@@ -99,6 +108,7 @@ export function AdvertisingResultsView({
   onSaveSpend,
   spendEntries = [],
   googleAdsReport,
+  routeBookings = [],
   onOpenBooking,
   onSaveSource,
   onSaveAdsAttribution,
@@ -126,6 +136,7 @@ export function AdvertisingResultsView({
   onSaveSpend: (input: SpendSaveInput) => void;
   spendEntries?: SpendRangeEntry[];
   googleAdsReport?: ReturnType<typeof buildGoogleAdsPeriodReport>;
+  routeBookings?: AdvertisingBookingInput[];
   onOpenBooking?: (bookingId: string) => void;
   onSaveSource: (id: string, source: string, channel: "telephone" | "whatsapp") => void;
   onSaveAdsAttribution?: (id: string, source: string) => void;
@@ -143,6 +154,10 @@ export function AdvertisingResultsView({
   const [editingSpendId, setEditingSpendId] = useState<string | null>(null);
   const [showSpendForm, setShowSpendForm] = useState(false);
   const [startDate, setStartDate] = useState(advertisingStartedOn || "");
+  const [routeAttributionFilter, setRouteAttributionFilter] = useState<RoutePerformanceAttributionFilter>("all_ads");
+  const [routeDateBasis, setRouteDateBasis] = useState<RoutePerformanceDateBasis>("acquisition");
+  const [routeBarMetric, setRouteBarMetric] = useState<RoutePerformanceBarMetric>("bookings");
+  const [selectedRoute, setSelectedRoute] = useState<RoutePerformanceCategory | "all">("all");
   useEffect(() => {
     setStartDate(advertisingStartedOn || "");
   }, [advertisingStartedOn]);
@@ -156,6 +171,22 @@ export function AdvertisingResultsView({
   const listedJobs = ads
     ? filterGoogleAdsJobs(ads.jobs, reportFilters || { status: "all", route: "all", vehicle: "all", source: "all" })
     : [];
+  const routeReport = useMemo(
+    () => buildRoutePerformanceReport(routeBookings, {
+      from: report.from,
+      to: report.to,
+      attributionFilter: routeAttributionFilter,
+      dateBasis: routeDateBasis,
+    }),
+    [routeBookings, report.from, report.to, routeAttributionFilter, routeDateBasis]
+  );
+  const routeDrillJobs = selectedRoute === "all"
+    ? routeReport.jobs
+    : routeReport.jobs.filter((job) => job.routeCategory === selectedRoute);
+  const routeBarMax = Math.max(
+    0,
+    ...routeReport.rows.map((row) => (routeBarMetric === "bookings" ? row.bookings : row.journeyLegs))
+  );
   const resetSpendForm = () => {
     setEditingSpendId(null);
     setSpendDate(report.to);
@@ -306,8 +337,171 @@ export function AdvertisingResultsView({
         </div>
       ) : null}
 
+      <section className="advertising-results__panel route-performance" aria-label="Route Performance">
+        <h2>Route Performance</h2>
+        <p>{routeReport.dateBasisLabel}</p>
+        <p>{routeReport.periodSpendNote}</p>
+        <form className="advertising-results__filters route-performance__filters" onSubmit={(event) => event.preventDefault()}>
+          <label>Attribution
+            <select
+              className="form-select"
+              value={routeAttributionFilter}
+              onChange={(event) => setRouteAttributionFilter(event.target.value as RoutePerformanceAttributionFilter)}
+            >
+              <option value="all_ads">All ad-related bookings</option>
+              <option value="verified">Verified Google Ads</option>
+              <option value="likely">Likely Google Ads</option>
+            </select>
+          </label>
+          <label>Date basis
+            <select
+              className="form-select"
+              value={routeDateBasis}
+              onChange={(event) => setRouteDateBasis(event.target.value as RoutePerformanceDateBasis)}
+            >
+              <option value="acquisition">Acquisition (enquiry / created)</option>
+              <option value="journey">Outbound journey date</option>
+            </select>
+          </label>
+        </form>
+        {routeReport.rows.length === 0 ? (
+          <p>No ad-related bookings match this period and attribution filter.</p>
+        ) : (
+          <>
+            <div className="advertising-results__table-wrap">
+              <table className="ads-jobs-table route-performance__table">
+                <thead>
+                  <tr>
+                    <th>Route / Service</th>
+                    <th>Bookings</th>
+                    <th>One-way</th>
+                    <th>Returns</th>
+                    <th>Journey legs</th>
+                    <th>Completed legs</th>
+                    <th>Agreed fares</th>
+                    <th>Avg booking</th>
+                    <th>Payments received</th>
+                    <th>Outstanding</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {routeReport.rows.map((row) => (
+                    <tr key={row.route}>
+                      <td>
+                        <button
+                          type="button"
+                          className="booking-customer-link"
+                          onClick={() => setSelectedRoute(row.route === selectedRoute ? "all" : row.route as RoutePerformanceCategory)}
+                        >
+                          {row.route}
+                        </button>
+                      </td>
+                      <td>{row.bookings}</td>
+                      <td>{row.oneWay}</td>
+                      <td>{row.returns}</td>
+                      <td>{row.journeyLegs}</td>
+                      <td>
+                        {row.completedLegs}
+                        {!row.completedLegsKnown ? <span className="ads-job-ref"> · some legs need review</span> : null}
+                      </td>
+                      <td>{formatRouteFare(row.agreedFarePence)}</td>
+                      <td>{formatRouteFare(row.averageFarePence)}</td>
+                      <td>{formatRouteFare(row.paymentsReceivedPence)}</td>
+                      <td>{formatRouteFare(row.outstandingPence)}</td>
+                    </tr>
+                  ))}
+                  <tr className="route-performance__totals">
+                    <td>All routes</td>
+                    <td>{routeReport.totals.bookings}</td>
+                    <td>{routeReport.totals.oneWay}</td>
+                    <td>{routeReport.totals.returns}</td>
+                    <td>{routeReport.totals.journeyLegs}</td>
+                    <td>{routeReport.totals.completedLegs}</td>
+                    <td>{formatRouteFare(routeReport.totals.agreedFarePence)}</td>
+                    <td>{formatRouteFare(routeReport.totals.averageFarePence)}</td>
+                    <td>{formatRouteFare(routeReport.totals.paymentsReceivedPence)}</td>
+                    <td>{formatRouteFare(routeReport.totals.outstandingPence)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="route-performance__chart">
+              <div className="route-performance__chart-head">
+                <h3>Most popular routes</h3>
+                <div className="advertising-results__presets" role="group" aria-label="Route chart metric">
+                  <button type="button" className={routeBarMetric === "bookings" ? "is-active" : ""} aria-pressed={routeBarMetric === "bookings"} onClick={() => setRouteBarMetric("bookings")}>Bookings</button>
+                  <button type="button" className={routeBarMetric === "legs" ? "is-active" : ""} aria-pressed={routeBarMetric === "legs"} onClick={() => setRouteBarMetric("legs")}>Journey legs</button>
+                </div>
+              </div>
+              <ul className="advertising-results__bars">
+                {routeReport.rows.map((row) => {
+                  const value = routeBarMetric === "bookings" ? row.bookings : row.journeyLegs;
+                  return (
+                    <li key={`bar-${row.route}`}>
+                      <div className="route-performance__bar-label">
+                        <button type="button" className="booking-customer-link" onClick={() => setSelectedRoute(row.route as RoutePerformanceCategory)}>{row.route}</button>
+                        <span>{value}</span>
+                      </div>
+                      <span className="advertising-results__bar" style={{ width: routeBarWidth(value, routeBarMax) }} aria-hidden="true" />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div className="route-performance__summary">
+              <p>Confirmed bookings: {routeReport.totals.confirmedBookings}. Fully completed bookings: {routeReport.totals.completedBookings}. Cancelled bookings: {routeReport.totals.cancelledBookings}. Upcoming legs: {routeReport.totals.upcomingLegs}.</p>
+            </div>
+            <div className="route-performance__drill">
+              <h3>{selectedRoute === "all" ? "Ad bookings by route" : selectedRoute}</h3>
+              {selectedRoute !== "all" ? (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedRoute("all")}>Show all routes</button>
+              ) : null}
+              {routeDrillJobs.length === 0 ? <p>No bookings in this route for the current filters.</p> : (
+                <div className="advertising-results__table-wrap">
+                  <table className="ads-jobs-table">
+                    <thead>
+                      <tr>
+                        <th>Customer</th>
+                        <th>Reference</th>
+                        <th>Pickup / destination</th>
+                        <th>Outbound</th>
+                        <th>Return</th>
+                        <th>Status</th>
+                        <th>Journey completion</th>
+                        <th>Agreed fare</th>
+                        <th>Attribution</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {routeDrillJobs.map((job) => (
+                        <tr key={job.id} className={job.cancelled ? "is-cancelled" : undefined}>
+                          <td>
+                            {onOpenBooking && job.id ? (
+                              <button type="button" className="booking-customer-link" onClick={() => onOpenBooking(job.id)}>{job.hirerName}</button>
+                            ) : job.hirerName}
+                          </td>
+                          <td>{job.bookingNumber}</td>
+                          <td>{job.pickup} → {job.destination}</td>
+                          <td>{job.outboundDate}</td>
+                          <td>{job.returnDate || "—"}</td>
+                          <td>{job.cancelled ? <span className="ads-cancelled-tag">Cancelled</span> : statusLabel(job.status)}</td>
+                          <td>{job.journeyCompletionLabel}</td>
+                          <td>{formatRouteFare(job.farePence)}</td>
+                          <td>{job.attributionLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="advertising-results__panel">
-        <h2>Spend history</h2>
+        <h2>Advertising spend</h2>
+        <p>Imported and manually entered advertising expenditure for the selected period.</p>
         {spendEntries.length === 0 ? <p>No ad spend recorded.</p> : (
           <ul className="ads-spend-history">
             {spendEntries.map((entry) => (
@@ -321,7 +515,7 @@ export function AdvertisingResultsView({
       </section>
 
       <section className="advertising-results__panel ads-jobs-panel">
-        <h2>Bookings from ads</h2>
+        <h2>Booking details</h2>
         <p>{ads?.reportingDatesLabel || `Period ${report.from} to ${report.to}.`} Returns count once. Cancelled bookings are marked and excluded from confirmed totals. List filters do not change account wide spend or headline ratios.</p>
         {onReportFilters && reportFilters && filterChoices ? (
           <form className="advertising-results__filters ads-job-filters" onSubmit={(event) => event.preventDefault()}>
@@ -1045,6 +1239,7 @@ const AdvertisingResults: React.FC<{
       }}
       spendEntries={spend as SpendRangeEntry[]}
       googleAdsReport={googleAdsReport}
+      routeBookings={noted}
       onOpenBooking={onOpenBooking}
       reportFilters={reportFilters}
       filterChoices={filterChoices}
