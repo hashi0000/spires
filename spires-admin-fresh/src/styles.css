@@ -2289,6 +2289,20 @@ header.admin-header,
 .advertising-results__counts strong, .advertising-results__amount { display: block; margin-top: 0.35rem; font-size: 1.4rem; color: #002147; }
 .advertising-results__check { display: flex; gap: 0.5rem; align-items: center; font-weight: 600; }
 .advertising-results__table-wrap { overflow-x: auto; }
+.route-performance__filters { margin: 0.75rem 0 1rem; }
+.route-performance__table td, .route-performance__table th { white-space: nowrap; }
+.route-performance__table td:first-child, .route-performance__table th:first-child { white-space: normal; }
+.route-performance__totals td { font-weight: 700; border-top: 2px solid #c5ced8; }
+.route-performance__chart { margin-top: 1.25rem; }
+.route-performance__chart-head { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+.route-performance__chart-head h3 { margin: 0; font-size: 1rem; }
+.route-performance__bar-label { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; }
+.route-performance__summary { margin-top: 0.85rem; font-size: 0.875rem; color: #334155; }
+.route-performance__drill { margin-top: 1.25rem; display: grid; gap: 0.75rem; }
+@media (max-width: 699px) {
+  .route-performance__table { font-size: 0.8125rem; }
+  .route-performance__chart-head { flex-direction: column; align-items: flex-start; }
+}
 .advertising-results table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 .advertising-results th, .advertising-results td { text-align: left; padding: 0.45rem; border-bottom: 1px solid #e6ebf0; vertical-align: top; }
 .advertising-results__footer { font-size: 0.8125rem; color: #334155; }

@@ -53,6 +53,7 @@ test("main view shows November fixture spend, bookings, fares and ratios", () =>
       onSaveSpend={() => undefined}
       spendEntries={spend}
       googleAdsReport={googleAdsReport}
+      routeBookings={bookings as any}
       onOpenBooking={onOpenBooking}
       onSaveSource={() => undefined}
       onSaveCost={() => undefined}
@@ -68,8 +69,9 @@ test("main view shows November fixture spend, bookings, fares and ratios", () =>
   expect(summary.textContent).toMatch(/£453\.00/);
   expect(summary.textContent).toMatch(/£26\.55/);
   expect(summary.textContent).toMatch(/£5\.69/);
-  expect(screen.getByRole("heading", { name: "Bookings from ads" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Spend history" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Route Performance" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Booking details" })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { name: "Advertising spend" }).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole("button", { name: "2026-11-02" }));
   expect(onOpenBooking).toHaveBeenCalledWith("1");
   fireEvent.click(screen.getByRole("button", { name: "Add ad spend" }));
@@ -99,6 +101,7 @@ test("preview hides passenger details and keeps legacy metrics under More detail
       onSaveStartDate={() => undefined}
       onSaveSpend={() => undefined}
       googleAdsReport={googleAdsReport}
+      routeBookings={advertisingPreviewBookings as any}
       onSaveSource={() => undefined}
       onSaveCost={() => undefined}
     />
