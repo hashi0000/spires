@@ -153,12 +153,13 @@
     }
   }
   function applyRequestedVehicle() {
-    if (requestedVehicle !== "executive") return;
-    var executiveInput = form.querySelector("input[name='vehicleType'][value='executive']");
-    if (!executiveInput || executiveInput.closest("[hidden]") || executiveInput.checked) return;
-    executiveInput.checked = true;
+    var allowed = { executive: true, "8_seater": true, standard: true };
+    if (!allowed[requestedVehicle]) return;
+    var input = form.querySelector("input[name='vehicleType'][value='" + requestedVehicle + "']");
+    if (!input || input.closest("[hidden]") || input.checked) return;
+    input.checked = true;
     syncPassengers();
-    if (window.SpiresMeasurement && window.SpiresMeasurement.engagement) {
+    if (requestedVehicle === "executive" && window.SpiresMeasurement && window.SpiresMeasurement.engagement) {
       window.SpiresMeasurement.engagement("executive_option_selected", { service_type: "executive", airport: "heathrow" });
     }
   }
@@ -258,7 +259,7 @@
       return;
     }
     if (!validPhone(phone)) {
-      setStatus("Enter a phone number we can call, including the area code. Mobile numbers and landlines are both fine.");
+      setStatus("Enter a phone number we can call, with country code if you are outside the UK (for example +1, +81, +86, +852 or +65). A UK number is not required.");
       return;
     }
     if (!email && !phone) {
@@ -384,6 +385,10 @@
 
     Promise.resolve(window.SpiresMeasurement ? window.SpiresMeasurement.attribution().catch(function () { return null; }) : null).then(function (attribution) {
       payload.marketingAttribution = attribution;
+      try {
+        payload.websiteLandingPath = String(window.location.pathname || "").slice(0, 200);
+        payload.websitePageUrl = String(window.location.href || "").slice(0, 500);
+      } catch (err) { /* attribution still sends without page path */ }
       return fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -190,6 +190,8 @@ export const mapCustomerToAdminBooking = (customerBooking: CustomerBooking): Par
     createdByFunction: (customerBooking as any).createdByFunction === true,
     syntheticMeasurementTest: (customerBooking as any).syntheticMeasurementTest === true,
     marketingAttribution: (customerBooking as any).marketingAttribution || null,
+    websiteLandingPath: (customerBooking as any).websiteLandingPath || undefined,
+    websitePageUrl: (customerBooking as any).websitePageUrl || undefined,
     paymentEntries: (customerBooking as any).paymentEntries,
     amountRefundedPence: (customerBooking as any).amountRefundedPence,
   } as Partial<Booking>;
