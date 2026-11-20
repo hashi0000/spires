@@ -142,6 +142,20 @@ describe("advertising results", () => {
     expect(report.sourcePrompts.map((row) => row.channel).sort()).toEqual(["telephone", "whatsapp"]);
   });
 
+  it("updates Advertising Results when a telephone job is marked or unmarked as Google Ads", () => {
+    const phoneJob = booking({ id: "phone1", bookingNumber: "PH1", bookingMethod: "telephone" });
+    expect(sourceLabel(phoneJob)).toBe("Unknown");
+    expect(buildAdvertisingReport([phoneJob], period).attribution.customerReported).toBe(0);
+
+    const marked = { ...phoneJob, staffReportedSource: "google_ads", enquiryChannel: "telephone" as const };
+    expect(sourceLabel(marked)).toBe("Customer reported Google Ads");
+    expect(buildAdvertisingReport([marked], period).attribution.customerReported).toBe(1);
+
+    const removed = { ...marked, staffReportedSource: "" };
+    expect(sourceLabel(removed)).toBe("Unknown");
+    expect(buildAdvertisingReport([removed], period).attribution.customerReported).toBe(0);
+  });
+
   it("does not count an expired click or a refused consent choice as Google Ads", () => {
     const expired = booking({ marketingAttribution: { consent: "granted", gclid: "old", expiresAt: Date.parse("2026-11-01T00:00:00Z") } });
     const refused = booking({ id: "no", bookingNumber: "NO", marketingAttribution: { consent: "denied", gclid: "click", expiresAt: Date.parse("2026-12-01T00:00:00Z") } });

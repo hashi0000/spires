@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { enquiryChannel } from '../utils/advertisingResults';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { bookingMoney } from '../utils/bookingMoney';
@@ -64,6 +66,7 @@ function isReturnBooking(booking: Booking): boolean {
   return row.bookingType === 'return' || Boolean(row.returnPickupLocation && row.returnDestination);
 }
 
+const recordBookingSource = httpsCallable(functions, 'recordBookingSource');
 const sendDriverReminderManualCallable = httpsCallable(functions, 'sendDriverReminderManual');
 const sendBookingPdfToCustomerCallable = httpsCallable(functions, 'sendBookingPdfToCustomer');
 
@@ -123,6 +126,48 @@ const Bookings: React.FC<BookingsProps> = ({
   const [bulkNote, setBulkNote] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState('');
+  const [sourceNotes, setSourceNotes] = useState<Record<string, { staffReportedSource?: string; enquiryChannel?: string }> | null>(null);
+  const [savingSources, setSavingSources] = useState<Record<string, boolean>>({});
+  const [sourceError, setSourceError] = useState('');
+
+  useEffect(() => onSnapshot(collection(db, 'bookingMeasurementNotes'), (snapshot) => {
+    setSourceNotes(Object.fromEntries(snapshot.docs.map((note) => [note.id, note.data()])));
+  }, () => {
+    setSourceNotes(null);
+    setSourceError('Booking sources could not be loaded.');
+  }), []);
+
+  async function saveGoogleAdsSource(id: string, channel: 'telephone' | 'whatsapp', checked: boolean) {
+    setSourceError('');
+    setSavingSources((current) => ({ ...current, [id]: true }));
+    try {
+      await recordBookingSource({ bookingId: id, source: checked ? 'google_ads' : '', channel });
+    } catch (error) {
+      setSourceError(getCallableErrorMessage(error));
+    } finally {
+      setSavingSources((current) => ({ ...current, [id]: false }));
+    }
+  }
+
+  function googleAdsToggle(booking: Booking) {
+    const id = booking.id;
+    if (!id) return null;
+    const note = sourceNotes?.[id];
+    const channel = enquiryChannel({ ...booking, ...note });
+    if (!channel) return null;
+    return (
+      <label className="booking-ref">
+        <input
+          type="checkbox"
+          aria-label={'Customer said Google Ads for ' + booking.hirerName}
+          checked={note?.staffReportedSource === 'google_ads'}
+          disabled={!sourceNotes || bulkSaving || savingSources[id]}
+          onChange={(event) => void saveGoogleAdsSource(id, channel, event.target.checked)}
+        />
+        {' Customer said Google Ads'}
+      </label>
+    );
+  }
 
   useEffect(() => {
     const node = listRef.current;
@@ -534,6 +579,35 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
       : Array.from(new Set([...current, ...visibleKeys])));
   };
 
+  async function applyBulkGoogleAdsSource(checked: boolean) {
+    if (!sourceNotes || bulkSaving) return;
+    setBulkSaving(true);
+    setBulkMessage('');
+    let saved = 0;
+    let skipped = 0;
+    let failed = 0;
+    try {
+      for (const booking of selectedBookings) {
+        const id = booking.id;
+        const note = id ? sourceNotes[id] : undefined;
+        const channel = enquiryChannel({ ...booking, ...note });
+        if (!id || !channel || savingSources[id] || (note?.staffReportedSource === 'google_ads') === checked) {
+          skipped += 1;
+          continue;
+        }
+        try {
+          await recordBookingSource({ bookingId: id, source: checked ? 'google_ads' : '', channel });
+          saved += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      setBulkMessage([saved + ' updated', skipped + ' skipped', failed + ' failed'].join(', ') + '.');
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   const applyBulkEdit = async () => {
     if (bulkSaving || selectedBookings.length === 0) return;
     const changes: BulkJobChanges = { driver: bulkDriver, vehicle: bulkVehicle, status: bulkStatus, note: bulkNote };
@@ -691,6 +765,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           <div className="bg-white p-4 rounded-lg shadow-sm"><p className="text-sm font-medium text-gray-700 mb-2">Quoted fare by driver</p><div className="space-y-2 max-h-24 overflow-y-auto">{accountingSummary.driverRevenue.length > 0 ? accountingSummary.driverRevenue.map((dr, idx) => (<div key={idx} className="flex justify-between"><span className="text-sm text-gray-600">{dr.driver} ({dr.bookings})</span><span className="text-sm font-semibold text-blue-600">{gbp(dr.revenue)}</span></div>)) : (<p className="text-sm text-gray-500">No completed bookings</p>)}{accountingSummary.driverRevenue.some((dr) => dr.knownFares < dr.bookings) ? <p className="text-xs text-gray-500 mt-2">Jobs with no quoted fare are left out of the driver amounts.</p> : null}</div></div>
         </div>
       </details>
+      {sourceError ? <p role="alert">{sourceError}</p> : null}
       <div className="card booking-list-card" style={{ marginTop: '1.5rem' }} ref={listRef}>
         {selectedKeys.length > 0 && (
           <>
@@ -741,6 +816,12 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
               <div className="bulk-edit-actions">
                 <button type="button" className="btn btn-primary" onClick={() => void applyBulkEdit()} disabled={bulkSaving || (!bulkDriver && !bulkVehicle && !bulkStatus && !bulkNote.trim())}>
                   {bulkSaving ? 'Saving…' : `Apply to ${selectedBookings.length} ${selectedBookings.length === 1 ? 'job' : 'jobs'}`}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => void applyBulkGoogleAdsSource(true)} disabled={bulkSaving || !sourceNotes}>
+                  Mark as Google Ads
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => void applyBulkGoogleAdsSource(false)} disabled={bulkSaving || !sourceNotes}>
+                  Remove Google Ads tag
                 </button>
               </div>
             </section>
@@ -821,6 +902,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                         <td>
                           <button type="button" className="booking-customer booking-customer-link" onClick={() => openBooking(booking)} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
                           <div className="booking-ref">{booking.bookingNumber}{leg?.leg === 'return' ? ' · Return' : ''}</div>
+                          {googleAdsToggle(booking)}
                           {brandOf(booking) === 'spires_international' ? <div className="booking-ref">Spires International</div> : null}
                         </td>
                         <td className="booking-route-cell">
@@ -915,6 +997,7 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                       <input className="booking-select" type="checkbox" aria-label={`Select ${booking.bookingNumber}${leg?.leg === 'return' ? ' return' : ''}`} checked={Boolean(selectionKey && selectedKeys.includes(selectionKey))} onChange={() => selectionKey && toggleSelected(selectionKey)} />
                       Select
                     </label>
+                    {googleAdsToggle(booking)}
                     <div className="booking-mobile-topline">
                       <span>{londonWhen(when)}</span>
                       <button type="button" className="booking-customer-link" onClick={() => openBooking(booking)} aria-label={`Open booking for ${booking.hirerName}`}>{booking.hirerName}</button>
