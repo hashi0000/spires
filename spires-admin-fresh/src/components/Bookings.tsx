@@ -154,7 +154,6 @@ const Bookings: React.FC<BookingsProps> = ({
     if (!id) return null;
     const note = sourceNotes?.[id];
     const channel = channelForStaffGoogleAds({ ...booking, ...note });
-    if (!channel) return null;
     return (
       <label className="booking-ref">
         <input
@@ -586,7 +585,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     let saved = 0;
     let skipped = 0;
     let failed = 0;
-    let noChannel = 0;
     let alreadySet = 0;
     try {
       for (const booking of selectedBookings) {
@@ -595,11 +593,6 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         const channel = channelForStaffGoogleAds({ ...booking, ...note });
         if (!id || savingSources[id]) {
           skipped += 1;
-          continue;
-        }
-        if (!channel) {
-          skipped += 1;
-          noChannel += 1;
           continue;
         }
         if ((note?.staffReportedSource === 'google_ads') === checked) {
@@ -619,10 +612,9 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
         skipped + ' skipped',
         failed + ' failed',
       ].join(', ');
-      const why = [
-        alreadySet ? alreadySet + (checked ? ' already marked' : ' already unmarked') : '',
-        noChannel ? noChannel + ' website or portal only' : '',
-      ].filter(Boolean).join('; ');
+      const why = alreadySet
+        ? alreadySet + (checked ? ' already marked' : ' already unmarked')
+        : '';
       setBulkMessage(why ? detail + '. ' + why + '.' : detail + '.');
     } finally {
       setBulkSaving(false);
