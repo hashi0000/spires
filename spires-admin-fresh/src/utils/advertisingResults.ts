@@ -738,6 +738,23 @@ export function enquiryChannel(booking: AdvertisingBookingInput): "telephone" | 
   return "";
 }
 
+/**
+ * Channel used when staff tags Google Ads on a job.
+ * Past office bookings often lack bookingMethod / enquiryChannel; default those to telephone.
+ * Website guest and customer portal requests stay on automatic click attribution.
+ */
+export function channelForStaffGoogleAds(booking: AdvertisingBookingInput): "telephone" | "whatsapp" | "" {
+  const known = enquiryChannel(booking);
+  if (known) return known;
+  const source = String(booking.source || "").toLowerCase();
+  const acceptance = String(booking.acceptanceMethod || "").toLowerCase();
+  if (source === "website" || source === "customer_app" || acceptance === "customer_portal" || acceptance === "website") {
+    return "";
+  }
+  if ((booking as { guestRequest?: boolean }).guestRequest === true) return "";
+  return "telephone";
+}
+
 export function routeLabel(booking: AdvertisingBookingInput): string {
   const text = `${booking.pickupLocation || ""} ${booking.pickup || ""} ${booking.destination || ""}`.toLowerCase();
   const airports: Array<[string, string]> = [

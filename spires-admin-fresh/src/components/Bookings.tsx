@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { enquiryChannel } from '../utils/advertisingResults';
+import { channelForStaffGoogleAds } from '../utils/advertisingResults';
 import { Plus, Edit3, Trash2, Download, Calendar, DollarSign, Filter, X, Copy, AlertCircle, Mail, ArrowLeftRight, Send } from 'lucide-react';
 import { Booking, Driver, Vehicle, ExtendedBooking } from '../types/types';
 import { bookingMoney } from '../utils/bookingMoney';
@@ -153,7 +153,7 @@ const Bookings: React.FC<BookingsProps> = ({
     const id = booking.id;
     if (!id) return null;
     const note = sourceNotes?.[id];
-    const channel = enquiryChannel({ ...booking, ...note });
+    const channel = channelForStaffGoogleAds({ ...booking, ...note });
     if (!channel) return null;
     return (
       <label className="booking-ref">
@@ -586,13 +586,25 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
     let saved = 0;
     let skipped = 0;
     let failed = 0;
+    let noChannel = 0;
+    let alreadySet = 0;
     try {
       for (const booking of selectedBookings) {
         const id = booking.id;
         const note = id ? sourceNotes[id] : undefined;
-        const channel = enquiryChannel({ ...booking, ...note });
-        if (!id || !channel || savingSources[id] || (note?.staffReportedSource === 'google_ads') === checked) {
+        const channel = channelForStaffGoogleAds({ ...booking, ...note });
+        if (!id || savingSources[id]) {
           skipped += 1;
+          continue;
+        }
+        if (!channel) {
+          skipped += 1;
+          noChannel += 1;
+          continue;
+        }
+        if ((note?.staffReportedSource === 'google_ads') === checked) {
+          skipped += 1;
+          alreadySet += 1;
           continue;
         }
         try {
@@ -602,7 +614,16 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
           failed += 1;
         }
       }
-      setBulkMessage([saved + ' updated', skipped + ' skipped', failed + ' failed'].join(', ') + '.');
+      const detail = [
+        saved + ' updated',
+        skipped + ' skipped',
+        failed + ' failed',
+      ].join(', ');
+      const why = [
+        alreadySet ? alreadySet + (checked ? ' already marked' : ' already unmarked') : '',
+        noChannel ? noChannel + ' website or portal only' : '',
+      ].filter(Boolean).join('; ');
+      setBulkMessage(why ? detail + '. ' + why + '.' : detail + '.');
     } finally {
       setBulkSaving(false);
     }

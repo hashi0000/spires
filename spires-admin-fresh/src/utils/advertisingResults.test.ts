@@ -1,4 +1,4 @@
-import { advertisingDateRange, afterAdsBookingsPerDay, averageBookingValueChange, beforeAdsBookingsPerDay, bookingFrequencyChange, bookingPaceChange, buildAdvertisingReport, confirmedBookingRateChange, formatGbp, formatPace, formatRate, formatReturn, interpretAttribution, percentageChange, revenuePerDayChange, sourceLabel, type AdvertisingBookingInput, type SpendEntryInput } from "./advertisingResults";
+import { advertisingDateRange, afterAdsBookingsPerDay, averageBookingValueChange, beforeAdsBookingsPerDay, bookingFrequencyChange, bookingPaceChange, buildAdvertisingReport, channelForStaffGoogleAds, confirmedBookingRateChange, formatGbp, formatPace, formatRate, formatReturn, interpretAttribution, percentageChange, revenuePerDayChange, sourceLabel, type AdvertisingBookingInput, type SpendEntryInput } from "./advertisingResults";
 
 const period = { from: "2026-11-01", to: "2026-11-30", dateBasis: "journey" as const, manualSpendIsComplete: false, adsConnected: false, spend: [] as SpendEntryInput[] };
 
@@ -154,6 +154,20 @@ describe("advertising results", () => {
     const removed = { ...marked, staffReportedSource: "" };
     expect(sourceLabel(removed)).toBe("Unknown");
     expect(buildAdvertisingReport([removed], period).attribution.customerReported).toBe(0);
+  });
+
+  it("lets staff tag past office jobs that have no stored telephone channel", () => {
+    const pastOffice = booking({ id: "old1", bookingNumber: "OLD1", bookingMethod: "internet" });
+    const blankMethod = booking({ id: "old2", bookingNumber: "OLD2", bookingMethod: undefined as any });
+    const inPerson = booking({ id: "old3", bookingNumber: "OLD3", bookingMethod: "in person" as any });
+    const website = booking({ id: "web1", bookingNumber: "WEB1", source: "website", guestRequest: true } as any);
+    const portal = booking({ id: "app1", bookingNumber: "APP1", source: "customer_app" } as any);
+    expect(channelForStaffGoogleAds(pastOffice)).toBe("telephone");
+    expect(channelForStaffGoogleAds(blankMethod)).toBe("telephone");
+    expect(channelForStaffGoogleAds(inPerson)).toBe("telephone");
+    expect(channelForStaffGoogleAds(website)).toBe("");
+    expect(channelForStaffGoogleAds(portal)).toBe("");
+    expect(channelForStaffGoogleAds(booking({ bookingMethod: "whatsapp" }))).toBe("whatsapp");
   });
 
   it("does not count an expired click or a refused consent choice as Google Ads", () => {
