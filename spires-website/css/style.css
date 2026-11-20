@@ -234,6 +234,7 @@ li + li { margin-top: 0.35rem; }
   position: sticky;
   top: 0;
   z-index: 100;
+  overflow: visible;
   background: rgba(255, 252, 248, 0.96);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0, 33, 71, 0.1);
@@ -284,7 +285,7 @@ li + li { margin-top: 0.35rem; }
   display: flex;
   justify-content: center;
   align-self: stretch;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .site-nav__list {
@@ -308,7 +309,9 @@ li + li { margin-top: 0.35rem; }
   position: absolute;
   top: calc(100% - 1px);
   left: 0;
-  z-index: 40;
+  z-index: 120;
+  padding-top: 0.35rem;
+  margin-top: -0.35rem;
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px);
@@ -1784,13 +1787,57 @@ h3 + .included-list {
   scroll-margin-bottom: 5rem;
 }
 
+.card.airport-fare-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.card.airport-fare-card .airport-fare-card__name {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.card.airport-fare-card .airport-fare-card__grid {
+  flex: 1 1 auto;
+}
+
+.card.airport-fare-card .airport-fare-card__class {
+  margin-bottom: 0.35rem;
+}
+
+.card.airport-fare-card .card__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  margin: 0.2rem 0;
+  font-size: 1.15rem;
+  white-space: normal;
+}
+
+.card.airport-fare-card .card__price-label {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.card.airport-fare-card .price-save,
+.card.airport-fare-card .card__meta {
+  margin: 0.25rem 0 0;
+}
+
 .airport-fare-card__actions {
-  margin-top: 1rem;
+  margin-top: auto;
   flex-wrap: wrap;
 }
 
 .airport-fare-card__actions .btn {
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
