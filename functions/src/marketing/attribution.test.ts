@@ -50,3 +50,16 @@ test('keeps the first click when a later visit has no campaign and rejects perso
   assert.equal(dirty.latest && dirty.latest.landingPath, undefined);
   assert.equal(dirty.latest && dirty.latest.referrerHost, undefined);
 });
+
+test('keeps the most recent paid click across a referral and a saved-record read', () => {
+  const result = readAttribution({
+    ...valid,
+    first: { capturedAt: now - 1000, gclid: 'older-click' },
+    latest: { capturedAt: now, referrerHost: 'example.org' },
+    paidClick: { capturedAt: now, wbraid: 'newer-click', utmCampaign: 'private@example.com' },
+  }, now)!;
+  assert.equal(result.wbraid, 'newer-click');
+  assert.equal(result.gclid, undefined);
+  assert.equal(result.paidClick?.utmCampaign, undefined);
+  assert.deepEqual(readAttribution(result, now), result);
+});

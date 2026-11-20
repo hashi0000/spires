@@ -5,6 +5,8 @@
   var hosts = ['www.spires-taxis.com', 'spires-taxis.com', 'customer.spires-taxis.com'];
   var live = w.location.protocol === 'https:' && hosts.indexOf(w.location.hostname) !== -1;
   var id = 'G-RSE4NNBP64', loaded = false, consent = '', context = null;
+  var clickKeys = ['gclid', 'gbraid', 'wbraid'];
+  var touchLifetime = 30 * 86400000;
   var consentKey = 'spires_measurement_consent_v1';
   var contextKey = 'spires_measurement_context_v1';
   var withdrawalKey = 'spires_measurement_withdrawal_v1';
@@ -67,7 +69,7 @@
       var url = new URL(d.referrer);
       var host = url.hostname.toLowerCase();
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
-      if (host === 'spires-taxis.com' || host.indexOf('.spires-taxis.com') === host.length - 17) return '';
+      if (host === 'spires-taxis.com' || host.endsWith('.spires-taxis.com')) return '';
       return /^[a-z0-9.-]{1,253}$/.test(host) ? host : '';
     } catch (_) { return ''; }
   }
@@ -85,8 +87,20 @@
     if (host) touch.referrerHost = host;
     return touch;
   }
+  function hasClick(touch) {
+    return !!touch && clickKeys.some(function (key) { return !!touch[key]; });
+  }
+  function unexpired(touch) {
+    return !!touch && touch.capturedAt + touchLifetime > now();
+  }
+  function latestClick(saved) {
+    if (!saved) return null;
+    return [saved.paidClick, saved.latest, saved.first].find(function (touch) {
+      return unexpired(touch) && hasClick(touch);
+    }) || null;
+  }
   function nonDirect(touch) {
-    return !!(touch && (touch.gclid || touch.gbraid || touch.wbraid || touch.utmSource || touch.utmMedium || touch.utmCampaign || touch.utmContent || touch.utmTerm || touch.referrerHost));
+    return !!(touch && (hasClick(touch) || touch.utmSource || touch.utmMedium || touch.utmCampaign || touch.utmContent || touch.utmTerm || touch.referrerHost));
   }
   function normalise(saved) {
     if (!saved || !saved.expiresAt || saved.expiresAt <= now()) return null;
@@ -122,6 +136,7 @@
     if (!live || !allowed()) return null;
     var saved = normalise(read(contextKey));
     context = saved;
+    var paidClick = latestClick(saved);
     var touch = pageTouch();
     if (!context) context = { capturedAt: touch.capturedAt, expiresAt: touch.capturedAt + 30 * 86400000, first: touch, latest: touch };
     else if (nonDirect(touch)) {
@@ -129,6 +144,9 @@
       context.latest = touch;
       context.expiresAt = touch.capturedAt + 30 * 86400000;
     }
+    if (hasClick(touch)) paidClick = touch;
+    if (paidClick) context.paidClick = paidClick;
+    else delete context.paidClick;
     if (!context.consentReceiptId && w.crypto && w.crypto.randomUUID) context.consentReceiptId=w.crypto.randomUUID();
     if (context) write(contextKey, context, Math.max(0, Math.floor((context.expiresAt - now()) / 1000)));
     return context;
@@ -195,7 +213,7 @@
     var kind = type === 'contact' || type === 'quote' || type === 'booking_request' ? type : (channel === 'portal' ? 'booking_request' : channel === 'contact' ? 'contact' : 'quote');
     sentLead[id] = true;
     try { w.sessionStorage.setItem(storageKey, '1'); } catch (_) {}
-    var params = { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: w.location.origin + cleanPath() };
+    var params = { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: safeLocation() };
     var more = safeExtra(extra);
     if (more.service_type) params.service_type = more.service_type;
     if (more.airport) params.airport = more.airport;
@@ -212,22 +230,27 @@
   }
   function bestTouch(saved) {
     if (!saved) return null;
-    if (nonDirect(saved.latest)) return saved.latest;
-    if (nonDirect(saved.first)) return saved.first;
-    return saved.first || saved.latest || null;
+    if (unexpired(saved.latest)) return saved.latest;
+    return unexpired(saved.first) ? saved.first : null;
   }
   function attribution() {
     return new Promise(function (resolve) {
       if (!live || !allowed()) return resolve(null);
       var saved = capture();
       var best = bestTouch(saved) || {};
+      var paidClick = latestClick(saved);
+      var capturedAt = (paidClick || best).capturedAt || now();
       var result = {
         consent: 'granted', consentAt: now(), consentGrantedAt: read(consentKey).at, consentReceiptId:saved && saved.consentReceiptId,
-        capturedAt: best.capturedAt || now(),
-        expiresAt: (best.capturedAt || now()) + 30 * 86400000,
+        capturedAt: capturedAt,
+        expiresAt: capturedAt + touchLifetime,
         first: saved && saved.first, latest: nonDirect(saved && saved.latest) ? saved.latest : (nonDirect(saved && saved.first) ? saved.first : saved && saved.first)
       };
-      ['gclid', 'gbraid', 'wbraid', 'utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm', 'landingPath', 'referrerHost'].forEach(function (key) { if (best[key]) result[key] = best[key]; });
+      ['utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm', 'landingPath', 'referrerHost'].forEach(function (key) { if (best[key]) result[key] = best[key]; });
+      if (paidClick) {
+        result.paidClick = paidClick;
+        clickKeys.forEach(function (key) { if (paidClick[key]) result[key] = paidClick[key]; });
+      }
       var done = false, timer = w.setTimeout(finish, 600);
       function finish() { if (done) return; done = true; w.clearTimeout(timer); resolve(allowed() ? result : null); }
       w.gtag('get', id, 'client_id', function (v) { if (!done && /^\d+\.\d+$/.test(String(v))) result.clientId = String(v); w.gtag('get', id, 'session_id', function (s) { if (!done && /^\d+$/.test(String(s))) { result.sessionId = String(s); result.sessionCapturedAt = Number(s) * 1000; } finish(); }); });

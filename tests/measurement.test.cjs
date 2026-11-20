@@ -162,3 +162,26 @@ test('expired in-memory attribution cannot survive an expired shared cookie',asy
  const result=await b.win.SpiresMeasurement.attribution();
  assert.equal(result.gclid,undefined);
 });
+
+test('a paid click between other visits survives a referral and the portal handoff', async () => {
+ const first=browser('www.spires-taxis.com','granted','https://www.google.co.uk/search','',{search:''});
+ const ad=browser('www.spires-taxis.com','','','',{cookies:first.cookies,search:'?gclid=middleClick'});
+ const referred=browser('www.spires-taxis.com','','https://example.org/page','',{cookies:ad.cookies,search:''});
+ const portal=browser('customer.spires-taxis.com','','https://www.spires-taxis.com/contact','',{cookies:referred.cookies,search:''});
+ const result=await portal.win.SpiresMeasurement.attribution();
+ assert.equal(result.first.referrerHost,'www.google.co.uk');
+ assert.equal(result.latest.referrerHost,'example.org');
+ assert.equal(result.gclid,'middleClick');
+ assert.equal(result.paidClick.gclid,'middleClick');
+ assert.equal(result.expiresAt,result.paidClick.capturedAt+30*86400000);
+});
+
+test('lead events retain validated campaign parameters on the submission page', () => {
+ const b=browser('www.spires-taxis.com','granted','','',{search:'?gclid=click123&utm_source=google&email=private@example.com'});
+ b.win.SpiresMeasurement.lead('saved-contact','contact');
+ const lead=b.win.dataLayer.find(row=>row[1]==='generate_lead')[2];
+ const url=new URL(lead.page_location);
+ assert.equal(url.searchParams.get('gclid'),'click123');
+ assert.equal(url.searchParams.get('utm_source'),'google');
+ assert.equal(url.searchParams.has('email'),false);
+});
