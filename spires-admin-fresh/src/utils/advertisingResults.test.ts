@@ -156,7 +156,7 @@ describe("advertising results", () => {
     expect(buildAdvertisingReport([removed], period).attribution.customerReported).toBe(0);
   });
 
-  it("lets staff tag past office jobs that have no stored telephone channel", () => {
+  it("lets staff tag every job, including website and portal bookings", () => {
     const pastOffice = booking({ id: "old1", bookingNumber: "OLD1", bookingMethod: "internet" });
     const blankMethod = booking({ id: "old2", bookingNumber: "OLD2", bookingMethod: undefined as any });
     const inPerson = booking({ id: "old3", bookingNumber: "OLD3", bookingMethod: "in person" as any });
@@ -165,8 +165,8 @@ describe("advertising results", () => {
     expect(channelForStaffGoogleAds(pastOffice)).toBe("telephone");
     expect(channelForStaffGoogleAds(blankMethod)).toBe("telephone");
     expect(channelForStaffGoogleAds(inPerson)).toBe("telephone");
-    expect(channelForStaffGoogleAds(website)).toBe("");
-    expect(channelForStaffGoogleAds(portal)).toBe("");
+    expect(channelForStaffGoogleAds(website)).toBe("telephone");
+    expect(channelForStaffGoogleAds(portal)).toBe("telephone");
     expect(channelForStaffGoogleAds(booking({ bookingMethod: "whatsapp" }))).toBe("whatsapp");
   });
 
