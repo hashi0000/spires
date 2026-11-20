@@ -67,6 +67,7 @@ function page(pathname) {
       className: attrs.className || "",
       textContent: attrs.text || "",
       dataset: {},
+      elements: tag === "form" ? {} : undefined,
       listeners: {},
       classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} },
       setAttribute(key, value) { this.attrs[key] = value; },
@@ -81,6 +82,7 @@ function page(pathname) {
       dispatch(name, event) { (this.listeners[name] || []).forEach((fn) => fn(event)); },
       appendChild(child) {
         this.children.push(child);
+        if (this.elements && child.name) this.elements[child.name] = child;
         child.parentNode = this;
         if (child.id) ids.set(child.id, child);
         return child;
@@ -132,6 +134,8 @@ function page(pathname) {
   const alerts = [];
   const win = {
     location,
+    URL,
+    URLSearchParams,
     sessionStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     setTimeout,
     clearTimeout,

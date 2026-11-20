@@ -18,6 +18,7 @@ export type Attribution = {
   gclid?: string; gbraid?: string; wbraid?: string;
   first?: MarketingTouch;
   latest?: MarketingTouch;
+  paidClick?: MarketingTouch;
 };
 
 const CLICK_KEYS = ['gclid', 'gbraid', 'wbraid'] as const;
@@ -110,11 +111,13 @@ export function readAttribution(input: unknown, now = Date.now()): Attribution |
   const latest = latestRaw && hasCampaignSignal(latestRaw) ? latestRaw : undefined;
   if (first) clean.first = first;
   if (latest) clean.latest = latest;
+  const paidClick = readTouch(row.paidClick, now);
+  if (paidClick && CLICK_KEYS.some((key) => paidClick[key])) clean.paidClick = paidClick;
   const clickFrom = latest && CLICK_KEYS.some((key) => latest[key]) ? latest : first;
   for (const key of CLICK_KEYS) {
     const nested = pickClick(clickFrom, first, key);
     const flat = clickValue(row[key]);
-    const value = nested || flat;
+    const value = clean.paidClick ? clean.paidClick[key] : nested || flat;
     if (value) clean[key] = value;
   }
   if (!clean.first && (clean.gclid || clean.gbraid || clean.wbraid)) {

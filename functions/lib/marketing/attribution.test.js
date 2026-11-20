@@ -55,3 +55,15 @@ const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: 
     node_assert_1.strict.equal(dirty.latest && dirty.latest.landingPath, undefined);
     node_assert_1.strict.equal(dirty.latest && dirty.latest.referrerHost, undefined);
 });
+(0, node_test_1.test)('keeps the most recent paid click across a referral and a saved-record read', () => {
+    const result = (0, attribution_1.readAttribution)({
+        ...valid,
+        first: { capturedAt: now - 1000, gclid: 'older-click' },
+        latest: { capturedAt: now, referrerHost: 'example.org' },
+        paidClick: { capturedAt: now, wbraid: 'newer-click', utmCampaign: 'private@example.com' },
+    }, now);
+    node_assert_1.strict.equal(result.wbraid, 'newer-click');
+    node_assert_1.strict.equal(result.gclid, undefined);
+    node_assert_1.strict.equal(result.paidClick?.utmCampaign, undefined);
+    node_assert_1.strict.deepEqual((0, attribution_1.readAttribution)(result, now), result);
+});

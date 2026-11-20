@@ -114,11 +114,14 @@ function readAttribution(input, now = Date.now()) {
         clean.first = first;
     if (latest)
         clean.latest = latest;
+    const paidClick = readTouch(row.paidClick, now);
+    if (paidClick && CLICK_KEYS.some((key) => paidClick[key]))
+        clean.paidClick = paidClick;
     const clickFrom = latest && CLICK_KEYS.some((key) => latest[key]) ? latest : first;
     for (const key of CLICK_KEYS) {
         const nested = pickClick(clickFrom, first, key);
         const flat = clickValue(row[key]);
-        const value = nested || flat;
+        const value = clean.paidClick ? clean.paidClick[key] : nested || flat;
         if (value)
             clean[key] = value;
     }
