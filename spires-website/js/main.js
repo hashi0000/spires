@@ -79,13 +79,21 @@ function initDesktopNav() {
       item._navTimer = window.setTimeout(() => scheduleClose(item), 120);
     });
     item.addEventListener('focusout', (event) => {
-      if (!item.contains(event.relatedTarget)) finishClose(item);
+      if (event.relatedTarget && item.contains(event.relatedTarget)) return;
+      // Defer until after focus has settled; a single rAF can still see
+      // document.body when focus is moving into the panel or summary.
+      window.setTimeout(() => {
+        if (!item.contains(document.activeElement)) finishClose(item);
+      }, 0);
     });
     if (summary) {
       summary.addEventListener('click', (event) => {
-        if (!desktop() || !item.open) return;
+        if (!desktop()) return;
+        // Own open/close on desktop so the native details toggle cannot
+        // race this handler (open becomes true before click runs).
         event.preventDefault();
-        scheduleClose(item);
+        if (item.open) scheduleClose(item);
+        else openItem(item);
       });
       summary.addEventListener('keydown', (event) => {
         if (event.key === 'ArrowDown' && panel) {
