@@ -38,6 +38,38 @@
     return chosen ? chosen.value : "";
   }
 
+  function leadRouteCategory() {
+    var path = String(window.location.pathname || "").toLowerCase();
+    var pickup = String((form.elements.pickup && form.elements.pickup.value) || "").toLowerCase();
+    var destination = String((form.elements.destination && form.elements.destination.value) || "").toLowerCase();
+    var text = path + " " + pickup + " " + destination;
+    if (/heathrow|\blhr\b|8-seater|8_seater/.test(text)) return "heathrow";
+    if (/gatwick|\blgw\b/.test(text)) return "gatwick";
+    if (/stansted|\bstn\b/.test(text)) return "stansted";
+    if (/luton|\bltn\b/.test(text)) return "luton";
+    if (/birmingham|\bbhx\b/.test(text)) return "birmingham";
+    if (/london city|\blcy\b/.test(text)) return "london_city";
+    if (/bristol|\bbrs\b/.test(text)) return "bristol";
+    if (/cotswolds?/.test(text)) return "cotswolds";
+    if (/airport|terminal/.test(text)) return "other_airport";
+    return "other";
+  }
+
+  function leadExtras() {
+    var vehicle = selectedVehicle();
+    var extras = {
+      vehicle_type: vehicle === "standard" || vehicle === "8_seater" || vehicle === "executive" ? vehicle : undefined,
+      journey_type: journey && journey.value === "return" ? "return" : "one_way",
+      route_category: leadRouteCategory(),
+      landing_page: String(window.location.pathname || "").slice(0, 120)
+    };
+    if (vehicle === "executive") {
+      extras.service_type = "executive";
+      extras.airport = "heathrow";
+    }
+    return extras;
+  }
+
   function syncPassengers() {
     if (!passengers) return;
     var type = selectedVehicle();
@@ -408,7 +440,7 @@
               response.body.bookingNumber,
               "website",
               "quote",
-              selectedVehicle() === "executive" ? { service_type: "executive", airport: "heathrow" } : null
+              leadExtras()
             );
           } catch (_) { /* Saved requests must still show success. */ }
         }

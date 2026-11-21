@@ -1,3 +1,5 @@
+import { applyMeasurementContext, type MeasurementContext } from './measurementContext';
+
 export type MarketingTouch = {
   capturedAt: number;
   gclid?: string;
@@ -128,12 +130,33 @@ export function readAttribution(input: unknown, now = Date.now()): Attribution |
   return clean.clientId || clean.gclid || clean.gbraid || clean.wbraid || clean.first || clean.latest ? clean : null;
 }
 
-export function confirmationPayload(bookingId: string, attribution: Attribution, at: number, sentAt = at) {
+export function confirmationPayload(
+  bookingId: string,
+  attribution: Attribution,
+  at: number,
+  sentAt = at,
+  context?: MeasurementContext | null,
+) {
   if (!attribution.clientId || attribution.expiresAt <= at) return null;
-  const params: Record<string, unknown> = { event_id: `booking_confirmed_${bookingId}`, engagement_time_msec: 1, booking_channel: 'online' };
+  let params: Record<string, unknown> = {
+    event_id: `booking_confirmed_${bookingId}`,
+    engagement_time_msec: 1,
+    booking_channel: 'online',
+  };
   // Session attributes are only requested inside Google's 24 hour window, and the confirmation time is not moved earlier.
-  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
+  if (
+    attribution.sessionId &&
+    attribution.sessionCapturedAt &&
+    at >= attribution.sessionCapturedAt &&
+    sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS
+  ) {
     params.session_id = Number(attribution.sessionId);
   }
-  return { client_id: attribution.clientId, timestamp_micros: at * 1000, consent: { ad_user_data: 'GRANTED', ad_personalization: 'DENIED' }, events: [{ name: 'booking_confirmed', params }] };
+  params = applyMeasurementContext(params, context);
+  return {
+    client_id: attribution.clientId,
+    timestamp_micros: at * 1000,
+    consent: { ad_user_data: 'GRANTED', ad_personalization: 'DENIED' },
+    events: [{ name: 'booking_confirmed', params }],
+  };
 }

@@ -185,3 +185,21 @@ test('lead events retain validated campaign parameters on the submission page', 
  assert.equal(url.searchParams.get('utm_source'),'google');
  assert.equal(url.searchParams.has('email'),false);
 });
+
+test('lead events accept vehicle and route parameters without personal data', () => {
+ const b=browser('www.spires-taxis.com','granted');
+ b.win.SpiresMeasurement.lead('eight-seater-lead','website','quote',{
+  vehicle_type:'8_seater',
+  route_category:'heathrow',
+  journey_type:'return',
+  landing_page:'/heathrow-to-oxford-8-seater',
+  email:'private@example.com'
+ });
+ const lead=b.win.dataLayer.find(row=>row[1]==='generate_lead')[2];
+ assert.equal(lead.vehicle_type,'8_seater');
+ assert.equal(lead.route_category,'heathrow');
+ assert.equal(lead.journey_type,'return');
+ assert.equal(lead.landing_page,'/heathrow-to-oxford-8-seater');
+ assert.equal(lead.lead_type,'quote');
+ assert.equal('email' in lead,false);
+});

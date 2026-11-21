@@ -1,5 +1,6 @@
 import { paymentPosition } from '../quotes/fareMath';
 import { MEASUREMENT_MAX_AGE_MS, SESSION_JOIN_MS, type Attribution } from './attribution';
+import { applyMeasurementContext, type MeasurementContext } from './measurementContext';
 
 export type PaymentMethod = 'card' | 'cash' | 'bank';
 export type PaymentKind = 'deposit' | 'balance' | 'full';
@@ -67,11 +68,18 @@ export function paymentChange(before: BookingRow, after: BookingRow): PaymentMea
   };
 }
 
-export function paymentPayload(bookingId: string, attribution: Attribution, change: PaymentMeasurement, at: number, sentAt = at) {
+export function paymentPayload(
+  bookingId: string,
+  attribution: Attribution,
+  change: PaymentMeasurement,
+  at: number,
+  sentAt = at,
+  context?: MeasurementContext | null,
+) {
   if (!attribution.clientId || attribution.expiresAt <= at) return null;
   if (change.deltaPence <= 0 || change.deltaPence > 1_000_000_00) return null;
   const transactionId = `${change.direction === 'purchase' ? 'pay' : 'refund'}_${bookingId}_${change.entryId}`.slice(0, 100);
-  const params: Record<string, unknown> = {
+  let params: Record<string, unknown> = {
     transaction_id: transactionId,
     value: change.deltaPence / 100,
     currency: 'GBP',
@@ -80,9 +88,15 @@ export function paymentPayload(bookingId: string, attribution: Attribution, chan
     engagement_time_msec: 1,
   };
   if (change.method) params.payment_method = change.method;
-  if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS) {
+  if (
+    attribution.sessionId &&
+    attribution.sessionCapturedAt &&
+    at >= attribution.sessionCapturedAt &&
+    sentAt - attribution.sessionCapturedAt < SESSION_JOIN_MS
+  ) {
     params.session_id = Number(attribution.sessionId);
   }
+  params = applyMeasurementContext(params, context);
   return {
     client_id: attribution.clientId,
     timestamp_micros: at * 1000,

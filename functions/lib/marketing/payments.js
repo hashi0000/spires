@@ -11,6 +11,7 @@ exports.deliveryOutcome = deliveryOutcome;
 exports.eligibleToSend = eligibleToSend;
 const fareMath_1 = require("../quotes/fareMath");
 const attribution_1 = require("./attribution");
+const measurementContext_1 = require("./measurementContext");
 function farePence(booking) {
     const quote = booking.issuedQuote && typeof booking.issuedQuote === 'object' ? booking.issuedQuote : null;
     if (quote && Number.isFinite(Number(quote.finalFarePence)))
@@ -63,13 +64,13 @@ function paymentChange(before, after) {
         receivedAfterPence: received,
     };
 }
-function paymentPayload(bookingId, attribution, change, at, sentAt = at) {
+function paymentPayload(bookingId, attribution, change, at, sentAt = at, context) {
     if (!attribution.clientId || attribution.expiresAt <= at)
         return null;
     if (change.deltaPence <= 0 || change.deltaPence > 100000000)
         return null;
     const transactionId = `${change.direction === 'purchase' ? 'pay' : 'refund'}_${bookingId}_${change.entryId}`.slice(0, 100);
-    const params = {
+    let params = {
         transaction_id: transactionId,
         value: change.deltaPence / 100,
         currency: 'GBP',
@@ -79,9 +80,13 @@ function paymentPayload(bookingId, attribution, change, at, sentAt = at) {
     };
     if (change.method)
         params.payment_method = change.method;
-    if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < attribution_1.SESSION_JOIN_MS) {
+    if (attribution.sessionId &&
+        attribution.sessionCapturedAt &&
+        at >= attribution.sessionCapturedAt &&
+        sentAt - attribution.sessionCapturedAt < attribution_1.SESSION_JOIN_MS) {
         params.session_id = Number(attribution.sessionId);
     }
+    params = (0, measurementContext_1.applyMeasurementContext)(params, context);
     return {
         client_id: attribution.clientId,
         timestamp_micros: at * 1000,

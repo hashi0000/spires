@@ -43,6 +43,7 @@ const attribution_1 = require("./attribution");
 const payments_1 = require("./payments");
 const eventTime_1 = require("./eventTime");
 const consent_1 = require("./consent");
+const measurementContext_1 = require("./measurementContext");
 const apiSecret = (0, params_1.defineSecret)('SPIRES_GA4_API_SECRET');
 const MEASUREMENT_ID = 'G-RSE4NNBP64';
 const db = () => admin.firestore();
@@ -72,7 +73,8 @@ exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).fir
     if ((0, quoteWorkflow_1.isWorkflowConfirmed)(after) && !(change.before.exists && (0, quoteWorkflow_1.isWorkflowConfirmed)(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
         const attribution = (0, attribution_1.readAttribution)(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
         if (attribution && attribution.expiresAt > at) {
-            await createOnce(bookingId, { bookingId, event: 'booking_confirmed', attribution, occurredAt: at });
+            const measurementContext = (0, measurementContext_1.measurementContextFromBooking)(after, attribution);
+            await createOnce(bookingId, { bookingId, event: 'booking_confirmed', attribution, context: measurementContext, occurredAt: at });
         }
     }
     const changeInPayment = (0, payments_1.paymentChange)(before, after);
@@ -84,10 +86,12 @@ exports.queueBookingMeasurement = functions.runWith({ failurePolicy: true }).fir
     if (!['website', 'customer_app'].includes(String(after.source)) || after.createdByFunction !== true)
         return;
     const id = `${changeInPayment.direction}_${bookingId}_${changeInPayment.entryId}`;
+    const measurementContext = (0, measurementContext_1.measurementContextFromBooking)(after, attribution);
     await createOnce(id, {
         bookingId,
         event: changeInPayment.direction,
         attribution,
+        context: measurementContext,
         occurredAt: writeAt,
         valuePence: changeInPayment.deltaPence,
         currency: 'GBP',
@@ -109,18 +113,22 @@ function payloadFor(row) {
     const attribution = row.attribution;
     if (!attribution || typeof attribution !== 'object')
         return null;
-    if (row.event === 'booking_confirmed')
-        return (0, attribution_1.confirmationPayload)(String(row.bookingId), attribution, Number(row.occurredAt), Date.now());
+    const context = (row.context || null);
+    if (row.event === 'booking_confirmed') {
+        return (0, attribution_1.confirmationPayload)(String(row.bookingId), attribution, Number(row.occurredAt), Date.now(), context);
+    }
     const change = {
         direction: row.event === 'refund' ? 'refund' : 'purchase',
         deltaPence: Number(row.valuePence) || 0,
         entryId: String(row.entryId || row.bookingId),
         kind: row.paymentKind === 'deposit' || row.paymentKind === 'full' ? row.paymentKind : 'balance',
-        method: row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'bank' ? row.paymentMethod : undefined,
+        method: row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'bank'
+            ? row.paymentMethod
+            : undefined,
         farePence: 0,
         receivedAfterPence: Number(row.receivedAfterPence) || 0,
     };
-    return (0, payments_1.paymentPayload)(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now());
+    return (0, payments_1.paymentPayload)(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now(), context);
 }
 /** Scheduled delivery stays off until marketingConfig/ga4.enabled is set after a real debug validation. */
 exports.deliverBookingMeasurements = functions.runWith({ secrets: [apiSecret], timeoutSeconds: 120 }).pubsub.schedule('every 15 minutes').onRun(async () => {

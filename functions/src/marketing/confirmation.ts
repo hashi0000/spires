@@ -7,6 +7,7 @@ import { confirmationPayload, readAttribution, type Attribution } from './attrib
 import { deliveryOutcome, eligibleToSend, interpretValidation, paymentChange, paymentPayload, type PaymentMeasurement } from './payments';
 import { measurementEventTime } from './eventTime';
 import { measurementWithdrawn } from './consent';
+import { measurementContextFromBooking, type MeasurementContext } from './measurementContext';
 
 const apiSecret = defineSecret('SPIRES_GA4_API_SECRET');
 const MEASUREMENT_ID = 'G-RSE4NNBP64';
@@ -37,7 +38,8 @@ export const queueBookingMeasurement = functions.runWith({ failurePolicy: true }
   if (isWorkflowConfirmed(after) && !(change.before.exists && isWorkflowConfirmed(before)) && after.createdByFunction === true && ['website', 'customer_app'].includes(String(after.source))) {
     const attribution = readAttribution(after.marketingAttribution, Number(after.marketingAttribution?.consentAt) || at);
     if (attribution && attribution.expiresAt > at) {
-      await createOnce(bookingId, { bookingId, event: 'booking_confirmed', attribution, occurredAt: at });
+      const measurementContext = measurementContextFromBooking(after as Record<string, unknown>, attribution);
+      await createOnce(bookingId, { bookingId, event: 'booking_confirmed', attribution, context: measurementContext, occurredAt: at });
     }
   }
   const changeInPayment = paymentChange(before, after);
@@ -46,10 +48,12 @@ export const queueBookingMeasurement = functions.runWith({ failurePolicy: true }
   if (!attribution?.clientId || attribution.expiresAt <= at) return;
   if (!['website', 'customer_app'].includes(String(after.source)) || after.createdByFunction !== true) return;
   const id = `${changeInPayment.direction}_${bookingId}_${changeInPayment.entryId}`;
+  const measurementContext = measurementContextFromBooking(after as Record<string, unknown>, attribution);
   await createOnce(id, {
     bookingId,
     event: changeInPayment.direction,
     attribution,
+    context: measurementContext,
     occurredAt: writeAt,
     valuePence: changeInPayment.deltaPence,
     currency: 'GBP',
@@ -71,18 +75,24 @@ async function postMeasurement(secret: string, path: 'debug/mp/collect' | 'mp/co
 
 function payloadFor(row: FirebaseFirestore.DocumentData) {
   const attribution = row.attribution as Attribution;
-  if(!attribution || typeof attribution!=='object')return null;
-  if (row.event === 'booking_confirmed') return confirmationPayload(String(row.bookingId), attribution, Number(row.occurredAt), Date.now());
+  if (!attribution || typeof attribution !== 'object') return null;
+  const context = (row.context || null) as MeasurementContext | null;
+  if (row.event === 'booking_confirmed') {
+    return confirmationPayload(String(row.bookingId), attribution, Number(row.occurredAt), Date.now(), context);
+  }
   const change: PaymentMeasurement = {
     direction: row.event === 'refund' ? 'refund' : 'purchase',
     deltaPence: Number(row.valuePence) || 0,
     entryId: String(row.entryId || row.bookingId),
     kind: row.paymentKind === 'deposit' || row.paymentKind === 'full' ? row.paymentKind : 'balance',
-    method: row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'bank' ? row.paymentMethod : undefined,
+    method:
+      row.paymentMethod === 'card' || row.paymentMethod === 'cash' || row.paymentMethod === 'bank'
+        ? row.paymentMethod
+        : undefined,
     farePence: 0,
     receivedAfterPence: Number(row.receivedAfterPence) || 0,
   };
-  return paymentPayload(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now());
+  return paymentPayload(String(row.bookingId), attribution, change, Number(row.occurredAt), Date.now(), context);
 }
 
 /** Scheduled delivery stays off until marketingConfig/ga4.enabled is set after a real debug validation. */
