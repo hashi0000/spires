@@ -25,6 +25,24 @@ test('confirmed payload has no invented monetary value or customer data', () => 
   assert.equal('value' in payload.events[0].params, false);
   assert.equal(payload.client_id, '123.456');
 });
+
+test('confirmed payload can include non-PII vehicle and campaign context', () => {
+  const payload = confirmationPayload('booking123', valid as any, now, now, {
+    vehicle_type: '8_seater',
+    route_category: 'heathrow',
+    journey_type: 'return',
+    booking_source: 'verified_ads',
+    campaign_source: 'google',
+    campaign_medium: 'cpc',
+    landing_page: '/heathrow-to-oxford-8-seater',
+  })!;
+  assert.equal(payload.events[0].params.vehicle_type, '8_seater');
+  assert.equal(payload.events[0].params.route_category, 'heathrow');
+  assert.equal(payload.events[0].params.booking_source, 'verified_ads');
+  assert.equal(payload.events[0].params.landing_page, '/heathrow-to-oxford-8-seater');
+  assert.equal(JSON.stringify(payload).includes('@'), false);
+});
+
 test('does not pretend a late booking confirmation belongs to an old session', () => {
   const payload = confirmationPayload('booking123', {...valid, expiresAt:now+5*86400000} as any, now+2*86400000)!;
   assert.equal('session_id' in payload.events[0].params, false);

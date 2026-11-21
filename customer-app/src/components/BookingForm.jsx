@@ -512,7 +512,16 @@ export default function BookingForm({ onClose, onBookingCreated }) {
         termsVersion: TERMS_VERSION,
       });
 
-      try { recordPortalLead(window.SpiresMeasurement, result.data); } catch (_) { /* Measurement must not interrupt a saved booking. */ }
+      try {
+        recordPortalLead(window.SpiresMeasurement, result.data, {
+          vehicleType: formData.vehicleType,
+          journeyType: formData.journeyType || (isReturn ? "return" : "one_way"),
+          pickupLocation: formData.pickupLocation,
+          destination: formData.destination,
+          returnPickupLocation: formData.returnPickupLocation,
+          returnDestination: formData.returnDestination,
+        });
+      } catch (_) { /* Measurement must not interrupt a saved booking. */ }
       submissionId.current = null;
       onBookingCreated();
     } catch (err) {

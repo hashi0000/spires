@@ -202,6 +202,11 @@
     if (!extra || typeof extra !== 'object') return out;
     if (extra.service_type === 'executive') out.service_type = 'executive';
     if (extra.airport === 'heathrow') out.airport = 'heathrow';
+    if (extra.vehicle_type === 'standard' || extra.vehicle_type === '8_seater' || extra.vehicle_type === 'executive') out.vehicle_type = extra.vehicle_type;
+    if (extra.journey_type === 'one_way' || extra.journey_type === 'return' || extra.journey_type === 'cotswolds') out.journey_type = extra.journey_type;
+    if (typeof extra.route_category === 'string' && /^[a-z0-9_]{1,40}$/.test(extra.route_category)) out.route_category = extra.route_category;
+    if (extra.booking_source === 'verified_ads' || extra.booking_source === 'likely_ads' || extra.booking_source === 'other') out.booking_source = extra.booking_source;
+    if (typeof extra.landing_page === 'string' && /^\/[a-z0-9/_-]{0,120}$/i.test(extra.landing_page)) out.landing_page = extra.landing_page;
     return out;
   }
   function lead(key, channel, type, extra) {
@@ -215,8 +220,9 @@
     try { w.sessionStorage.setItem(storageKey, '1'); } catch (_) {}
     var params = { lead_channel: channel === 'portal' ? 'portal' : 'website', lead_type: kind, transport_type: 'beacon', page_location: safeLocation() };
     var more = safeExtra(extra);
-    if (more.service_type) params.service_type = more.service_type;
-    if (more.airport) params.airport = more.airport;
+    ['service_type', 'airport', 'vehicle_type', 'journey_type', 'route_category', 'booking_source', 'landing_page'].forEach(function (key) {
+      if (more[key]) params[key] = more[key];
+    });
     w.gtag('event', 'generate_lead', params);
   }
   function engagement(name, extra) {

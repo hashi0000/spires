@@ -7,6 +7,7 @@ exports.cleanReferrerHost = cleanReferrerHost;
 exports.hasCampaignSignal = hasCampaignSignal;
 exports.readAttribution = readAttribution;
 exports.confirmationPayload = confirmationPayload;
+const measurementContext_1 = require("./measurementContext");
 const CLICK_KEYS = ['gclid', 'gbraid', 'wbraid'];
 const UTM_KEYS = ['utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm'];
 const DAY = 86400000;
@@ -134,13 +135,26 @@ function readAttribution(input, now = Date.now()) {
     }
     return clean.clientId || clean.gclid || clean.gbraid || clean.wbraid || clean.first || clean.latest ? clean : null;
 }
-function confirmationPayload(bookingId, attribution, at, sentAt = at) {
+function confirmationPayload(bookingId, attribution, at, sentAt = at, context) {
     if (!attribution.clientId || attribution.expiresAt <= at)
         return null;
-    const params = { event_id: `booking_confirmed_${bookingId}`, engagement_time_msec: 1, booking_channel: 'online' };
+    let params = {
+        event_id: `booking_confirmed_${bookingId}`,
+        engagement_time_msec: 1,
+        booking_channel: 'online',
+    };
     // Session attributes are only requested inside Google's 24 hour window, and the confirmation time is not moved earlier.
-    if (attribution.sessionId && attribution.sessionCapturedAt && at >= attribution.sessionCapturedAt && sentAt - attribution.sessionCapturedAt < exports.SESSION_JOIN_MS) {
+    if (attribution.sessionId &&
+        attribution.sessionCapturedAt &&
+        at >= attribution.sessionCapturedAt &&
+        sentAt - attribution.sessionCapturedAt < exports.SESSION_JOIN_MS) {
         params.session_id = Number(attribution.sessionId);
     }
-    return { client_id: attribution.clientId, timestamp_micros: at * 1000, consent: { ad_user_data: 'GRANTED', ad_personalization: 'DENIED' }, events: [{ name: 'booking_confirmed', params }] };
+    params = (0, measurementContext_1.applyMeasurementContext)(params, context);
+    return {
+        client_id: attribution.clientId,
+        timestamp_micros: at * 1000,
+        consent: { ad_user_data: 'GRANTED', ad_personalization: 'DENIED' },
+        events: [{ name: 'booking_confirmed', params }],
+    };
 }

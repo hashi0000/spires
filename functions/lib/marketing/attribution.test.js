@@ -30,6 +30,22 @@ const valid = { consent: 'granted', consentAt: now, capturedAt: now, expiresAt: 
     node_assert_1.strict.equal('value' in payload.events[0].params, false);
     node_assert_1.strict.equal(payload.client_id, '123.456');
 });
+(0, node_test_1.test)('confirmed payload can include non-PII vehicle and campaign context', () => {
+    const payload = (0, attribution_1.confirmationPayload)('booking123', valid, now, now, {
+        vehicle_type: '8_seater',
+        route_category: 'heathrow',
+        journey_type: 'return',
+        booking_source: 'verified_ads',
+        campaign_source: 'google',
+        campaign_medium: 'cpc',
+        landing_page: '/heathrow-to-oxford-8-seater',
+    });
+    node_assert_1.strict.equal(payload.events[0].params.vehicle_type, '8_seater');
+    node_assert_1.strict.equal(payload.events[0].params.route_category, 'heathrow');
+    node_assert_1.strict.equal(payload.events[0].params.booking_source, 'verified_ads');
+    node_assert_1.strict.equal(payload.events[0].params.landing_page, '/heathrow-to-oxford-8-seater');
+    node_assert_1.strict.equal(JSON.stringify(payload).includes('@'), false);
+});
 (0, node_test_1.test)('does not pretend a late booking confirmation belongs to an old session', () => {
     const payload = (0, attribution_1.confirmationPayload)('booking123', { ...valid, expiresAt: now + 5 * 86400000 }, now + 2 * 86400000);
     node_assert_1.strict.equal('session_id' in payload.events[0].params, false);
