@@ -9,6 +9,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
   Timestamp,
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -277,8 +278,14 @@ export const useBookings = () => {
   const updateBooking = async (id: string, bookingData: any) => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'bookings', id), bookingData);
-      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...bookingData } : b));
+      const payload = { ...(bookingData || {}) };
+      // Staff booking rules require revision = previous + 1 on every update.
+      if (!Number.isInteger(Number(payload.revision)) || Number(payload.revision) < 1) {
+        const snap = await getDoc(doc(db, 'bookings', id));
+        payload.revision = Number(snap.data()?.revision || 0) + 1;
+      }
+      await updateDoc(doc(db, 'bookings', id), payload);
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...payload } : b));
     } catch (error) {
       console.error('Error updating booking:', error);
       throw error;
