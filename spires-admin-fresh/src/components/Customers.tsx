@@ -246,7 +246,12 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
       setSelectedIds([]);
       setSelected(null);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Merge failed');
+      const message = err instanceof Error ? err.message : 'Merge failed';
+      window.alert(
+        /permission|insufficient/i.test(message)
+          ? 'Merge failed: missing or insufficient permissions. Refresh the page and try again. If it still fails, the booking record may have changed — open the booking and save once, then retry the merge.'
+          : message
+      );
     } finally {
       setMergeBusy(false);
     }

@@ -13,6 +13,8 @@ export function buildBulkContactPatch(
   const patch: Record<string, unknown> = {
     hirerName: name,
     hirerPhone: phone,
+    // Staff booking updates must bump revision or Firestore rules deny the write.
+    revision: Number((booking as { revision?: number }).revision || 0) + 1,
   };
   const em = email.trim().toLowerCase();
   if (em.includes('@')) {
