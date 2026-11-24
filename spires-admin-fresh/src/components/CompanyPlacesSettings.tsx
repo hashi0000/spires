@@ -121,111 +121,111 @@ const CompanyPlacesSettings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <div className="places-board">
+      <div className="places-board__header">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Company places</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Shared pickup labels, aliases and meeting instructions for booking forms and driver cards.
-          </p>
+          <h2>Company places</h2>
+          <p>Shared pickup labels, aliases and meeting instructions for booking forms and driver cards.</p>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <button type="button" className="btn" disabled={busy} onClick={() => void onSeed()}>
+        <div className="places-board__actions">
+          <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void onSeed()}>
             Seed Oxford places if empty
           </button>
-          <button type="button" className="btn-primary" onClick={startNew}>
+          <button type="button" className="btn btn-primary btn-sm" onClick={startNew}>
             Add place
           </button>
         </div>
       </div>
 
-      {message ? <p className="text-sm text-gray-700" role="status">{message}</p> : null}
-      {error ? <p className="text-sm text-red-700" role="alert">{error}</p> : null}
+      {message ? <p className="places-status" role="status">{message}</p> : null}
+      {error ? <p className="places-status is-error" role="alert">{error}</p> : null}
 
       {editing ? (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-          <h3 className="text-base font-semibold text-gray-900">{editing.id ? 'Edit place' : 'New place'}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="text-sm text-gray-700">
+        <div className="places-editor">
+          <h3>{editing.id ? 'Edit place' : 'New place'}</h3>
+          <div className="places-editor__grid">
+            <label>
               Name
               <input
                 type="text"
-                className="form-input mt-1 w-full"
+                className="form-input"
                 value={editing.label}
                 onChange={(e) => setEditing({ ...editing, label: e.target.value })}
               />
             </label>
-            <label className="text-sm text-gray-700">
+            <label>
               Postcode
               <input
                 type="text"
-                className="form-input mt-1 w-full"
+                className="form-input"
                 value={editing.postcode}
                 onChange={(e) => setEditing({ ...editing, postcode: e.target.value })}
               />
             </label>
-            <label className="text-sm text-gray-700 md:col-span-2">
+            <label className="is-wide">
               Address
               <input
                 type="text"
-                className="form-input mt-1 w-full"
+                className="form-input"
                 value={editing.address}
                 onChange={(e) => setEditing({ ...editing, address: e.target.value })}
               />
             </label>
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Aliases (comma separated)
+            <label className="is-wide">
+              Aliases, comma separated
               <input
                 type="text"
-                className="form-input mt-1 w-full"
+                className="form-input"
                 value={aliasesText}
                 onChange={(e) => setAliasesText(e.target.value)}
                 placeholder="Randolph, The Randolph"
               />
             </label>
-            <label className="text-sm text-gray-700 md:col-span-2">
+            <label className="is-wide">
               Meeting instructions
               <textarea
-                className="form-input mt-1 w-full"
+                className="form-input"
                 rows={2}
                 value={editing.meetingInstructions || ''}
                 onChange={(e) => setEditing({ ...editing, meetingInstructions: e.target.value })}
               />
             </label>
           </div>
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => void onSave()}>
+          <div className="places-editor__actions">
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void onSave()}>
               Save place
             </button>
-            <button type="button" className="btn" onClick={() => setEditing(null)}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>
               Cancel
             </button>
           </div>
         </div>
       ) : null}
 
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+      <div className="places-list">
         {loading ? (
-          <p className="text-sm text-gray-600 px-4 py-6">Loading places…</p>
+          <p className="places-list__empty">Loading places…</p>
         ) : places.length === 0 ? (
-          <p className="text-sm text-gray-600 px-4 py-6">No company places yet. Seed Oxford places or add one.</p>
+          <p className="places-list__empty">No company places yet. Seed Oxford places or add one.</p>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="places-rows">
             {places.map((place) => (
-              <li key={place.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{companyPlaceSuggestionLabel(place)}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">{place.address || '—'}</p>
+              <li key={place.id} className="places-row">
+                <div className="places-row__main">
+                  <p className="places-row__title">{companyPlaceSuggestionLabel(place)}</p>
+                  <p className="places-row__line">{place.address || '—'}</p>
                   {place.meetingInstructions ? (
-                    <p className="text-xs text-gray-500 mt-0.5">{place.meetingInstructions}</p>
+                    <p className="places-row__meta">{place.meetingInstructions}</p>
                   ) : null}
                   {place.aliases.length > 0 ? (
-                    <p className="text-xs text-gray-400 mt-0.5">Aliases: {place.aliases.join(', ')}</p>
+                    <p className="places-row__meta">Aliases: {place.aliases.join(', ')}</p>
                   ) : null}
                 </div>
-                <button type="button" className="text-sm text-indigo-700" onClick={() => startEdit(place)}>
-                  Edit
-                </button>
+                <div className="places-row__action">
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => startEdit(place)}>
+                    Edit
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
