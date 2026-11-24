@@ -1182,7 +1182,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
           {editingBooking && !['completed', 'cancelled'].includes(String(formData.status || '')) ? (
             <div className="booking-header-complete">
               <CompleteJobActions
-                booking={{ ...formData, id: editingBooking.id, revision: editingBooking.revision, paymentEntries: editingBooking.paymentEntries || formData.paymentEntries } as any}
+                booking={{ ...formData, id: editingBooking.id, revision: editingBooking.revision, paymentEntries: (editingBooking as any).paymentEntries || (formData as any).paymentEntries } as any}
                 leg={hasTimedReturn(formData as any) && String(formData.outboundStatus || '') === 'completed' ? 'return' : 'outbound'}
                 onDone={(text) => window.alert(text)}
               />
