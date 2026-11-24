@@ -58,8 +58,8 @@ test("shows Today sections and marketing inside reports snapshot for an admin", 
   expect(screen.getByRole("heading", { name: "Unassigned" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Exceptions" })).toBeTruthy();
   expect(screen.getByText("Desktop reminders")).toBeTruthy();
-  expect(screen.getByText("Reports snapshot")).toBeTruthy();
-  fireEvent.click(screen.getByText("Reports snapshot"));
+  expect(screen.getByText("Reports")).toBeTruthy();
+  fireEvent.click(screen.getByText("Reports"));
   expect(screen.getByRole("heading", { name: "Marketing performance" })).toBeTruthy();
   expect(screen.getByText("Booking frequency")).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Before and after advertising" })).toBeTruthy();
@@ -83,7 +83,7 @@ test("leaves marketing performance hidden when the account is not an admin", () 
   expect(screen.getByRole("heading", { name: "Today" })).toBeTruthy();
   expect(screen.getByRole("heading", { name: "Today's jobs" })).toBeTruthy();
   expect(screen.getByText("Desktop reminders")).toBeTruthy();
-  fireEvent.click(screen.getByText("Reports snapshot"));
+  fireEvent.click(screen.getByText("Reports"));
   expect(screen.queryByRole("heading", { name: "Marketing performance" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "Before and after advertising" })).toBeNull();
 });
@@ -105,12 +105,12 @@ test("keeps the pending review alert and the fuel price note in reports snapshot
       onDesktopRemindersChange={() => undefined}
     />
   );
-  expect(screen.getByRole("heading", { name: "2 New Customer Bookings Pending Review" })).toBeTruthy();
-  expect(screen.getByText(/Go to the Bookings page to review and confirm customer bookings with pricing/)).toBeTruthy();
-  fireEvent.click(screen.getByText("Reports snapshot"));
+  expect(screen.getByRole("heading", { name: "2 new customer requests to review" })).toBeTruthy();
+  expect(screen.getByText(/Open Bookings to quote or confirm/)).toBeTruthy();
+  fireEvent.click(screen.getByText("Reports"));
   expect(await screen.findByRole("heading", { name: "UK average fuel prices" })).toBeTruthy();
   expect(screen.getByText(/Petrol 134.5p\/L/)).toBeTruthy();
-  expect(screen.getByText(/informational only, not linked to fares/)).toBeTruthy();
+  expect(screen.getByText(/Informational only, not linked to fares/)).toBeTruthy();
 });
 
 test("shows before and after performance once an administrator confirms the start date", () => {
@@ -132,7 +132,7 @@ test("shows before and after performance once an administrator confirms the star
       advertisingStartConfirmed
     />
   );
-  fireEvent.click(screen.getByText("Reports snapshot"));
+  fireEvent.click(screen.getByText("Reports"));
   expect(screen.getByRole("heading", { name: "Before" })).toBeTruthy();
   expect(screen.getByText(/Before ads:/)).toBeTruthy();
   expect(screen.getByText(/After ads:/)).toBeTruthy();

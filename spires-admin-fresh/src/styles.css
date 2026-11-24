@@ -2377,3 +2377,224 @@ header.admin-header,
 .booking-section-nav{gap:8px;margin-top:16px}
 .modal-header .booking-summary{margin:8px 0;font-size:.8125rem}
 @media(max-width:600px){.booking-setup{padding:16px}.modal-header{padding:18px}.modal-body{padding:16px}}
+
+/* ========= Today board ========== */
+.today-board {
+  display: grid;
+  gap: 1rem;
+}
+
+.today-board > h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+
+.today-section {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.today-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.9rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.today-section__head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+
+.today-section__count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.today-section__empty {
+  margin: 0;
+  padding: 0.85rem 0.9rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.today-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.today-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 1rem;
+  align-items: start;
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.today-rows .today-row:first-child {
+  border-top: 0;
+}
+
+.today-row__main {
+  min-width: 0;
+}
+
+.today-row__ref {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #002147;
+  cursor: pointer;
+  text-align: left;
+}
+
+.today-row__ref:hover {
+  color: #b8956a;
+  text-decoration: underline;
+}
+
+.today-row__ref-static {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0b1c3d;
+}
+
+.today-row__meta {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.today-row__route {
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+
+.today-row__note {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: #92400e;
+}
+
+.today-row__side {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.today-row__when {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #0b1c3d;
+  white-space: nowrap;
+}
+
+.today-row__action {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b8956a;
+}
+
+.today-alert {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  border-radius: 8px;
+  border-left: 4px solid #b8956a;
+  background: #fff8ef;
+}
+
+.today-alert h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #0b1c3d;
+}
+
+.today-alert p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: #5c6b7a;
+}
+
+.today-reminders {
+  padding: 0.75rem 0.9rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.today-reminders label {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: #334155;
+}
+
+.today-reminders strong {
+  color: #0b1c3d;
+}
+
+.today-reports {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.today-reports > summary {
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0b1c3d;
+  list-style: none;
+}
+
+.today-reports > summary::-webkit-details-marker {
+  display: none;
+}
+
+.today-reports[open] > summary {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.today-reports__body {
+  padding: 0.85rem 0.9rem 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .today-row {
+    grid-template-columns: 1fr;
+  }
+
+  .today-row__side {
+    text-align: left;
+  }
+
+  .today-row__when {
+    white-space: normal;
+  }
+}

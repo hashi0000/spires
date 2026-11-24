@@ -114,7 +114,9 @@ exports.onBookingWrite = functions.firestore
         after.paymentStatus === "paid" &&
         !after.paymentReceiptEmailSentAt &&
         (after.hirerEmail || after.email) &&
-        !(0, rules_1.skipsTaxisPaymentReceipt)(after)) {
+        !(0, rules_1.skipsTaxisPaymentReceipt)(after) &&
+        // Past journeys: office catch-up (driver, payment status) stays silent. Staff can still email a PDF manually.
+        !(0, quoteWorkflow_1.bookingPickupHasPassed)(after)) {
         const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
         const existingReceipt = await receiptRef.get();
         if (!existingReceipt.exists) {

@@ -348,9 +348,16 @@ const airportReturn = {
         strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), false);
         strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
         strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
-        // A genuine new confirmation still sends.
-        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "pending" }, { status: "confirmed", email: "test@example.com" }), true);
-        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)(null, { status: "confirmed", email: "test@example.com" }), true);
+        // A genuine new confirmation still sends when the journey is still ahead.
+        const future = "2099-06-01T12:00:00Z";
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "pending", pickupTime: future }, { status: "confirmed", email: "test@example.com", pickupTime: future }), true);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)(null, { status: "confirmed", email: "test@example.com", pickupTime: future }), true);
+    });
+    (0, node_test_1.it)("stays silent when confirming or updating a journey whose pickup has already passed", () => {
+        const past = "2020-01-15T10:00:00Z";
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "pending", pickupTime: past }, { status: "confirmed", email: "a@example.invalid", pickupTime: past }), false);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed", pickupTime: past }, { status: "confirmed", email: "a@example.invalid", pickupTime: past }), false);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)(null, { status: "confirmed", email: "a@example.invalid", pickupTime: past }), false);
     });
     (0, node_test_1.it)("allows the actual Shift4 payment host and rejects lookalikes", () => {
         const hosts = (0, paymentLink_1.paymentLinkAllowlist)();

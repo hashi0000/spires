@@ -401,9 +401,23 @@ describe("booking reliability regressions", () => {
     assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), false);
     assert.equal(shouldSendConfirmation({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
     assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
-    // A genuine new confirmation still sends.
-    assert.equal(shouldSendConfirmation({ status: "pending" }, { status: "confirmed", email: "test@example.com" }), true);
-    assert.equal(shouldSendConfirmation(null, { status: "confirmed", email: "test@example.com" }), true);
+    // A genuine new confirmation still sends when the journey is still ahead.
+    const future = "2099-06-01T12:00:00Z";
+    assert.equal(shouldSendConfirmation({ status: "pending", pickupTime: future }, { status: "confirmed", email: "test@example.com", pickupTime: future }), true);
+    assert.equal(shouldSendConfirmation(null, { status: "confirmed", email: "test@example.com", pickupTime: future }), true);
+  });
+
+  it("stays silent when confirming or updating a journey whose pickup has already passed", () => {
+    const past = "2020-01-15T10:00:00Z";
+    assert.equal(shouldSendConfirmation({ status: "pending", pickupTime: past }, { status: "confirmed", email: "a@example.invalid", pickupTime: past }), false);
+    assert.equal(
+      shouldSendConfirmation(
+        { status: "confirmed", pickupTime: past },
+        { status: "confirmed", email: "a@example.invalid", pickupTime: past }
+      ),
+      false
+    );
+    assert.equal(shouldSendConfirmation(null, { status: "confirmed", email: "a@example.invalid", pickupTime: past }), false);
   });
 
   it("allows the actual Shift4 payment host and rejects lookalikes", () => {

@@ -137,11 +137,49 @@ type ConfirmationBooking = BookingWorkflow & {
   confirmationEmailSentAt?: unknown;
   hirerEmail?: string | null;
   email?: string | null;
+  pickupTime?: unknown;
+  dateTime?: unknown;
 };
 
-export function shouldSendConfirmation(before: ConfirmationBooking | null, after: ConfirmationBooking): boolean {
+/** Earliest known outbound pickup instant, or null when missing/invalid. */
+export function bookingPickupMs(data: { pickupTime?: unknown; dateTime?: unknown }): number | null {
+  for (const key of ["pickupTime", "dateTime"] as const) {
+    const raw = data[key];
+    if (raw == null || raw === "") continue;
+    if (typeof (raw as { toDate?: () => Date }).toDate === "function") {
+      const ms = (raw as { toDate: () => Date }).toDate().getTime();
+      if (Number.isFinite(ms)) return ms;
+      continue;
+    }
+    if (typeof (raw as { toMillis?: () => number }).toMillis === "function") {
+      const ms = (raw as { toMillis: () => number }).toMillis();
+      if (Number.isFinite(ms)) return ms;
+      continue;
+    }
+    const ms = new Date(String(raw)).getTime();
+    if (Number.isFinite(ms)) return ms;
+  }
+  return null;
+}
+
+/** True when the journey pickup is already in the past (office catch-up must stay silent). */
+export function bookingPickupHasPassed(
+  data: { pickupTime?: unknown; dateTime?: unknown },
+  nowMs: number = Date.now()
+): boolean {
+  const pickupMs = bookingPickupMs(data);
+  return pickupMs != null && pickupMs < nowMs;
+}
+
+export function shouldSendConfirmation(
+  before: ConfirmationBooking | null,
+  after: ConfirmationBooking,
+  nowMs: number = Date.now()
+): boolean {
   if (effectiveWorkflowStatus(after) === "completed") return false;
   if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after)) return false;
+  // Catching up past journeys (assign driver, confirm late, fill contacts) must not email.
+  if (bookingPickupHasPassed(after, nowMs)) return false;
   // Only when the booking newly becomes confirmed. Contact merges and email corrections stay silent.
   if (!before) return true;
   return !isWorkflowConfirmed(before);

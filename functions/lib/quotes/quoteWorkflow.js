@@ -9,6 +9,8 @@ exports.paymentBuckets = paymentBuckets;
 exports.shouldMoveToConfirmedAfterPayment = shouldMoveToConfirmedAfterPayment;
 exports.effectiveWorkflowStatus = effectiveWorkflowStatus;
 exports.isWorkflowConfirmed = isWorkflowConfirmed;
+exports.bookingPickupMs = bookingPickupMs;
+exports.bookingPickupHasPassed = bookingPickupHasPassed;
 exports.shouldSendConfirmation = shouldSendConfirmation;
 exports.bookingMatchesStatusFilter = bookingMatchesStatusFilter;
 exports.workflowStatusLabel = workflowStatusLabel;
@@ -109,10 +111,42 @@ function effectiveWorkflowStatus(data) {
 function isWorkflowConfirmed(data) {
     return ["confirmed", "allocated", "completed"].includes(effectiveWorkflowStatus(data));
 }
-function shouldSendConfirmation(before, after) {
+/** Earliest known outbound pickup instant, or null when missing/invalid. */
+function bookingPickupMs(data) {
+    for (const key of ["pickupTime", "dateTime"]) {
+        const raw = data[key];
+        if (raw == null || raw === "")
+            continue;
+        if (typeof raw.toDate === "function") {
+            const ms = raw.toDate().getTime();
+            if (Number.isFinite(ms))
+                return ms;
+            continue;
+        }
+        if (typeof raw.toMillis === "function") {
+            const ms = raw.toMillis();
+            if (Number.isFinite(ms))
+                return ms;
+            continue;
+        }
+        const ms = new Date(String(raw)).getTime();
+        if (Number.isFinite(ms))
+            return ms;
+    }
+    return null;
+}
+/** True when the journey pickup is already in the past (office catch-up must stay silent). */
+function bookingPickupHasPassed(data, nowMs = Date.now()) {
+    const pickupMs = bookingPickupMs(data);
+    return pickupMs != null && pickupMs < nowMs;
+}
+function shouldSendConfirmation(before, after, nowMs = Date.now()) {
     if (effectiveWorkflowStatus(after) === "completed")
         return false;
     if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after))
+        return false;
+    // Catching up past journeys (assign driver, confirm late, fill contacts) must not email.
+    if (bookingPickupHasPassed(after, nowMs))
         return false;
     // Only when the booking newly becomes confirmed. Contact merges and email corrections stay silent.
     if (!before)

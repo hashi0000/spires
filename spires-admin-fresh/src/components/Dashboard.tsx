@@ -1,6 +1,6 @@
 // Dashboard.tsx — Today landing
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, Clock, Car } from 'lucide-react';
+import { Bell, Car } from 'lucide-react';
 import { Booking } from '../types/types';
 import {
   formatPickupDisplay,
@@ -90,26 +90,29 @@ function BookingRow({
   onOpenBooking?: (booking: Booking) => void;
 }) {
   const open = () => onOpenBooking?.(row.booking);
+  const name = String(row.booking.hirerName || '').trim();
   return (
-    <li className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-      <div className="min-w-0">
+    <li className="today-row">
+      <div className="today-row__main">
         {onOpenBooking ? (
-          <button type="button" className="text-sm font-medium text-indigo-700 hover:underline text-left" onClick={open}>
+          <button type="button" className="today-row__ref" onClick={open}>
             {row.booking.bookingNumber}
-            {row.legLabel ? <span className="text-gray-500 font-normal"> · {row.legLabel}</span> : null}
+            {row.legLabel ? <span className="today-row__meta"> · {row.legLabel}</span> : null}
+            {name ? <span className="today-row__meta"> · {name}</span> : null}
           </button>
         ) : (
-          <p className="text-sm font-medium text-gray-900">
+          <span className="today-row__ref-static">
             {row.booking.bookingNumber}
-            {row.legLabel ? <span className="text-gray-500 font-normal"> · {row.legLabel}</span> : null}
-          </p>
+            {row.legLabel ? <span className="today-row__meta"> · {row.legLabel}</span> : null}
+            {name ? <span className="today-row__meta"> · {name}</span> : null}
+          </span>
         )}
-        <p className="text-xs text-gray-600 mt-0.5">{row.route}</p>
-        {row.note ? <p className="text-xs text-amber-700 mt-0.5">{row.note}</p> : null}
+        <p className="today-row__route">{row.route}</p>
+        {row.note ? <p className="today-row__note">{row.note}</p> : null}
       </div>
-      <div className="text-left sm:text-right flex-shrink-0">
-        <p className="text-sm text-gray-900">{formatPickupDisplay(row.pickupAt)}</p>
-        <p className="text-xs text-indigo-700 mt-0.5 font-medium">{row.nextAction}</p>
+      <div className="today-row__side">
+        <p className="today-row__when">{formatPickupDisplay(row.pickupAt)}</p>
+        <p className="today-row__action">{row.nextAction}</p>
       </div>
     </li>
   );
@@ -117,36 +120,31 @@ function BookingRow({
 
 function Section({
   title,
-  hint,
   rows,
   empty,
   onOpenBooking,
 }: {
   title: string;
-  hint?: string;
   rows: TodayRow[];
   empty: string;
   onOpenBooking?: (booking: Booking) => void;
 }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-        <Clock className="h-5 w-5 text-indigo-600 flex-shrink-0" />
-        <div>
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          {hint ? <p className="text-xs text-gray-500">{hint}</p> : null}
-        </div>
+    <section className="today-section" aria-label={title}>
+      <div className="today-section__head">
+        <h3>{title}</h3>
+        <span className="today-section__count">{rows.length}</span>
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-gray-600 px-4 py-6">{empty}</p>
+        <p className="today-section__empty">{empty}</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="today-rows">
           {rows.map((row) => (
             <BookingRow key={row.key} row={row} onOpenBooking={onOpenBooking} />
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -288,98 +286,61 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Today</h2>
-      <WelcomeReview />
+    <div className="today-board">
+      <h2>Today</h2>
 
-      {pendingCustomerBookingsCount > 0 && (
-        <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-lg">
-          <div className="flex items-center">
-            <Bell className="h-5 w-5 text-orange-600 mr-3 flex-shrink-0" />
-            <div>
-              <h3 className="text-sm font-semibold text-orange-900">
-                {pendingCustomerBookingsCount} New Customer {pendingCustomerBookingsCount === 1 ? 'Booking' : 'Bookings'} Pending Review
-              </h3>
-              <p className="text-sm text-orange-700 mt-1">
-                Go to the Bookings page to review and confirm customer bookings with pricing.
-              </p>
-            </div>
+      {pendingCustomerBookingsCount > 0 ? (
+        <div className="today-alert">
+          <Bell className="h-5 w-5 flex-shrink-0" style={{ color: '#b8956a' }} aria-hidden="true" />
+          <div>
+            <h3>
+              {pendingCustomerBookingsCount} new customer {pendingCustomerBookingsCount === 1 ? 'request' : 'requests'} to review
+            </h3>
+            <p>Open Bookings to quote or confirm.</p>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <Section
-        title="New enquiries"
-        hint="Pending and awaiting customer confirmation"
-        rows={lists.newEnquiries}
-        empty="No new enquiries."
-        onOpenBooking={onOpenBooking}
-      />
-      <Section
-        title="Today's jobs"
-        hint="Journeys with pickup today"
-        rows={lists.todaysJobs}
-        empty="No jobs today."
-        onOpenBooking={onOpenBooking}
-      />
-      <Section
-        title="Tomorrow's jobs"
-        rows={lists.tomorrowsJobs}
-        empty="No jobs tomorrow."
-        onOpenBooking={onOpenBooking}
-      />
-      <Section
-        title="Unassigned"
-        hint="Confirmed or allocated journeys without a driver"
-        rows={lists.unassigned}
-        empty="No unassigned confirmed journeys."
-        onOpenBooking={onOpenBooking}
-      />
-      <Section
-        title="Exceptions"
-        hint="Returns to review and overdue incomplete journeys"
-        rows={lists.exceptions}
-        empty="No exceptions."
-        onOpenBooking={onOpenBooking}
-      />
+      <Section title="New enquiries" rows={lists.newEnquiries} empty="No new enquiries." onOpenBooking={onOpenBooking} />
+      <Section title="Today's jobs" rows={lists.todaysJobs} empty="No jobs today." onOpenBooking={onOpenBooking} />
+      <Section title="Tomorrow's jobs" rows={lists.tomorrowsJobs} empty="No jobs tomorrow." onOpenBooking={onOpenBooking} />
+      <Section title="Unassigned" rows={lists.unassigned} empty="No unassigned confirmed journeys." onOpenBooking={onOpenBooking} />
+      <Section title="Exceptions" rows={lists.exceptions} empty="No exceptions." onOpenBooking={onOpenBooking} />
 
-      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-        <label className="flex items-start gap-2 cursor-pointer">
+      <div className="today-reminders">
+        <label>
           <input
             type="checkbox"
-            className="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
             checked={desktopRemindersEnabled}
             onChange={(e) => void handleDesktopToggle(e.target.checked)}
           />
-          <span className="text-sm text-gray-700">
-            <span className="font-medium text-gray-900">Desktop reminders</span>
+          <span>
+            <strong>Desktop reminders</strong>
             {' — '}
-            browser notifications for each journey in the next hour (and new booking alerts when permission is granted).
-            A chime also plays for new customer requests while this tab is open.
+            browser notifications for journeys in the next hour, and a chime for new customer requests while this tab is open.
           </span>
         </label>
       </div>
 
-      <details className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <summary className="px-4 py-3 cursor-pointer text-base font-semibold text-gray-900 select-none">
-          Reports snapshot
-        </summary>
-        <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+      <details className="today-reports">
+        <summary>Reports</summary>
+        <div className="today-reports__body">
+          <WelcomeReview />
           {fuelInfo ? (
-            <div className="pt-4 flex items-start gap-3">
-              <Car className="h-5 w-5 text-slate-500 mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-3">
+              <Car className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: '#64748b' }} aria-hidden="true" />
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">UK average fuel prices</h3>
-                <p className="text-sm text-gray-700 mt-1">
+                <h3 className="text-sm font-semibold" style={{ color: '#0b1c3d', margin: 0 }}>UK average fuel prices</h3>
+                <p className="text-sm" style={{ color: '#334155', margin: '0.25rem 0 0' }}>
                   Petrol {fuelInfo.petrol} · Diesel {fuelInfo.diesel}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Last updated {fuelInfo.updated} · informational only, not linked to fares
+                <p className="text-xs" style={{ color: '#64748b', margin: '0.25rem 0 0' }}>
+                  Last updated {fuelInfo.updated}. Informational only, not linked to fares.
                 </p>
               </div>
             </div>
           ) : (
-            <p className="pt-4 text-sm text-gray-600">Fuel prices are not available right now.</p>
+            <p className="text-sm" style={{ color: '#64748b', margin: 0 }}>Fuel prices are not available right now.</p>
           )}
 
           {showMarketingPerformance ? (
@@ -399,9 +360,9 @@ const Dashboard: React.FC<DashboardProps> = ({
               />
             </>
           ) : onOpenAdvertising ? (
-            <p className="text-sm text-gray-700">
+            <p className="text-sm" style={{ color: '#334155', margin: 0 }}>
               Marketing figures live on Advertising results.{' '}
-              <button type="button" className="text-indigo-700 font-medium" onClick={onOpenAdvertising}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onOpenAdvertising}>
                 Open Advertising
               </button>
             </p>

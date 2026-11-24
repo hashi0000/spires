@@ -33,7 +33,7 @@ import {
 } from "./terms/callables";
 import { submitBusinessAccountEnquiry } from "./businessAccounts/callables";
 import { claimGuestBooking, guestClaimPreview } from "./bookings/guestHandlers";
-import { shouldSendConfirmation } from "./quotes/quoteWorkflow";
+import { bookingPickupHasPassed, shouldSendConfirmation } from "./quotes/quoteWorkflow";
 import { skipsTaxisPaymentReceipt, skipsTaxisSideEffects } from "./international/rules";
 
 admin.initializeApp();
@@ -80,7 +80,9 @@ export const onBookingWrite = functions.firestore
       after.paymentStatus === "paid" &&
       !after.paymentReceiptEmailSentAt &&
       (after.hirerEmail || after.email) &&
-      !skipsTaxisPaymentReceipt(after)
+      !skipsTaxisPaymentReceipt(after) &&
+      // Past journeys: office catch-up (driver, payment status) stays silent. Staff can still email a PDF manually.
+      !bookingPickupHasPassed(after)
     ) {
       const receiptRef = admin.firestore().collection("emailJobs").doc(`payment_receipt__${bookingId}__1`);
       const existingReceipt = await receiptRef.get();
