@@ -1,5 +1,6 @@
 import { Booking } from "../types/types";
 import { effectiveWorkflowStatus } from "./bookingWorkflow";
+import { completeActionPlan } from "./completeAction";
 
 export type BookingNextAction = {
   code: "send_quote" | "confirm" | "assign_driver" | "record_payment" | "complete" | "invoice" | "review" | "none";
@@ -33,11 +34,15 @@ export function bookingNextAction(booking: Booking): BookingNextAction {
     return { code: "assign_driver", label: "Assign driver" };
   }
   if (status === "allocated" || status === "confirmed") {
+    const plan = completeActionPlan(booking as unknown as Record<string, unknown>, "outbound");
+    if (plan.mode === "complete_and_record") {
+      return { code: "complete", label: plan.primaryLabel };
+    }
     const paymentStatus = booking.paymentStatus || "pending";
-    if (!isAccountJob(booking) && paymentStatus !== "paid" && hasFare(booking) && hasEmail(booking)) {
+    if (!isAccountJob(booking) && paymentStatus !== "paid" && hasFare(booking) && hasEmail(booking) && plan.reason === "charges_pending") {
       return { code: "record_payment", label: "Record payment" };
     }
-    return { code: "complete", label: "Mark completed" };
+    return { code: "complete", label: plan.primaryLabel === "Mark complete" ? "Mark completed" : plan.primaryLabel };
   }
   if (status === "completed") {
     const row = booking as Booking & { invoiceStatus?: string };

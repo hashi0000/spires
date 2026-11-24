@@ -22,6 +22,8 @@ export type JourneyBooking = {
   returnDestination?: string | null;
   pickupPlace?: { label?: string; postcode?: string } | null;
   destinationPlace?: { label?: string; postcode?: string } | null;
+  stops?: unknown;
+  returnStops?: unknown;
 };
 
 type PlaceGroup = { id: string; label: string; test: RegExp; exclude?: RegExp };

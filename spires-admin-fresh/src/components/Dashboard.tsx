@@ -24,6 +24,8 @@ import {
 import { ComparisonBars, growthComparisonItems } from './ComparisonBars';
 import { BookingFrequencyChart } from './BookingFrequencyChart';
 import { WelcomeReview } from './WelcomeReview';
+import { CompleteJobActions } from './CompleteJobActions';
+import { resolveJobCardLeg } from '../utils/jobCardActions';
 
 interface DashboardProps {
   activeDriversCount: number;
@@ -113,6 +115,16 @@ function BookingRow({
       <div className="today-row__side">
         <p className="today-row__when">{formatPickupDisplay(row.pickupAt)}</p>
         <p className="today-row__action">{row.nextAction}</p>
+        {['confirmed', 'allocated'].includes(String(row.booking.status || '')) ||
+        row.nextAction.startsWith('Complete') ||
+        row.nextAction === 'Mark completed' ||
+        row.nextAction === 'Mark complete' ? (
+          <CompleteJobActions
+            booking={row.booking}
+            leg={resolveJobCardLeg(row.legLabel === 'Return' ? 'return' : row.legLabel === 'Outbound' ? 'outbound' : null)}
+            compact
+          />
+        ) : null}
       </div>
     </li>
   );

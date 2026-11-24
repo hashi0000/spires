@@ -6,6 +6,7 @@ import { legPaymentDue, poundsFromPence, type JobCardLeg } from "../utils/jobCar
 import { commitQuickLegStatus, commitQuickPayment } from "../utils/quickBookingWrite";
 import type { JourneyLegName, JourneyLegStatus } from "../utils/journeyLegs";
 import { hasTimedReturn } from "../utils/journeyLegs";
+import { CompleteJobActions } from "./CompleteJobActions";
 
 const STATUS_OPTIONS: { value: JourneyLegStatus; label: string }[] = [
   { value: "pending", label: "Pending" },
@@ -102,8 +103,23 @@ export function JobCardStatusControls({
     }
   };
 
+  const canComplete = !["completed", "cancelled"].includes(String(
+    leg === "return" ? (booking as any).returnStatus || booking.status : booking.status || ""
+  ));
+
   return (
     <div className="job-card-badges" ref={rootRef}>
+      {canComplete ? (
+        <CompleteJobActions
+          booking={booking}
+          leg={leg}
+          compact
+          onDone={(text) => {
+            setMessage(text);
+            setOpen("");
+          }}
+        />
+      ) : null}
       <button
         type="button"
         className={`badge badge-button ${badgeClass}`}

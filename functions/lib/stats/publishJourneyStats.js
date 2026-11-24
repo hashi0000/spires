@@ -62,6 +62,8 @@ async function buildSummary() {
         "returnDestination",
         "pickupPlace",
         "destinationPlace",
+        "stops",
+        "returnStops",
         "syntheticMeasurementTest",
     ];
     const bookings = [];

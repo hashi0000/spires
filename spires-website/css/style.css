@@ -3835,7 +3835,7 @@ html[dir="rtl"] .booking-form label {
 .loc-suggest { position: relative; }
 .loc-suggest__list {
   position: absolute;
-  z-index: 30;
+  z-index: 80;
   left: 0;
   right: 0;
   margin: 0.25rem 0 0;
@@ -3843,14 +3843,16 @@ html[dir="rtl"] .booking-form label {
   list-style: none;
   background: #fff;
   border: 1px solid #d5dbe3;
-  max-height: 240px;
+  max-height: min(240px, 45vh);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .loc-suggest__list button {
   display: block;
   width: 100%;
   text-align: left;
   padding: 0.55rem 0.75rem;
+  min-height: 44px;
   background: #fff;
   border: 0;
   color: inherit;

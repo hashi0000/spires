@@ -2514,6 +2514,52 @@ header.admin-header,
   color: #b8956a;
 }
 
+.complete-job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.complete-job-actions--compact {
+  margin-top: 0;
+  width: 100%;
+}
+
+.complete-job-actions .btn-sm {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.complete-job-message,
+.complete-job-confirm p {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: #0b1c3d;
+  width: 100%;
+}
+
+.complete-job-different {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: end;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.complete-job-different label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+}
+
+.booking-header-complete {
+  margin: 0.5rem 0 0;
+}
+
 .today-alert {
   display: flex;
   gap: 0.65rem;

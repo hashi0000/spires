@@ -42,6 +42,7 @@ import {
 } from '../utils/customerSuggestions';
 import QuoteEditor from './QuoteEditor';
 import JourneyStopsEditor from './JourneyStopsEditor';
+import { CompleteJobActions } from './CompleteJobActions';
 import { hasExtraStops, keepStoredItinerary, normaliseStops, OPEN_RETURN_NOTICE, validateStops } from '../utils/journeyStops';
 import TermsAcceptance from './TermsAcceptance';
 import {
@@ -1178,6 +1179,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
             )}
           </p>
             <p className="booking-summary">{editingBooking ? `Outstanding £${(money.outstandingPence / 100).toFixed(2)}. ` : ''}Saving does not email the customer. Confirm the journey separately when needed.</p>
+          {editingBooking && !['completed', 'cancelled'].includes(String(formData.status || '')) ? (
+            <div className="booking-header-complete">
+              <CompleteJobActions
+                booking={{ ...formData, id: editingBooking.id, revision: editingBooking.revision, paymentEntries: editingBooking.paymentEntries || formData.paymentEntries } as any}
+                leg={hasTimedReturn(formData as any) && String(formData.outboundStatus || '') === 'completed' ? 'return' : 'outbound'}
+                onDone={(text) => window.alert(text)}
+              />
+            </div>
+          ) : null}
           {!showCreateChooser ? (
           <nav className="booking-section-nav" aria-label="Booking sections">
             <button type="button" onClick={() => showSection('booking-section-customer')}>Customer</button>

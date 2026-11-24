@@ -1,3 +1,4 @@
+import { JourneyStop, normaliseStops } from "../bookings/journeyStops";
 import { JourneyBooking, isCompletedJourneyBooking, londonMonthKey } from "./journeyStats";
 
 /**
@@ -37,9 +38,28 @@ const TOWNS: PlaceRule[] = [
   { label: "Thame", outcode: "OX9", test: /\bthame\b/i },
   { label: "Woodstock", outcode: "OX20", test: /\bwoodstock\b/i },
   { label: "Oxford", outcode: "OX1", test: /\boxford\b/i, exclude: /london oxford airport|oxford airport/i },
+  { label: "Burford", outcode: "OX18", test: /\bburford\b/i },
+  { label: "Bourton-on-the-Water", outcode: "GL54", test: /\bbourton[- ]on[- ]the[- ]water\b/i },
+  { label: "Bibury", outcode: "GL7", test: /\bbibury\b/i },
+  { label: "Stow-on-the-Wold", outcode: "GL54", test: /\bstow[- ]on[- ]the[- ]wold\b/i },
+  { label: "Cirencester", outcode: "GL7", test: /\bcirencester\b/i },
+  { label: "Moreton-in-Marsh", outcode: "GL56", test: /\bmoreton[- ]in[- ]marsh\b/i },
+  { label: "Chipping Norton", outcode: "OX7", test: /\bchipping norton\b/i },
+  { label: "Broadway", outcode: "WR12", test: /\bbroadway\b/i },
+  { label: "Cheltenham", outcode: "GL50", test: /\bcheltenham\b/i },
+  { label: "Painswick", outcode: "GL6", test: /\bpainswick\b/i },
+  { label: "Tetbury", outcode: "GL8", test: /\btetbury\b/i },
+  { label: "Lechlade", outcode: "GL7", test: /\blechlade\b/i },
 ];
 
 export type ApproxPlace = { label: string; outcode: string; kind: PlaceKind };
+
+export type PublicJourneyStop = {
+  label: string;
+  lat: number;
+  lng: number;
+  kind: PlaceKind;
+};
 
 export type PublicJourneyRoute = {
   date: string;
@@ -51,6 +71,9 @@ export type PublicJourneyRoute = {
   fromLng: number;
   toLat: number;
   toLng: number;
+  stops: PublicJourneyStop[];
+  style: "direct" | "itinerary";
+  closedLoop: boolean;
 };
 
 export type JourneyMapMonth = {
@@ -63,6 +86,12 @@ export type JourneyMapMonth = {
   routes: PublicJourneyRoute[];
 };
 
+export type JourneyMapDraftVia = {
+  label: string;
+  outcode: string;
+  kind: PlaceKind;
+};
+
 export type JourneyMapDraftRoute = {
   date: string;
   from: string;
@@ -71,6 +100,9 @@ export type JourneyMapDraftRoute = {
   toKind: PlaceKind;
   fromOutcode: string;
   toOutcode: string;
+  via?: JourneyMapDraftVia[];
+  style: "direct" | "itinerary";
+  closedLoop?: boolean;
 };
 
 export type JourneyMapMonthDraft = {
@@ -93,6 +125,29 @@ function endText(booking: JourneyBooking, end: "from" | "to", leg: "out" | "retu
     return [booking.pickupPlace?.label, booking.pickupPlace?.postcode, booking.pickupLocation, booking.pickup].filter(Boolean).join(" ");
   }
   return [booking.destinationPlace?.label, booking.destinationPlace?.postcode, booking.destination].filter(Boolean).join(" ");
+}
+
+function stopText(stop: JourneyStop): string {
+  const place = stop.place || {};
+  const label = typeof place.label === "string" ? place.label : "";
+  const postcode = typeof place.postcode === "string" ? place.postcode : "";
+  return [label, postcode, stop.address].filter(Boolean).join(" ");
+}
+
+function placesMatch(a: { label: string; outcode: string }, b: { label: string; outcode: string }): boolean {
+  if (a.label.toLowerCase() === b.label.toLowerCase()) return true;
+  return a.outcode.toUpperCase() === b.outcode.toUpperCase() && a.label.toLowerCase() === b.label.toLowerCase();
+}
+
+function mappedPlacesForLeg(stops: JourneyStop[]): ApproxPlace[] {
+  const places: ApproxPlace[] = [];
+  for (const stop of stops) {
+    const text = stopText(stop);
+    if (SENSITIVE.test(text)) return [];
+    const place = approximatePlace(text);
+    if (place) places.push(place);
+  }
+  return places;
 }
 
 export function outwardCode(value: string): string | null {
@@ -164,6 +219,30 @@ function sortedUnique(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
+function draftRouteFromPlaces(date: string, places: ApproxPlace[]): JourneyMapDraftRoute | null {
+  if (places.length < 2) return null;
+  const from = places[0];
+  const to = places[places.length - 1];
+  const via = places.slice(1, -1).map((place) => ({
+    label: place.label,
+    outcode: place.outcode,
+    kind: place.kind,
+  }));
+  const style: "direct" | "itinerary" = places.length >= 3 ? "itinerary" : "direct";
+  return {
+    date,
+    from: from.label,
+    to: to.label,
+    fromKind: from.kind,
+    toKind: to.kind,
+    fromOutcode: from.outcode,
+    toOutcode: to.outcode,
+    ...(via.length ? { via } : {}),
+    style,
+    closedLoop: placesMatch(from, to),
+  };
+}
+
 export function draftJourneyMap(bookings: JourneyBooking[]): JourneyMapMonthDraft[] {
   const months = new Map<string, JourneyMapMonthDraft>();
   const seen = new Set<string>();
@@ -171,27 +250,31 @@ export function draftJourneyMap(bookings: JourneyBooking[]): JourneyMapMonthDraf
   for (const booking of bookings) {
     if (isSynthetic(booking) || !isCompletedJourneyBooking(booking)) continue;
     const isReturn = booking.bookingType === "return" || booking.returnTrip === true;
-    const legs: Array<{ role: string; when: string | null | undefined; from: string; to: string }> = [
-      {
-        role: "out",
-        when: booking.pickupTime || booking.dateTime,
-        from: endText(booking, "from", "out"),
-        to: endText(booking, "to", "out"),
-      },
+    const outboundStops = normaliseStops(
+      booking.stops,
+      endText(booking, "from", "out"),
+      endText(booking, "to", "out")
+    );
+    const legs: Array<{ role: string; when: string | null | undefined; stops: JourneyStop[] }> = [
+      { role: "out", when: booking.pickupTime || booking.dateTime, stops: outboundStops },
     ];
     if (isReturn && (booking.returnPickupTime || booking.returnDateTime)) {
       legs.push({
         role: "return",
         when: booking.returnPickupTime || booking.returnDateTime,
-        from: endText(booking, "from", "return"),
-        to: endText(booking, "to", "return"),
+        stops: normaliseStops(
+          booking.returnStops,
+          endText(booking, "from", "return"),
+          endText(booking, "to", "return")
+        ),
       });
     }
     for (const leg of legs) {
       const key = londonMonthKey(leg.when);
       const date = londonDateKey(leg.when);
       if (!key || !date) continue;
-      const identity = `${booking.id || booking.bookingNumber || ""}|${leg.role}|${leg.when}|${leg.from}|${leg.to}`.toLowerCase();
+      const pathKey = leg.stops.map((stop) => stop.address).join(">");
+      const identity = `${booking.id || booking.bookingNumber || ""}|${leg.role}|${leg.when}|${pathKey}`.toLowerCase();
       if (seen.has(identity)) continue;
       seen.add(identity);
       let month = months.get(key);
@@ -200,19 +283,10 @@ export function draftJourneyMap(bookings: JourneyBooking[]): JourneyMapMonthDraf
         months.set(key, month);
       }
       month.completedJourneys += 1;
-      if (SENSITIVE.test(`${leg.from} ${leg.to}`)) continue;
-      const from = approximatePlace(leg.from);
-      const to = approximatePlace(leg.to);
-      if (!from || !to) continue;
-      month.routes.push({
-        date,
-        from: from.label,
-        to: to.label,
-        fromKind: from.kind,
-        toKind: to.kind,
-        fromOutcode: from.outcode,
-        toOutcode: to.outcode,
-      });
+      const places = mappedPlacesForLeg(leg.stops);
+      const route = draftRouteFromPlaces(date, places);
+      if (!route) continue;
+      month.routes.push(route);
     }
   }
 
@@ -230,28 +304,48 @@ export function materialiseJourneyMap(
   const months = drafts.map((draft) => {
     const routes: PublicJourneyRoute[] = [];
     for (const route of draft.routes) {
-      const from = points.get(route.fromOutcode);
-      const to = points.get(route.toOutcode);
-      if (!from || !to) continue;
-      if (from.lat === to.lat && from.lng === to.lng) continue;
+      const draftPoints: Array<{ label: string; outcode: string; kind: PlaceKind }> = [
+        { label: route.from, outcode: route.fromOutcode, kind: route.fromKind },
+        ...(route.via || []),
+        { label: route.to, outcode: route.toOutcode, kind: route.toKind },
+      ];
+      const mapped: Array<PublicJourneyStop & { outcode: string }> = [];
+      for (const place of draftPoints) {
+        const point = points.get(place.outcode);
+        if (!point) continue;
+        mapped.push({
+          label: place.label,
+          lat: point.lat,
+          lng: point.lng,
+          kind: place.kind,
+          outcode: place.outcode,
+        });
+      }
+      if (mapped.length < 2) continue;
+      const first = mapped[0];
+      const last = mapped[mapped.length - 1];
+      const uniqueCoords = new Set(mapped.map((stop) => `${stop.lat},${stop.lng}`));
+      if (uniqueCoords.size < 2) continue;
+      const style: "direct" | "itinerary" = mapped.length >= 3 ? "itinerary" : "direct";
+      const closedLoop = placesMatch(first, last);
       routes.push({
         date: route.date,
-        from: route.from,
-        to: route.to,
-        fromKind: route.fromKind,
-        toKind: route.toKind,
-        fromLat: from.lat,
-        fromLng: from.lng,
-        toLat: to.lat,
-        toLng: to.lng,
+        from: first.label,
+        to: last.label,
+        fromKind: first.kind,
+        toKind: last.kind,
+        fromLat: first.lat,
+        fromLng: first.lng,
+        toLat: last.lat,
+        toLng: last.lng,
+        stops: mapped.map(({ label, lat, lng, kind }) => ({ label, lat, lng, kind })),
+        style,
+        closedLoop,
       });
     }
     routes.sort((a, b) => a.date.localeCompare(b.date) || a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
     const airports = sortedUnique(
-      routes.flatMap((route) => [
-        route.fromKind === "airport" ? route.from : "",
-        route.toKind === "airport" ? route.to : "",
-      ]).filter(Boolean)
+      routes.flatMap((route) => route.stops.filter((stop) => stop.kind === "airport").map((stop) => stop.label))
     );
     const destinations = sortedUnique(routes.map((route) => route.to));
     return {
@@ -301,6 +395,7 @@ export function outcodesIn(drafts: JourneyMapMonthDraft[]): string[] {
     for (const route of month.routes) {
       codes.add(route.fromOutcode);
       codes.add(route.toOutcode);
+      for (const stop of route.via || []) codes.add(stop.outcode);
     }
   }
   return [...codes];
@@ -348,6 +443,14 @@ export function publicJourneyMapView(
       fromLng: route.fromLng,
       toLat: route.toLat,
       toLng: route.toLng,
+      stops: route.stops.map((stop) => ({
+        label: stop.label,
+        lat: stop.lat,
+        lng: stop.lng,
+        kind: stop.kind,
+      })),
+      style: route.style,
+      closedLoop: route.closedLoop,
     })),
   };
 }

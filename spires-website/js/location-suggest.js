@@ -26,6 +26,9 @@
     input.setAttribute("role", "combobox");
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("autocomplete", "off");
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("inputmode", "search");
     var wrap = document.createElement("div");
     wrap.className = "loc-suggest";
     input.parentNode.insertBefore(wrap, input);
@@ -44,10 +47,30 @@
     var active = 0;
     var token = 0;
     var timer = 0;
+    var selecting = false;
 
     function close() {
       list.hidden = true;
       input.setAttribute("aria-expanded", "false");
+    }
+
+    function choose(item) {
+      selecting = false;
+      input.value = item.label;
+      if (item.latitude == null && item.longitude == null && !item.placeId) delete input.dataset.place;
+      else input.dataset.place = JSON.stringify(item);
+      note.hidden = item.needsProperty !== true;
+      close();
+    }
+
+    function selectItem(item, event) {
+      event.preventDefault();
+      event.stopPropagation();
+      selecting = true;
+      choose(item);
+      window.setTimeout(function () {
+        selecting = false;
+      }, 400);
     }
 
     function render() {
@@ -59,23 +82,14 @@
         var button = document.createElement("button");
         button.type = "button";
         button.textContent = item.label;
-        button.addEventListener("mousedown", function (event) {
-          event.preventDefault();
-          choose(item);
-        });
+        button.addEventListener("pointerdown", function (event) { selectItem(item, event); });
+        button.addEventListener("mousedown", function (event) { selectItem(item, event); });
+        button.addEventListener("click", function (event) { selectItem(item, event); });
         li.appendChild(button);
         list.appendChild(li);
       });
       list.hidden = items.length === 0;
       input.setAttribute("aria-expanded", list.hidden ? "false" : "true");
-    }
-
-    function choose(item) {
-      input.value = item.label;
-      if (item.latitude == null && item.longitude == null && !item.placeId) delete input.dataset.place;
-      else input.dataset.place = JSON.stringify(item);
-      note.hidden = item.needsProperty !== true;
-      close();
     }
 
     function search(query) {
@@ -97,6 +111,9 @@
     }
 
     input.addEventListener("focus", function () { search(input.value); });
+    input.addEventListener("touchstart", function () {
+      if (list.hidden) search(input.value);
+    }, { passive: true });
     input.addEventListener("input", function () {
       delete input.dataset.place;
       note.hidden = true;
@@ -118,9 +135,12 @@
         choose(items[active]);
       } else if (event.key === "Escape") close();
     });
-    document.addEventListener("mousedown", function (event) {
+    function onDoc(event) {
+      if (selecting) return;
       if (!wrap.contains(event.target)) close();
-    });
+    }
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
   }
 
   function start() {

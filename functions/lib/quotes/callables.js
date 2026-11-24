@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EMAIL_SETUP_MESSAGE = exports.recordFlightVerification = exports.recordAdditionalCharge = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.processEmailJob = exports.shouldSendConfirmation = exports.bookingMatchesStatusFilter = void 0;
+exports.EMAIL_SETUP_MESSAGE = exports.recordFlightVerification = exports.recordAdditionalCharge = exports.submitWebsiteQuote = exports.quotePublic = exports.resendQuoteEmail = exports.listBookingEmails = exports.retryEmailJob = exports.acceptQuote = exports.recordManualAcceptance = exports.recordManualPayment = exports.completeAndRecordPayment = exports.sendPaymentRequest = exports.savePaymentLink = exports.issueQuote = exports.saveQuoteDraft = exports.processEmailJob = exports.shouldSendConfirmation = exports.bookingMatchesStatusFilter = void 0;
 exports.enqueueConfirmationIfNeeded = enqueueConfirmationIfNeeded;
 exports.stampPromotionOnCreate = stampPromotionOnCreate;
 const admin = __importStar(require("firebase-admin"));
@@ -49,6 +49,7 @@ const bookingTerms_1 = require("../terms/bookingTerms");
 const paymentLink_1 = require("./paymentLink");
 const fareMath_1 = require("./fareMath");
 const paymentAmount_1 = require("../paymentAmount");
+const completeAndRecord_1 = require("../bookings/completeAndRecord");
 const bankDetails_1 = require("../bankDetails");
 const messages_1 = require("../offers/messages");
 const executiveService_1 = require("./executiveService");
@@ -673,6 +674,146 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
     });
     await audit(bookingId, "payment_request_queued", actor, { emailState: queued.state, amountRequestedPence: amount });
     return { ok: true, emailState: queued.state, paid: false };
+});
+exports.completeAndRecordPayment = functions.https.onCall(async (data, context) => {
+    const actor = requireAdmin(context);
+    const body = (data || {});
+    const bookingId = str(body.bookingId);
+    if (!bookingId || bookingId.includes("/"))
+        throw httpsError("invalid-argument", "A booking ID is required.");
+    const leg = str(body.leg) === "return" ? "return" : "outbound";
+    const mode = str(body.mode) === "complete_only" ? "complete_only" : "complete_and_record";
+    const confirmChanged = body.confirmChangedAmount === true;
+    const expectedAmountRaw = body.expectedAmountPence;
+    const expectedAmountPence = expectedAmountRaw === undefined || expectedAmountRaw === null || expectedAmountRaw === ""
+        ? null
+        : Math.max(0, Math.round(Number(expectedAmountRaw)));
+    const requestId = str(body.clientRequestId).slice(0, 80) || `complete_${bookingId}_${leg}`;
+    const differentAmountPence = body.amountPounds != null && String(body.amountPounds) !== ""
+        ? (() => {
+            try {
+                return (0, halfTerm_1.poundsToPence)(String(body.amountPounds));
+            }
+            catch {
+                throw httpsError("invalid-argument", "Enter the amount received.");
+            }
+        })()
+        : null;
+    const ref = db().collection("bookings").doc(bookingId);
+    const auditRef = ref.collection("audit").doc();
+    return db().runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists)
+            throw httpsError("not-found", "Booking not found.");
+        const booking = (snap.data() || {});
+        if ((0, executiveService_1.executiveCommerceBlocked)(booking))
+            throw httpsError("failed-precondition", executiveService_1.EXECUTIVE_COMMERCE_MESSAGE);
+        if (body.expectedRevision != null && body.expectedRevision !== "") {
+            const revision = (0, bookingRevision_1.bookingRevisionDecision)(booking, body.expectedRevision);
+            if (!revision.ok)
+                throw httpsError("aborted", revision.reason);
+        }
+        if (str(booking.status) === "cancelled") {
+            throw httpsError("failed-precondition", "This booking is cancelled.");
+        }
+        const entries = Array.isArray(booking.paymentEntries) ? booking.paymentEntries : [];
+        if (requestId && entries.some((entry) => entry && entry.clientRequestId === requestId)) {
+            const plan = (0, completeAndRecord_1.completeRecordPlan)(booking, leg);
+            return {
+                ok: true,
+                duplicate: true,
+                mode: plan.mode,
+                amountRecordedPence: 0,
+                journeyCompleted: leg,
+                bookingStatus: str(booking.status),
+                label: plan.label,
+                message: `${leg === "return" ? "Return" : "Outbound"} was already completed for this request.`,
+            };
+        }
+        const plan = (0, completeAndRecord_1.completeRecordPlan)(booking, leg);
+        const completeDecision = (0, completeAndRecord_1.applyCompleteLegPatch)(booking, leg);
+        if (!completeDecision.ok)
+            throw httpsError("failed-precondition", completeDecision.error);
+        let recordAmount = 0;
+        let recordMode = "complete_only";
+        if (mode === "complete_only" || plan.reason === "account" || plan.reason === "paid") {
+            recordMode = "complete_only";
+            recordAmount = 0;
+        }
+        else if (differentAmountPence != null) {
+            if (differentAmountPence <= 0)
+                throw httpsError("invalid-argument", "Enter an amount greater than zero.");
+            if (plan.reason === "fare_unknown") {
+                throw httpsError("failed-precondition", "Set the fare before recording payment.");
+            }
+            recordMode = "complete_and_record";
+            recordAmount = Math.min(differentAmountPence, Math.max(differentAmountPence, plan.outstandingPence));
+            if (plan.outstandingPence > 0) {
+                recordAmount = Math.min(differentAmountPence, plan.outstandingPence);
+            }
+        }
+        else if (plan.mode === "complete_and_record") {
+            recordMode = "complete_and_record";
+            recordAmount = plan.amountPence;
+            if (expectedAmountPence != null && expectedAmountPence !== recordAmount && !confirmChanged) {
+                return {
+                    ok: false,
+                    needsConfirm: true,
+                    previousAmountPence: expectedAmountPence,
+                    amountPence: recordAmount,
+                    label: `Complete & record £${(recordAmount / 100).toFixed(2)} received`,
+                    message: `The balance changed to £${(recordAmount / 100).toFixed(2)}. Confirm to continue.`,
+                };
+            }
+        }
+        else {
+            recordMode = "complete_only";
+            recordAmount = 0;
+        }
+        const method = plan.methodKnown ? plan.paymentMethod : str(body.method);
+        const patch = {
+            ...completeDecision.patch,
+            revision: (0, bookingRevision_1.nextBookingRevision)(booking),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            [completeDecision.completedAtField]: new Date().toISOString(),
+            [`${leg}CompletedByUid`]: context.auth?.uid || "",
+        };
+        if (recordMode === "complete_and_record" && recordAmount > 0) {
+            const pay = (0, completeAndRecord_1.buildPaymentPatch)(booking, recordAmount, method, leg, requestId, actor);
+            if (!pay.ok)
+                throw httpsError("failed-precondition", pay.error);
+            Object.assign(patch, pay.patch);
+            patch.paymentRecordedAt = firestore_1.FieldValue.serverTimestamp();
+            if (pay.position.stored === "paid") {
+                patch.paidAt = booking.paidAt || firestore_1.FieldValue.serverTimestamp();
+            }
+        }
+        tx.set(ref, patch, { merge: true });
+        tx.set(auditRef, {
+            action: recordMode === "complete_and_record" ? "complete_and_record_payment" : "leg_completed",
+            actorEmail: actor,
+            at: firestore_1.FieldValue.serverTimestamp(),
+            leg,
+            amountRecordedPence: recordAmount,
+            paymentMethod: method || "",
+            bookingStatus: completeDecision.nextStatus,
+            clientRequestId: requestId,
+        });
+        const journeyLabel = leg === "return" ? "Return" : "Outbound";
+        const amountLabel = recordAmount > 0
+            ? ` Recorded £${(recordAmount / 100).toFixed(2)} received.`
+            : " No payment recorded.";
+        return {
+            ok: true,
+            duplicate: false,
+            mode: recordMode,
+            amountRecordedPence: recordAmount,
+            journeyCompleted: leg,
+            bookingStatus: completeDecision.nextStatus,
+            label: plan.label,
+            message: `${journeyLabel} marked complete.${amountLabel}`,
+        };
+    });
 });
 exports.recordManualPayment = functions.https.onCall(async (data, context) => {
     const actor = requireAdmin(context);

@@ -10,6 +10,8 @@ import {
 } from "../utils/jobCardActions";
 import { commitQuickLegComplete, commitQuickPayment } from "../utils/quickBookingWrite";
 import { hasTimedReturn } from "../utils/journeyLegs";
+import { httpsCallable } from "firebase/functions";
+import { completeActionPlan } from "../utils/completeAction";
 
 export type SelectedJobRow = {
   key: string;
@@ -127,14 +129,72 @@ export function JobsSelectionBar({
       <section className="jobs-selection-bar" aria-label="Selected job actions">
         <p className="jobs-selection-count">{selectedRows.length} selected</p>
         <div className="jobs-selection-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy}
+            onClick={() => void (async () => {
+              if (busy || selectedRows.length === 0) return;
+              setBusy(true);
+              const call = httpsCallable(functions, "completeAndRecordPayment");
+              const succeeded: string[] = [];
+              const failed: string[] = [];
+              const notes: string[] = [];
+              for (const row of selectedRows) {
+                try {
+                  const plan = completeActionPlan(row.booking as unknown as Record<string, unknown>, row.leg);
+                  const leg = row.leg === "return" ? "return" : "outbound";
+                  if (row.leg === "booking" && hasTimedReturn(row.booking)) {
+                    const result = await call({
+                      bookingId: row.booking.id,
+                      leg: "outbound",
+                      mode: plan.mode,
+                      expectedRevision: Number(row.booking.revision || 0),
+                      expectedAmountPence: plan.amountPence,
+                      method: plan.methodKnown ? plan.paymentMethod : "",
+                      clientRequestId: `bulk_complete_${batchId}_${row.booking.id}_outbound`,
+                    });
+                    const data = (result.data || {}) as { message?: string; needsConfirm?: boolean };
+                    if (data.needsConfirm) {
+                      failed.push(`${row.booking.bookingNumber}: balance changed — open the job to confirm`);
+                      continue;
+                    }
+                    notes.push(data.message || `${row.booking.bookingNumber} updated`);
+                    succeeded.push(row.key);
+                    continue;
+                  }
+                  const result = await call({
+                    bookingId: row.booking.id,
+                    leg,
+                    mode: plan.mode,
+                    expectedRevision: Number(row.booking.revision || 0),
+                    expectedAmountPence: plan.amountPence,
+                    method: plan.methodKnown ? plan.paymentMethod : "",
+                    clientRequestId: `bulk_complete_${batchId}_${row.booking.id}_${leg}`,
+                  });
+                  const data = (result.data || {}) as { message?: string; needsConfirm?: boolean };
+                  if (data.needsConfirm) {
+                    failed.push(`${row.booking.bookingNumber}: balance changed — open the job to confirm`);
+                    continue;
+                  }
+                  notes.push(data.message || `${row.booking.bookingNumber} updated`);
+                  succeeded.push(row.key);
+                } catch (err) {
+                  failed.push(`${row.booking.bookingNumber}: ${getCallableErrorMessage(err)}`);
+                }
+              }
+              onSelectedKeysChange(selectedKeys.filter((key) => !succeeded.includes(key)));
+              onMessage([notes.slice(0, 3).join(" "), failed.length ? `Failed: ${failed.join(" ")}` : ""].filter(Boolean).join(" "));
+              setBusy(false);
+            })()}
+          >
+            Complete & record balance
+          </button>
           <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void runComplete()}>
-            Mark completed
+            Complete without payment
           </button>
           <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setConfirmPay("paid")}>
-            Record as paid
-          </button>
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => setConfirmPay("completed_paid")}>
-            Mark completed and paid
+            Record a different amount
           </button>
           <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onSelectedKeysChange([])}>
             Clear

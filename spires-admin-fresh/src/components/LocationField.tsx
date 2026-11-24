@@ -25,8 +25,10 @@ type Props = {
 
 function mergeSuggestions(
   api: Suggestion[],
-  extras?: { id: string; label: string }[]
+  extras: { id: string; label: string }[] | undefined,
+  query: string
 ): Suggestion[] {
+  const q = String(query || "").trim().toLowerCase();
   const fromExtras: Suggestion[] = (extras || [])
     .map((row) => ({
       id: row.id,
@@ -38,7 +40,12 @@ function mergeSuggestions(
       premise: "",
       needsProperty: false,
     }))
-    .filter((row) => String(row.label || "").trim());
+    .filter((row) => {
+      const label = String(row.label || "").trim();
+      if (!label) return false;
+      if (!q) return true;
+      return label.toLowerCase().includes(q);
+    });
   const seen = new Set(fromExtras.map((row) => row.label.trim().toLowerCase()));
   const fromApi = api.filter((row) => !seen.has(String(row.label || "").trim().toLowerCase()));
   return [...fromExtras, ...fromApi];
@@ -53,20 +60,26 @@ export default function LocationField({ label, value, required, onChange, extraS
   const request = useRef(0);
   const timer = useRef<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const selecting = useRef(false);
 
   useEffect(() => {
-    function onDoc(event: MouseEvent) {
+    function onDoc(event: Event) {
+      if (selecting.current) return;
       if (!box.current?.contains(event.target as Node)) setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
   }, []);
 
   async function load(query: string) {
     const token = ++request.current;
     const trimmed = String(query || "").trim();
     if (!trimmed) {
-      const onlyExtras = mergeSuggestions([], extraSuggestions);
+      const onlyExtras = mergeSuggestions([], extraSuggestions, "");
       setSuggestions(onlyExtras);
       setActive(0);
       setOpen(onlyExtras.length > 0);
@@ -77,13 +90,13 @@ export default function LocationField({ label, value, required, onChange, extraS
       const body = await response.json();
       if (token !== request.current) return;
       const api = Array.isArray(body.suggestions) ? body.suggestions : [];
-      const merged = mergeSuggestions(api, extraSuggestions);
+      const merged = mergeSuggestions(api, extraSuggestions, query);
       setSuggestions(merged);
       setActive(0);
       setOpen(merged.length > 0);
     } catch {
       if (token === request.current) {
-        const onlyExtras = mergeSuggestions([], extraSuggestions);
+        const onlyExtras = mergeSuggestions([], extraSuggestions, query);
         setSuggestions(onlyExtras);
         setOpen(onlyExtras.length > 0);
       }
@@ -91,6 +104,7 @@ export default function LocationField({ label, value, required, onChange, extraS
   }
 
   function choose(item: Suggestion) {
+    selecting.current = false;
     const place: SelectedPlace = {
       label: item.label,
       placeId: item.placeId || "",
@@ -122,8 +136,18 @@ export default function LocationField({ label, value, required, onChange, extraS
     }
   }
 
+  function selectSuggestion(item: Suggestion, event: React.SyntheticEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    selecting.current = true;
+    choose(item);
+    window.setTimeout(() => {
+      selecting.current = false;
+    }, 400);
+  }
+
   return (
-    <div ref={box} style={{ position: "relative" }}>
+    <div ref={box} className="location-field" style={{ position: "relative" }}>
       <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={listId}>{label}</label>
       <input
         id={listId}
@@ -131,11 +155,17 @@ export default function LocationField({ label, value, required, onChange, extraS
         required={required}
         value={value}
         autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        inputMode="search"
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
         aria-controls={`${listId}-list`}
         onFocus={() => load(value)}
+        onTouchStart={() => {
+          if (!open) load(value);
+        }}
         onChange={(event) => {
           onChange(event.target.value, null);
           setNeedsProperty(false);
@@ -162,17 +192,30 @@ export default function LocationField({ label, value, required, onChange, extraS
         <p className="text-xs text-gray-600 mt-1">This postcode covers more than one property. Add the building, flat or entrance to the address.</p>
       ) : null}
       {open && suggestions.length > 0 ? (
-        <ul id={`${listId}-list`} role="listbox" className="bg-white border rounded shadow" style={{ position: "absolute", zIndex: 30, left: 0, right: 0, marginTop: 4, maxHeight: 240, overflow: "auto" }}>
+        <ul
+          id={`${listId}-list`}
+          role="listbox"
+          className="location-field__list bg-white border rounded shadow"
+          style={{
+            position: "absolute",
+            zIndex: 80,
+            left: 0,
+            right: 0,
+            marginTop: 4,
+            maxHeight: "min(240px, 45vh)",
+            overflow: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
           {suggestions.map((item, index) => (
             <li key={item.id || item.label} role="option" aria-selected={index === active}>
               <button
                 type="button"
                 className="w-full text-left px-3 py-2 text-sm"
-                style={{ background: index === active ? "#f5efe6" : "#fff" }}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  choose(item);
-                }}
+                style={{ background: index === active ? "#f5efe6" : "#fff", minHeight: 44 }}
+                onPointerDown={(event) => selectSuggestion(item, event)}
+                onMouseDown={(event) => selectSuggestion(item, event)}
+                onClick={(event) => selectSuggestion(item, event)}
               >
                 {item.label}
               </button>

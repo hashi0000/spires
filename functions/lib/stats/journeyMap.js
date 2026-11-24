@@ -10,6 +10,7 @@ exports.lookupOutcodePoints = lookupOutcodePoints;
 exports.outcodesIn = outcodesIn;
 exports.defaultMapMonth = defaultMapMonth;
 exports.publicJourneyMapView = publicJourneyMapView;
+const journeyStops_1 = require("../bookings/journeyStops");
 const journeyStats_1 = require("./journeyStats");
 /**
  * Public journey map.
@@ -41,6 +42,18 @@ const TOWNS = [
     { label: "Thame", outcode: "OX9", test: /\bthame\b/i },
     { label: "Woodstock", outcode: "OX20", test: /\bwoodstock\b/i },
     { label: "Oxford", outcode: "OX1", test: /\boxford\b/i, exclude: /london oxford airport|oxford airport/i },
+    { label: "Burford", outcode: "OX18", test: /\bburford\b/i },
+    { label: "Bourton-on-the-Water", outcode: "GL54", test: /\bbourton[- ]on[- ]the[- ]water\b/i },
+    { label: "Bibury", outcode: "GL7", test: /\bbibury\b/i },
+    { label: "Stow-on-the-Wold", outcode: "GL54", test: /\bstow[- ]on[- ]the[- ]wold\b/i },
+    { label: "Cirencester", outcode: "GL7", test: /\bcirencester\b/i },
+    { label: "Moreton-in-Marsh", outcode: "GL56", test: /\bmoreton[- ]in[- ]marsh\b/i },
+    { label: "Chipping Norton", outcode: "OX7", test: /\bchipping norton\b/i },
+    { label: "Broadway", outcode: "WR12", test: /\bbroadway\b/i },
+    { label: "Cheltenham", outcode: "GL50", test: /\bcheltenham\b/i },
+    { label: "Painswick", outcode: "GL6", test: /\bpainswick\b/i },
+    { label: "Tetbury", outcode: "GL8", test: /\btetbury\b/i },
+    { label: "Lechlade", outcode: "GL7", test: /\blechlade\b/i },
 ];
 function endText(booking, end, leg) {
     if (leg === "return") {
@@ -51,6 +64,29 @@ function endText(booking, end, leg) {
         return [booking.pickupPlace?.label, booking.pickupPlace?.postcode, booking.pickupLocation, booking.pickup].filter(Boolean).join(" ");
     }
     return [booking.destinationPlace?.label, booking.destinationPlace?.postcode, booking.destination].filter(Boolean).join(" ");
+}
+function stopText(stop) {
+    const place = stop.place || {};
+    const label = typeof place.label === "string" ? place.label : "";
+    const postcode = typeof place.postcode === "string" ? place.postcode : "";
+    return [label, postcode, stop.address].filter(Boolean).join(" ");
+}
+function placesMatch(a, b) {
+    if (a.label.toLowerCase() === b.label.toLowerCase())
+        return true;
+    return a.outcode.toUpperCase() === b.outcode.toUpperCase() && a.label.toLowerCase() === b.label.toLowerCase();
+}
+function mappedPlacesForLeg(stops) {
+    const places = [];
+    for (const stop of stops) {
+        const text = stopText(stop);
+        if (SENSITIVE.test(text))
+            return [];
+        const place = approximatePlace(text);
+        if (place)
+            places.push(place);
+    }
+    return places;
 }
 function outwardCode(value) {
     const full = value.toUpperCase().match(FULL_POSTCODE);
@@ -128,6 +164,30 @@ function isSynthetic(booking) {
 function sortedUnique(values) {
     return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
+function draftRouteFromPlaces(date, places) {
+    if (places.length < 2)
+        return null;
+    const from = places[0];
+    const to = places[places.length - 1];
+    const via = places.slice(1, -1).map((place) => ({
+        label: place.label,
+        outcode: place.outcode,
+        kind: place.kind,
+    }));
+    const style = places.length >= 3 ? "itinerary" : "direct";
+    return {
+        date,
+        from: from.label,
+        to: to.label,
+        fromKind: from.kind,
+        toKind: to.kind,
+        fromOutcode: from.outcode,
+        toOutcode: to.outcode,
+        ...(via.length ? { via } : {}),
+        style,
+        closedLoop: placesMatch(from, to),
+    };
+}
 function draftJourneyMap(bookings) {
     const months = new Map();
     const seen = new Set();
@@ -135,20 +195,15 @@ function draftJourneyMap(bookings) {
         if (isSynthetic(booking) || !(0, journeyStats_1.isCompletedJourneyBooking)(booking))
             continue;
         const isReturn = booking.bookingType === "return" || booking.returnTrip === true;
+        const outboundStops = (0, journeyStops_1.normaliseStops)(booking.stops, endText(booking, "from", "out"), endText(booking, "to", "out"));
         const legs = [
-            {
-                role: "out",
-                when: booking.pickupTime || booking.dateTime,
-                from: endText(booking, "from", "out"),
-                to: endText(booking, "to", "out"),
-            },
+            { role: "out", when: booking.pickupTime || booking.dateTime, stops: outboundStops },
         ];
         if (isReturn && (booking.returnPickupTime || booking.returnDateTime)) {
             legs.push({
                 role: "return",
                 when: booking.returnPickupTime || booking.returnDateTime,
-                from: endText(booking, "from", "return"),
-                to: endText(booking, "to", "return"),
+                stops: (0, journeyStops_1.normaliseStops)(booking.returnStops, endText(booking, "from", "return"), endText(booking, "to", "return")),
             });
         }
         for (const leg of legs) {
@@ -156,7 +211,8 @@ function draftJourneyMap(bookings) {
             const date = londonDateKey(leg.when);
             if (!key || !date)
                 continue;
-            const identity = `${booking.id || booking.bookingNumber || ""}|${leg.role}|${leg.when}|${leg.from}|${leg.to}`.toLowerCase();
+            const pathKey = leg.stops.map((stop) => stop.address).join(">");
+            const identity = `${booking.id || booking.bookingNumber || ""}|${leg.role}|${leg.when}|${pathKey}`.toLowerCase();
             if (seen.has(identity))
                 continue;
             seen.add(identity);
@@ -166,21 +222,11 @@ function draftJourneyMap(bookings) {
                 months.set(key, month);
             }
             month.completedJourneys += 1;
-            if (SENSITIVE.test(`${leg.from} ${leg.to}`))
+            const places = mappedPlacesForLeg(leg.stops);
+            const route = draftRouteFromPlaces(date, places);
+            if (!route)
                 continue;
-            const from = approximatePlace(leg.from);
-            const to = approximatePlace(leg.to);
-            if (!from || !to)
-                continue;
-            month.routes.push({
-                date,
-                from: from.label,
-                to: to.label,
-                fromKind: from.kind,
-                toKind: to.kind,
-                fromOutcode: from.outcode,
-                toOutcode: to.outcode,
-            });
+            month.routes.push(route);
         }
     }
     return [...months.values()].sort((a, b) => b.key.localeCompare(a.key));
@@ -192,29 +238,50 @@ function materialiseJourneyMap(drafts, points) {
     const months = drafts.map((draft) => {
         const routes = [];
         for (const route of draft.routes) {
-            const from = points.get(route.fromOutcode);
-            const to = points.get(route.toOutcode);
-            if (!from || !to)
+            const draftPoints = [
+                { label: route.from, outcode: route.fromOutcode, kind: route.fromKind },
+                ...(route.via || []),
+                { label: route.to, outcode: route.toOutcode, kind: route.toKind },
+            ];
+            const mapped = [];
+            for (const place of draftPoints) {
+                const point = points.get(place.outcode);
+                if (!point)
+                    continue;
+                mapped.push({
+                    label: place.label,
+                    lat: point.lat,
+                    lng: point.lng,
+                    kind: place.kind,
+                    outcode: place.outcode,
+                });
+            }
+            if (mapped.length < 2)
                 continue;
-            if (from.lat === to.lat && from.lng === to.lng)
+            const first = mapped[0];
+            const last = mapped[mapped.length - 1];
+            const uniqueCoords = new Set(mapped.map((stop) => `${stop.lat},${stop.lng}`));
+            if (uniqueCoords.size < 2)
                 continue;
+            const style = mapped.length >= 3 ? "itinerary" : "direct";
+            const closedLoop = placesMatch(first, last);
             routes.push({
                 date: route.date,
-                from: route.from,
-                to: route.to,
-                fromKind: route.fromKind,
-                toKind: route.toKind,
-                fromLat: from.lat,
-                fromLng: from.lng,
-                toLat: to.lat,
-                toLng: to.lng,
+                from: first.label,
+                to: last.label,
+                fromKind: first.kind,
+                toKind: last.kind,
+                fromLat: first.lat,
+                fromLng: first.lng,
+                toLat: last.lat,
+                toLng: last.lng,
+                stops: mapped.map(({ label, lat, lng, kind }) => ({ label, lat, lng, kind })),
+                style,
+                closedLoop,
             });
         }
         routes.sort((a, b) => a.date.localeCompare(b.date) || a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
-        const airports = sortedUnique(routes.flatMap((route) => [
-            route.fromKind === "airport" ? route.from : "",
-            route.toKind === "airport" ? route.to : "",
-        ]).filter(Boolean));
+        const airports = sortedUnique(routes.flatMap((route) => route.stops.filter((stop) => stop.kind === "airport").map((stop) => stop.label)));
         const destinations = sortedUnique(routes.map((route) => route.to));
         return {
             key: draft.key,
@@ -262,6 +329,8 @@ function outcodesIn(drafts) {
         for (const route of month.routes) {
             codes.add(route.fromOutcode);
             codes.add(route.toOutcode);
+            for (const stop of route.via || [])
+                codes.add(stop.outcode);
         }
     }
     return [...codes];
@@ -305,6 +374,14 @@ function publicJourneyMapView(stored, month, selected) {
             fromLng: route.fromLng,
             toLat: route.toLat,
             toLng: route.toLng,
+            stops: route.stops.map((stop) => ({
+                label: stop.label,
+                lat: stop.lat,
+                lng: stop.lng,
+                kind: stop.kind,
+            })),
+            style: route.style,
+            closedLoop: route.closedLoop,
         })),
     };
 }
