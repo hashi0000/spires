@@ -433,24 +433,32 @@ export function publicJourneyMapView(
     mappedJourneys: month.mappedJourneys,
     destinations: month.destinations,
     airports: month.airports,
-    routes: month.routes.map((route) => ({
-      date: route.date,
-      from: route.from,
-      to: route.to,
-      fromKind: route.fromKind,
-      toKind: route.toKind,
-      fromLat: route.fromLat,
-      fromLng: route.fromLng,
-      toLat: route.toLat,
-      toLng: route.toLng,
-      stops: route.stops.map((stop) => ({
-        label: stop.label,
-        lat: stop.lat,
-        lng: stop.lng,
-        kind: stop.kind,
-      })),
-      style: route.style,
-      closedLoop: route.closedLoop,
-    })),
+    routes: month.routes.map((route) => {
+      const stops = Array.isArray(route.stops) && route.stops.length >= 2
+        ? route.stops.map((stop) => ({
+            label: stop.label,
+            lat: stop.lat,
+            lng: stop.lng,
+            kind: stop.kind,
+          }))
+        : [
+            { label: route.from, lat: route.fromLat, lng: route.fromLng, kind: route.fromKind },
+            { label: route.to, lat: route.toLat, lng: route.toLng, kind: route.toKind },
+          ];
+      return {
+        date: route.date,
+        from: route.from,
+        to: route.to,
+        fromKind: route.fromKind,
+        toKind: route.toKind,
+        fromLat: route.fromLat,
+        fromLng: route.fromLng,
+        toLat: route.toLat,
+        toLng: route.toLng,
+        stops,
+        style: route.style === "itinerary" || stops.length >= 3 ? "itinerary" : "direct",
+        closedLoop: Boolean(route.closedLoop),
+      };
+    }),
   };
 }
