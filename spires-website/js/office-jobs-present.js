@@ -545,6 +545,26 @@
     ];
   }
 
+  function mapLinkForJob(job) {
+    const booking = job.booking || {};
+    const place = job.leg === "return" ? booking.returnPickupPlace : booking.pickupPlace;
+    const stops = job.leg === "return" ? booking.returnStops : booking.stops;
+    const firstPlace = Array.isArray(stops) && stops[0] && stops[0].place ? stops[0].place : null;
+    const candidates = [place, firstPlace];
+    for (let i = 0; i < candidates.length; i += 1) {
+      const row = candidates[i];
+      if (!row || typeof row !== "object") continue;
+      const lat = Number(row.latitude);
+      const lng = Number(row.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return "https://www.google.com/maps?q=" + encodeURIComponent(lat + "," + lng);
+      }
+    }
+    const address = job.pickupRecorded ? job.pickupLocation : "";
+    if (address) return "https://www.google.com/maps?q=" + encodeURIComponent(address);
+    return "";
+  }
+
   function presentJob(job, lists, now) {
     const booking = job.booking;
     const driverId = driverIdFor(booking, job.leg);
@@ -584,13 +604,19 @@
       const extraCount = stops.length - 2;
       return extraCount === 1 ? "1 extra stop" : extraCount + " extra stops";
     })();
+    const stopRows = stopsFor(job);
+    const meetingInstructions = text(stopRows[0] && stopRows[0].note);
+    const passenger = textOf(booking, ["passengerName"]) || textOf(booking, ["hirerName", "name"]) || "Name not recorded";
+    const billingAccount = textOf(booking, ["billingAccountName"]);
     return {
       time: clockLabel(job.pickup),
       date: dateLabel(job.pickup),
       remaining: done ? "Completed" : timePhrase(job.pickup, now),
       overdue: overdue,
       pickup: job.pickupRecorded ? job.pickupLocation : "Pickup not recorded",
-      destination: job.destinationRecorded ? job.destination : (job.destination || "Destination not recorded"),
+      destination: job.destinationRecorded ? job.destination : (job.destination || "Drop off not recorded"),
+      pickupLabel: "Pickup",
+      dropOffLabel: "Drop off",
       driverName: driverName,
       registration: registration || "No vehicle recorded",
       category: category(booking.vehicleType),
@@ -607,8 +633,11 @@
       flight: flight,
       landingNote: landingNote,
       collect: collectInstruction(booking, job.leg),
-      stops: stopsFor(job),
-      customer: textOf(booking, ["hirerName", "name"]) || "Name not recorded",
+      stops: stopRows,
+      meetingInstructions: meetingInstructions,
+      mapLink: mapLinkForJob(job),
+      customer: passenger,
+      billingAccount: billingAccount,
       phone: textOf(booking, ["hirerPhone", "phone"]),
       notes: notes,
       nextAction: warning || "Open navigation and go to the pickup.",

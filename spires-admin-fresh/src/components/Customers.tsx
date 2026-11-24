@@ -428,10 +428,9 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
                 Merge customer profiles
               </h2>
               <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: '#4b5563' }}>
-                All bookings in the <strong>other</strong> selected rows will get the same name, phone, and email as
-                the <strong>primary</strong> row (so they group together). App user ids are not changed.
+                Contact details on bookings in the other selected rows are updated to match the primary profile so they group together. This does not email the customer. App user ids are not changed.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '1rem' }}>
                 {selectedProfiles.map((p) => (
                   <label
                     key={p.id}
@@ -455,10 +454,41 @@ const Customers: React.FC<CustomersProps> = ({ bookings, onUpdateBooking, onOpen
                     <span style={{ fontSize: '0.875rem' }}>
                       <strong>{p.displayName}</strong> · {p.phone || 'no phone'} · {p.bookingCount} booking(s)
                       {p.email ? ` · ${p.email}` : ''}
+                      {mergePrimaryId === p.id ? ' · primary' : ''}
                     </span>
                   </label>
                 ))}
               </div>
+              {mergePrimaryId ? (
+                <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.8125rem', color: '#334155' }}>
+                  <p style={{ margin: '0 0 0.5rem' }}>
+                    <strong>Primary:</strong>{' '}
+                    {selectedProfiles.find((p) => p.id === mergePrimaryId)?.displayName}
+                    {' · '}
+                    {selectedProfiles.find((p) => p.id === mergePrimaryId)?.email || 'no email'}
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    <strong>Bookings that will be updated:</strong>{' '}
+                    {selectedProfiles
+                      .filter((p) => p.id !== mergePrimaryId)
+                      .reduce((n, p) => n + p.bookingCount, 0)}
+                    {' '}(contact fields only; no confirmation email)
+                  </p>
+                  <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.1rem' }}>
+                    {selectedProfiles
+                      .filter((p) => p.id !== mergePrimaryId)
+                      .flatMap((p) => p.bookings)
+                      .slice(0, 8)
+                      .map((b) => (
+                        <li key={b.id || b.bookingNumber}>
+                          {b.bookingNumber || 'No reference'}
+                          {b.pickupTime ? ` · ${new Date(b.pickupTime).toLocaleDateString('en-GB')}` : ''}
+                          {b.status ? ` · ${b.status}` : ''}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary btn-sm" disabled={mergeBusy} onClick={() => setMergeOpen(false)}>
                   Cancel

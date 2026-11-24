@@ -343,10 +343,14 @@ const airportReturn = {
             strict_1.default.equal((0, quoteWorkflow_1.bookingMatchesStatusFilter)({ status, customerStatus: "confirmed" }, "confirmed"), false);
         }
     });
-    (0, node_test_1.it)("sends the first confirmation when a recipient is added later, but never resends a sent confirmation", () => {
-        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), true);
+    (0, node_test_1.it)("stays silent when contact is added to an already confirmed booking, and never resends a sent confirmation", () => {
+        // Profile merge / contact correction on an old confirmed job must not queue mail.
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), false);
         strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
         strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
+        // A genuine new confirmation still sends.
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)({ status: "pending" }, { status: "confirmed", email: "test@example.com" }), true);
+        strict_1.default.equal((0, quoteWorkflow_1.shouldSendConfirmation)(null, { status: "confirmed", email: "test@example.com" }), true);
     });
     (0, node_test_1.it)("allows the actual Shift4 payment host and rejects lookalikes", () => {
         const hosts = (0, paymentLink_1.paymentLinkAllowlist)();

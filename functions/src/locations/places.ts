@@ -40,12 +40,35 @@ export const CURATED_PLACES: CuratedPlace[] = [
   { id: "bristol", label: "Bristol Airport", postcode: "BS48 3DY", kind: "place", group: "Airports" },
   { id: "london-city", label: "London City Airport", postcode: "E16 2PX", kind: "place", group: "Airports" },
   { id: "london-oxford", label: "London Oxford Airport, Kidlington", postcode: "OX5 1RA", kind: "place", group: "Airports" },
-  { id: "oxford-station", label: "Oxford Station", postcode: "OX1 1HS", kind: "place", group: "Stations" },
+  { id: "oxford-station", label: "Oxford Railway Station", postcode: "OX1 1HS", kind: "place", group: "Stations" },
+  { id: "randolph-hotel", label: "The Randolph Hotel, Beaumont Street, Oxford", postcode: "OX1 2LN", kind: "place", group: "Oxford" },
+  { id: "old-parsonage-hotel", label: "Old Parsonage Hotel, Banbury Road, Oxford", postcode: "OX2 6NN", kind: "place", group: "Oxford" },
+  { id: "gloucester-green", label: "Gloucester Green Coach Station, Oxford", postcode: "OX1 2BU", kind: "place", group: "Oxford" },
+  { id: "westgate-oxford", label: "Westgate Oxford", postcode: "OX1 1TR", kind: "place", group: "Oxford" },
   { id: "twickenham", label: "Allianz Stadium, Twickenham", postcode: "TW2 7BA", kind: "place", group: "Venues" },
   { id: "silverstone", label: "Silverstone Circuit", postcode: "NN12 8TN", kind: "place", group: "Venues" },
 ];
 
-const POPULAR_IDS = ["heathrow-t2", "heathrow-t3", "heathrow-t4", "heathrow-t5", "gatwick-south", "gatwick-north", "oxford-station", "london-oxford"];
+/** Extra search phrases that map onto curated ids. */
+const PLACE_ALIASES: Record<string, string[]> = {
+  "oxford-station": ["oxford station", "oxford train station", "oxford railway station"],
+  "randolph-hotel": ["randolph", "randolph hotel", "the randolph"],
+  "old-parsonage-hotel": ["old parsonage", "parsonage"],
+  "gloucester-green": ["gloucester green", "oxford coach station"],
+  "westgate-oxford": ["westgate", "westgate oxford"],
+};
+
+const POPULAR_IDS = [
+  "heathrow-t2",
+  "heathrow-t3",
+  "heathrow-t4",
+  "heathrow-t5",
+  "gatwick-south",
+  "gatwick-north",
+  "oxford-station",
+  "randolph-hotel",
+  "london-oxford",
+];
 
 const POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
@@ -63,9 +86,11 @@ export function curatedMatches(query: string): CuratedPlace[] {
   const q = query.trim().toLowerCase();
   if (!q) return CURATED_PLACES.filter((place) => POPULAR_IDS.includes(place.id));
   return CURATED_PLACES.filter((place) => {
-    const haystack = `${place.label} ${place.group} ${place.postcode}`.toLowerCase();
+    const aliases = PLACE_ALIASES[place.id] || [];
+    const haystack = `${place.label} ${place.group} ${place.postcode} ${aliases.join(" ")}`.toLowerCase();
     if (q === "heathrow" || q === "lhr") return place.group === "Heathrow Airport";
     if (q === "gatwick" || q === "lgw") return place.group === "Gatwick Airport";
+    if (aliases.some((alias) => alias === q || alias.startsWith(q) || q.startsWith(alias))) return true;
     return haystack.includes(q);
   }).slice(0, 8);
 }

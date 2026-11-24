@@ -21,6 +21,8 @@ import Vehicles from './components/Vehicles';
 import Bookings from './components/Bookings';
 import LinkBookings from './components/LinkBookings';
 import Customers from './components/Customers';
+import AccountTrips from './components/AccountTrips';
+import CompanyPlacesSettings from './components/CompanyPlacesSettings';
 import SchoolInvoices from './components/SchoolInvoices';
 import GeneralInvoices from './components/GeneralInvoices';
 import SpiresShareAdmin from './components/SpiresShareAdmin';
@@ -32,21 +34,29 @@ import VehicleModal from './components/VehicleModal';
 import BookingModal from './components/BookingModal';
 import ReturnJourneyPreview from './components/ReturnJourneyPreview';
 import ReportingPreview from './components/ReportingPreview';
+import {
+  companyPlaceSuggestionLabel,
+  loadCompanyPlaces,
+  type CompanyPlace,
+} from './utils/companyPlaces';
 import './styles.css';
 
 const DESKTOP_REMINDERS_KEY = 'spires_admin_desktop_reminders';
 const UPCOMING_SOON_MS = 48 * 60 * 60 * 1000;
 const LAST_TAB_KEY = 'spires_admin_last_tab';
 const PAGE_TITLES: Record<string, string> = {
-  dashboard: 'Dashboard',
+  dashboard: 'Today',
   bookings: 'Bookings',
   customers: 'Customers',
-  drivers: 'Drivers',
-  vehicles: 'Vehicles',
+  'account-trips': 'Billing',
+  fleet: 'Fleet',
+  drivers: 'Fleet',
+  vehicles: 'Fleet',
   invoices: 'Invoices',
   'school-invoices': 'School invoices',
   'spires-share': 'Spires Share',
   'link-bookings': 'Maintenance: link bookings',
+  'company-places': 'Company places',
   advertising: 'Advertising results',
   communications: 'Offers and Messages',
 };
@@ -67,6 +77,7 @@ const App: React.FC = () => {
   const [advertisingStartedOn, setAdvertisingStartedOn] = useState<string | null>(null);
   const [advertisingStartConfirmed, setAdvertisingStartConfirmed] = useState(false);
   const [headerNow, setHeaderNow] = useState(() => new Date());
+  const [companyPlaces, setCompanyPlaces] = useState<CompanyPlace[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -103,6 +114,24 @@ const App: React.FC = () => {
     sessionStorage.setItem(LAST_TAB_KEY, activeTab);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (!user) {
+      setCompanyPlaces([]);
+      return undefined;
+    }
+    let cancelled = false;
+    loadCompanyPlaces()
+      .then((places) => {
+        if (!cancelled) setCompanyPlaces(places);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyPlaces([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   const driversHook = useDrivers();
   const vehiclesHook = useVehicles();
   const bookingsHook = useBookings();
@@ -116,6 +145,15 @@ const App: React.FC = () => {
     }
     return Array.from(seen).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [bookingsHook.bookings]);
+
+  const placeSuggestions = useMemo(
+    () =>
+      companyPlaces.map((place) => ({
+        id: place.id,
+        label: companyPlaceSuggestionLabel(place),
+      })),
+    [companyPlaces]
+  );
 
   const customerSuggestions = useMemo(
     () => buildCustomerSuggestionsFromBookings(bookingsHook.bookings),
@@ -438,26 +476,42 @@ const App: React.FC = () => {
             onOpenAdvertising={() => setActiveTab('advertising')}
             advertisingStartedOn={advertisingStartedOn}
             advertisingStartConfirmed={advertisingStartConfirmed}
+            onOpenBooking={(booking) => {
+              handleEditBooking(booking);
+            }}
           />
         );
+      case 'fleet':
       case 'drivers':
-        return (
-          <Drivers
-            drivers={driversHook.drivers}
-            onAddDriver={openDriverModal}
-            onEditDriver={handleEditDriver}
-            onDeleteDriver={handleDeleteDriver}
-          />
-        );
       case 'vehicles':
         return (
-          <Vehicles
-            vehicles={vehiclesHook.vehicles}
-            onAddVehicle={openVehicleModal}
-            onEditVehicle={handleEditVehicle}
-            onDeleteVehicle={handleDeleteVehicle}
+          <div className="space-y-8">
+            <Drivers
+              drivers={driversHook.drivers}
+              onAddDriver={openDriverModal}
+              onEditDriver={handleEditDriver}
+              onDeleteDriver={handleDeleteDriver}
+            />
+            <Vehicles
+              vehicles={vehiclesHook.vehicles}
+              onAddVehicle={openVehicleModal}
+              onEditVehicle={handleEditVehicle}
+              onDeleteVehicle={handleDeleteVehicle}
+            />
+          </div>
+        );
+      case 'account-trips':
+        return (
+          <AccountTrips
+            bookings={bookingsHook.bookings}
+            onUpdateBooking={bookingsHook.updateBooking}
+            onOpenBooking={(booking) => {
+              handleEditBooking(booking);
+            }}
           />
         );
+      case 'company-places':
+        return <CompanyPlacesSettings />;
       case 'bookings':
         return (
           <Bookings
@@ -550,6 +604,7 @@ const App: React.FC = () => {
           activeDrivers={activeDrivers}
           availableVehicles={availableVehicles}
           locationSuggestions={bookingLocationSuggestions}
+          placeSuggestions={placeSuggestions}
           customerSuggestions={customerSuggestions}
           initialDraft={bookingModalInitialDraft}
         />

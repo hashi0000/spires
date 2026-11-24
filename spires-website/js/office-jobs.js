@@ -383,8 +383,12 @@
       '<p class="' + (prominent ? "next-time" : "job-time") + '"><strong>' + escapeHtml(viewModel.time) + "</strong></p>" +
       (prominent ? '<p class="next-date">' + escapeHtml(viewModel.date) + "</p>" : "") +
       '<p class="next-remain' + (viewModel.overdue ? " is-overdue" : "") + '">' + escapeHtml(viewModel.remaining) + "</p>" +
-      '<p class="place"><span>Pickup</span><strong>' + escapeHtml(viewModel.pickup) + "</strong></p>" +
-      '<p class="place"><span>Destination</span><strong>' + escapeHtml(viewModel.destination) + "</strong></p>" +
+      '<p class="place"><span>' + escapeHtml(viewModel.pickupLabel || "Pickup") + '</span><strong>' + escapeHtml(viewModel.pickup) + "</strong></p>" +
+      '<p class="place"><span>' + escapeHtml(viewModel.dropOffLabel || "Drop off") + '</span><strong>' + escapeHtml(viewModel.destination) + "</strong></p>" +
+      (viewModel.meetingInstructions ? '<p class="meta">Meeting: ' + escapeHtml(viewModel.meetingInstructions) + "</p>" : "") +
+      '<p class="who"><strong>' + escapeHtml(viewModel.customer) + "</strong>" +
+      (viewModel.billingAccount ? '<br><span class="meta">Bill to: ' + escapeHtml(viewModel.billingAccount) + "</span>" : "") +
+      "</p>" +
       '<p class="who"><strong>' + escapeHtml(viewModel.driverName) + "</strong> · " + escapeHtml(viewModel.registration) + "</p>" +
       '<p class="meta">' + escapeHtml(viewModel.category) + " · " + escapeHtml(viewModel.passengers) + " · " + escapeHtml(viewModel.luggage) +
       (viewModel.extraStops ? " · " + escapeHtml(viewModel.extraStops) : "") + "</p>" +
@@ -393,6 +397,7 @@
       badgeMarkup(viewModel.badges) +
       (viewModel.warning ? '<p class="warning">' + escapeHtml(viewModel.warning) + "</p>" : "") +
       (viewModel.summary ? '<p class="summary">' + escapeHtml(viewModel.summary) + "</p>" : "") +
+      (viewModel.mapLink ? '<p class="meta"><a href="' + escapeHtml(viewModel.mapLink) + '" target="_blank" rel="noreferrer">Open map</a></p>' : "") +
       (prominent ? "" : '<p class="job-open">Open job</p>')
     );
   }
@@ -593,7 +598,7 @@
     const call = telHref(phone);
     const wa = whatsappHref(phone, "Spires Taxis job " + (booking.bookingNumber || "") + "\n" + viewModel.pickup + " to " + viewModel.destination);
     const place = job.leg === "return" ? booking.returnPickupPlace : booking.pickupPlace;
-    const navigate = mapsHref(job.pickupRecorded ? job.pickupLocation : "", place);
+    const navigate = viewModel.mapLink || mapsHref(job.pickupRecorded ? job.pickupLocation : "", place);
     const flight = viewModel.flight
       ? "<p>Flight " + escapeHtml(viewModel.flight.flight) + "</p><p>Terminal " + escapeHtml(viewModel.flight.terminal) + "</p>" +
         (viewModel.landingNote ? "<p>" + escapeHtml(viewModel.landingNote) + "</p>" : "") +
@@ -635,6 +640,8 @@
       escapeHtml(viewModel.registration) + "</p><p>Requested category: " + escapeHtml(viewModel.category) + "</p><p>" +
       escapeHtml(viewModel.passengers) + " · " + escapeHtml(viewModel.luggage) + "</p></section>" +
       '<section class="detail-block"><h3>Customer</h3><p>' + escapeHtml(viewModel.customer) + "</p>" +
+      (viewModel.billingAccount ? "<p>Bill to: " + escapeHtml(viewModel.billingAccount) + "</p>" : "") +
+      (viewModel.meetingInstructions ? "<p>Meeting: " + escapeHtml(viewModel.meetingInstructions) + "</p>" : "") +
       (phone ? "<p>" + escapeHtml(phone) + "</p>" : "<p>No phone number recorded.</p>") + "</section>" +
       '<section class="detail-block"><h3>Collection and payment</h3>' + flight +
       "<p><strong>" + escapeHtml(viewModel.collect.title || viewModel.collect.text) + "</strong></p>" +

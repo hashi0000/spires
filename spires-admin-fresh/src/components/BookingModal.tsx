@@ -44,6 +44,16 @@ import QuoteEditor from './QuoteEditor';
 import JourneyStopsEditor from './JourneyStopsEditor';
 import { hasExtraStops, keepStoredItinerary, normaliseStops, OPEN_RETURN_NOTICE, validateStops } from '../utils/journeyStops';
 import TermsAcceptance from './TermsAcceptance';
+import {
+  airportModeLabel,
+  emptyAirportCollectionFields,
+  inferAirportMode,
+  parseKnownTerminal,
+  syncOutboundAirportFromAddresses,
+  syncReturnAirportFromAddresses,
+  terminalSuggestionsFor,
+  type AirportMode,
+} from '../utils/airportLegFields';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -56,9 +66,13 @@ interface BookingModalProps {
   locationSuggestions?: string[];
   /** Past customers from bookings — name autocomplete + phone/address fill */
   customerSuggestions?: CustomerProfile[];
+  /** Company or recent places for address fields (label = Name, postcode) */
+  placeSuggestions?: Array<string | { id: string; label: string }>;
   /** Pre-fill a new booking (e.g. return trip); ignored when editing */
   initialDraft?: Partial<ExtendedBooking> | null;
 }
+
+type CreateMode = 'choose' | 'enquiry' | 'agreed' | 'account';
 
 const AirportWaitingAdminNote: React.FC = () => {
   const [minutes, setMinutes] = useState('');
@@ -132,8 +146,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
   availableVehicles,
   locationSuggestions = [],
   customerSuggestions = [],
+  placeSuggestions = [],
   initialDraft = null
 }) => {
+  const placeSuggestionRows = placeSuggestions.map((row, index) =>
+    typeof row === 'string'
+      ? { id: `place-${index}`, label: row.trim() }
+      : { id: row.id || `place-${index}`, label: String(row.label || '').trim() }
+  ).filter((row) => row.label);
+  const locationDatalist = Array.from(
+    new Set([
+      ...placeSuggestionRows.map((row) => row.label),
+      ...locationSuggestions.map((s) => s.trim()),
+    ].filter(Boolean))
+  );
   const applyKnownCustomer = (rawName: string) => {
     const match = matchCustomerSuggestion(rawName, customerSuggestions);
     if (!match) return;
@@ -153,6 +179,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const [undoBusy, setUndoBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<CreateMode>('choose');
+  const [airportManualOverride, setAirportManualOverride] = useState(false);
+  const [returnAirportManualOverride, setReturnAirportManualOverride] = useState(false);
+  const [terminalUnlocked, setTerminalUnlocked] = useState(false);
+  const [returnTerminalUnlocked, setReturnTerminalUnlocked] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const moreOptionsRef = useRef<HTMLDetailsElement>(null);
   const [formData, setFormData] = useState<ExtendedBooking>({
@@ -184,14 +215,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
     depositStatus: 'not_required',
     bookingType: 'one_way',
     airportCollection: false,
+    airportDropOff: false,
     flightNumber: '',
     returnPickupTime: '',
     returnPickupLocation: '',
     returnDestination: '',
     returnAirportCollection: false,
+    returnAirportDropOff: false,
     returnFlightNumber: '',
     dueOnOutbound: '',
     dueOnReturn: '',
+    jobKind: undefined,
+    billingAccountName: '',
+    passengerName: '',
     stops: normaliseStops(undefined, '', ''),
     returnStops: normaliseStops(undefined, '', ''),
     openReturn: false,
@@ -212,7 +248,13 @@ const BookingModal: React.FC<BookingModalProps> = ({
   // ✅ Pre-fill form for editing or default new booking
   useEffect(() => {
     setDirty(false);
+    setAirportManualOverride(false);
+    setReturnAirportManualOverride(false);
+    setTerminalUnlocked(false);
+    setReturnTerminalUnlocked(false);
+    setMoreOptionsOpen(false);
     if (editingBooking) {
+      setCreateMode('choose');
       // Map customer booking fields to admin format if needed
       const mappedBooking: any = {
         ...editingBooking,
@@ -261,11 +303,18 @@ const BookingModal: React.FC<BookingModalProps> = ({
         returnPickupLocation: editingBooking.returnPickupLocation || '',
         returnDestination: editingBooking.returnDestination || '',
         returnAirportCollection: editingBooking.returnAirportCollection === true,
+        returnAirportDropOff: (editingBooking as { returnAirportDropOff?: boolean }).returnAirportDropOff === true,
         returnFlightNumber: editingBooking.returnFlightNumber || '',
         returnTerminal: (editingBooking as { returnTerminal?: string }).returnTerminal || '',
         returnLandingTime: (editingBooking as { returnLandingTime?: string }).returnLandingTime || '',
         passengers: editingBooking.passengers,
         luggage: (editingBooking as { luggage?: number | string }).luggage ?? '',
+        jobKind: (editingBooking as { jobKind?: ExtendedBooking['jobKind'] }).jobKind,
+        billingAccountName: (editingBooking as { billingAccountName?: string }).billingAccountName || '',
+        billingAccountId: (editingBooking as { billingAccountId?: string }).billingAccountId || '',
+        passengerName: (editingBooking as { passengerName?: string }).passengerName || '',
+        invoiceStatus: (editingBooking as { invoiceStatus?: ExtendedBooking['invoiceStatus'] }).invoiceStatus,
+        invoiceReference: (editingBooking as { invoiceReference?: string }).invoiceReference || '',
         stops: normaliseStops((editingBooking as any).stops, editingBooking.pickupLocation || (editingBooking as any).pickup || '', editingBooking.destination || ''),
         returnStops: normaliseStops((editingBooking as any).returnStops, editingBooking.returnPickupLocation || '', editingBooking.returnDestination || ''),
         openReturn: (editingBooking as any).openReturn === true,
@@ -285,6 +334,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
       setFormError('');
       setFormData(mappedBooking);
     } else {
+      setCreateMode('choose');
       const now = new Date();
       now.setMinutes(now.getMinutes() + 30);
       const defaultLocal = toDatetimeLocalValue(now);
@@ -314,14 +364,19 @@ const BookingModal: React.FC<BookingModalProps> = ({
         depositStatus: 'not_required',
         bookingType: 'one_way',
         airportCollection: false,
+        airportDropOff: false,
         flightNumber: '',
         returnPickupTime: '',
         returnPickupLocation: '',
         returnDestination: '',
         returnAirportCollection: false,
+        returnAirportDropOff: false,
         returnFlightNumber: '',
         dueOnOutbound: '',
         dueOnReturn: '',
+        jobKind: undefined,
+        billingAccountName: '',
+        passengerName: '',
         stops: normaliseStops(undefined, '', ''),
         returnStops: normaliseStops(undefined, '', ''),
         openReturn: false,
@@ -357,12 +412,17 @@ const BookingModal: React.FC<BookingModalProps> = ({
           depositStatus: (d as any).depositStatus || empty.depositStatus,
           bookingType: resolveBookingType(d as any),
           airportCollection: (d as any).airportCollection === true,
+          airportDropOff: (d as any).airportDropOff === true,
           flightNumber: (d as any).flightNumber || '',
           returnPickupTime: (d as any).returnPickupTime ? toDatetimeLocalValue(String((d as any).returnPickupTime)) : '',
           returnPickupLocation: (d as any).returnPickupLocation || '',
           returnDestination: (d as any).returnDestination || '',
           returnAirportCollection: (d as any).returnAirportCollection === true,
+          returnAirportDropOff: (d as any).returnAirportDropOff === true,
           returnFlightNumber: (d as any).returnFlightNumber || '',
+          jobKind: (d as any).jobKind,
+          billingAccountName: (d as any).billingAccountName || '',
+          passengerName: (d as any).passengerName || '',
           stops: normaliseStops((d as any).stops, d.pickupLocation || '', d.destination || ''),
           returnStops: normaliseStops((d as any).returnStops, (d as any).returnPickupLocation || '', (d as any).returnDestination || ''),
           openReturn: (d as any).openReturn === true,
@@ -501,6 +561,24 @@ const BookingModal: React.FC<BookingModalProps> = ({
       skipAutomaticEmailMatch: guestUnclaimed,
     });
 
+    const isOutboundCollection = formData.airportCollection === true;
+    const isOutboundDropOff = !isOutboundCollection && formData.airportDropOff === true;
+    const isReturnCollection = isReturn && formData.returnAirportCollection === true;
+    const isReturnDropOff = isReturn && !isReturnCollection && formData.returnAirportDropOff === true;
+    const outboundArrangement =
+      formData.collectionLocationKind === 'hotel'
+        ? 'fixed_time'
+        : (formData.collectionArrangement || 'flight_monitored');
+    const returnArrangement =
+      formData.returnCollectionLocationKind === 'hotel'
+        ? 'fixed_time'
+        : (formData.returnCollectionArrangement || 'flight_monitored');
+    const effectiveJobKind: ExtendedBooking['jobKind'] =
+      formData.jobKind
+      || (createMode === 'enquiry' || createMode === 'agreed' || createMode === 'account' ? createMode : undefined)
+      || (formData.paymentMethod === 'account' ? 'account' : undefined);
+    const isAccountJob = effectiveJobKind === 'account' || formData.paymentMethod === 'account';
+
     const bookingData: any = {
       ...formData,
       ...(formData.journeyType === 'cotswolds' ? { timedHire: {
@@ -516,15 +594,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
         typeof formData.actualFare === 'string'
           ? (formData.actualFare.trim() ? parseFloat(formData.actualFare) : undefined)
           : formData.actualFare,
-      depositRequired: formData.depositRequired === true,
+      depositRequired: isAccountJob ? false : formData.depositRequired === true,
       depositAmount:
-        formData.depositRequired === true && formData.depositAmount !== undefined && formData.depositAmount !== ''
+        !isAccountJob && formData.depositRequired === true && formData.depositAmount !== undefined && formData.depositAmount !== ''
           ? (typeof formData.depositAmount === 'string'
               ? parseFloat(formData.depositAmount)
               : formData.depositAmount)
           : undefined,
       depositStatus:
-        formData.depositRequired === true
+        !isAccountJob && formData.depositRequired === true
           ? (formData.depositStatus === 'paid' ? 'paid' : 'pending')
           : 'not_required',
       dateTime: dateTimeIso,
@@ -538,17 +616,39 @@ const BookingModal: React.FC<BookingModalProps> = ({
       bookingNumber: newBookingNumber,
       bookingType: isReturn ? 'return' : 'one_way',
       returnTrip: isReturn,
-      waitingPolicyVersion: editingBooking ? (formData.waitingPolicyVersion || editingBooking.waitingPolicyVersion || "") : ((formData.airportCollection || formData.returnAirportCollection) ? CURRENT_WAITING_VERSION : ""),
-      airportCollection: formData.airportCollection === true,
-      collectionArrangement: formData.collectionLocationKind === 'hotel' ? 'fixed_time' : formData.collectionArrangement || 'flight_monitored',
-      collectionLocationKind: formData.collectionLocationKind || 'terminal',
-      collectionLocation: formData.collectionLocation || formData.pickupLocation,
-      arrivalDate: formData.arrivalDate || String(pickupIso).slice(0,10),
-      returnCollectionArrangement: formData.returnCollectionLocationKind === 'hotel' ? 'fixed_time' : formData.returnCollectionArrangement || 'flight_monitored',
-      returnCollectionLocationKind: formData.returnCollectionLocationKind || 'terminal',
-      returnCollectionLocation: formData.returnCollectionLocation || formData.returnPickupLocation || '',
-      returnArrivalDate: formData.returnArrivalDate || String(formData.returnPickupTime || '').slice(0,10),
-      flightNumber: formData.airportCollection === true ? String(formData.flightNumber || '').trim() : '',
+      jobKind: effectiveJobKind || '',
+      billingAccountName: String(formData.billingAccountName || '').trim(),
+      billingAccountId: String(formData.billingAccountId || '').trim(),
+      passengerName: String(formData.passengerName || '').trim(),
+      invoiceStatus: formData.invoiceStatus || (isAccountJob ? 'unbilled' : undefined),
+      invoiceReference: String(formData.invoiceReference || '').trim(),
+      waitingPolicyVersion: editingBooking
+        ? (formData.waitingPolicyVersion || editingBooking.waitingPolicyVersion || '')
+        : ((isOutboundCollection || isReturnCollection) ? CURRENT_WAITING_VERSION : ''),
+      airportCollection: isOutboundCollection,
+      airportDropOff: isOutboundDropOff,
+      collectionArrangement: isOutboundCollection ? outboundArrangement : '',
+      collectionLocationKind: isOutboundCollection ? (formData.collectionLocationKind || 'terminal') : '',
+      collectionLocation: isOutboundCollection
+        ? (String(formData.collectionLocation || '').trim() || String(formData.pickupLocation || '').trim())
+        : '',
+      arrivalDate: isOutboundCollection
+        ? (formData.arrivalDate || String(pickupIso).slice(0, 10))
+        : '',
+      terminal: isOutboundCollection ? String(formData.terminal || '').trim() : '',
+      landingTime: isOutboundCollection && outboundArrangement === 'flight_monitored'
+        ? String(formData.landingTime || '').trim()
+        : '',
+      fixedTimeAcknowledged: isOutboundCollection ? formData.fixedTimeAcknowledged === true : false,
+      returnCollectionArrangement: isReturnCollection ? returnArrangement : '',
+      returnCollectionLocationKind: isReturnCollection ? (formData.returnCollectionLocationKind || 'terminal') : '',
+      returnCollectionLocation: isReturnCollection
+        ? (String(formData.returnCollectionLocation || '').trim() || String(formData.returnPickupLocation || '').trim())
+        : '',
+      returnArrivalDate: isReturnCollection
+        ? (formData.returnArrivalDate || String(formData.returnPickupTime || '').slice(0, 10))
+        : '',
+      flightNumber: isOutboundCollection ? String(formData.flightNumber || '').trim() : '',
       returnPickupTime: isReturn && !formData.openReturn ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : (isReturn && formData.returnPickupTime ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : ''),
       returnDate: isReturn ? (String(formData.returnDate || '').slice(0, 10) || String(formData.returnPickupTime || '').slice(0, 10)) : '',
       openReturn: isReturn && formData.openReturn === true,
@@ -561,16 +661,26 @@ const BookingModal: React.FC<BookingModalProps> = ({
       destination: outboundStops[outboundStops.length - 1]?.address || formData.destination,
       returnPickupLocation: isReturn ? (returnStops[0]?.address || '') : '',
       returnDestination: isReturn ? (returnStops[returnStops.length - 1]?.address || '') : '',
-      returnAirportCollection: isReturn && formData.returnAirportCollection === true,
-      returnFlightNumber:
-        isReturn && formData.returnAirportCollection === true
-          ? String(formData.returnFlightNumber || '').trim()
-          : '',
+      returnAirportCollection: isReturnCollection,
+      returnAirportDropOff: isReturnDropOff,
+      returnFlightNumber: isReturnCollection ? String(formData.returnFlightNumber || '').trim() : '',
+      returnTerminal: isReturnCollection ? String(formData.returnTerminal || '').trim() : '',
+      returnLandingTime: isReturnCollection && returnArrangement === 'flight_monitored'
+        ? String(formData.returnLandingTime || '').trim()
+        : '',
+      returnFixedTimeAcknowledged: isReturnCollection ? formData.returnFixedTimeAcknowledged === true : false,
       returnDateTime: isReturn && formData.returnPickupTime ? fromDatetimeLocalValue(String(formData.returnPickupTime || '')) : '',
       dueOnOutbound: isReturn && dueOnOutbound != null ? dueOnOutbound : '',
       dueOnReturn: isReturn && dueOnReturn != null ? dueOnReturn : '',
       hirerName,
+      paymentMethod: isAccountJob ? 'account' : formData.paymentMethod,
     };
+    if (!effectiveJobKind) delete bookingData.jobKind;
+    if (!bookingData.billingAccountName) delete bookingData.billingAccountName;
+    if (!bookingData.billingAccountId) delete bookingData.billingAccountId;
+    if (!bookingData.passengerName) delete bookingData.passengerName;
+    if (!bookingData.invoiceStatus) delete bookingData.invoiceStatus;
+    if (!bookingData.invoiceReference) delete bookingData.invoiceReference;
     if (link.email) {
       bookingData.email = link.email;
       bookingData.hirerEmail = link.email;
@@ -931,6 +1041,56 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isAccountMode =
+    (!editingBooking && createMode === 'account')
+    || formData.jobKind === 'account'
+    || formData.paymentMethod === 'account';
+  const showCreateChooser = !editingBooking && createMode === 'choose';
+
+  const pickCreateMode = (mode: 'enquiry' | 'agreed' | 'account') => {
+    setCreateMode(mode);
+    setDirty(true);
+    setFormData((prev) => {
+      if (mode === 'enquiry') {
+        return {
+          ...prev,
+          jobKind: 'enquiry',
+          status: 'pending',
+          paymentMethod: 'undecided',
+          actualFare: '',
+          depositRequired: false,
+          depositAmount: '',
+          depositStatus: 'not_required',
+        };
+      }
+      if (mode === 'account') {
+        return {
+          ...prev,
+          jobKind: 'account',
+          status: 'confirmed',
+          paymentMethod: 'account',
+          depositRequired: false,
+          depositAmount: '',
+          depositStatus: 'not_required',
+          invoiceStatus: prev.invoiceStatus || 'unbilled',
+        };
+      }
+      return {
+        ...prev,
+        jobKind: 'agreed',
+        status: 'confirmed',
+      };
+    });
+  };
+
+  const saveButtonLabel = (() => {
+    if (editingBooking) return 'Save booking';
+    if (createMode === 'enquiry' || formData.jobKind === 'enquiry') return 'Save enquiry';
+    if (createMode === 'account' || formData.jobKind === 'account') return 'Save account job';
+    if (createMode === 'agreed' || formData.jobKind === 'agreed') return 'Book agreed trip';
+    return 'Save booking';
+  })();
+
   const requestClose = () => {
     if (dirty && !window.confirm('You have unsaved changes. Close without saving?')) return;
     onClose();
@@ -1004,14 +1164,21 @@ const BookingModal: React.FC<BookingModalProps> = ({
         <div className="modal-header">
           <button className="modal-close" type="button" onClick={requestClose} aria-label="Close booking">×</button>
           <h3 className="modal-title" id="booking-panel-title">
-            {editingBooking ? 'Edit Booking' : 'Create New Booking'}
+            {editingBooking ? 'Edit Booking' : showCreateChooser ? 'New booking' : (
+              createMode === 'enquiry' ? 'New enquiry' : createMode === 'account' ? 'New account job' : 'New agreed booking'
+            )}
           </h3>
           <p className="modal-subtitle">
-            {editingBooking ? editingBooking.bookingNumber : 'New booking'}
-            {' · '}
-            {formData.pickupLocation || 'Pickup not set'} to {formData.destination || 'destination not set'}
+            {editingBooking ? editingBooking.bookingNumber : (showCreateChooser ? 'Choose how to record this job' : 'New booking')}
+            {showCreateChooser ? null : (
+              <>
+                {' · '}
+                {formData.pickupLocation || 'Pickup not set'} to {formData.destination || 'destination not set'}
+              </>
+            )}
           </p>
             <p className="booking-summary">{editingBooking ? `Outstanding £${(money.outstandingPence / 100).toFixed(2)}. ` : ''}Saving does not email the customer. Confirm the journey separately when needed.</p>
+          {!showCreateChooser ? (
           <nav className="booking-section-nav" aria-label="Booking sections">
             <button type="button" onClick={() => showSection('booking-section-customer')}>Customer</button>
             <button type="button" onClick={() => showSection('booking-section-journey')}>Journey</button>
@@ -1020,9 +1187,47 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {editingBooking ? <button type="button" onClick={() => showSection('booking-section-documents')}>Communications</button> : null}
             {editingBooking ? <button type="button" onClick={() => showSection('booking-section-history')}>History</button> : null}
           </nav>
+          ) : null}
         </div>
 
-        <form onSubmit={handleSubmit} onChange={() => setDirty(true)}>
+        {showCreateChooser ? (
+          <div className="modal-body">
+            <section className="booking-panel" aria-label="Choose booking type">
+              <h4 className="booking-panel__title">What are you recording?</h4>
+              <div className="grid grid-cols-1 gap-3">
+                <button
+                  type="button"
+                  className="btn btn-secondary text-left"
+                  style={{ display: 'block', padding: '1rem', borderColor: '#b8956a' }}
+                  onClick={() => pickCreateMode('enquiry')}
+                >
+                  <strong style={{ color: '#002147' }}>Enquiry</strong>
+                  <span className="block text-sm text-gray-600 mt-1">Price or availability request. No confirmed fare yet.</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary text-left"
+                  style={{ display: 'block', padding: '1rem', borderColor: '#b8956a' }}
+                  onClick={() => pickCreateMode('agreed')}
+                >
+                  <strong style={{ color: '#002147' }}>Agreed booking</strong>
+                  <span className="block text-sm text-gray-600 mt-1">Customer has agreed the trip. You can change status later if needed.</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary text-left"
+                  style={{ display: 'block', padding: '1rem', borderColor: '#b8956a' }}
+                  onClick={() => pickCreateMode('account')}
+                >
+                  <strong style={{ color: '#002147' }}>Account job</strong>
+                  <span className="block text-sm text-gray-600 mt-1">Charge to a billing account. No deposit or payment request from this screen.</span>
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSubmit} onChange={() => setDirty(true)} style={showCreateChooser ? { display: 'none' } : undefined}>
           <div className="modal-body">
             {customerSuggestions.length > 0 && (
               <datalist id="booking-past-customers">
@@ -1033,10 +1238,48 @@ const BookingModal: React.FC<BookingModalProps> = ({
             )}
 
             <section id="booking-section-customer" className="booking-panel" aria-label="Customer">
-            <h4 className="booking-panel__title">Customer</h4>
+            <h4 className="booking-panel__title">{isAccountMode ? 'Account and passenger' : 'Customer'}</h4>
+            {!editingBooking && createMode !== 'choose' ? (
+              <p className="text-xs text-gray-500 mb-3">
+                {createMode === 'enquiry' ? 'Enquiry · pending until you agree the trip.' : null}
+                {createMode === 'agreed' ? 'Agreed booking · starts as confirmed. Change status in More options if needed.' : null}
+                {createMode === 'account' ? 'Account job · billed to the account, not an individual card or deposit.' : null}
+                {' '}
+                <button type="button" className="text-xs underline" style={{ color: '#002147' }} onClick={() => setCreateMode('choose')}>Change type</button>
+              </p>
+            ) : null}
+            {isAccountMode ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Billing account name *</label>
+                  <input
+                    type="text"
+                    value={formData.billingAccountName || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      billingAccountName: e.target.value,
+                      hirerName: formData.hirerName || e.target.value,
+                    })}
+                    required
+                    className="form-input"
+                    placeholder="Company or account name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Passenger name</label>
+                  <input
+                    type="text"
+                    value={formData.passengerName || ''}
+                    onChange={(e) => setFormData({ ...formData, passengerName: e.target.value })}
+                    className="form-input"
+                    placeholder="Traveller if different from the account"
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{isAccountMode ? 'Contact name *' : 'Customer Name *'}</label>
                 <input
                   type="text"
                   value={formData.hirerName}
@@ -1095,9 +1338,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
             </div>
             </section>
 
-            {locationSuggestions.length > 0 && (
+            {locationDatalist.length > 0 && (
               <datalist id="booking-past-locations">
-                {locationSuggestions.map((loc) => (
+                {locationDatalist.map((loc) => (
                   <option key={loc} value={loc} />
                 ))}
               </datalist>
@@ -1173,17 +1416,34 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     </div>
                     <JourneyStopsEditor
                       addressesRequired={formData.status !== 'cancelled'}
+                      placeSuggestions={placeSuggestionRows}
                       extraStopsIncluded={Boolean((formData as { extraStopsIncludedInFare?: boolean }).extraStopsIncludedInFare)}
                       onExtraStopsIncluded={(included) => setFormData((prev) => ({ ...prev, extraStopsIncludedInFare: included }))}
                       stops={formData.stops?.length ? formData.stops : normaliseStops(undefined, formData.pickupLocation, formData.destination || '')}
-                      onChange={(stops) => setFormData((prev) => ({
-                        ...prev,
-                        stops,
-                        pickupLocation: stops[0]?.address || '',
-                        destination: stops[stops.length - 1]?.address || '',
-                        pickupPlace: (stops[0]?.place as ExtendedBooking['pickupPlace']) || null,
-                        destinationPlace: (stops[stops.length - 1]?.place as ExtendedBooking['destinationPlace']) || null,
-                      }))}
+                      onChange={(stops) => {
+                        const pickupLocation = stops[0]?.address || '';
+                        const destination = stops[stops.length - 1]?.address || '';
+                        if (!airportManualOverride && parseKnownTerminal(pickupLocation)) {
+                          setTerminalUnlocked(false);
+                        }
+                        setFormData((prev) => {
+                          const airportPatch = syncOutboundAirportFromAddresses(
+                            pickupLocation,
+                            destination,
+                            prev,
+                            { manualOverride: airportManualOverride }
+                          );
+                          return {
+                            ...prev,
+                            ...airportPatch,
+                            stops,
+                            pickupLocation,
+                            destination,
+                            pickupPlace: (stops[0]?.place as ExtendedBooking['pickupPlace']) || null,
+                            destinationPlace: (stops[stops.length - 1]?.place as ExtendedBooking['destinationPlace']) || null,
+                          };
+                        });
+                      }}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                       <div>
@@ -1217,41 +1477,144 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     {formData.vehicleType === 'executive' ? (
                       <p className="text-sm text-gray-700 mb-3">Mercedes E Class or equivalent for Heathrow or Cotswolds trips. Availability must be confirmed.</p>
                     ) : null}
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Airport</label>
-                    <select
-                      className="form-input mb-3"
-                      value={formData.airportCollection ? 'collection' : formData.airportDropOff ? 'dropoff' : 'none'}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        airportCollection: e.target.value === 'collection',
-                        airportDropOff: e.target.value === 'dropoff',
-                        flightNumber: e.target.value === 'collection' ? formData.flightNumber : '',
-                        terminal: e.target.value === 'collection' ? formData.terminal : '',
-                        landingTime: e.target.value === 'collection' ? formData.landingTime : '',
-                      })}
-                    >
-                      <option value="none">No airport details</option>
-                      <option value="dropoff">Airport drop off</option>
-                      <option value="collection">Airport collection</option>
-                    </select>
-                    {formData.airportCollection && <div className="mb-4">{editingBooking && !formData.waitingPolicyVersion ? <p>{airportWaitingTextForBooking(editingBooking)} Existing agreed terms are retained.</p> : <CollectionChoices formData={formData} setFormData={setFormData} />}</div>}
-                  {formData.airportCollection && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
-                          <input type="text" value={formData.flightNumber || ''} onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })} className="form-input" placeholder="BA123" />
+                    {(() => {
+                      const outboundMode: AirportMode = formData.airportCollection
+                        ? 'collection'
+                        : formData.airportDropOff
+                          ? 'dropoff'
+                          : inferAirportMode(formData.pickupLocation, formData.destination);
+                      const knownPickup = parseKnownTerminal(formData.pickupLocation);
+                      const knownDest = parseKnownTerminal(formData.destination);
+                      const knownForLabel = outboundMode === 'dropoff' ? knownDest : knownPickup;
+                      const arrangement = formData.collectionLocationKind === 'hotel'
+                        ? 'fixed_time'
+                        : (formData.collectionArrangement || 'flight_monitored');
+                      const terminalSuggestions = !knownPickup && outboundMode === 'collection'
+                        ? terminalSuggestionsFor(formData.pickupLocation)
+                        : [];
+                      const applyOutboundMode = (mode: AirportMode) => {
+                        setAirportManualOverride(true);
+                        if (mode === 'none') {
+                          setFormData({
+                            ...formData,
+                            airportCollection: false,
+                            airportDropOff: false,
+                            ...emptyAirportCollectionFields(),
+                            collectionLocationKind: 'terminal',
+                          });
+                          return;
+                        }
+                        if (mode === 'dropoff') {
+                          setFormData({
+                            ...formData,
+                            airportCollection: false,
+                            airportDropOff: true,
+                            ...emptyAirportCollectionFields(),
+                            collectionLocationKind: 'terminal',
+                          });
+                          return;
+                        }
+                        const known = parseKnownTerminal(formData.pickupLocation);
+                        setTerminalUnlocked(!known);
+                        setFormData({
+                          ...formData,
+                          airportCollection: true,
+                          airportDropOff: false,
+                          terminal: known?.terminal || formData.terminal || '',
+                          collectionLocation: known?.label || formData.collectionLocation || formData.pickupLocation || '',
+                          collectionLocationKind: formData.collectionLocationKind === 'hotel' ? 'hotel' : 'terminal',
+                          collectionArrangement: formData.collectionArrangement || 'flight_monitored',
+                        });
+                      };
+                      return (
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-800 mb-2">{airportModeLabel(outboundMode, knownForLabel)}</p>
+                          {!airportManualOverride ? (
+                            <button type="button" className="btn btn-secondary btn-sm mb-3" onClick={() => setAirportManualOverride(true)}>
+                              Change airport details
+                            </button>
+                          ) : (
+                            <>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Airport</label>
+                              <select
+                                className="form-input mb-3"
+                                value={outboundMode}
+                                onChange={(e) => applyOutboundMode(e.target.value as AirportMode)}
+                              >
+                                <option value="none">No airport details</option>
+                                <option value="dropoff">Airport drop off</option>
+                                <option value="collection">Airport collection</option>
+                              </select>
+                            </>
+                          )}
+                          {outboundMode === 'dropoff' ? (
+                            <p className="text-xs text-gray-600">Drop off only. Flight and waiting fields are not used.</p>
+                          ) : null}
+                          {outboundMode === 'collection' ? (
+                            <>
+                              <div className="mb-4">
+                                {editingBooking && !formData.waitingPolicyVersion
+                                  ? <p>{airportWaitingTextForBooking(editingBooking)} Existing agreed terms are retained.</p>
+                                  : <CollectionChoices formData={formData} setFormData={setFormData} />}
+                              </div>
+                              {knownPickup && !terminalUnlocked ? (
+                                <p className="text-sm text-gray-700 mb-3">
+                                  Terminal: {knownPickup.terminal} (from address)
+                                  {' '}
+                                  <button type="button" className="underline text-xs" style={{ color: '#002147' }} onClick={() => setTerminalUnlocked(true)}>Edit</button>
+                                </p>
+                              ) : (
+                                <div className="mb-3 max-w-xs">
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">Terminal</label>
+                                  <input type="text" value={formData.terminal || ''} onChange={(e) => setFormData({ ...formData, terminal: e.target.value })} className="form-input" />
+                                </div>
+                              )}
+                              {terminalSuggestions.length > 0 ? (
+                                <div className="mb-3 flex flex-wrap gap-2">
+                                  {terminalSuggestions.map((row) => (
+                                    <button
+                                      key={row.label}
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={() => setFormData((prev) => {
+                                        const stops = [...(prev.stops?.length ? prev.stops : normaliseStops(undefined, prev.pickupLocation, prev.destination || ''))];
+                                        if (stops[0]) stops[0] = { ...stops[0], address: row.label, place: null };
+                                        return {
+                                          ...prev,
+                                          stops,
+                                          pickupLocation: row.label,
+                                          terminal: row.terminal,
+                                          collectionLocation: row.label,
+                                          airportCollection: true,
+                                          airportDropOff: false,
+                                        };
+                                      })}
+                                    >
+                                      {row.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {arrangement === 'flight_monitored' ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
+                                    <input type="text" value={formData.flightNumber || ''} onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })} className="form-input" placeholder="BA123" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled landing time</label>
+                                    <input type="time" value={formData.landingTime || ''} onChange={(e) => setFormData({ ...formData, landingTime: e.target.value })} className="form-input" />
+                                    <p className="text-xs text-gray-600 mt-1">Scheduled landing time. The pickup time above is when the driver should arrive.</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-600 mb-3">Fixed time collection uses the pickup time above. Add meeting instructions in the collection location if needed.</p>
+                              )}
+                            </>
+                          ) : null}
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Terminal</label>
-                          <input type="text" value={formData.terminal || ''} onChange={(e) => setFormData({ ...formData, terminal: e.target.value })} className="form-input" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled landing time</label>
-                          <input type="time" value={formData.landingTime || ''} onChange={(e) => setFormData({ ...formData, landingTime: e.target.value })} className="form-input" />
-                          <p className="text-xs text-gray-600 mt-1">Scheduled landing time. The pickup time above is when the driver should arrive.</p>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </section>
 
                   {formData.bookingType === 'return' && (
@@ -1313,48 +1676,182 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       ) : null}
                       <JourneyStopsEditor
                         addressesRequired={formData.status !== 'cancelled' && formData.returnStatus !== 'cancelled'}
+                        placeSuggestions={placeSuggestionRows}
                         extraStopsIncluded={Boolean((formData as { returnExtraStopsIncludedInFare?: boolean }).returnExtraStopsIncludedInFare)}
                         onExtraStopsIncluded={(included) => setFormData((prev) => ({ ...prev, returnExtraStopsIncludedInFare: included }))}
                         stops={formData.returnStops?.length ? formData.returnStops : normaliseStops(undefined, formData.returnPickupLocation || '', formData.returnDestination || '')}
-                        onChange={(stops) => setFormData((prev) => ({
-                          ...prev,
-                          returnStops: stops,
-                          returnPickupLocation: stops[0]?.address || '',
-                          returnDestination: stops[stops.length - 1]?.address || '',
-                        }))}
+                        onChange={(stops) => {
+                          const returnPickupLocation = stops[0]?.address || '';
+                          const returnDestination = stops[stops.length - 1]?.address || '';
+                          if (!returnAirportManualOverride && parseKnownTerminal(returnPickupLocation)) {
+                            setReturnTerminalUnlocked(false);
+                          }
+                          setFormData((prev) => {
+                            const airportPatch = syncReturnAirportFromAddresses(
+                              returnPickupLocation,
+                              returnDestination,
+                              prev,
+                              { manualOverride: returnAirportManualOverride }
+                            ) as Partial<ExtendedBooking>;
+                            return {
+                              ...prev,
+                              ...airportPatch,
+                              returnStops: stops,
+                              returnPickupLocation,
+                              returnDestination,
+                            };
+                          });
+                        }}
                       />
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Airport</label>
-                      <select
-                        className="form-input mb-3"
-                        value={formData.returnAirportCollection ? 'collection' : 'none'}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          returnAirportCollection: e.target.value === 'collection',
-                          returnFlightNumber: e.target.value === 'collection' ? formData.returnFlightNumber : '',
-                          returnTerminal: e.target.value === 'collection' ? formData.returnTerminal : '',
-                          returnLandingTime: e.target.value === 'collection' ? formData.returnLandingTime : '',
-                        })}
-                      >
-                        <option value="none">Airport drop off or no flight</option>
-                        <option value="collection">Airport collection</option>
-                      </select>
-                      {formData.returnAirportCollection && <div className="mb-4">{editingBooking && !formData.waitingPolicyVersion ? <p>Existing return waiting terms are retained.</p> : <CollectionChoices formData={formData} setFormData={setFormData} prefix="return" />}</div>}
-                  {formData.returnAirportCollection && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
-                            <input type="text" value={formData.returnFlightNumber || ''} onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })} className="form-input" />
+                      {(() => {
+                        const returnMode: AirportMode = formData.returnAirportCollection
+                          ? 'collection'
+                          : formData.returnAirportDropOff
+                            ? 'dropoff'
+                            : inferAirportMode(formData.returnPickupLocation, formData.returnDestination);
+                        const knownPickup = parseKnownTerminal(formData.returnPickupLocation);
+                        const knownDest = parseKnownTerminal(formData.returnDestination);
+                        const knownForLabel = returnMode === 'dropoff' ? knownDest : knownPickup;
+                        const arrangement = formData.returnCollectionLocationKind === 'hotel'
+                          ? 'fixed_time'
+                          : (formData.returnCollectionArrangement || 'flight_monitored');
+                        const terminalSuggestions = !knownPickup && returnMode === 'collection'
+                          ? terminalSuggestionsFor(formData.returnPickupLocation)
+                          : [];
+                        const applyReturnMode = (mode: AirportMode) => {
+                          setReturnAirportManualOverride(true);
+                          if (mode === 'none') {
+                            setFormData({
+                              ...formData,
+                              returnAirportCollection: false,
+                              returnAirportDropOff: false,
+                              returnTerminal: '',
+                              returnFlightNumber: '',
+                              returnLandingTime: '',
+                              returnCollectionLocation: '',
+                              returnCollectionArrangement: 'flight_monitored',
+                              returnArrivalDate: '',
+                              returnFixedTimeAcknowledged: false,
+                              returnCollectionLocationKind: 'terminal',
+                            });
+                            return;
+                          }
+                          if (mode === 'dropoff') {
+                            setFormData({
+                              ...formData,
+                              returnAirportCollection: false,
+                              returnAirportDropOff: true,
+                              returnTerminal: '',
+                              returnFlightNumber: '',
+                              returnLandingTime: '',
+                              returnCollectionLocation: '',
+                              returnCollectionArrangement: 'flight_monitored',
+                              returnArrivalDate: '',
+                              returnFixedTimeAcknowledged: false,
+                              returnCollectionLocationKind: 'terminal',
+                            });
+                            return;
+                          }
+                          const known = parseKnownTerminal(formData.returnPickupLocation);
+                          setReturnTerminalUnlocked(!known);
+                          setFormData({
+                            ...formData,
+                            returnAirportCollection: true,
+                            returnAirportDropOff: false,
+                            returnTerminal: known?.terminal || formData.returnTerminal || '',
+                            returnCollectionLocation: known?.label || formData.returnCollectionLocation || formData.returnPickupLocation || '',
+                            returnCollectionLocationKind: formData.returnCollectionLocationKind === 'hotel' ? 'hotel' : 'terminal',
+                            returnCollectionArrangement: formData.returnCollectionArrangement || 'flight_monitored',
+                          });
+                        };
+                        return (
+                          <div className="mt-4">
+                            <p className="text-sm text-gray-800 mb-2">{airportModeLabel(returnMode, knownForLabel)}</p>
+                            {!returnAirportManualOverride ? (
+                              <button type="button" className="btn btn-secondary btn-sm mb-3" onClick={() => setReturnAirportManualOverride(true)}>
+                                Change airport details
+                              </button>
+                            ) : (
+                              <>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Airport</label>
+                                <select
+                                  className="form-input mb-3"
+                                  value={returnMode}
+                                  onChange={(e) => applyReturnMode(e.target.value as AirportMode)}
+                                >
+                                  <option value="none">No airport details</option>
+                                  <option value="dropoff">Airport drop off</option>
+                                  <option value="collection">Airport collection</option>
+                                </select>
+                              </>
+                            )}
+                            {returnMode === 'dropoff' ? (
+                              <p className="text-xs text-gray-600">Return drop off only. Flight and waiting fields are not used.</p>
+                            ) : null}
+                            {returnMode === 'collection' ? (
+                              <>
+                                <div className="mb-4">
+                                  {editingBooking && !formData.waitingPolicyVersion
+                                    ? <p>Existing return waiting terms are retained.</p>
+                                    : <CollectionChoices formData={formData} setFormData={setFormData} prefix="return" />}
+                                </div>
+                                {knownPickup && !returnTerminalUnlocked ? (
+                                  <p className="text-sm text-gray-700 mb-3">
+                                    Terminal: {knownPickup.terminal} (from address)
+                                    {' '}
+                                    <button type="button" className="underline text-xs" style={{ color: '#002147' }} onClick={() => setReturnTerminalUnlocked(true)}>Edit</button>
+                                  </p>
+                                ) : (
+                                  <div className="mb-3 max-w-xs">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Terminal</label>
+                                    <input type="text" value={formData.returnTerminal || ''} onChange={(e) => setFormData({ ...formData, returnTerminal: e.target.value })} className="form-input" />
+                                  </div>
+                                )}
+                                {terminalSuggestions.length > 0 ? (
+                                  <div className="mb-3 flex flex-wrap gap-2">
+                                    {terminalSuggestions.map((row) => (
+                                      <button
+                                        key={`return-${row.label}`}
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setFormData((prev) => {
+                                          const stops = [...(prev.returnStops?.length ? prev.returnStops : normaliseStops(undefined, prev.returnPickupLocation || '', prev.returnDestination || ''))];
+                                          if (stops[0]) stops[0] = { ...stops[0], address: row.label, place: null };
+                                          return {
+                                            ...prev,
+                                            returnStops: stops,
+                                            returnPickupLocation: row.label,
+                                            returnTerminal: row.terminal,
+                                            returnCollectionLocation: row.label,
+                                            returnAirportCollection: true,
+                                            returnAirportDropOff: false,
+                                          };
+                                        })}
+                                      >
+                                        {row.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {arrangement === 'flight_monitored' ? (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">Flight number</label>
+                                      <input type="text" value={formData.returnFlightNumber || ''} onChange={(e) => setFormData({ ...formData, returnFlightNumber: e.target.value })} className="form-input" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled landing time</label>
+                                      <input type="time" value={formData.returnLandingTime || ''} onChange={(e) => setFormData({ ...formData, returnLandingTime: e.target.value })} className="form-input" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-gray-600">Fixed time collection uses the return pickup time. Add meeting instructions in the collection location if needed.</p>
+                                )}
+                              </>
+                            ) : null}
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Terminal</label>
-                            <input type="text" value={formData.returnTerminal || ''} onChange={(e) => setFormData({ ...formData, returnTerminal: e.target.value })} className="form-input" />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled landing time</label>
-                            <input type="time" value={formData.returnLandingTime || ''} onChange={(e) => setFormData({ ...formData, returnLandingTime: e.target.value })} className="form-input" />
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
                 </>
@@ -1549,7 +2046,27 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
             <section id="booking-section-fare" className="booking-panel booking-panel--fare">
               <h4 className="booking-panel__title">Fare</h4>
-              {editingBooking?.id ? (
+              {isAccountMode ? (
+                <>
+                  <p className="text-sm text-gray-800 mb-3">Account job. Fare is optional here. Quotes, deposits and payment requests are not used for account billing.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Agreed fare (£), optional</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.actualFare || ''}
+                        onChange={(e) => setFormData({ ...formData, actualFare: e.target.value })}
+                        className="form-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment method</label>
+                      <input className="form-input" value="Account" disabled />
+                    </div>
+                  </div>
+                </>
+              ) : editingBooking?.id ? (
                 <QuoteEditor
                   bookingId={editingBooking.id}
                   form={{
@@ -1573,7 +2090,11 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 />
               ) : (
               <>
-              <p className="text-sm text-gray-800 mb-3">This agreed total covers {formData.bookingType === 'return' ? 'both journeys.' : 'the one way journey.'}</p>
+              <p className="text-sm text-gray-800 mb-3">
+                {createMode === 'enquiry'
+                  ? 'Leave the fare blank until a price is agreed.'
+                  : `This agreed total covers ${formData.bookingType === 'return' ? 'both journeys.' : 'the one way journey.'}`}
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Actual Fare (£)</label>
@@ -1629,6 +2150,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               )}
 
+              {createMode !== 'enquiry' ? (
+                <>
               <label className="block text-sm font-medium text-gray-700 mb-1">Shift4 payment link, optional</label>
               <input className="form-input mb-4" value={(formData as { paymentLinkUrl?: string }).paymentLinkUrl || ''} placeholder="https://" onChange={(e) => setFormData({ ...formData, paymentLinkUrl: e.target.value } as ExtendedBooking)} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1680,7 +2203,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
                       value={formData.depositStatus === 'paid' ? 'paid' : 'pending'}
                       onChange={(e) => setFormData({ ...formData, depositStatus: e.target.value })}
                       className="form-input"
-                    >
+                  >
                       <option value="pending">Pending</option>
                       <option value="paid">Paid</option>
                     </select>
@@ -1701,10 +2224,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
                   />
                 </div>
               )}
+                </>
+              ) : null}
               </>
               )}
 
-              {formData.bookingType === 'return' && (
+              {formData.bookingType === 'return' && !isAccountMode && (
                 <div className="mb-4 p-3 rounded-md border border-gray-200 bg-white">
                   <div className="font-semibold text-gray-900 mb-1">Payment schedule (optional)</div>
                   <p className="text-xs text-gray-500 mb-3">
@@ -1870,10 +2395,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
               type="submit"
               className="btn btn-primary"
             >
-              {editingBooking ? 'Save booking' : 'Save booking'}
+              {saveButtonLabel}
             </button>
           </div>
         </form>
+        {showCreateChooser ? (
+          <div className="modal-footer">
+            <button type="button" onClick={requestClose} className="btn btn-secondary">Cancel</button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

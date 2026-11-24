@@ -41,7 +41,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab, open, 
             const isActive = activeTab === item.id;
             return (
               <React.Fragment key={item.id}>
-                {item.id === firstQuiet ? <p className="admin-nav-quiet-label">More</p> : null}
+                {item.id === firstQuiet ? <p className="admin-nav-quiet-label">Settings</p> : null}
                 <button
                   type="button"
                   onClick={() => {

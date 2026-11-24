@@ -209,4 +209,28 @@ assert.equal(undone.update.outboundStatus, "completed");
 assert.equal(undone.update.status, "allocated");
 assert.equal(undone.update.actualFare, undefined);
 
+const displayJob = {
+  id: "account-display",
+  status: "allocated",
+  pickupTime: "2026-11-15T16:40:00",
+  dateTime: "2026-11-15T16:40:00",
+  pickupLocation: "The Randolph Hotel, Beaumont Street, Oxford",
+  destination: "Oxford Railway Station",
+  driverId: "sam",
+  vehicleId: "car-out",
+  vehicleType: "standard",
+  hirerName: "Company Contact",
+  passengerName: "Guest Traveller",
+  billingAccountName: "Randolph Accounts",
+  pickupPlace: { label: "The Randolph Hotel", latitude: 51.75499, longitude: -1.259782 },
+  stops: [{ type: "pickup", address: "The Randolph Hotel", notes: "Main entrance on Beaumont Street" }],
+};
+const accountView = hub.presentJob(hub.expandJobs(displayJob)[0], lists, now);
+assert.equal(accountView.customer, "Guest Traveller");
+assert.equal(accountView.billingAccount, "Randolph Accounts");
+assert.equal(accountView.meetingInstructions, "Main entrance on Beaumont Street");
+assert.equal(accountView.pickupLabel, "Pickup");
+assert.equal(accountView.dropOffLabel, "Drop off");
+assert.match(accountView.mapLink, /google\.com\/maps\?q=51\.75499/);
+
 console.log("driver hub presentation ok");

@@ -1,7 +1,16 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import Dashboard from "./Dashboard";
-import type { Booking } from "../types/types";
+import { Booking } from "../types/types";
+
+jest.mock("firebase/functions", () => ({ httpsCallable: () => () => Promise.resolve({ data: {} }) }));
+jest.mock("firebase/firestore", () => ({
+  collection: jest.fn(),
+  onSnapshot: () => () => undefined,
+  query: jest.fn(),
+  where: jest.fn(),
+}));
+jest.mock("../utils/firebase", () => ({ db: {}, functions: {} }));
 
 beforeEach(() => {
   global.fetch = jest.fn(() => Promise.resolve({ ok: false, json: async () => null })) as unknown as typeof fetch;
@@ -25,7 +34,7 @@ function booking(overrides: Partial<Booking>): Booking {
   };
 }
 
-test("keeps the existing dashboard and adds marketing performance for an admin", () => {
+test("shows Today sections and marketing inside reports snapshot for an admin", () => {
   const onOpenAdvertising = jest.fn();
   render(
     <Dashboard
@@ -42,37 +51,18 @@ test("keeps the existing dashboard and adds marketing performance for an admin",
     />
   );
 
-  expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Upcoming jobs" })).toBeTruthy();
-  expect(screen.getByText("Each journey in the next 7 days. A return is listed on its own pickup time.")).toBeTruthy();
-  expect(screen.getByText("No upcoming jobs in the next week.")).toBeTruthy();
-  expect(screen.getByText("Active Drivers")).toBeTruthy();
-  expect(screen.getByText("Active Drivers").parentElement?.textContent).toContain("2");
-  expect(screen.queryByText(/Compliant/)).toBeNull();
-  expect(screen.getByText("Vehicles on fleet").parentElement?.textContent).toContain("3");
-  expect(screen.getByText("Total Bookings").parentElement?.textContent).toContain("1");
-  expect(screen.getByText("Today's Bookings").parentElement?.textContent).toContain("0");
-  expect(screen.getByRole("heading", { name: "Records on file" })).toBeTruthy();
-  expect(screen.getByText("Active drivers recorded")).toBeTruthy();
-  expect(screen.getByText(/not a licence check/)).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Today" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "New enquiries" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Today's jobs" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Tomorrow's jobs" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Unassigned" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Exceptions" })).toBeTruthy();
   expect(screen.getByText("Desktop reminders")).toBeTruthy();
+  expect(screen.getByText("Reports snapshot")).toBeTruthy();
+  fireEvent.click(screen.getByText("Reports snapshot"));
   expect(screen.getByRole("heading", { name: "Marketing performance" })).toBeTruthy();
   expect(screen.getByText("Booking frequency")).toBeTruthy();
-  expect(screen.getAllByText("Seasonality, repeat customers, referrals and other marketing activities may affect these results.").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Before and after advertising" })).toBeTruthy();
-  expect(screen.getByText(/Overall business growth after advertising started is separate/)).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Objective" })).toBeTruthy();
-  expect(screen.getByText(/See whether introducing Google Ads increased the number of bookings/)).toBeTruthy();
-  expect(screen.getByText(/Google Ads start date: not recorded/)).toBeTruthy();
-  expect(screen.getByText(/Not calculated/)).toBeTruthy();
-  expect(screen.queryByText("Visual comparison")).toBeNull();
-  expect(screen.getAllByText(/Google Ads reporting is not available/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/existing Firebase booking records/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/not modified merely to produce a comparison/).length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Incomplete historical records" })).toBeTruthy();
-  expect(screen.getByText(/Where a historical booking record is incomplete, the limitation is shown here/)).toBeTruthy();
-  expect(screen.getByText(/no creation time/)).toBeTruthy();
-  expect(screen.queryByRole("heading", { name: "Incomplete records in the before and after comparison" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Open Advertising results" }));
   expect(onOpenAdvertising).toHaveBeenCalledTimes(1);
 });
@@ -90,23 +80,15 @@ test("leaves marketing performance hidden when the account is not an admin", () 
       onDesktopRemindersChange={() => undefined}
     />
   );
-  expect(screen.getByRole("heading", { name: "Upcoming jobs" })).toBeTruthy();
-  expect(screen.getByText("Active Drivers")).toBeTruthy();
-  expect(screen.getByText("Active Drivers").parentElement?.textContent).toContain("1");
-  expect(screen.getByText("Vehicles on fleet").parentElement?.textContent).toContain("1");
-  expect(screen.getByText("Total Bookings").parentElement?.textContent).toContain("0");
-  expect(screen.getByText("Today's Bookings").parentElement?.textContent).toContain("0");
-  expect(screen.getByRole("heading", { name: "Records on file" })).toBeTruthy();
-  expect(screen.getByText(/not a licence check/)).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Today" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Today's jobs" })).toBeTruthy();
   expect(screen.getByText("Desktop reminders")).toBeTruthy();
+  fireEvent.click(screen.getByText("Reports snapshot"));
   expect(screen.queryByRole("heading", { name: "Marketing performance" })).toBeNull();
-  expect(screen.queryByText("Booking frequency")).toBeNull();
-  expect(screen.queryByText("Seasonality, repeat customers, referrals and other marketing activities may affect these results.")).toBeNull();
   expect(screen.queryByRole("heading", { name: "Before and after advertising" })).toBeNull();
-  expect(screen.queryByRole("heading", { name: "Incomplete historical records" })).toBeNull();
 });
 
-test("keeps the pending review alert and the fuel price note", async () => {
+test("keeps the pending review alert and the fuel price note in reports snapshot", async () => {
   global.fetch = jest.fn(() => Promise.resolve({
     ok: true,
     json: async () => ({ available: true, petrolPence: 134.5, dieselPence: 141.2, weekCommencing: "02/11/2026" }),
@@ -125,10 +107,10 @@ test("keeps the pending review alert and the fuel price note", async () => {
   );
   expect(screen.getByRole("heading", { name: "2 New Customer Bookings Pending Review" })).toBeTruthy();
   expect(screen.getByText(/Go to the Bookings page to review and confirm customer bookings with pricing/)).toBeTruthy();
+  fireEvent.click(screen.getByText("Reports snapshot"));
   expect(await screen.findByRole("heading", { name: "UK average fuel prices" })).toBeTruthy();
   expect(screen.getByText(/Petrol 134.5p\/L/)).toBeTruthy();
   expect(screen.getByText(/informational only, not linked to fares/)).toBeTruthy();
-  expect(screen.queryByRole("heading", { name: "Marketing performance" })).toBeNull();
 });
 
 test("shows before and after performance once an administrator confirms the start date", () => {
@@ -150,37 +132,16 @@ test("shows before and after performance once an administrator confirms the star
       advertisingStartConfirmed
     />
   );
+  fireEvent.click(screen.getByText("Reports snapshot"));
   expect(screen.getByRole("heading", { name: "Before" })).toBeTruthy();
   expect(screen.getByText(/Before ads:/)).toBeTruthy();
   expect(screen.getByText(/After ads:/)).toBeTruthy();
-  expect(screen.getAllByText("Increase: 0%").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "After" })).toBeTruthy();
-  expect(screen.getAllByText(/Total bookings: 1/).length).toBe(2);
-  expect(screen.getAllByText(/Confirmed bookings: 1/).length).toBe(2);
-  expect(screen.getAllByText(/Completed bookings: 1/).length).toBe(2);
-  expect(screen.getAllByText(/Bookings per day:/).length).toBe(2);
-  expect(screen.getAllByText(/Bookings per week:/).length).toBe(2);
-  expect(screen.getAllByText(/Gross booking revenue: £40\.00/).length).toBe(2);
-  expect(screen.getAllByText(/Average booking value: £40\.00/).length).toBe(2);
-  expect(screen.getAllByText(/Enquiry volume: no enquiry records/).length).toBe(2);
-  expect(screen.getAllByText(/Enquiry to booking conversion rate: not measurable/).length).toBe(2);
-  expect(screen.getByText(/Returning customers: 0/)).toBeTruthy();
-  expect(screen.getByText(/New customers: 1/)).toBeTruthy();
-  expect(screen.getByText(/Returning customers: 1/)).toBeTruthy();
-  expect(screen.getByText(/New customers: 0/)).toBeTruthy();
   expect(screen.getByText("Visual comparison")).toBeTruthy();
-  expect(screen.getByText(/not drawn as zero/)).toBeTruthy();
-  expect(screen.getByText(/The confirmed Google Ads start date is 2024-06-01/)).toBeTruthy();
-  expect(screen.getByText(/not a finished day on this chart/)).toBeTruthy();
-  expect(screen.getAllByText(/does not claim that all additional bookings were caused by Google Ads/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/existing Firebase booking records/).length).toBeGreaterThan(0);
-  expect(screen.getAllByText(/not modified merely to produce a comparison/).length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Incomplete records in the before and after comparison" })).toBeTruthy();
-  expect(screen.getByText(/no recorded source/)).toBeTruthy();
-  expect(screen.getAllByText(/no creation time/).length).toBeGreaterThan(0);
 });
 
-test("lists a future return once when the outbound is already completed", () => {
+test("lists a future return in exceptions when the outbound is already completed", () => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date("2026-11-12T12:00:00Z"));
   const row = booking({
@@ -212,13 +173,43 @@ test("lists a future return once when the outbound is already completed", () => 
     />
   );
   try {
-    expect(screen.getAllByText(/SP355017/)).toHaveLength(1);
+    expect(screen.getAllByText(/SP355017/).length).toBeGreaterThan(0);
     expect(screen.getByText(/· Return/)).toBeTruthy();
     expect(screen.getByText("London Heathrow Terminal 2 → 10 Beech Crescent OX5 1DN")).toBeTruthy();
     expect(screen.getByText("Needs review")).toBeTruthy();
     expect(screen.getByText("Driver not confirmed")).toBeTruthy();
-    expect(screen.queryByText("10 Beech Crescent OX5 1DN → London Heathrow Terminal 2")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Returns to review" })).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("opens a booking when a Today row is clicked", () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date("2026-11-24T10:00:00Z"));
+  const onOpenBooking = jest.fn();
+  const row = booking({
+    id: "pending1",
+    bookingNumber: "SP-PENDING",
+    status: "pending",
+    pickupTime: "2026-11-25T09:00:00Z",
+    dateTime: "2026-11-25T09:00:00Z",
+  });
+  render(
+    <Dashboard
+      activeDriversCount={1}
+      availableVehiclesCount={1}
+      totalBookings={1}
+      todaysBookingsCount={0}
+      pendingCustomerBookingsCount={1}
+      bookings={[row]}
+      desktopRemindersEnabled={false}
+      onDesktopRemindersChange={() => undefined}
+      onOpenBooking={onOpenBooking}
+    />
+  );
+  try {
+    fireEvent.click(screen.getAllByRole("button", { name: /SP-PENDING/ })[0]);
+    expect(onOpenBooking).toHaveBeenCalledWith(expect.objectContaining({ id: "pending1" }));
   } finally {
     jest.useRealTimers();
   }

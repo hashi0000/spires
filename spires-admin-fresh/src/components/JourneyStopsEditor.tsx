@@ -8,9 +8,11 @@ type Props = {
   extraStopsIncluded?: boolean;
   onExtraStopsIncluded?: (included: boolean) => void;
   addressesRequired?: boolean;
+  /** Company or recent places passed through to each address field. */
+  placeSuggestions?: { id: string; label: string }[];
 };
 
-const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange, extraStopsIncluded = false, onExtraStopsIncluded, addressesRequired = true }) => {
+const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange, extraStopsIncluded = false, onExtraStopsIncluded, addressesRequired = true, placeSuggestions }) => {
   const update = (index: number, patch: Partial<JourneyStop>) => {
     onChange(stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)));
   };
@@ -66,6 +68,7 @@ const JourneyStopsEditor: React.FC<Props> = ({ stops, onChange, extraStopsInclud
             label="Address"
             value={stop.address}
             required={addressesRequired}
+            extraSuggestions={placeSuggestions}
             onChange={(value, place) => update(index, { address: value, place: place || null })}
           />
           <label className="stop-note">

@@ -19,9 +19,32 @@ type Props = {
   value: string;
   required?: boolean;
   onChange: (value: string, place: SelectedPlace | null) => void;
+  /** Company or recent places shown ahead of API results. Deduped by label. */
+  extraSuggestions?: { id: string; label: string }[];
 };
 
-export default function LocationField({ label, value, required, onChange }: Props) {
+function mergeSuggestions(
+  api: Suggestion[],
+  extras?: { id: string; label: string }[]
+): Suggestion[] {
+  const fromExtras: Suggestion[] = (extras || [])
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      placeId: "",
+      postcode: "",
+      latitude: null as number | null,
+      longitude: null as number | null,
+      premise: "",
+      needsProperty: false,
+    }))
+    .filter((row) => String(row.label || "").trim());
+  const seen = new Set(fromExtras.map((row) => row.label.trim().toLowerCase()));
+  const fromApi = api.filter((row) => !seen.has(String(row.label || "").trim().toLowerCase()));
+  return [...fromExtras, ...fromApi];
+}
+
+export default function LocationField({ label, value, required, onChange, extraSuggestions }: Props) {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -41,17 +64,28 @@ export default function LocationField({ label, value, required, onChange }: Prop
 
   async function load(query: string) {
     const token = ++request.current;
+    const trimmed = String(query || "").trim();
+    if (!trimmed) {
+      const onlyExtras = mergeSuggestions([], extraSuggestions);
+      setSuggestions(onlyExtras);
+      setActive(0);
+      setOpen(onlyExtras.length > 0);
+      return;
+    }
     try {
       const response = await fetch(`${ENDPOINT}?q=${encodeURIComponent(query)}`);
       const body = await response.json();
       if (token !== request.current) return;
-      setSuggestions(Array.isArray(body.suggestions) ? body.suggestions : []);
+      const api = Array.isArray(body.suggestions) ? body.suggestions : [];
+      const merged = mergeSuggestions(api, extraSuggestions);
+      setSuggestions(merged);
       setActive(0);
-      setOpen(true);
+      setOpen(merged.length > 0);
     } catch {
       if (token === request.current) {
-        setSuggestions([]);
-        setOpen(false);
+        const onlyExtras = mergeSuggestions([], extraSuggestions);
+        setSuggestions(onlyExtras);
+        setOpen(onlyExtras.length > 0);
       }
     }
   }

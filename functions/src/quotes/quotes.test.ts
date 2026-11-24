@@ -396,10 +396,14 @@ describe("booking reliability regressions", () => {
     }
   });
 
-  it("sends the first confirmation when a recipient is added later, but never resends a sent confirmation", () => {
-    assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), true);
+  it("stays silent when contact is added to an already confirmed booking, and never resends a sent confirmation", () => {
+    // Profile merge / contact correction on an old confirmed job must not queue mail.
+    assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com" }), false);
     assert.equal(shouldSendConfirmation({ status: "confirmed", email: "test@example.com" }, { status: "confirmed", email: "test@example.com" }), false);
     assert.equal(shouldSendConfirmation({ status: "confirmed" }, { status: "confirmed", email: "test@example.com", confirmationEmailSentAt: "sent" }), false);
+    // A genuine new confirmation still sends.
+    assert.equal(shouldSendConfirmation({ status: "pending" }, { status: "confirmed", email: "test@example.com" }), true);
+    assert.equal(shouldSendConfirmation(null, { status: "confirmed", email: "test@example.com" }), true);
   });
 
   it("allows the actual Shift4 payment host and rejects lookalikes", () => {

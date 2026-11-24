@@ -114,11 +114,10 @@ function shouldSendConfirmation(before, after) {
         return false;
     if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after))
         return false;
-    if (!before || !isWorkflowConfirmed(before))
+    // Only when the booking newly becomes confirmed. Contact merges and email corrections stay silent.
+    if (!before)
         return true;
-    // A confirmed booking that previously had no recipient can now receive its first confirmation.
-    const recipient = (row) => String(row.hirerEmail || row.email || "").trim();
-    return !recipient(before) && Boolean(recipient(after));
+    return !isWorkflowConfirmed(before);
 }
 function bookingMatchesStatusFilter(booking, filter) {
     return !filter || filter === "all" || effectiveWorkflowStatus(booking) === filter;

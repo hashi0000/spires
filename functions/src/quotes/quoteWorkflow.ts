@@ -142,10 +142,9 @@ type ConfirmationBooking = BookingWorkflow & {
 export function shouldSendConfirmation(before: ConfirmationBooking | null, after: ConfirmationBooking): boolean {
   if (effectiveWorkflowStatus(after) === "completed") return false;
   if (after.confirmationEmailSentAt || !isWorkflowConfirmed(after)) return false;
-  if (!before || !isWorkflowConfirmed(before)) return true;
-  // A confirmed booking that previously had no recipient can now receive its first confirmation.
-  const recipient = (row: ConfirmationBooking) => String(row.hirerEmail || row.email || "").trim();
-  return !recipient(before) && Boolean(recipient(after));
+  // Only when the booking newly becomes confirmed. Contact merges and email corrections stay silent.
+  if (!before) return true;
+  return !isWorkflowConfirmed(before);
 }
 
 export function bookingMatchesStatusFilter(booking: BookingWorkflow, filter: string): boolean {

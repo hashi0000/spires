@@ -26,6 +26,7 @@ import { QuickBookingActions } from './QuickBookingActions';
 import { JobCardStatusControls } from './JobCardStatusControls';
 import { JobsSelectionBar, selectedRowsFromKeys } from './JobsSelectionBar';
 import { jobSelectionKey, resolveJobCardLeg } from '../utils/jobCardActions';
+import { bookingNextAction } from '../utils/bookingNextAction';
 
 type QuickView = 'all' | 'today' | 'tomorrow' | 'upcoming' | 'past' | 'unassigned' | 'awaiting_payment';
 const FILTER_KEY = 'spires_admin_booking_filters';
@@ -891,9 +892,11 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                     const routeFrom = leg?.pickupLocation || booking.pickupLocation;
                     const routeTo = leg?.destination || booking.destination;
                     const rowKey = `${booking.id || booking.bookingNumber}-${leg?.leg || 'booking'}`;
-                    const nextAction = workflow === 'pending' ? 'Prepare quote'
-                      : workflow === 'awaiting_customer_confirmation' ? (booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Record deposit or payment' : 'Review quote and acceptance')
-                      : shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId ? 'Assign driver' : 'Open booking';
+                    const nextAction = (() => {
+                      if (shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId) return 'Assign driver';
+                      const action = bookingNextAction(booking);
+                      return action.label === 'Done' || action.code === 'none' ? 'Open booking' : action.label;
+                    })();
                     const routeOpen = openRouteId === rowKey;
                     const returnJourney = isReturnBooking(booking);
                     const unassigned = !driverId && shownStatus !== 'cancelled' && shownStatus !== 'completed';
@@ -995,9 +998,11 @@ await onSaveBookingDirect(bookingData);        if (existingBooking) {
                 const routeFrom = leg?.pickupLocation || booking.pickupLocation;
                 const routeTo = leg?.destination || booking.destination;
                 const rowKey = `${booking.id || booking.bookingNumber}-${leg?.leg || 'booking'}`;
-                const nextAction = workflow === 'pending' ? 'Prepare quote'
-                  : workflow === 'awaiting_customer_confirmation' ? (booking.quoteAcceptanceSubstatus === 'awaiting_payment' ? 'Record deposit or payment' : 'Review quote and acceptance')
-                  : shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId ? 'Assign driver' : 'Open booking';
+                const nextAction = (() => {
+                  if (shownStatus !== 'cancelled' && shownStatus !== 'completed' && !driverId) return 'Assign driver';
+                  const action = bookingNextAction(booking);
+                  return action.label === 'Done' || action.code === 'none' ? 'Open booking' : action.label;
+                })();
                 const returnJourney = isReturnBooking(booking);
                 const badgeLabel = shownStatus === 'needs_review' ? 'Needs review' : workflowStatusLabel(shownStatus);
                 const badgeClass = shownStatus === 'needs_review' ? 'badge-awaiting' : workflowBadgeClass(shownStatus);

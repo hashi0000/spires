@@ -233,6 +233,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /companyPlaces/{placeId} {
+      allow read, write: if isStaff();
+    }
+
     // School invoice vault: ciphertext only, written by Cloud Functions (Admin SDK).
     match /schoolInvoiceVault/{docId} {
       allow read, write: if false;

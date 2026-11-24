@@ -173,6 +173,16 @@ export interface Booking {
   websiteEnquiryRef?: string;
   /** What the customer told the office. This is not tracked advertising. */
   customerReportedSource?: '' | 'google_advert' | 'google_search' | 'recommendation' | 'repeat' | 'other';
+  /** How the office created or classified this job. */
+  jobKind?: 'enquiry' | 'agreed' | 'account';
+  billingAccountId?: string;
+  billingAccountName?: string;
+  /** Traveller name when different from the hirer or billing account. */
+  passengerName?: string;
+  invoiceStatus?: 'unbilled' | 'invoiced';
+  invoiceReference?: string;
+  /** Outbound leg is an airport drop off (not a collection). */
+  airportDropOff?: boolean;
 }
 
 // Extended booking interface for form handling
@@ -217,6 +227,13 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   returnLandingTime?: string;
   paymentLinkUrl?: string;
   airportDropOff?: boolean;
+  returnAirportDropOff?: boolean;
+  jobKind?: 'enquiry' | 'agreed' | 'account';
+  billingAccountId?: string;
+  billingAccountName?: string;
+  passengerName?: string;
+  invoiceStatus?: 'unbilled' | 'invoiced';
+  invoiceReference?: string;
   customerStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
   returnTrip?: boolean;
   returnDateTime?: string;

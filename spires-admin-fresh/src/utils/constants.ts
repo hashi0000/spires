@@ -1,18 +1,19 @@
 // constants.ts - Put this in a separate file
-import { Calendar, Car, FileText, Users, Link2, UserCircle, Receipt, DollarSign, Share2, TrendingUp, Mail } from 'lucide-react';
+import { Calendar, FileText, Users, Link2, UserCircle, Receipt, DollarSign, Share2, TrendingUp, Mail, MapPin } from 'lucide-react';
 
 export const navigation = [
-  { id: 'dashboard', name: 'Dashboard', icon: Calendar, quiet: false, adminOnly: false },
+  { id: 'dashboard', name: 'Today', icon: Calendar, quiet: false, adminOnly: false },
   { id: 'bookings', name: 'Bookings', icon: FileText, quiet: false, adminOnly: false },
   { id: 'customers', name: 'Customers', icon: UserCircle, quiet: false, adminOnly: false },
-  { id: 'drivers', name: 'Drivers', icon: Users, quiet: false, adminOnly: false },
-  { id: 'vehicles', name: 'Vehicles', icon: Car, quiet: false, adminOnly: false },
+  { id: 'account-trips', name: 'Billing', icon: DollarSign, quiet: false, adminOnly: false },
+  { id: 'fleet', name: 'Fleet', icon: Users, quiet: false, adminOnly: false },
   { id: 'advertising', name: 'Advertising results', icon: TrendingUp, quiet: true, adminOnly: true },
   { id: 'communications', name: 'Offers and Messages', icon: Mail, quiet: true, adminOnly: true },
-  { id: 'invoices', name: 'Invoices', icon: DollarSign, quiet: true, adminOnly: false },
+  { id: 'invoices', name: 'Invoices', icon: Receipt, quiet: true, adminOnly: false },
   { id: 'school-invoices', name: 'School invoices', icon: Receipt, quiet: true },
   { id: 'spires-share', name: 'Spires Share', icon: Share2, quiet: true },
   { id: 'link-bookings', name: 'Maintenance: link bookings', icon: Link2, quiet: true },
+  { id: 'company-places', name: 'Company places', icon: MapPin, quiet: true },
 ];
 
 export const expenseTypes = [
