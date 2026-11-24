@@ -95,7 +95,7 @@ async function check(label, fn) { await fn(); console.log(`PASS ${label}`); }
     await quote(id);
     await assert.rejects(call('acceptQuote', { bookingId: id }, { auth: { uid: 'other-user', token: {} } }), /cannot accept/);
   });
-  await check('late email can enqueue one confirmation and duplicate enqueue is harmless', async () => {
+  await check('late email on an already confirmed booking stays silent', async () => {
     const id = await seed('late-email');
     await db.collection('bookings').doc(id).update({ status: 'confirmed', hirerEmail: admin.firestore.FieldValue.delete() });
     const before = await row(id);
@@ -103,8 +103,7 @@ async function check(label, fn) { await fn(); console.log(`PASS ${label}`); }
     const after = await row(id);
     await Promise.all([flow.enqueueConfirmationIfNeeded(before, after, id), flow.enqueueConfirmationIfNeeded(before, after, id)]);
     const jobs = await db.collection('emailJobs').where('bookingId', '==', id).get();
-    assert.equal(jobs.size, 1);
-    assert.equal(jobs.docs[0].data().status, 'queued');
+    assert.equal(jobs.size, 0);
   });
   await check('retry targets failed messages for this booking only', async () => {
     const id = ids[0];
