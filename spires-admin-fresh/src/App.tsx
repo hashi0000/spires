@@ -11,6 +11,9 @@ import { generateBookingConfirmationPDF } from './utils/pdfGenerator';
 import { isPendingIncomingRequest } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
+import { buildBillingAccountSuggestions } from './utils/billingAccounts';
+import { loadGeneralInvoiceVault } from './utils/generalInvoiceStorage';
+import type { SavedInvoiceClient } from './utils/generalInvoiceTypes';
 import { isAdminEmail } from './utils/staffAccess';
 import Login from './components/Login';
 import Header from './components/Header';
@@ -158,6 +161,26 @@ const App: React.FC = () => {
   const customerSuggestions = useMemo(
     () => buildCustomerSuggestionsFromBookings(bookingsHook.bookings),
     [bookingsHook.bookings]
+  );
+
+  const [invoiceClients, setInvoiceClients] = useState<SavedInvoiceClient[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadGeneralInvoiceVault()
+      .then((vault) => {
+        if (!cancelled) setInvoiceClients(vault.clients || []);
+      })
+      .catch(() => {
+        if (!cancelled) setInvoiceClients([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const billingAccountSuggestions = useMemo(
+    () => buildBillingAccountSuggestions(bookingsHook.bookings, invoiceClients),
+    [bookingsHook.bookings, invoiceClients]
   );
 
   const upcomingSoonCount = useMemo(
@@ -606,6 +629,7 @@ const App: React.FC = () => {
           locationSuggestions={bookingLocationSuggestions}
           placeSuggestions={placeSuggestions}
           customerSuggestions={customerSuggestions}
+          billingAccountSuggestions={billingAccountSuggestions}
           initialDraft={bookingModalInitialDraft}
         />
       )}

@@ -40,6 +40,11 @@ import {
   normaliseCustomerEmail,
   type CustomerProfile,
 } from '../utils/customerSuggestions';
+import {
+  billingAccountOptionLabel,
+  matchBillingAccount,
+  type BillingAccountSuggestion,
+} from '../utils/billingAccounts';
 import QuoteEditor from './QuoteEditor';
 import JourneyStopsEditor from './JourneyStopsEditor';
 import { CompleteJobActions } from './CompleteJobActions';
@@ -67,6 +72,8 @@ interface BookingModalProps {
   locationSuggestions?: string[];
   /** Past customers from bookings — name autocomplete + phone/address fill */
   customerSuggestions?: CustomerProfile[];
+  /** Companies already invoiced or used as billing accounts */
+  billingAccountSuggestions?: BillingAccountSuggestion[];
   /** Company or recent places for address fields (label = Name, postcode) */
   placeSuggestions?: Array<string | { id: string; label: string }>;
   /** Pre-fill a new booking (e.g. return trip); ignored when editing */
@@ -147,6 +154,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   availableVehicles,
   locationSuggestions = [],
   customerSuggestions = [],
+  billingAccountSuggestions = [],
   placeSuggestions = [],
   initialDraft = null
 }) => {
@@ -174,6 +182,20 @@ const BookingModal: React.FC<BookingModalProps> = ({
       email: match.email || prev.email || '',
       hirerEmail: match.email || prev.hirerEmail || '',
       uid: match.uid || prev.uid || '',
+    }));
+  };
+  const applyBillingAccount = (rawName: string) => {
+    const match = matchBillingAccount(rawName, billingAccountSuggestions);
+    if (!match) return;
+    setFormData((prev) => ({
+      ...prev,
+      billingAccountName: match.name,
+      billingAccountId: match.id || prev.billingAccountId || '',
+      hirerName: prev.hirerName || match.name,
+      hirerPhone: prev.hirerPhone || match.phone || '',
+      hirerAddress: prev.hirerAddress || match.address || '',
+      email: prev.email || match.email || '',
+      hirerEmail: prev.hirerEmail || match.email || '',
     }));
   };
   const [formError, setFormError] = useState('');
@@ -1268,12 +1290,28 @@ const BookingModal: React.FC<BookingModalProps> = ({
                     onChange={(e) => setFormData({
                       ...formData,
                       billingAccountName: e.target.value,
+                      billingAccountId: '',
                       hirerName: formData.hirerName || e.target.value,
                     })}
+                    onBlur={(e) => applyBillingAccount(e.target.value)}
+                    list={billingAccountSuggestions.length > 0 ? 'booking-billing-accounts' : undefined}
+                    autoComplete="off"
                     required
                     className="form-input"
-                    placeholder="Company or account name"
+                    placeholder="Type or choose a company we invoice"
                   />
+                  {billingAccountSuggestions.length > 0 ? (
+                    <>
+                      <datalist id="booking-billing-accounts">
+                        {billingAccountSuggestions.map((account) => (
+                          <option key={account.id || account.name} value={billingAccountOptionLabel(account)} />
+                        ))}
+                      </datalist>
+                      <p className="text-xs text-gray-500 mt-1">Choose from saved invoice clients and companies already used on account jobs.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">No saved invoice clients yet. Type a new company name, or add clients under Invoices.</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Passenger name</label>

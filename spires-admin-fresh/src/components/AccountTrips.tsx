@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Booking } from '../types/types';
 import { effectiveWorkflowStatus } from '../utils/bookingWorkflow';
 import { getBookingPickupDate } from '../utils/bookingSchedule';
+import { buildBillingAccountSuggestions, billingAccountOptionLabel } from '../utils/billingAccounts';
+import { loadGeneralInvoiceVault } from '../utils/generalInvoiceStorage';
+import type { SavedInvoiceClient } from '../utils/generalInvoiceTypes';
 
 interface AccountTripsProps {
   bookings: Booking[];
@@ -43,6 +46,26 @@ const AccountTrips: React.FC<AccountTripsProps> = ({ bookings, onUpdateBooking, 
   const [linkAccountName, setLinkAccountName] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [invoiceClients, setInvoiceClients] = useState<SavedInvoiceClient[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGeneralInvoiceVault()
+      .then((vault) => {
+        if (!cancelled) setInvoiceClients(vault.clients || []);
+      })
+      .catch(() => {
+        if (!cancelled) setInvoiceClients([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const billingSuggestions = useMemo(
+    () => buildBillingAccountSuggestions(bookings, invoiceClients),
+    [bookings, invoiceClients]
+  );
 
   const accountBookings = useMemo(() => {
     const seen = new Set<string>();
@@ -221,8 +244,17 @@ const AccountTrips: React.FC<AccountTripsProps> = ({ bookings, onUpdateBooking, 
             className="form-input w-full"
             value={linkAccountName}
             onChange={(e) => setLinkAccountName(e.target.value)}
-            placeholder="Billing account name"
+            list={billingSuggestions.length > 0 ? 'billing-account-link-list' : undefined}
+            autoComplete="off"
+            placeholder="Type or choose a company we invoice"
           />
+          {billingSuggestions.length > 0 ? (
+            <datalist id="billing-account-link-list">
+              {billingSuggestions.map((account) => (
+                <option key={account.id || account.name} value={billingAccountOptionLabel(account)} />
+              ))}
+            </datalist>
+          ) : null}
           <div className="flex gap-2">
             <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveBillingLink()}>
               Save link
