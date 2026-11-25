@@ -130,6 +130,7 @@ export { familyPushPublicKey, saveFamilyPushSubscription, onFamilyJobPush, sched
 export { sendBookingPdfToCustomer } from "./sendBookingPdfToCustomer";
 export { getSchoolInvoiceVault, saveSchoolInvoiceVault } from "./schoolInvoiceVault";
 export { sendGeneralInvoiceEmail } from "./sendGeneralInvoiceEmail";
+export { stampAccountInvoiceBookings } from "./bookings/stampAccountInvoice";
 export {
   saveQuoteDraft,
   issueQuote,

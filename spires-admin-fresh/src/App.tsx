@@ -12,6 +12,7 @@ import { isPendingIncomingRequest } from './utils/bookingMapper';
 import { countUpcomingWithinMs } from './utils/bookingSchedule';
 import { buildCustomerSuggestionsFromBookings } from './utils/customerSuggestions';
 import { buildBillingAccountSuggestions } from './utils/billingAccounts';
+import type { AccountInvoiceDraftHandoff } from './utils/accountBilling';
 import { loadGeneralInvoiceVault } from './utils/generalInvoiceStorage';
 import type { SavedInvoiceClient } from './utils/generalInvoiceTypes';
 import { isAdminEmail } from './utils/staffAccess';
@@ -195,6 +196,7 @@ const App: React.FC = () => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [bookingModalInitialDraft, setBookingModalInitialDraft] = useState<Partial<ExtendedBooking> | null>(null);
+  const [invoiceDraftFromBilling, setInvoiceDraftFromBilling] = useState<AccountInvoiceDraftHandoff | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -531,6 +533,10 @@ const App: React.FC = () => {
             onOpenBooking={(booking) => {
               handleEditBooking(booking);
             }}
+            onCreateInvoiceDraft={(draft) => {
+              setInvoiceDraftFromBilling(draft);
+              setActiveTab('invoices');
+            }}
           />
         );
       case 'company-places':
@@ -562,7 +568,13 @@ const App: React.FC = () => {
           />
         );
       case 'invoices':
-        return <GeneralInvoices bookings={bookingsHook.bookings} />;
+        return (
+          <GeneralInvoices
+            bookings={bookingsHook.bookings}
+            invoiceDraft={invoiceDraftFromBilling}
+            onDraftConsumed={() => setInvoiceDraftFromBilling(null)}
+          />
+        );
       case 'school-invoices':
         return <SchoolInvoices />;
       case 'spires-share':
@@ -630,6 +642,7 @@ const App: React.FC = () => {
           placeSuggestions={placeSuggestions}
           customerSuggestions={customerSuggestions}
           billingAccountSuggestions={billingAccountSuggestions}
+          savedInvoiceClients={invoiceClients}
           initialDraft={bookingModalInitialDraft}
         />
       )}

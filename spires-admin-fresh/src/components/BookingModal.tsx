@@ -40,11 +40,8 @@ import {
   normaliseCustomerEmail,
   type CustomerProfile,
 } from '../utils/customerSuggestions';
-import {
-  billingAccountOptionLabel,
-  matchBillingAccount,
-  type BillingAccountSuggestion,
-} from '../utils/billingAccounts';
+import type { BillingAccountSuggestion } from '../utils/billingAccounts';
+import type { SavedInvoiceClient } from '../utils/generalInvoiceTypes';
 import QuoteEditor from './QuoteEditor';
 import JourneyStopsEditor from './JourneyStopsEditor';
 import { CompleteJobActions } from './CompleteJobActions';
@@ -72,8 +69,10 @@ interface BookingModalProps {
   locationSuggestions?: string[];
   /** Past customers from bookings — name autocomplete + phone/address fill */
   customerSuggestions?: CustomerProfile[];
-  /** Companies already invoiced or used as billing accounts */
+  /** Companies already invoiced or used as billing accounts (legacy names for display only) */
   billingAccountSuggestions?: BillingAccountSuggestion[];
+  /** Saved invoice clients — explicit bill to picker for account jobs */
+  savedInvoiceClients?: SavedInvoiceClient[];
   /** Company or recent places for address fields (label = Name, postcode) */
   placeSuggestions?: Array<string | { id: string; label: string }>;
   /** Pre-fill a new booking (e.g. return trip); ignored when editing */
@@ -155,6 +154,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
   locationSuggestions = [],
   customerSuggestions = [],
   billingAccountSuggestions = [],
+  savedInvoiceClients = [],
   placeSuggestions = [],
   initialDraft = null
 }) => {
@@ -184,20 +184,26 @@ const BookingModal: React.FC<BookingModalProps> = ({
       uid: match.uid || prev.uid || '',
     }));
   };
-  const applyBillingAccount = (rawName: string) => {
-    const match = matchBillingAccount(rawName, billingAccountSuggestions);
-    if (!match) return;
+  const applySavedInvoiceClient = (clientId: string) => {
+    const client = savedInvoiceClients.find((row) => row.id === clientId);
+    if (!client) {
+      setFormData((prev) => ({
+        ...prev,
+        billingAccountId: '',
+      }));
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
-      billingAccountName: match.name,
-      billingAccountId: match.id || prev.billingAccountId || '',
-      hirerName: prev.hirerName || match.name,
-      hirerPhone: prev.hirerPhone || match.phone || '',
-      hirerAddress: prev.hirerAddress || match.address || '',
-      email: prev.email || match.email || '',
-      hirerEmail: prev.hirerEmail || match.email || '',
+      billingAccountId: client.id,
+      billingAccountName: client.name,
+      hirerPhone: prev.hirerPhone || client.phone || '',
+      hirerAddress: prev.hirerAddress || client.address || '',
+      email: prev.email || client.email || '',
+      hirerEmail: prev.hirerEmail || client.email || '',
     }));
   };
+
   const [formError, setFormError] = useState('');
   const [undoBusy, setUndoBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -267,6 +273,12 @@ const BookingModal: React.FC<BookingModalProps> = ({
     amount: '',
     description: ''
   });
+
+  const linkedInvoiceClient =
+    savedInvoiceClients.find((row) => row.id === String(formData.billingAccountId || '').trim()) || null;
+  const legacyBillingName = String(formData.billingAccountName || '').trim();
+  const unmatchedLegacyName =
+    legacyBillingName && !linkedInvoiceClient ? legacyBillingName : '';
 
   // ✅ Pre-fill form for editing or default new booking
   useEffect(() => {
@@ -601,6 +613,10 @@ const BookingModal: React.FC<BookingModalProps> = ({
       || (createMode === 'enquiry' || createMode === 'agreed' || createMode === 'account' ? createMode : undefined)
       || (formData.paymentMethod === 'account' ? 'account' : undefined);
     const isAccountJob = effectiveJobKind === 'account' || formData.paymentMethod === 'account';
+    if (isAccountJob && !String(formData.billingAccountId || '').trim()) {
+      failValidation('Choose a saved invoice client for this account job.', 'booking-section-customer');
+      return;
+    }
 
     const bookingData: any = {
       ...formData,
@@ -1283,35 +1299,45 @@ const BookingModal: React.FC<BookingModalProps> = ({
             {isAccountMode ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Billing account name *</label>
-                  <input
-                    type="text"
-                    value={formData.billingAccountName || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      billingAccountName: e.target.value,
-                      billingAccountId: '',
-                      hirerName: formData.hirerName || e.target.value,
-                    })}
-                    onBlur={(e) => applyBillingAccount(e.target.value)}
-                    list={billingAccountSuggestions.length > 0 ? 'booking-billing-accounts' : undefined}
-                    autoComplete="off"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Bill to invoice client *</label>
+                  <select
+                    value={formData.billingAccountId || ''}
+                    onChange={(e) => applySavedInvoiceClient(e.target.value)}
                     required
                     className="form-input"
-                    placeholder="Type or choose a company we invoice"
-                  />
-                  {billingAccountSuggestions.length > 0 ? (
-                    <>
-                      <datalist id="booking-billing-accounts">
-                        {billingAccountSuggestions.map((account) => (
-                          <option key={account.id || account.name} value={billingAccountOptionLabel(account)} />
-                        ))}
-                      </datalist>
-                      <p className="text-xs text-gray-500 mt-1">Choose from saved invoice clients and companies already used on account jobs.</p>
-                    </>
+                  >
+                    <option value="">Choose saved invoice client</option>
+                    {savedInvoiceClients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                        {client.invoicePrefix ? ` · ${client.invoicePrefix}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {unmatchedLegacyName ? (
+                    <p className="text-xs text-amber-800 mt-1">
+                      Legacy account name on this booking: {unmatchedLegacyName}. Choose the matching saved client explicitly. Names are never merged automatically.
+                    </p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">No saved invoice clients yet. Type a new company name, or add clients under Invoices.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Saved clients come from Invoices. Passenger stays separate from the bill to customer.
+                    </p>
                   )}
+                  {editingBooking && (formData.invoiceStatus === 'invoiced' || formData.invoiceStatus === 'partial' || formData.invoiceReference) ? (
+                    <p className="text-xs text-gray-700 mt-1">
+                      Invoice state: {formData.invoiceStatus || 'unbilled'}
+                      {formData.invoiceReference ? ` · ${formData.invoiceReference}` : ''}
+                      . Payment status stays separate ({formData.paymentStatus || 'pending'}).
+                    </p>
+                  ) : null}
+                  {savedInvoiceClients.length === 0 ? (
+                    <p className="text-xs text-amber-800 mt-1">No saved invoice clients yet. Add EDUGUARD, DCRB or others under Invoices first.</p>
+                  ) : null}
+                  {billingAccountSuggestions.some((row) => row.source === 'booking') ? (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Older account names still appear on past jobs until you link each one to a saved client from Billing.
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Passenger name</label>

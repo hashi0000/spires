@@ -102,6 +102,10 @@ export type GeneratedGeneralInvoice = {
   customer: GeneralInvoiceCustomer;
   clientId?: string;
   bookingNumber: string;
+  /** Booking document ids included when this invoice was built from Billing. */
+  bookingIds?: string[];
+  /** Billable unit keys (booking id or bookingId:leg) claimed by this invoice. */
+  billingLineKeys?: string[];
   travelDate: string;
   pickup: string;
   destination: string;

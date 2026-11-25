@@ -179,8 +179,13 @@ export interface Booking {
   billingAccountName?: string;
   /** Traveller name when different from the hirer or billing account. */
   passengerName?: string;
-  invoiceStatus?: 'unbilled' | 'invoiced';
+  invoiceStatus?: 'unbilled' | 'invoiced' | 'partial';
   invoiceReference?: string;
+  /** Vault invoice document id when issued through Invoices. */
+  invoiceId?: string;
+  /** Billable unit keys already linked to an issued invoice (booking id or bookingId:leg). */
+  invoicedBillingKeys?: string[];
+  invoiceLinks?: Array<{ key: string; invoiceId: string; invoiceNumber: string }>;
   /** Outbound leg is an airport drop off (not a collection). */
   airportDropOff?: boolean;
 }
@@ -232,8 +237,11 @@ export interface ExtendedBooking extends Omit<Booking, 'actualFare' | 'depositAm
   billingAccountId?: string;
   billingAccountName?: string;
   passengerName?: string;
-  invoiceStatus?: 'unbilled' | 'invoiced';
+  invoiceStatus?: 'unbilled' | 'invoiced' | 'partial';
   invoiceReference?: string;
+  invoiceId?: string;
+  invoicedBillingKeys?: string[];
+  invoiceLinks?: Array<{ key: string; invoiceId: string; invoiceNumber: string }>;
   customerStatus?: 'pending' | 'awaiting_customer_confirmation' | 'confirmed' | 'allocated' | 'completed' | 'paid' | 'cancelled';
   returnTrip?: boolean;
   returnDateTime?: string;

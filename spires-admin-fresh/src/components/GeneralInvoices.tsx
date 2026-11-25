@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BadgeCheck, Download, Edit3, Mail, Plus, Trash2 } from "lucide-react";
 import {
   DEFAULT_GENERAL_SUPPLIER,
@@ -39,6 +39,9 @@ import {
 } from "../utils/generalInvoiceStorage";
 import { downloadGeneralInvoicePdf } from "../utils/generalInvoicePdf";
 import { askInvoiceRecipient, emailGeneralInvoicePdf, SPIRES_OFFICE_EMAIL } from "../utils/generalInvoiceEmail";
+import type { AccountInvoiceDraftHandoff } from "../utils/accountBilling";
+import { filterUnitsNotAlreadyInvoiced, invoicedKeysFromHistory } from "../utils/accountBilling";
+import { linksFromDraft, stampAccountInvoiceBookings } from "../utils/stampAccountInvoice";
 
 function emptyLine(): GeneralInvoiceLine {
   return {
@@ -84,7 +87,11 @@ function pdfInputFromRecord(
   };
 }
 
-const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) => {
+const GeneralInvoices: React.FC<{
+  bookings?: Booking[];
+  invoiceDraft?: AccountInvoiceDraftHandoff | null;
+  onDraftConsumed?: () => void;
+}> = ({ bookings = [], invoiceDraft = null, onDraftConsumed }) => {
   const [vault, setVault] = useState<GeneralInvoiceVault | null>(null);
   const [supplier, setSupplier] = useState<InvoiceSupplierDetails>(DEFAULT_GENERAL_SUPPLIER);
   const [clients, setClients] = useState<SavedInvoiceClient[]>([]);
@@ -109,6 +116,10 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
   const [busy, setBusy] = useState<"save" | "download" | "email" | "delete" | "paid" | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [billingLineKeys, setBillingLineKeys] = useState<string[]>([]);
+  const [billingBookingIds, setBillingBookingIds] = useState<string[]>([]);
+  const [billingRevisions, setBillingRevisions] = useState<Record<string, number>>({});
+  const appliedDraftRef = useRef<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +143,73 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!invoiceDraft || loading) return;
+    const draftKey = `${invoiceDraft.clientId}:${invoiceDraft.billingLineKeys.join(",")}:${invoiceDraft.bookingNumber}`;
+    if (appliedDraftRef.current === draftKey) return;
+    appliedDraftRef.current = draftKey;
+    const claimed = invoicedKeysFromHistory(history);
+    const blocked = filterUnitsNotAlreadyInvoiced(
+      invoiceDraft.billingLineKeys.map((key) => ({
+        key,
+        bookingId: key.includes(":") ? key.split(":")[0] : key,
+        bookingNumber: "",
+        clientId: invoiceDraft.clientId,
+        clientName: invoiceDraft.clientName,
+        passengerName: "",
+        serviceDate: "",
+        route: "",
+        farePounds: 1,
+        receivedPounds: 0,
+        creditNote: "",
+        legLabel: "Journey" as const,
+        bookingRevision: 0,
+      })),
+      claimed
+    ).blocked;
+    if (blocked.length) {
+      setError(
+        `Some selected trips are already on an issued invoice (${blocked
+          .map((row) => row.key)
+          .join(", ")}). Clear the draft and choose different trips.`
+      );
+      onDraftConsumed?.();
+      return;
+    }
+    setEditingId(null);
+    setSelectedClientId(invoiceDraft.clientId);
+    setCustomer({
+      name: invoiceDraft.clientName,
+      address: invoiceDraft.clientAddress,
+      email: invoiceDraft.clientEmail,
+      phone: invoiceDraft.clientPhone,
+    });
+    setInvoiceDate(todayIsoDate());
+    setPaymentTerms("30_days");
+    setPaymentMethod("bank_transfer");
+    setDueDate(dueDateFor(todayIsoDate(), "30_days"));
+    setBookingNumber(invoiceDraft.bookingNumber);
+    setTravelDate(invoiceDraft.travelDate);
+    setPickup(invoiceDraft.pickup);
+    setDestination(invoiceDraft.destination);
+    setLines(invoiceDraft.lines.length ? invoiceDraft.lines.map((line) => ({ ...line })) : [emptyLine()]);
+    setNotes(invoiceDraft.notes || "");
+    setPaid(false);
+    setBillingLineKeys(invoiceDraft.billingLineKeys);
+    setBillingBookingIds(invoiceDraft.bookingIds);
+    setBillingRevisions(invoiceDraft.bookingRevisions);
+    setError("");
+    setStatus(
+      `Draft from Billing for ${invoiceDraft.clientName}: ${invoiceDraft.billingLineKeys.length} trip line${
+        invoiceDraft.billingLineKeys.length === 1 ? "" : "s"
+      }. Download or email to issue. Closing without issuing leaves the jobs unbilled.`
+    );
+    onDraftConsumed?.();
+    window.requestAnimationFrame(() => {
+      document.getElementById("general-invoice-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [invoiceDraft, loading, history, onDraftConsumed]);
 
   const persist = async (next: GeneralInvoiceVault) => {
     const withClients = { ...next, clients: next.clients ?? clients };
@@ -292,6 +370,21 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
     setLines([emptyLine()]);
     setNotes("");
     setPaid(false);
+    setBillingLineKeys([]);
+    setBillingBookingIds([]);
+    setBillingRevisions({});
+  };
+
+  const stampLinkedBookings = async (issued: GeneratedGeneralInvoice) => {
+    if (!billingLineKeys.length) return;
+    await stampAccountInvoiceBookings({
+      invoiceId: issued.id,
+      invoiceNumber: issued.invoiceNumber,
+      links: linksFromDraft(billingLineKeys, billingRevisions),
+    });
+    setBillingLineKeys([]);
+    setBillingBookingIds([]);
+    setBillingRevisions({});
   };
 
   const startEdit = (row: GeneratedGeneralInvoice) => {
@@ -355,6 +448,8 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
       },
       clientId: selectedClientId || undefined,
       bookingNumber: bookingNumber.trim(),
+      bookingIds: existing?.bookingIds || (billingBookingIds.length ? billingBookingIds : undefined),
+      billingLineKeys: existing?.billingLineKeys || (billingLineKeys.length ? billingLineKeys : undefined),
       travelDate,
       pickup: pickup.trim(),
       destination: destination.trim(),
@@ -431,16 +526,29 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
         record.numberPrefix = activePrefix;
         record.numberPeriod = invoiceDate.slice(0, 7);
       }
+      if (!editingInvoice && billingLineKeys.length) {
+        const claimed = invoicedKeysFromHistory(history);
+        const clash = billingLineKeys.filter((key) => claimed.has(key) || claimed.has(key.split(":")[0]));
+        if (clash.length) {
+          throw new Error(`These trips are already on an issued invoice: ${clash.join(", ")}.`);
+        }
+      }
       const stored = await persistInvoiceRecord(record, vault);
       const issued = stored.invoices.find((row) => row.id === record.id) || record;
       if (!editingInvoice && (issued.invoiceNumber === "PENDING" || issued.needsServerNumber)) {
         throw new Error("The server did not issue an invoice number. The PDF was not downloaded.");
       }
+      const linkedFromBilling = !editingInvoice && billingLineKeys.length > 0;
+      if (linkedFromBilling) {
+        await stampLinkedBookings(issued);
+      }
       await downloadGeneralInvoicePdf(pdfInputFromRecord(issued, supplier));
       setStatus(
         editingInvoice
           ? `Updated PDF ${issued.invoiceNumber} downloaded.`
-          : `PDF ${issued.invoiceNumber} downloaded.`
+          : linkedFromBilling
+            ? `PDF ${issued.invoiceNumber} downloaded. Linked trips marked invoiced. Payment status was not changed.`
+            : `PDF ${issued.invoiceNumber} downloaded.`
       );
     } catch (err) {
       if (draftId && !editing) {
@@ -504,17 +612,32 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
         record.numberPeriod = invoiceDate.slice(0, 7);
       }
       record.customer = { ...record.customer, email: to };
+      if (!editingInvoice && billingLineKeys.length) {
+        const claimed = invoicedKeysFromHistory(history);
+        const clash = billingLineKeys.filter((key) => claimed.has(key) || claimed.has(key.split(":")[0]));
+        if (clash.length) {
+          throw new Error(`These trips are already on an issued invoice: ${clash.join(", ")}.`);
+        }
+      }
       const stored = await persistInvoiceRecord(record, vault);
       const issued = stored.invoices.find((row) => row.id === record.id) || record;
       if (!editingInvoice && (issued.invoiceNumber === "PENDING" || issued.needsServerNumber)) {
         throw new Error("The server did not issue an invoice number. The email was not sent.");
       }
+      const linkedFromBilling = !editingInvoice && billingLineKeys.length > 0;
+      if (linkedFromBilling) {
+        await stampLinkedBookings(issued);
+      }
       const sent = await emailGeneralInvoicePdf(issued, supplier, to);
       await markEmailed(stored.invoices, issued.invoiceNumber, sent.to, stored);
       setStatus(
         sent.cc
-          ? `Invoice ${issued.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.`
-          : `Invoice ${issued.invoiceNumber} emailed to ${sent.to}.`
+          ? `Invoice ${issued.invoiceNumber} emailed to ${sent.to}, copy to ${sent.cc}.${
+              linkedFromBilling ? " Linked trips marked invoiced. Payment status was not changed." : ""
+            }`
+          : linkedFromBilling
+            ? `Invoice ${issued.invoiceNumber} emailed to ${sent.to}. Linked trips marked invoiced. Payment status was not changed.`
+            : `Invoice ${issued.invoiceNumber} emailed to ${sent.to}.`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not email the invoice.";
@@ -810,8 +933,28 @@ const GeneralInvoices: React.FC<{ bookings?: Booking[] }> = ({ bookings = [] }) 
             <button type="button" className="btn btn-sm" onClick={cancelEdit} disabled={Boolean(busy)}>
               Cancel edit
             </button>
+          ) : billingLineKeys.length ? (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => {
+                resetCreateForm();
+                setStatus("Draft cleared. Linked trips were not marked invoiced.");
+                setError("");
+              }}
+              disabled={Boolean(busy)}
+            >
+              Abandon draft
+            </button>
           ) : null}
         </div>
+        {billingLineKeys.length && !editingInvoice ? (
+          <p className="text-sm text-indigo-900 bg-indigo-50 border border-indigo-200 rounded p-3 mb-3">
+            Draft from Billing with {billingLineKeys.length} trip line{billingLineKeys.length === 1 ? "" : "s"}.
+            Download or email to issue and link those trips. Abandon draft or leave without issuing to keep the jobs unbilled.
+            Payment status is not changed when you issue.
+          </p>
+        ) : null}
         {editingInvoice ? (
           <p className="text-sm text-gray-600" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
             Changes keep invoice number {editingInvoice.invoiceNumber}. Save, download, or email to update the stored invoice.
