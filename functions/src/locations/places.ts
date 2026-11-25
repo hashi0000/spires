@@ -45,6 +45,17 @@ export const CURATED_PLACES: CuratedPlace[] = [
   { id: "old-parsonage-hotel", label: "Old Parsonage Hotel, Banbury Road, Oxford", postcode: "OX2 6NN", kind: "place", group: "Oxford" },
   { id: "gloucester-green", label: "Gloucester Green Coach Station, Oxford", postcode: "OX1 2BU", kind: "place", group: "Oxford" },
   { id: "westgate-oxford", label: "Westgate Oxford", postcode: "OX1 1TR", kind: "place", group: "Oxford" },
+  { id: "burford", label: "Burford", postcode: "OX18 4QF", kind: "place", group: "Cotswolds" },
+  { id: "bibury", label: "Bibury", postcode: "GL7 5NR", kind: "place", group: "Cotswolds" },
+  { id: "bourton-on-the-water", label: "Bourton on the Water", postcode: "GL54 2AP", kind: "place", group: "Cotswolds" },
+  { id: "upper-slaughter", label: "Upper Slaughter", postcode: "GL54 2JF", kind: "place", group: "Cotswolds" },
+  { id: "lower-slaughter", label: "Lower Slaughter", postcode: "GL54 2HS", kind: "place", group: "Cotswolds" },
+  { id: "stow-on-the-wold", label: "Stow on the Wold", postcode: "GL54 1AF", kind: "place", group: "Cotswolds" },
+  { id: "broadway", label: "Broadway", postcode: "WR12 7AA", kind: "place", group: "Cotswolds" },
+  { id: "chipping-norton", label: "Chipping Norton", postcode: "OX7 5DD", kind: "place", group: "Cotswolds" },
+  { id: "moreton-in-marsh", label: "Moreton in Marsh", postcode: "GL56 0AF", kind: "place", group: "Cotswolds" },
+  { id: "cirencester", label: "Cirencester", postcode: "GL7 2AE", kind: "place", group: "Cotswolds" },
+  { id: "tetbury", label: "Tetbury", postcode: "GL8 8AA", kind: "place", group: "Cotswolds" },
   { id: "twickenham", label: "Allianz Stadium, Twickenham", postcode: "TW2 7BA", kind: "place", group: "Venues" },
   { id: "silverstone", label: "Silverstone Circuit", postcode: "NN12 8TN", kind: "place", group: "Venues" },
 ];
@@ -56,6 +67,12 @@ const PLACE_ALIASES: Record<string, string[]> = {
   "old-parsonage-hotel": ["old parsonage", "parsonage"],
   "gloucester-green": ["gloucester green", "oxford coach station"],
   "westgate-oxford": ["westgate", "westgate oxford"],
+  "bourton-on-the-water": ["bourton", "bourton on the water", "bourton-on-the-water"],
+  "stow-on-the-wold": ["stow", "stow on the wold", "stow-on-the-wold"],
+  "moreton-in-marsh": ["moreton", "moreton in marsh", "moreton-in-marsh"],
+  "chipping-norton": ["chipping norton", "chippy"],
+  "upper-slaughter": ["upper slaughter"],
+  "lower-slaughter": ["lower slaughter"],
 };
 
 const POPULAR_IDS = [

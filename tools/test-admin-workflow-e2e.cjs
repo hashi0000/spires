@@ -43,6 +43,17 @@ const SEEDED = [
   { id: "oxford-railway-station", label: "Oxford Railway Station", address: "Oxford Railway Station, Park End Street, Oxford", postcode: "OX1 1HS", aliases: ["Oxford station", "Oxford train station", "Oxford Station"], meetingInstructions: "Station forecourt / taxi rank unless the note says otherwise", latitude: 51.753427, longitude: -1.270079 },
   { id: "gloucester-green-coach", label: "Gloucester Green Coach Station", address: "Gloucester Green Coach Station, Oxford", postcode: "OX1 2BU", aliases: ["Gloucester Green", "Oxford coach station", "Gloucester Green bus"], meetingInstructions: "Coach station forecourt", latitude: 51.75408, longitude: -1.26223 },
   { id: "westgate-oxford", label: "Westgate Oxford", address: "Westgate Oxford, Bonn Square, Oxford", postcode: "OX1 1TR", aliases: ["Westgate", "Westgate shopping centre"], meetingInstructions: "Bonn Square entrance unless the note says otherwise", latitude: 51.747771, longitude: -1.259958 },
+  { id: "burford", label: "Burford", address: "Burford, Oxfordshire", postcode: "OX18 4QF", aliases: ["Burford High Street", "Burford Cotswolds"], meetingInstructions: "", latitude: 51.808225, longitude: -1.636826 },
+  { id: "bibury", label: "Bibury", address: "Bibury, Gloucestershire", postcode: "GL7 5NR", aliases: ["Bibury Cotswolds", "Arlington Row"], meetingInstructions: "", latitude: 51.757342, longitude: -1.831173 },
+  { id: "bourton-on-the-water", label: "Bourton on the Water", address: "Bourton on the Water, Gloucestershire", postcode: "GL54 2AP", aliases: ["Bourton", "Bourton-on-the-Water"], meetingInstructions: "", latitude: 51.885422, longitude: -1.759095 },
+  { id: "upper-slaughter", label: "Upper Slaughter", address: "Upper Slaughter, Gloucestershire", postcode: "GL54 2JF", aliases: ["Upper Slaughter Cotswolds"], meetingInstructions: "", latitude: 51.907222, longitude: -1.775361 },
+  { id: "lower-slaughter", label: "Lower Slaughter", address: "Lower Slaughter, Gloucestershire", postcode: "GL54 2HS", aliases: ["Lower Slaughter Cotswolds"], meetingInstructions: "", latitude: 51.901272, longitude: -1.762862 },
+  { id: "stow-on-the-wold", label: "Stow on the Wold", address: "Stow on the Wold, Gloucestershire", postcode: "GL54 1AF", aliases: ["Stow", "Stow-on-the-Wold"], meetingInstructions: "", latitude: 51.930423, longitude: -1.722452 },
+  { id: "broadway", label: "Broadway", address: "Broadway, Worcestershire", postcode: "WR12 7AA", aliases: ["Broadway Cotswolds"], meetingInstructions: "", latitude: 52.035692, longitude: -1.862783 },
+  { id: "chipping-norton", label: "Chipping Norton", address: "Chipping Norton, Oxfordshire", postcode: "OX7 5DD", aliases: ["Chippy"], meetingInstructions: "", latitude: 51.940688, longitude: -1.545275 },
+  { id: "moreton-in-marsh", label: "Moreton in Marsh", address: "Moreton in Marsh, Gloucestershire", postcode: "GL56 0AF", aliases: ["Moreton", "Moreton-in-Marsh"], meetingInstructions: "", latitude: 51.990904, longitude: -1.703422 },
+  { id: "cirencester", label: "Cirencester", address: "Cirencester, Gloucestershire", postcode: "GL7 2AE", aliases: ["Ciren"], meetingInstructions: "", latitude: 51.717547, longitude: -1.968779 },
+  { id: "tetbury", label: "Tetbury", address: "Tetbury, Gloucestershire", postcode: "GL8 8AA", aliases: ["Tetbury Cotswolds"], meetingInstructions: "", latitude: 51.638046, longitude: -2.160774 },
 ];
 
 function matchCompanyPlaces(query, placesList) {
@@ -54,13 +65,20 @@ function matchCompanyPlaces(query, placesList) {
   }).slice(0, 8);
 }
 
-async function seedCompanyPlacesIfEmpty() {
+async function seedMissingCompanyPlaces() {
   const snap = await db.collection("companyPlaces").get();
-  if (!snap.empty) return 0;
+  const existing = new Set(snap.docs.map((doc) => doc.id));
+  let added = 0;
   for (const place of SEEDED) {
+    if (existing.has(place.id)) continue;
     await db.collection("companyPlaces").doc(place.id).set({ ...place, seeded: true });
+    added += 1;
   }
-  return SEEDED.length;
+  return added;
+}
+
+async function seedCompanyPlacesIfEmpty() {
+  return seedMissingCompanyPlaces();
 }
 
 async function emailJobsFor(bookingId) {
@@ -151,9 +169,11 @@ async function check(label, fn) {
     await clearCompanyPlaces();
     const first = await seedCompanyPlacesIfEmpty();
     const second = await seedCompanyPlacesIfEmpty();
-    assert.equal(first, 5);
+    assert.equal(first, SEEDED.length);
     assert.equal(second, 0);
-    assert.equal((await db.collection("companyPlaces").get()).size, 5);
+    assert.equal((await db.collection("companyPlaces").get()).size, SEEDED.length);
+    assert.ok(matchCompanyPlaces("Bourton", SEEDED).some((row) => row.id === "bourton-on-the-water"));
+    assert.ok(matchCompanyPlaces("Bibury", SEEDED).some((row) => row.postcode === "GL7 5NR"));
 
     const curated = places.curatedMatches("Randolph");
     assert.ok(curated.some((row) => /randolph/i.test(row.label)));

@@ -4,8 +4,8 @@ import {
   companyPlaceSuggestionLabel,
   loadCompanyPlaces,
   saveCompanyPlace,
-  seedCompanyPlacesIfEmpty,
-  SEEDED_OXFORD_PLACES,
+  seedMissingCompanyPlaces,
+  ALL_SEEDED_COMPANY_PLACES,
 } from '../utils/companyPlaces';
 
 function emptyPlace(): CompanyPlace {
@@ -47,7 +47,7 @@ const CompanyPlacesSettings: React.FC = () => {
       setPlaces(loaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load company places.');
-      setPlaces(SEEDED_OXFORD_PLACES);
+      setPlaces(ALL_SEEDED_COMPANY_PLACES);
     } finally {
       setLoading(false);
     }
@@ -74,9 +74,9 @@ const CompanyPlacesSettings: React.FC = () => {
     setMessage('');
     setError('');
     try {
-      const added = await seedCompanyPlacesIfEmpty();
+      const added = await seedMissingCompanyPlaces();
       await refresh();
-      setMessage(added > 0 ? `Seeded ${added} Oxford places.` : 'Company places already exist. Nothing was added.');
+      setMessage(added > 0 ? `Added ${added} missing company places (Oxford and Cotswolds).` : 'All seeded places are already saved. Nothing was added.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not seed company places.');
     } finally {
@@ -129,7 +129,7 @@ const CompanyPlacesSettings: React.FC = () => {
         </div>
         <div className="places-board__actions">
           <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void onSeed()}>
-            Seed Oxford places if empty
+            Add missing seeded places
           </button>
           <button type="button" className="btn btn-primary btn-sm" onClick={startNew}>
             Add place
@@ -206,7 +206,7 @@ const CompanyPlacesSettings: React.FC = () => {
         {loading ? (
           <p className="places-list__empty">Loading places…</p>
         ) : places.length === 0 ? (
-          <p className="places-list__empty">No company places yet. Seed Oxford places or add one.</p>
+          <p className="places-list__empty">No company places yet. Add missing seeded places or create one.</p>
         ) : (
           <ul className="places-rows">
             {places.map((place) => (
